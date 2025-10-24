@@ -1,0 +1,75 @@
+services:
+  nginx:
+    image: nginx:1.21.1
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./backend:/var/www/backend  # 💡 修正: マウント先を /var/www/backend に変更
+    depends_on:
+      - php
+    networks:
+      simulation1_network: # ネットワークをオブジェクト形式に変更
+        ipv4_address: 172.22.0.2 # ★ 固定IPを割り当て
+
+  php:
+    build: ./docker/php
+    volumes:
+      - ./backend:/var/www/backend  # 💡 修正: マウント先を /var/www/backend に変更
+      - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
+    depends_on:
+      - mysql
+    networks:
+      simulation1_network: # ネットワークをオブジェクト形式に変更
+        ipv4_address: 172.22.0.3 # ★ 固定IPを割り当て
+
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: laravel_db
+      MYSQL_USER: laravel_user
+      MYSQL_PASSWORD: laravel_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      simulation1_network: # ネットワークをオブジェクト形式に変更
+        ipv4_address: 172.22.0.4 # ★ 固定IPを割り当て (最も重要)
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    platform: linux/amd64
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=172.22.0.4 # ★ PMA_HOSTを固定IPに変更
+      - PMA_USER=laravel_user
+      - PMA_PASSWORD=laravel_pass
+    depends_on:
+      - mysql
+    ports:
+      - 8080:80
+    networks:
+      simulation1_network: # ネットワークをオブジェクト形式に変更
+        ipv4_address: 172.22.0.5 # ★ 固定IPを割り当て
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    platform: linux/amd64
+    restart: always
+    ports:
+      - "8025:8025" # MailHog Web UI
+      - "1025:1025" # SMTPサーバー
+    networks:
+      simulation1_network: # ネットワークをオブジェクト形式に変更
+        ipv4_address: 172.22.0.6 # ★ 固定IPを割り当て
+
+# ★ ネットワーク定義にIPアドレスのレンジ(サブネット)を追記
+networks:
+  simulation1_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+
+volumes:
+  mysql_data: ~
