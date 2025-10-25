@@ -1,13 +1,20 @@
 services:
   nginx:
-    image: nginx:1.21.1
+    # image: nginx:1.21.1  <-- 汎用イメージからビルドに変更
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile # ★ Nginx専用のDockerfileを使用
     ports:
       - "80:80"
     volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./backend:/var/www/backend  # 💡 修正: マウント先を /var/www/backend に変更
+      # Nginxがビルド成果物を内部でコピーするため、ソースコードのマウントは不要（削除）
+      # - ./frontend:/var/www/frontend # <-- この行を削除
+      - ./backend:/var/www/backend  # Laravelのソースコードは引き続きマウント
+      # Nginx設定ファイルはDocker build時にコピーされるため、ボリュームマウントは不要（削除）
+      # - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf # <-- この行を削除
     depends_on:
       - php
+      # - frontend_builder # ★ ビルドサービスを削除したため、依存関係も削除
     networks:
       simulation1_network: # ネットワークをオブジェクト形式に変更
         ipv4_address: 172.22.0.2 # ★ 固定IPを割り当て
@@ -15,8 +22,15 @@ services:
   php:
     build: ./docker/php
     volumes:
-      - ./backend:/var/www/backend  # 💡 修正: マウント先を /var/www/backend に変更
+      - ./backend:/var/www/backend  # Laravel
       - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
+      # 🚨 【削除/コメントアウト】 Nuxtのソースコード全体のマウントはビルド完了で不要
+      # - ./frontend:/var/www/frontend
+      # 【維持】 Nuxtの静的アセット部分のみをマウント
+      - ./frontend/.output/public:/var/www/frontend/public:ro
+      # ★ 【追加】 Nuxtのサーバーサイドレンダリング(SSR)コードをLaravel/PHP側から実行するためにマウント
+      # Laravelのフロントコントローラー（public/index.phpなど）がこのパスを参照します
+      - ./frontend/.output/server:/var/www/frontend/server:ro
     depends_on:
       - mysql
     networks:
@@ -62,6 +76,33 @@ services:
     networks:
       simulation1_network: # ネットワークをオブジェクト形式に変更
         ipv4_address: 172.22.0.6 # ★ 固定IPを割り当て
+
+  # frontend_builderサービスは、NginxのDockerfileに統合されたため削除します。
+  # frontend_builder: 
+  #   image: nuxt_build_artifacts:latest
+  #   build:
+  #     context: .
+  #     dockerfile: ./docker/nuxt/Dockerfile
+  #     target: builder
+  #   networks:
+  #     simulation1_network:
+  #       ipv4_address: 172.22.0.77
+
+  frontend_dev: # ★ Nuxt 4 開発サーバー用サービス
+    build:
+      context: .
+      dockerfile: ./docker/nuxt/Dockerfile
+    volumes:
+      - ./frontend:/app # Nuxtプロジェクトのソースコードをマウント
+      - /app/node_modules # ★ 匿名ボリュームを追加して、ホスト側の node_modules の上書きをブロック
+    ports:
+      - "3000:3000"
+    working_dir: /app
+    # ★ 修正箇所：npm run dev の後に、ホストオプション '-- --host 0.0.0.0' を追加
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      simulation1_network:
+        ipv4_address: 172.22.0.7
 
 # ★ ネットワーク定義にIPアドレスのレンジ(サブネット)を追記
 networks:
