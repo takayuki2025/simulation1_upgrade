@@ -20,83 +20,198 @@ use Illuminate\Http\Request;
 |
 */
 
+// =========================================================================
+// 1. Nuxt SPAのフォールバックルート (APIパスを完全に除外)
+// =========================================================================
+// 全てのGETリクエストはNuxtに任せるため、このビューを返す。
+Route::get('{any}', function () {
+    return view('welcome'); 
+})
+    // ★★★ 決定的な修正：/api/ で始まるパスは Web ルートで処理しない ★★★
+    // これにより、POST /api/* のリクエストが Web ルートの処理に流れ込むのを防ぎます
+    ->where('any', '^(?!api\/).*$')
+    ->name('nuxt.fallback');
 
 
-// フロントページを表示し、持続検索機能とタブの切り替えを処理をするルーティング。
-Route::get('/', [ItemController::class, 'index'])->name('front_page');
+Route::get('/login', function () {
+    // APIサーバーとして動作するため、ログイン画面ではなく JSON 401 を返す
+    return response()->json([
+        'message' => 'Unauthenticated.'
+    ], 401);
+})->name('login'); 
 
-// 認証後のいろいろな処理を扱うルーティング
-Route::get('/onetime', [ItemController::class, 'handleOnetimeRedirect'])->name('onetime.show');
+// // フロントページを表示し、持続検索機能とタブの切り替えを処理をするルーティング。
+// Route::get('/', [ItemController::class, 'index'])->name('front_page');
 
+// // 認証後のいろいろな処理を扱うルーティング
+// Route::get('/onetime', [ItemController::class, 'handleOnetimeRedirect'])->name('onetime.show');
+
+
+// // =========================================================================
+// // ★★★ カスタム認証ルート定義（Fortifyの機能を使わずに構築） ★★★
+// // =========================================================================
+
+// // メール認証関連のルート (AuthControllerを使用)
+// // メール認証通知ページを表示するルート
+// Route::get('/email/verify', [AuthController::class, 'notice']) // 修正
+//     ->middleware('auth')
+//     ->name('verification.notice');
+
+// // メール認証リクエストを処理するルート
+// Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify']) // 修正
+//     ->middleware(['auth', 'signed'])
+//     ->name('verification.verify');
+
+// // メール認証通知を再送信するルート
+// Route::post('/email/verification-notification', [AuthController::class, 'resend']) // 修正
+//     ->middleware(['auth', 'throttle:6,1'])
+//     ->name('verification.send');
+
+// // Fortifyが提供するデフォルトのログアウト処理
+// Route::post('/logout', function (Request $request) {
+//     Auth::logout();
+//     $request->session()->invalidate();
+//     $request->session()->regenerateToken();
+//     return redirect('/');
+// })->name('logout');
+
+// // 主に基本設計書の順に並んでいます。
+// Route::get('/item/{item_id}', [ItemController::class, 'item_detail_show'])->name('item_detail');
+
+// Route::get('/purchase/{item_id}', [ItemController::class, 'item_buy_show'])->middleware(['auth'])->name('item_buy');
+
+// Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update'])->name('item.purchase.update');
+// Route::get('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'item_purchase_edit'])->name('item.purchase.edit');
+
+// Route::get('/sell', [ItemController::class, 'item_sell_show'])->middleware(['auth'])->name('item_sell');
+
+// Route::get('/mypage', [ItemController::class, 'profile_show'])->middleware(['auth'])->name('profile');
+
+// // 🌟 修正：メール認証コントローラのリダイレクト先とテストが期待するルート 🌟
+// Route::get('/mypage/profile', [ItemController::class, 'profile_revise'])->middleware(['auth'])->name('profile_edit');
+
+// Route::post('/thanks_sell', [ItemController::class, 'thanks_sell_create']);
+// Route::get('/thanks_sell', [ItemController::class, 'thanks_sell_create']);
+
+
+// //購入処理（コンビニ払い完了処理まで/カード支払いstripe決済に繋げる処理）のルード
+// Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create');
+// // カード支払いstripeでの処理
+// Route::get('/stripe_success', [ItemController::class, 'stripeSuccess'])->name('stripe_success');
+// // コンビニ/カード支払い共に処理完了後のページ移動のルード
+// Route::get('/thanks_buy', [ItemController::class, 'thanks_buy_show'])->name('thanks_buy');
+
+
+// // ユーザー情報の更新、出品商品登録、コメント投稿、いいね機能
+// Route::patch('/profile_update', [ItemController::class, 'profile_update']);
+
+// Route::post('/upload2', [ItemController::class, 'user_image_upload']);
+
+// Route::post('/upload', [ItemController::class, 'item_image_upload']);
+
+// Route::post('/comment_read', [ItemController::class, 'comment_create'])->name('comment_create');
+
+// Route::post('/items/{item}/favorite', [ItemController::class, 'favorite'])->name('item.favorite');
+
+
+// // mailhog受信テスト用
+// Route::get('/send-test-email', function () {
+//     try {
+//         Mail::raw('This is a test email from Laravel.', function (\Illuminate\Mail\Message $message) {
+//             $message->to('test@example.com')->subject('Test Email');
+//         });
+//         return 'Email sent successfully!';
+//     } catch (\Exception $e) {
+//         return 'Failed to send email: ' . $e->getMessage();
+//     }
+// });
 
 // =========================================================================
-// ★★★ カスタム認証ルート定義（Fortifyの機能を使わずに構築） ★★★
+// Fortifyコントローラへの参照とカスタムAuthControllerへの参照を整理します。
 // =========================================================================
 
-// メール認証関連のルート (AuthControllerを使用)
-// メール認証通知ページを表示するルート
-Route::get('/email/verify', [AuthController::class, 'notice']) // 修正
-    ->middleware('auth')
-    ->name('verification.notice');
+// Route::group(['middleware' => ['web']], function () {
+//     $fortifyControllers = 'Laravel\Fortify\Http\Controllers\\';
+    
+//     登録ルート (AuthControllerを使用)
+//     Route::get('/register', [AuthController::class, 'createRegister'])->name('register');
+//     Route::post('/register', [AuthController::class, 'storeRegister']);
 
-// メール認証リクエストを処理するルート
-Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify']) // 修正
-    ->middleware(['auth', 'signed'])
-    ->name('verification.verify');
+//     ログインルート (AuthControllerを使用 - カスタムリクエスト/ロジック適用)
+//     Route::get('/login', [AuthController::class, 'createLogin'])->name('login'); // ★ 修正
+//     Route::post('/login', [AuthController::class, 'storeLogin']); // ★ 修正
 
-// メール認証通知を再送信するルート
-Route::post('/email/verification-notification', [AuthController::class, 'resend']) // 修正
-    ->middleware(['auth', 'throttle:6,1'])
-    ->name('verification.send');
+//     パスワードリセットルート (Fortifyを使用)
+//     Route::get('/forgot-password', $fortifyControllers . 'PasswordResetLinkController@create')->name('password.request');
+//     Route::post('/forgot-password', $fortifyControllers . 'PasswordResetLinkController@store')->name('password.email');
+//     Route::get('/reset-password/{token}', $fortifyControllers . 'NewPasswordController@create')->name('password.reset');
+//     Route::post('/reset-password', $fortifyControllers . 'NewPasswordController@store')->name('password.update');
+    
+//     // プロフィール情報更新ルート (Fortifyを使用)
+//     Route::put('/user/profile-information', $fortifyControllers . 'ProfileInformationController@update')->middleware(['auth'])->name('user-profile-information.update');
+    
+//     // パスワード更新ルート (Fortifyを使用)
+//     Route::put('/user/password', $fortifyControllers . 'PasswordController@update')->middleware(['auth'])->name('user-password.update');
+// });
 
-// Fortifyが提供するデフォルトのログアウト処理
-Route::post('/logout', function (Request $request) {
-    Auth::logout();
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
-    return redirect('/');
-})->name('logout');
-
-// 主に基本設計書の順に並んでいます。
-Route::get('/item/{item_id}', [ItemController::class, 'item_detail_show'])->name('item_detail');
-
-Route::get('/purchase/{item_id}', [ItemController::class, 'item_buy_show'])->middleware(['auth'])->name('item_buy');
-
-Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update'])->name('item.purchase.update');
-Route::get('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'item_purchase_edit'])->name('item.purchase.edit');
-
-Route::get('/sell', [ItemController::class, 'item_sell_show'])->middleware(['auth'])->name('item_sell');
-
-Route::get('/mypage', [ItemController::class, 'profile_show'])->middleware(['auth'])->name('profile');
-
-// 🌟 修正：メール認証コントローラのリダイレクト先とテストが期待するルート 🌟
-Route::get('/mypage/profile', [ItemController::class, 'profile_revise'])->middleware(['auth'])->name('profile_edit');
-
-Route::post('/thanks_sell', [ItemController::class, 'thanks_sell_create']);
-Route::get('/thanks_sell', [ItemController::class, 'thanks_sell_create']);
+// 🌟 削除：便宜的なprofile_editルートを削除し、/mypage/profileのルート名'profile_edit'を優先させます。
+// Route::get('/profile', function () {
+//     return view('profile.edit'); 
+// })->middleware(['auth', 'verified'])->name('profile_edit');
 
 
-//購入処理（コンビニ払い完了処理まで/カード支払いstripe決済に繋げる処理）のルード
-Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create');
-// カード支払いstripeでの処理
-Route::get('/stripe_success', [ItemController::class, 'stripeSuccess'])->name('stripe_success');
-// コンビニ/カード支払い共に処理完了後のページ移動のルード
-Route::get('/thanks_buy', [ItemController::class, 'thanks_buy_show'])->name('thanks_buy');
 
 
-// ユーザー情報の更新、出品商品登録、コメント投稿、いいね機能
-Route::patch('/profile_update', [ItemController::class, 'profile_update']);
 
-Route::post('/upload2', [ItemController::class, 'user_image_upload']);
+/*
+|--------------------------------------------------------------------------
+| Web Routes (for Nuxt SPA)
+|--------------------------------------------------------------------------
+|
+| LaravelがHTMLを返す必要のあるルート、またはNuxt SPAのルーティングに関係のない
+| 単発のユーティリティルート（例：テストメール送信）のみを残します。
+| 認証後のページ表示系ルートは全てNuxt側で処理されます。
+|
+*/
 
-Route::post('/upload', [ItemController::class, 'item_image_upload']);
 
-Route::post('/comment_read', [ItemController::class, 'comment_create'])->name('comment_create');
+// ----------------------------------------------------
+// 1. Nuxt SPAのルートフォールバック（推奨はしませんが、index.phpへの入り口として）
+// ----------------------------------------------------
+// Nuxtが全てのフロントエンドパスを処理するため、Webルートは極力シンプルにします。
+// フロントページを表示するルートは削除し、Nginxの設定（index.phpへのフォールバック）に任せるか、
+// もしテストなどで必要なら残します。
+// Route::get('/', [ItemController::class, 'index'])->name('front_page'); 
 
-Route::post('/items/{item}/favorite', [ItemController::class, 'favorite'])->name('item.favorite');
+
+// ----------------------------------------------------
+// 2. 認証後のWebページ表示ルート (APIサーバー化に伴い**全て削除**)
+// ----------------------------------------------------
+// Nuxtが担当するため、以下のルートは routes/api.php に機能（POST/PATCH）を移動し、
+// Web表示ルート（GET）は削除します。
+// Route::get('/onetime', [ItemController::class, 'handleOnetimeRedirect'])->name('onetime.show');
+// Route::get('/item/{item_id}', [ItemController::class, 'item_detail_show'])->name('item_detail');
+// ... その他、item_buy_show, item_sell_show, profile_show なども削除 ...
 
 
-// mailhog受信テスト用
+// ----------------------------------------------------
+// 3. メール認証関連のルート (API連携のため**すべて削除**)
+// ----------------------------------------------------
+// メール認証関連の処理（notice, verify, resend）はAPI化し、APIまたはNuxtに任せます。
+// Route::get('/email/verify', ...), Route::get('/email/verify/{id}/{hash}', ...) などは削除
+
+
+// ----------------------------------------------------
+// 4. Fortifyが提供するデフォルトのログアウトルート (API連携のため**削除**)
+// ----------------------------------------------------
+// ログアウト処理は /api/logout として API ルートに移動します。
+// Route::post('/logout', function (Request $request) { ... })->name('logout');
+
+
+// ----------------------------------------------------
+// 5. テスト用ユーティリティ
+// ----------------------------------------------------
+// mailhog受信テスト用は残します。
 Route::get('/send-test-email', function () {
     try {
         Mail::raw('This is a test email from Laravel.', function (\Illuminate\Mail\Message $message) {
@@ -108,35 +223,14 @@ Route::get('/send-test-email', function () {
     }
 });
 
-// =========================================================================
-// Fortifyコントローラへの参照とカスタムAuthControllerへの参照を整理します。
-// =========================================================================
 
-Route::group(['middleware' => ['web']], function () {
-    $fortifyControllers = 'Laravel\Fortify\Http\Controllers\\';
-    
-    // 登録ルート (AuthControllerを使用)
-    Route::get('/register', [AuthController::class, 'createRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'storeRegister']);
+// ----------------------------------------------------
+// 6. APIとして残すべき POST/PATCH ルート (APIへ移動を推奨)
+// ----------------------------------------------------
+// Webルートに残す必要はありません。すべて /api/* として api.php に移動してください。
+// Route::patch('/purchase/address/{item_id}/{user_id?}', ...)
+// Route::post('/thanks_sell', ...)
+// ... など全て API へ移動 ...
 
-    // ログインルート (AuthControllerを使用 - カスタムリクエスト/ロジック適用)
-    Route::get('/login', [AuthController::class, 'createLogin'])->name('login'); // ★ 修正
-    Route::post('/login', [AuthController::class, 'storeLogin']); // ★ 修正
-
-    // パスワードリセットルート (Fortifyを使用)
-    Route::get('/forgot-password', $fortifyControllers . 'PasswordResetLinkController@create')->name('password.request');
-    Route::post('/forgot-password', $fortifyControllers . 'PasswordResetLinkController@store')->name('password.email');
-    Route::get('/reset-password/{token}', $fortifyControllers . 'NewPasswordController@create')->name('password.reset');
-    Route::post('/reset-password', $fortifyControllers . 'NewPasswordController@store')->name('password.update');
-    
-    // プロフィール情報更新ルート (Fortifyを使用)
-    Route::put('/user/profile-information', $fortifyControllers . 'ProfileInformationController@update')->middleware(['auth'])->name('user-profile-information.update');
-    
-    // パスワード更新ルート (Fortifyを使用)
-    Route::put('/user/password', $fortifyControllers . 'PasswordController@update')->middleware(['auth'])->name('user-password.update');
-});
-
-// 🌟 削除：便宜的なprofile_editルートを削除し、/mypage/profileのルート名'profile_edit'を優先させます。
-// Route::get('/profile', function () {
-//     return view('profile.edit'); 
-// })->middleware(['auth', 'verified'])->name('profile_edit');
+// 💡 最終的に、SPAとして動作させるために、Webルートは最小限にするか、
+// Nginxで index.php にフォールバックさせてNuxtに処理を委譲するのが理想です。

@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ./docker/nginx/Dockerfile # ★ Nginx専用のDockerfileを使用
     ports:
-      - "80:80"
+      - "8000:80"
     volumes:
       # Nginxがビルド成果物を内部でコピーするため、ソースコードのマウントは不要（削除）
       # - ./frontend:/var/www/frontend # <-- この行を削除
@@ -21,21 +21,26 @@ services:
 
   php:
     build: ./docker/php
+    working_dir: /var/www/backend
     volumes:
       - ./backend:/var/www/backend  # Laravel
       - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
-      # 🚨 【削除/コメントアウト】 Nuxtのソースコード全体のマウントはビルド完了で不要
-      # - ./frontend:/var/www/frontend
-      # 【維持】 Nuxtの静的アセット部分のみをマウント
-      - ./frontend/.output/public:/var/www/frontend/public:ro
-      # ★ 【追加】 Nuxtのサーバーサイドレンダリング(SSR)コードをLaravel/PHP側から実行するためにマウント
-      # Laravelのフロントコントローラー（public/index.phpなど）がこのパスを参照します
-      - ./frontend/.output/server:/var/www/frontend/server:ro
+      # 🚨 【削除】 Nuxt/SSR関連のボリュームマウントを全て削除
+      # ----------------------------------------------------
+    # ★★★ 修正箇所: PHP-FPMポートを公開（接続テストのため一時的に維持） ★★★
+    ports:
+      - "9000:9000"
+    # ----------------------------------------------------
     depends_on:
       - mysql
     networks:
       simulation1_network: # ネットワークをオブジェクト形式に変更
         ipv4_address: 172.22.0.3 # ★ 固定IPを割り当て
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"] # PHP-FPMの設定テスト
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mysql:
     image: mysql:8.3
@@ -99,7 +104,7 @@ services:
       - "3000:3000"
     working_dir: /app
     # ★ 修正箇所：npm run dev の後に、ホストオプション '-- --host 0.0.0.0' を追加
-    command: npm run dev -- --host 0.0.0.0
+    command: sh -c "VITE_FS_INOTIFY_LIMIT=524288 yarn dev --host 0.0.0.0"
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.7

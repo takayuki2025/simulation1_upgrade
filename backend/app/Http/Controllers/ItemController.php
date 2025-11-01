@@ -22,12 +22,12 @@ use Stripe\Checkout\Session;
 use Illuminate\Http\RedirectResponse;
 
 
-class ItemController
+class ItemController extends Controller 
 {
 
-// 主に基本設計書の順に並んでいます。
-        // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
-        public function index(Request $request)
+    // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
+    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
+    public function index(Request $request)
     {
         // URLのGETパラメータ'tab'を取得。デフォルトは'all'
         $tab = $request->query('tab', 'all');
@@ -38,44 +38,66 @@ class ItemController
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
             $user = Auth::user();
-        if (!$user) {
-            $items = collect([]); // 未認証ユーザーの場合、空のコレクションを渡す
-        } else {
-            // Goodモデルを介して関連するItemを取得
-            $items = Good::where('user_id', $user->id)->with('item')->get()->map(function ($good) {
-                return $good->item;
-            });
-        }
-        // 取得したコレクションを検索キーワードでフィルタリング
-        if (!empty($searchQuery)) {
-            $items = $items->filter(function ($item) use ($searchQuery) {
-                return stripos($item->name, $searchQuery) !== false;
-            });
-        }
-        } else {
-                // 'all'タブ（またはデフォルト）の場合、出品者自身の商品を除いて全商品を取得
-                $query = Item::query();
-            // Auth::id()がnullでないことを確認してからwhere句を適用
-            if (Auth::id()) {
-                $query->where('user_id', '!=', Auth::id());
+            
+            // 🚨 認証済みでなければマイリストは空のコレクション
+            if (!$user) {
+                $items = collect([]); 
+            } else {
+                // Goodモデルを介して関連するItemを取得
+                $items = Good::where('user_id', $user->id)
+                    ->with('item')
+                    ->get()
+                    ->pluck('item')
+                    ->filter(); // nullをフィルタリング
             }
+            
+            // 検索キーワードでフィルタリング
+            if (!empty($searchQuery)) {
+                $items = $items->filter(function ($item) use ($searchQuery) {
+                    return stripos($item->name, $searchQuery) !== false;
+                })->values(); // フィルタリング後にインデックスをリセット
+            }
+
+        } else {
+            // 'all'タブ（またはデフォルト）の場合、全商品を取得
+            $query = Item::query();
+            
+            // 💡 認証済みユーザーの場合のみ、自身が出品した商品を除外する
+            $authId = Auth::id();
+            if ($authId) {
+                // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
+                $query->where('user_id', '!=', $authId);
+            }
+            // 🚨 ここでは、上記 where 句は未認証ユーザーの場合実行されないため、
+            // Item::query() (全ての商品) がそのまま実行される。
 
             // 検索キーワードがあれば、クエリをフィルタリング
             if (!empty($searchQuery)) {
                 $query->where('name', 'like', '%' . $searchQuery . '%');
             }
-                $items = $query->get();
+            
+            // リレーションをロード
+            $items = $query->withCount(['comments', 'goods'])->get();
         }
 
-        // 取得した商品コレクションをループ処理
+        // 取得した商品コレクションをループ処理し、表示用のデータを整形
         $items->each(function ($item) {
-            // remainが0の場合、priceの値をsoldに設定
-            if ($item->remain == 0) {
-                $item->price = 'sold';
+            
+            // 画像パスが相対パス（storage/images/...）であると仮定し、そのまま返す
+            // Nuxt側でASSET_BASE_URLと結合してフルURLにする
+            if ($item->item_image && !Str::startsWith($item->item_image, ['http://', 'https://'])) {
+                // 'storage/' が含まれていない場合は追加（二重に追加されないように注意）
+                if (!Str::startsWith($item->item_image, 'storage/')) {
+                    $item->item_image = 'storage/' . $item->item_image; // 例: storage/images/item_xxx.jpg
+                }
             }
         });
 
-        return view('front_page', compact('items', 'tab'));
+        // 🚨 HTMLビューではなくJSONデータを返す
+        return response()->json([
+            'items' => $items,
+            'current_tab' => $tab,
+        ]);
     }
 
 
@@ -161,33 +183,89 @@ class ItemController
     }
 
 
-        public function profile_show(Request $request)
+    /**
+     * マイページ用のプロフィールと商品リストをJSONで返す
+     * Route::get('/mypage/profile')に対応
+     */
+    public function profile_revise(Request $request)
     {
+        // Route::middleware('auth:sanctum') で保護されているため、Auth::user() は認証済みユーザーを返す
         $user = Auth::user();
 
+        // 認証ミドルウェアが機能しているため、理論上は不要だが安全のため
         if (!$user) {
-            return redirect()->route('login')->with('error', 'ログインしてください。');
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
         $page = $request->input('page', 'sell');
         $items = collect();
 
-        // pageの値に応じてデータを取得
+        // pageの値に応じてデータを取得し、JSONで扱いやすい形式に整形
         if ($page === 'sell') {
+            // 出品した商品を取得
             $items = Item::where('user_id', $user->id)->get();
         } elseif ($page === 'buy') {
-            $items = OrderHistory::where('user_id', $user->id)->with('item')->get();
+            // 購入履歴（OrderHistory）から商品情報（itemリレーション）を取得
+            $orderHistories = OrderHistory::where('user_id', $user->id)->with('item')->get();
+            // Nuxt側で扱いやすいようにOrderHistoryオブジェクトの配列を返す
+            $items = $orderHistories;
         }
-        return view('profile', compact('user', 'items', 'page'));
+
+        return response()->json([
+            'user' => $user, // ユーザー情報をそのまま返す
+            'items' => $items, // 整形された商品リストを返す
+            'page' => $page, // 現在のページ情報も返す
+        ]);
     }
 
 
-        public function profile_revise(Request $request)
+
+    /**
+     * 認証済みのユーザーのプロフィール情報をJSONで返します。
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function profile_show(Request $request)
     {
-        if (Auth::check()) {
-        $user = Auth::user();
+        // 認証チェック
+        if (!Auth::check()) {
+            // 認証されていない場合は 401 Unauthorized を返す
+            // Sanctum/Handler.php の設定により、通常は自動的に 401 が返されますが、明示的に記述
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-        return view('profile_edit',compact('user'));
+
+        // 認証済みのユーザーを取得
+        $user = Auth::user();
+
+        // Nuxt側のストアが期待するデータ構造に合わせてデータを整形して返す
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            // Pinia store の User インターフェースに合わせて uid も含める
+            'uid' => $user->uid ?? null,
+            // 必要に応じて他のプロフィール関連データも追加可能
+        ]);
+    }
+
+
+                                     // ItemController.php 内の修正（例: メソッド名を getUserProfile に変更）
+    public function getUserProfile(Request $request)
+    {
+    // ★ 修正: Auth::user() の代わりに、Firebaseミドルウェアが挿入したユーザー情報を取得
+    // ここでは、ミドルウェアが 'user' または 'firebaseUser' をリクエストにセットしていると仮定
+        $user = $request->user(); // Laravelの標準的なミドルウェアの動作に従い、user() を使用する場合
+
+        if (!$user) {
+        // IDトークン検証失敗や、ユーザーがDBに存在しない場合の応答
+        return response()->json(['message' => 'User not authenticated or not found in database.'], 404);
+        }
+
+    // Nuxt.jsが利用するユーザー情報をJSONで返す
+        return response()->json([
+        'user' => $user
+        ]);
     }
 
 
@@ -217,24 +295,29 @@ class ItemController
 
 // ユーザー情報の更新。画像アップロードの処理
 
-        public function profile_update(ProfileRequest $request)
-    {
-        if (Auth::check()) {
-            $user = Auth::user();
+                                       // ItemController.php 内の修正
+    public function profile_update(ProfileRequest $request)
+{
+    // ★ 修正: 認証済みユーザーを取得
+    $user = $request->user();
 
-        if (!$user) {
-
-        return redirect()->route('login')->with('error', 'ログインしてください。');
-        }
-
-            $updateData = $request->only('name', 'post_number', 'address', 'building');
-
-            $user->user_image = $request->input('user_image');
-            $user->update($updateData);
-
-        }
-        return redirect()->route('front_page')->with('success', 'プロフィールを更新しました');
+    if (!$user) {
+        return response()->json(['message' => 'Authentication required.'], 401);
     }
+
+    $updateData = $request->only('name', 'post_number', 'address', 'building');
+    
+    // ★ user_imageの処理は画像アップロードAPIに任せるため、削除
+    // 既存のLaravelコードでの $user->user_image = $request->input('user_image'); は削除
+    
+    $user->update($updateData);
+
+    // ★ JSONで成功レスポンスを返す（リダイレクトを削除）
+    return response()->json([
+        'success' => true,
+        'message' => 'プロフィールを更新しました。'
+    ], 200);
+}
 
 
         public function update(AddressRequest $request, $itemId, $userId)
@@ -256,33 +339,46 @@ class ItemController
     }
 
 
-        public function user_image_upload(ProfileImageRequest $request)
+                                             // ItemController.php 内の修正
+    public function user_image_upload(ProfileImageRequest $request)
     {
-        // アップロードされたファイルが存在するか、かつ有効なファイルかを確認
+    // ★ 修正: 認証済みユーザーを取得
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Authentication required.'], 401);
+        }
+
         if ($request->hasFile('user_image') && $request->file('user_image')->isValid()) {
-            // ランダムなファイル名を作成（user_image_ + ランダムな文字列 + 元の拡張子）
-            $originalName = $request->user_image->getClientOriginalName();
+        // ファイル名生成と保存のロジックは変更なし
             $extension = $request->user_image->getClientOriginalExtension();
             $randomName = 'user_image_' . Str::random(30) . '.' . $extension;
-
-            // `storeAs`メソッドで指定したファイル名で保存
-            // 'public'ディスクを使用
             $path = $request->user_image->storeAs('public/user_images', $randomName);
-
-            // データベースに保存するパスを生成
-            // 'public/' プレフィックスを削除
             $dbPath = str_replace('public/', '', $path);
+            $storagePath = 'storage/' . $dbPath;
 
-            // アップデート処理
-            $user = Auth::user();
+        // DBアップデート処理
             $user->update([
-                'user_image' => 'storage/' . $dbPath // データベースにはstorage/からのパスを保存
+                'user_image' => $storagePath 
             ]);
 
-            return redirect()->route('profile_edit')->with('success', 'ユーザーイメージをアップロードしました。')->with('image_path2', 'storage/' . $dbPath);
-        }
-        return back()->with('error', '画像ファイルがありません。');
+        // ★ JSONで成功レスポンスを返す（リダイレクトを削除）
+            return response()->json([
+                'success' => true,
+                'message' => 'ユーザーイメージをアップロードしました。',
+            '   image_path' => $storagePath 
+            ], 200);
+
+            }
+    
+    // 画像ファイルがない場合のエラー処理
+        return response()->json([
+            'success' => false,
+            'message' => '画像ファイルがありません。'
+        ], 400);
     }
+
+    
 
 
 // 購入商品(コンビニ支払い、カード支払い)・出品商品の処理

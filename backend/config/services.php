@@ -30,12 +30,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    
 
     'stripe' => [
         'secret' => env('STRIPE_SECRET_KEY'),
         'key' => env('STRIPE_KEY'),
     ],
 
-
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+        // プロジェクトIDを環境変数から自動取得したい場合は以下も設定可能
+        // 'project_id' => env('FIREBASE_PROJECT_ID'),
+    ],
 ];

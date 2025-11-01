@@ -19,7 +19,10 @@ class CreatePersonalAccessTokensTable extends Migration
             $table->string('name');
             $table->string('token', 64)->unique();
             $table->text('abilities')->nullable();
-            $table->timestamp('last_used_at')->nullable();
+
+            // ★★★ 修正箇所: expires_at カラムをnullableで追加 ★★★
+            $table->timestamp('expires_at')->nullable(); 
+            // $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
         });
     }

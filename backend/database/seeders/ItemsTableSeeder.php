@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use App\Models\User; // Userモデルを使用するために追加
 
 class ItemsTableSeeder extends Seeder
 {
@@ -14,9 +15,32 @@ class ItemsTableSeeder extends Seeder
      */
     public function run()
     {
+        // UsersTableSeeder で作成したユーザーのメールアドレスリスト (最新版に更新)
+        $userEmails = [
+            'valid.email@example.com',      // ユーザー1
+            'taro.y@coachtech.com',         // ユーザー2
+            'reina.n@coachtech.com',        // ユーザー3
+            'tomomi.a@coachtech.com',       // ユーザー4
+        ];
+
+        // ユーザーのメールアドレスをキー、実際のIDを値とする連想配列を取得
+        // 例: ['valid.email@example.com' => 5, 'taro.y@coachtech.com' => 6, ...]
+        $userIds = User::whereIn('email', $userEmails)
+                       ->pluck('id', 'email')
+                       ->toArray();
+
+        // ユーザーIDが見つからない場合のフォールバック（デバッグ用）
+        if (count($userIds) !== count($userEmails)) {
+            \Log::error("ItemsTableSeeder: User IDs could not be retrieved correctly.");
+            // 処理を継続させず、エラーとする
+            // throw new \Exception("Required users for seeder are missing.");
+        }
+
+
+        // 商品データ。user_idを動的に割り当てるように修正
         $params = [
             [
-                'user_id' => 1,
+                'user_id' => $userIds['valid.email@example.com'] ?? 1, // ユーザー1のIDを使用
                 'name' => '腕時計',
                 'price' => 15000,
                 'brand' => 'Rolax',
@@ -27,7 +51,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 1,
+                'user_id' => $userIds['valid.email@example.com'] ?? 1, // ユーザー1のIDを使用
                 'name' => 'HDD',
                 'price' => 5000,
                 'brand' => '西芝',
@@ -38,7 +62,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 2,
+                'user_id' => $userIds['taro.y@coachtech.com'] ?? 2, // ユーザー2のIDを使用
                 'name' => '玉ねぎ３束',
                 'price' => 300,
                 'brand' => 'なし',
@@ -49,7 +73,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 2,
+                'user_id' => $userIds['taro.y@coachtech.com'] ?? 2, // ユーザー2のIDを使用
                 'name' => '革靴',
                 'price' => 4000,
                 'brand' => '',
@@ -60,7 +84,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 3,
+                'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
                 'name' => 'ノートPC',
                 'price' => 45000,
                 'brand' => '',
@@ -71,7 +95,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 3,
+                'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
                 'name' => 'マイク',
                 'price' => 8000,
                 'brand' => 'なし',
@@ -82,7 +106,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 3,
+                'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
                 'name' => 'ショルダーバッグ',
                 'price' => 3500,
                 'brand' => '',
@@ -93,21 +117,21 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 4,
-                'name' => 'ダンブラー',
+                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
+                'name' => 'タンブラー',
                 'price' => 500,
                 'brand' => 'なし',
-                'explain' => '使いやすいダンブラー',
+                'explain' => '使いやすいタンブラー',
                 'condition' => '状態が悪い',
                 'category' => json_encode(['キッチン']),
                 'item_image' => 'storage/item_images/Tumbler+souvenir.jpg',
                 'remain' => 1,
             ],
             [
-                'user_id' => 4,
+                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
                 'name' => 'コーヒーミル',
                 'price' => 4000,
-                'brand' => 'slarbacks',
+                'brand' => 'Starbacks',
                 'explain' => '手動のコーヒーミル',
                 'condition' => '良好',
                 'category' => json_encode(['キッチン']),
@@ -115,7 +139,7 @@ class ItemsTableSeeder extends Seeder
                 'remain' => 1,
             ],
             [
-                'user_id' => 4,
+                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
                 'name' => 'メイクセット',
                 'price' => 2500,
                 'brand' => '',

@@ -28,6 +28,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'building',
         'user_image',
         'address_country',
+        'firebase_uid', // <-- これを追加
     ];
 
     /**
