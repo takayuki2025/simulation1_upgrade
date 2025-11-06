@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth'; 
-import { useForm } from 'vee-validate'; // 💡 VeeValidateをインポート
-import { loginSchema } from '../schemas/authSchema'; // 💡 統合されたスキーマからloginSchemaをインポート
+import { useForm } from 'vee-validate'; // VeeValidateをインポート
+import { loginSchema } from '../schemas/authSchema'; // ログインスキーマをインポート
+import { useRouter } from 'vue-router'; // 💡 Nuxt Router をインポート
 
 // レイアウトを 'auth' に指定
 definePageMeta({
@@ -10,10 +11,11 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+const router = useRouter(); // 💡 useRouter を初期化
 
 // --- VeeValidate の導入 ---
 const { defineField, handleSubmit: veeValidateHandleSubmit, errors, isSubmitting } = useForm({
-  validationSchema: loginSchema, // 💡 ログインスキーマを使用
+  validationSchema: loginSchema, // ログインスキーマを使用
   initialValues: {
     email: '',
     password: '',
@@ -34,7 +36,11 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
   try {
     // VeeValidateで検証済みの値 (values) を使用
     await authStore.login(values);
-    // 成功するとストアのアクション内でリダイレクトされます
+    
+    // 💡 認証ストアのログイン処理が成功した場合、トップページへリダイレクト
+    // 商品一覧が表示されるのはルートパス ('/') です
+    router.push('/'); 
+
   } catch (error: any) {
     // APIからのエラーレスポンスを処理
     if (error.response && error.response.status === 422) {
@@ -69,7 +75,7 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
       {{ apiError }}
     </div>
     
-    <!-- 💡 VeeValidateの handleSubmit を使用 -->
+    <!-- VeeValidateの handleSubmit を使用 -->
     <form @submit="handleSubmit" class="space-y-4">
       
       <!-- Email Field -->
@@ -85,7 +91,7 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
           v-bind="emailAttrs"
           autocomplete="email"
         />
-        <!-- 💡 VeeValidateのエラーメッセージを表示 -->
+        <!-- VeeValidateのエラーメッセージを表示 -->
         <div v-if="errors.email" class="mt-1 text-xs text-red-600">{{ errors.email }}</div>
       </div>
 
@@ -102,7 +108,7 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
           v-bind="passwordAttrs"
           autocomplete="current-password"
         />
-        <!-- 💡 VeeValidateのエラーメッセージを表示 -->
+        <!-- VeeValidateのエラーメッセージを表示 -->
         <div v-if="errors.password" class="mt-1 text-xs text-red-600">{{ errors.password }}</div>
       </div>
       

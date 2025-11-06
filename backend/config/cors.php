@@ -1,68 +1,40 @@
 <?php
 
-
-
 return [
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cross-Origin Resource Sharing (CORS) Configuration
+    |--------------------------------------------------------------------------
+    */
+
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'user', 'register', 'firebase/*',],
+
+    'allowed_methods' => ['*'],
+
+    // ★★★ 【重要修正】フロントエンドのホスト名とポートを明示的に許可 ★★★
+    'allowed_origins' => [
+        // 環境変数から取得（ここで FRONTEND_URL=http://localhost:3000 とするのが理想）
+        env('FRONTEND_URL', 'https://laravel.test:4431'), 
+        // 念のため明示的に追記
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://laravel.test:4431',
+        'https://laravel.test:4430', // CaddyがHTTPSの場合に備えて
+    ],
+    // 環境変数にFRONTEND_URLが設定されていない場合（.envファイル）、
+    // デフォルトで 'http://localhost' のみ許可するようにします。
 
 
-/*
+    'allowed_origins_patterns' => [],
 
-|--------------------------------------------------------------------------
+    'allowed_headers' => ['*'],
 
-| Cross-Origin Resource Sharing (CORS) Configuration
+    'exposed_headers' => [],
 
-|--------------------------------------------------------------------------
+    'max_age' => 0,
 
-|
-
-*/
-
-
-
-// ↓ 修正案（api/* を削除し、Sanctumに必要なものだけ残す）
-
-'paths' => ['sanctum/csrf-cookie'],
-// 'paths' => ['api/*', 'sanctum/csrf-cookie'],
-
-
-
-'allowed_methods' => ['*'],
-
-
-
-// ★★★ 修正箇所: 環境変数でオリジンを安全に設定し、複数設定を避ける ★★★
-
-// Nuxtのデフォルト開発ポート (3000) を指定
-
-'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:3000')],
-
-// 環境変数にFRONTEND_URLが設定されていない場合（.envファイル）、
-
-// デフォルトで 'http://localhost:3000' のみ許可するようにします。
-
-
-
-'allowed_origins_patterns' => [],
-
-
-
-'allowed_headers' => ['*'],
-
-
-
-'exposed_headers' => [],
-
-
-
-'max_age' => 0,
-
-
-
-// ★★★ Sanctum認証でCookieを使用するために必須 ★★★
-
-'supports_credentials' => true,
-
-
+    // ★★★ Sanctum認証でCookieを使用するために必須 ★★★
+    'supports_credentials' => true,
 
 ];

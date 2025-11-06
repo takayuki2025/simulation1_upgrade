@@ -22,7 +22,7 @@ class CreatePersonalAccessTokensTable extends Migration
 
             // ★★★ 修正箇所: expires_at カラムをnullableで追加 ★★★
             $table->timestamp('expires_at')->nullable(); 
-            // $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
         });
     }

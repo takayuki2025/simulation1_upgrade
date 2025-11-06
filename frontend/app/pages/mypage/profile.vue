@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useAuthStore } from '@/stores/auth'; // Authストアを使用
+import { ref, watch, onMounted } from 'vue'; 
+import { useAuthStore } from '@/stores/auth';
+import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig } from '#app';
+import { storeToRefs } from 'pinia'; 
 
 // 認証が必要なページであることを示すミドルウェアを設定
 definePageMeta({
-  // middleware: 'auth', // 必要に応じてコメントアウトを解除
   layout: 'default',
 });
 
-// グローバルな $fetch を使用
-const fetcher = globalThis.$fetch;
-const authStore = useAuthStore();
+// useNuxtApp().$api からカスタムAPIクライアントを取得
+const { $api } = useNuxtApp();
+if (typeof $api !== 'function') {
+  console.error("CRITICAL: $api instance is missing. Check plugins/api-interceptor.ts.");
+}
 
-// ユーザー情報とフォームの状態を null で初期化（データがまだない状態を表現）
+const authStore = useAuthStore();
+const { isAuthenticated: isAuthed, token: storeToken } = storeToRefs(authStore); 
+
 const user = ref<any | null>(null);
 const form = ref<any>({
   name: '',
@@ -21,71 +26,94 @@ const form = ref<any>({
   building: '',
 });
 
-// エラーと成功メッセージ
 const profileErrors = ref<any>({});
 const imageError = ref(''); 
 const successMessage = ref('');
-const isLoading = ref(true); // ロード状態
+const isLoading = ref(true); 
 
 // ユーザー情報取得（初期表示時）
 const fetchUserProfile = async () => {
+  // ロード済みでユーザーデータがあればスキップ
+  if (user.value && !isLoading.value) { 
+    return;
+  }
+  
   isLoading.value = true;
   profileErrors.value = {};
   
-  // 認証が解決するのを待機（デッドロック回避プラグインと連携）
-  await authStore.waitForAuthResolved();
+  // 認証ストアの解決を待つ (重要な修正点)
+  await authStore.waitForAuthResolution(); 
 
-  if (!authStore.isAuthenticated) {
-      // 未認証ならログインページへリダイレクト（ミドルウェアがない場合のガード）
+  // 認証状態の確認
+  if (!isAuthed.value) { 
       console.log("未認証のためプロフィールページからリダイレクトします。");
       await navigateTo('/login');
       return;
   }
   
+  // Sanctumセッションの確立を待つためのワンクッション（維持）
   try {
-    // 【APIエンドポイントの確認と修正: /api/mypage/profile を使用】
-    const response = await fetcher('/api/mypage/profile', {
-        baseURL: authStore.getApiBaseUrl(), // PiniaストアからベースURLを取得
-        credentials: 'include',
-        headers: { Accept: 'application/json' },
-    }); 
+      console.log("セッション確立確認のためCSRFトークンを強制取得します...");
+      await authStore.getSanctumCsrfToken();
+      console.log("CSRFトークン取得完了。プロフィール取得へ移行します。");
+  } catch(e) {
+      console.error("CSRFトークン取得に失敗しました。セッションが切れている可能性があります。", e);
+      isLoading.value = false;
+      return;
+  }
+  
+  try {
+    // credentials: 'include' はグローバルインターセプターで設定済み
+    const response = await $api('mypage/profile', {}); 
 
-    // レスポンスをチェックし、userオブジェクトが存在するか確認する
     if (response && response.user) {
-        user.value = response.user; // ユーザーオブジェクトをセット
+        user.value = response.user; 
         
-        // フォームに初期値を安全にセット
         form.value.name = response.user.name || '';
         form.value.post_number = response.user.post_number || '';
         form.value.address = response.user.address || '';
         form.value.building = response.user.building || '';
     } else {
         console.warn('APIからユーザーデータが取得できませんでした。');
-        user.value = authStore.user; // 少なくともPiniaのデータを表示
+        user.value = authStore.user; 
     }
 
-    // メール認証完了後のリダイレクトによるメッセージを処理
     const route = useRoute();
     if (route.query.verified === 'true') {
-        successMessage.value = 'メール認証が完了しました！';
-        // URLからクエリパラメータを削除してURLをクリーンにする
-        navigateTo({ path: route.path }, { replace: true });
+        successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
+        console.log("メール認証完了。クエリパラメータを削除します。");
+        
+        await navigateTo({ path: route.path }, { replace: true });
     }
 
-  } catch (error) {
+  } catch (error: any) { 
+    if (error.response && error.response.status === 401) {
+        console.error('プロフィールデータの取得中に401エラー。インターセプターがリダイレクトを処理します。');
+        return;
+    }
+    
     console.error('プロフィールデータの取得に失敗しました:', error);
     successMessage.value = 'プロフィールデータのロードに失敗しました。';
-    user.value = authStore.user; // エラー時もPiniaのデータがあればそれを使用
+    user.value = authStore.user; 
   } finally {
     isLoading.value = false;
   }
 };
 
+// ----------------------------------------------------
+// 修正点: onMountedフック内で初期データ取得をトリガーする
+// ----------------------------------------------------
+onMounted(() => {
+    console.log("onMounted: プロフィールデータ取得を開始します。");
+    fetchUserProfile();
+});
+
+
 // --- 画像アップロード処理 ---
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
-  if (!file || !user.value) return; // userがnullの場合は処理しないガードを追加
+  if (!file || !user.value) return; 
 
   imageError.value = '';
   successMessage.value = '';
@@ -94,15 +122,13 @@ const handleImageUpload = async (event: Event) => {
   formData.append('user_image', file);
 
   try {
-    // POST /api/upload2 を叩く
-    const response: any = await fetcher('/api/upload2', { 
-      baseURL: authStore.getApiBaseUrl(),
+    await authStore.getSanctumCsrfToken(); 
+
+    const response: any = await $api('upload2', { 
       method: 'POST',
       body: formData,
-      credentials: 'include',
     });
 
-    // 成功したら新しい画像パスをユーザーオブジェクトに反映
     user.value.user_image = response.image_path; 
     successMessage.value = '画像をアップロードしました。';
 
@@ -110,6 +136,9 @@ const handleImageUpload = async (event: Event) => {
     console.error('画像アップロードに失敗:', error);
     if (error.response && error.response.status === 422) {
       imageError.value = error.response._data.errors.user_image?.[0] || '無効なファイルです。';
+    } else if (error.response && error.response.status === 401) {
+      successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+      return; 
     } else {
       imageError.value = 'アップロードに失敗しました。';
     }
@@ -120,45 +149,47 @@ const handleImageUpload = async (event: Event) => {
 const handleProfileUpdate = async () => {
   profileErrors.value = {};
   successMessage.value = '';
-  if (!user.value) return; // userがnullの場合は処理しないガード
+  if (!user.value) return; 
 
   try {
-    // PATCH /api/profile_update を叩く
-    await fetcher('/api/profile_update', { 
-      baseURL: authStore.getApiBaseUrl(),
+    await authStore.getSanctumCsrfToken(); 
+    
+    await $api('profile_update', { 
       method: 'PATCH',
       body: form.value,
-      credentials: 'include',
     });
 
     successMessage.value = 'プロフィール情報を更新しました！';
     
-    // 成功したらルートページ ('/') に遷移する
-    await navigateTo('/', { replace: true });
+    // 成功時、すぐにリダイレクトせずにメッセージを表示するため、navigateToをコメントアウトします
+    // await navigateTo('/', { replace: true });
 
   } catch (error: any) {
     console.error('プロフィール更新に失敗:', error);
     if (error.response && error.response.status === 422) {
-      // Laravelのバリデーションエラーをセット
       profileErrors.value = error.response._data.errors;
+    } else if (error.response && error.response.status === 401) {
+      successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+      return; 
     } else {
       successMessage.value = '更新に失敗しました。再度お試しください。';
     }
   }
 };
 
-onMounted(fetchUserProfile);
 
 // プロフィール画像のURLを生成するヘルパー関数
 const getProfileImageUrl = (path: string | undefined | null) => {
-  // pathが undefined, null, 空文字列の場合はデフォルト画像
   if (!path) {
     return '/storage/images/default-profile2.jpg';
   }
-  // APIのベースURLを使用してフルパスを構成
   const base = useRuntimeConfig().public.apiBaseUrl.replace(/\/api$/, '') || ''; 
-  // ★ ここでベースURLと画像パスを結合する際のパス区切り文字に注意 (例: http://example.com/storage/path/...)
-  return `${base}/${path}`; 
+  
+  if (path.startsWith('http')) {
+      return path;
+  }
+  
+  return `${base}/${path.replace(/^\//, '')}`; 
 };
 
 </script>
@@ -168,7 +199,7 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     <h2 class="title">プロフィール設定</h2>
     
     <!-- ロード中表示 -->
-    <div v-if="isLoading" class="text-center p-8">
+    <div v-if="isLoading && !user" class="text-center p-8">
         <p class="text-lg text-gray-500">データをロード中です...</p>
     </div>
 
@@ -182,7 +213,6 @@ const getProfileImageUrl = (path: string | undefined | null) => {
       <!-- 画像アップロードフォーム -->
       <form @submit.prevent class="item_sell_contents_box_line">
         <div class="image_name">
-          <!-- user が存在するため、user.user_image の参照は安全 -->
           <img 
             :src="getProfileImageUrl(user.user_image)" 
             alt="プロフィール画像" 
@@ -208,7 +238,6 @@ const getProfileImageUrl = (path: string | undefined | null) => {
       <!-- プロフィール情報更新フォーム -->
       <form @submit.prevent="handleProfileUpdate">
         <label class="label_form_1">ユーザー名</label>
-        <!-- form.name の v-model 参照は安全 -->
         <input type="text" class="name_form" name="name" v-model="form.name" />
         <div class="profile__error">
           {{ profileErrors.name ? profileErrors.name[0] : '' }}
@@ -251,23 +280,24 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     text-align: center;
     margin: 0 auto;
     max-width: 1400px;
+    padding: 20px;
 }
 .title {
     font-size: 2rem;
     font-weight: bold;
     margin-bottom: 2rem;
-    color: #4f46e5; /* Tailwind indigo-600相当 */
+    color: #4f46e5; 
 }
 .alert-success2 {
-    background-color: #d1fae5; /* Tailwind green-100 */
-    color: #065f46; /* Tailwind green-900 */
+    background-color: #d1fae5; 
+    color: #065f46; 
     padding: 1rem;
     border-radius: 0.5rem;
     margin-bottom: 1.5rem;
-    border: 1px solid #34d399; /* Tailwind green-400 */
+    border: 1px solid #34d399; 
 }
 .item_sell_contents_box_line {
-    border-bottom: 1px solid #e5e7eb; /* Tailwind gray-200 */
+    border-bottom: 1px solid #e5e7eb; 
     padding-bottom: 1.5rem;
     margin-bottom: 1.5rem;
 }
@@ -283,11 +313,11 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 1rem;
-    border: 3px solid #6366f1; /* Tailwind indigo-500 */
+    border: 3px solid #6366f1; 
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 .upload_submit {
-    background-color: #6366f1; /* Tailwind indigo-500 */
+    background-color: #6366f1; 
     color: white;
     padding: 0.5rem 1rem;
     border: none;
@@ -297,10 +327,10 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     font-weight: 600;
 }
 .upload_submit:hover {
-    background-color: #4f46e5; /* Tailwind indigo-600 */
+    background-color: #4f46e5; 
 }
 .user_image_error_message {
-    color: #ef4444; /* Tailwind red-500 */
+    color: #ef4444; 
     margin-top: 0.5rem;
 }
 .label_form_1, .label_form_2, .label_form_3, .label_form_4 {
@@ -308,18 +338,18 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     text-align: left;
     margin-bottom: 0.5rem;
     font-weight: 600;
-    color: #374151; /* Tailwind gray-700 */
+    color: #374151; 
 }
 .name_form, .email_form, .password_form {
     width: 100%;
     padding: 0.75rem;
     margin-bottom: 1.5rem;
-    border: 1px solid #d1d5db; /* Tailwind gray-300 */
+    border: 1px solid #d1d5db; 
     border-radius: 0.375rem;
     box-sizing: border-box;
 }
 .profile__error {
-    color: #ef4444; /* Tailwind red-500 */
+    color: #ef4444; 
     margin-top: -1rem;
     margin-bottom: 1rem;
     text-align: left;

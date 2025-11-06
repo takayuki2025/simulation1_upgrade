@@ -14,6 +14,7 @@ use App\Http\Requests\RegisterRequest; // カスタムリクエストをイン�
 use App\Http\Requests\LoginRequest; // ★ LoginRequestをインポート (修正)
 use Illuminate\Validation\ValidationException; // (修正)
 
+use Illuminate\Support\Facades\Hash; // Hashをインポート
 /**
  * 認証関連の全般的なカスタム処理を担うコントローラ。
  * (新規登録、ログイン、メール認証など)
@@ -110,10 +111,32 @@ class AuthController extends BaseController
      */
     public function logout(Request $request)
     {
-        // Sanctumトークンを削除
-        $request->user()->currentAccessToken()->delete();
+        // ユーザーが認証されているかチェックする (Sanctumがユーザーを特定できた場合)
+        if ($request->user()) {
+            
+            // ★ 修正: currentAccessToken() が null の可能性があるため、安全にチェックする
+            // ユーザーに紐づくトークンがあれば削除する
+            // Sanctumトークンは $request->user()->currentAccessToken() で取得できるが、
+            // Firebase側でサインアウト済みの場合、不整合が起こりやすいため、
+            // ユーザーオブジェクトのトークンコレクション全体から現在のトークンを削除する方が安全。
+            
+            // 1. 現在使用されているトークンを取得 (nullチェックを追加)
+            $currentAccessToken = $request->user()->currentAccessToken();
+            
+            if ($currentAccessToken) {
+                // 2. トークンが存在すれば削除
+                $currentAccessToken->delete();
+                
+                // 成功メッセージを返す
+                return response()->json([
+                    'message' => 'Successfully logged out and token revoked.'
+                ], 200);
+            }
+            
+            // トークンが既になかった場合も、成功として扱う
+        }
 
-        // Nuxt側でログアウト状態を更新するため、成功JSONを返す
+        // そもそもユーザーが認証されていない、またはトークンがなかった場合も成功としてフロントに返す
         return response()->json(['message' => 'Logged out successfully.'], 200);
     }
 

@@ -18,11 +18,18 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        // ★★★ 修正箇所: 以前のlocalhost:3000を明示する設定を維持し、APP_URLも考慮する ★★★
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        env('APP_URL') ? ','.parse_url(env('APP_URL'), PHP_URL_HOST) : ''
-    ))),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
+        'localhost',
+        'localhost:3000',
+        '127.0.0.1',
+        '127.0.0.1:8000',
+        '::1',
+        'nuxt.test',
+        'nuxt.test:4440',
+        'laravel.test',
+        'laravel.test:4430',
+        'laravel.test:4431',
+    ]))),
 
     /*
     |--------------------------------------------------------------------------
@@ -76,7 +83,7 @@ return [
     | This is generally only needed in a production environment.
     |
     */
-    // ★★★ 修正箇所: このセクションを追加し、以前の 'secure_cookies' の設定をここに移動 ★★★
-    'secure_cookies' => env('SANCTUM_SECURE_COOKIES', false),
+    // ★★★ 修正箇所: ここを修正し、.envの値（SESSION_SECURE_COOKIE）を参照するように変更 ★★★
+    'secure_cookies' => env('SESSION_SECURE_COOKIE', false), 
 
 ];

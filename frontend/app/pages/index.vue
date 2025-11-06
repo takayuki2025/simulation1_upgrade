@@ -1,44 +1,27 @@
 <template>
   <div class="main_contents">
-    <!-- 成功メッセージの表示 (NuxtではLaravelのsessionではなく、別の方法で実装される
-        ここでは仮にメッセージを表示するスペースのみ用意 -->
-    <!-- <div v-if="successMessage" class="alert alert-success">
-      {{ successMessage }}
-    </div> -->
-    
+    <!-- ... (中略: タブ切り替え、検索フォーム) ... -->
+
     <!-- ローディング状態 -->
-    <div v-if="loading" class="flex justify-center items-center h-48">
-      <div class="animate-spin rounded-full h-10 w-10 border-b-3 border-red-500"></div>
-      <p class="ml-4 text-lg text-gray-600">商品を読み込み中...</p>
+    <!-- 💡 isPageLoading を使用: 商品データロード中、またはマイリストタブで認証確認中の場合にローディングを表示 -->
+    <div v-if="isPageLoading" class="flex justify-center items-center h-48">
+      <div class="animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"></div>
+      <p class="ml-4 text-lg text-gray-600">{{ currentTab.value === 'mylist' ? '認証状態を確認中...' : '商品を読み込み中...' }}</p>
     </div>
 
     <div v-else>
+      <!-- ... (中略: タブ切り替え) ... -->
         <div class="main_select">
-            <!-- おすすめ (tab=all) -->
-            <NuxtLink
-              :to="{
-                query: {
-                  tab: 'all',
-                  all_item_search: currentSearchQuery || undefined,
-                },
-              }"
-              class="recs"
-              :class="{ active: currentTab === 'all' }"
-            >
-              おすすめ
+            <NuxtLink 
+              :to="{ query: { tab: 'all', all_item_search: currentSearchQuery || undefined } }" 
+              :class="['recs', { active: currentTab === 'all' }]"
+              >
+              すべて
             </NuxtLink>
-
-            <!-- マイリスト (tab=mylist) -->
-            <NuxtLink
-              :to="{
-                query: {
-                  tab: 'mylist',
-                  all_item_search: currentSearchQuery || undefined,
-                },
-              }"
-              class="mylists"
-              :class="{ active: currentTab === 'mylist' }"
-            >
+            <NuxtLink 
+              :to="{ query: { tab: 'mylist', all_item_search: currentSearchQuery || undefined } }" 
+              :class="['mylists', { active: currentTab === 'mylist' }]"
+              >
               マイリスト
             </NuxtLink>
         </div>
@@ -48,28 +31,26 @@
           <template v-if="items.length > 0">
             <div v-for="item in items" :key="item.id" class="items_select_all">
               <NuxtLink :to="`/item/${item.id}`">
-                <!-- 💡 画像URLを getImageUrl ヘルパー関数で組み立て -->
-                <img
-                  :src="getImageUrl(item.item_image)"
-                  :alt="item.name"
-                  @error="(e) => onImageError(e, item.name)"
-                />
+                <div class="relative">
+                  <img 
+                    :src="getImageUrl(item.item_image)" 
+                    :alt="item.name"
+                    @error="onImageError($event, item.name)"
+                  />
+                  <!-- remainが0の場合にSOLDタグを表示 -->
+                  <div v-if="item.remain === 0" class="sold-text">SOLD</div>
+                </div>
+                <div class="item-info">
+                  <p class="item-name">{{ item.name }}</p>
+                  <p class="item-price font-bold text-red-500 text-lg mt-1">
+                    &yen;{{ item.price ? item.price.toLocaleString() : '---' }}
+                  </p>
+                </div>
               </NuxtLink>
-              <div class="item-info">
-                <!-- 🚨 修正箇所: item.priceが有効な数値であるかをチェック -->
-                <p class="item-name">
-                  <!-- null/undefined の場合は '---' を表示してクラッシュを回避 -->
-                  &yen;{{ typeof item.price === 'number' && item.price !== null
-                    ? item.price.toLocaleString()
-                    : '---'
-                  }} {{ item.name }}
-                </p>
-                <p v-if="item.remain === 0" class="sold-text">sold</p>
-              </div>
             </div>
           </template>
           <div v-else class="text-center w-full py-10 text-gray-500">
-            <p>該当する商品が見つかりませんでした。</p>
+            <p>{{ currentTab.value === 'mylist' && !isLoggedIn ? 'マイリストを見るにはログインしてください。' : '該当する商品が見つかりませんでした。' }}</p>
           </div>
         </div>
     </div>
@@ -77,32 +58,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
-import { useRoute } from "vue-router";
+import { ref, watch, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import { $fetch } from "ofetch";
 
 definePageMeta({
   layout: 'default',
 });
 
 // =======================================================
-// 🚨 修正: runtimeConfig から API_BASE_URL も取得
+// 認証ストアの取得と状態
 // =======================================================
-const config = useRuntimeConfig();
-const ASSET_BASE_URL = config.public.assetBaseUrl; // Nuxt.configで設定されているはず
-console.log("ASSET_BASE_URL:", ASSET_BASE_URL);
-const API_BASE_URL = config.public.apiBaseUrl; // APIのベースURLも取得
-
+const authStore = useAuthStore();
+const router = useRouter();
 const route = useRoute();
 
+const isLoggedIn = computed(() => authStore.isAuthenticated); 
+// authStore.isLoading は !authStore.isAuthResolved のエイリアス
+
 // =======================================================
-// 型定義
+// runtimeConfig から API_BASE_URL, ASSET_BASE_URL を取得
+// =======================================================
+const config = useRuntimeConfig();
+const ASSET_BASE_URL = config.public.assetBaseUrl;
+const API_BASE_URL = config.public.apiBaseUrl;
+
+
+// =======================================================
+// 型定義 (変更なし)
 // =======================================================
 
 interface Item {
   id: number;
   name: string;
-  price: number | null; // 💡 修正: priceがnullになる可能性を考慮して型に含める
-  item_image: string | null; // 画像パスはAPIから来る
+  price: number | null;
+  item_image: string | null;
   remain: number;
 }
 
@@ -110,45 +101,56 @@ interface Item {
 // 状態管理
 // =======================================================
 
-// 現在のタブの状態 (URLクエリ 'tab' に連動)
 const currentTab = computed(() =>
   route.query.tab === "mylist" ? "mylist" : "all"
 );
-// 現在の検索クエリ (URLクエリ 'all_item_search' に連動)
 const currentSearchQuery = computed(
   () => (route.query.all_item_search as string) || ""
 );
 
 const items = ref<Item[]>([]);
-const loading = ref(true);
+const loading = ref(true); // ★ 商品データのロード状態 (true: ロード中, false: 完了)
+const placeholderImageUrl = 'https://placehold.co/300x300/e0e0e0/333?text=No+Image';
 
 // =======================================================
-// ヘルパー関数
+// テンプレートの v-if/v-else の判断に使用する computed
+// =======================================================
+
+const isPageLoading = computed(() => {
+    // 1. 商品データ自体をロード中であれば、ロード中と見なす
+    if (loading.value) return true; 
+
+    // 2. マイリスト表示時、かつ、まだ認証状態が確定していない場合は、ロード中と見なす
+    //    (authStore.isLoading は !authStore.isAuthResolved の状態)
+    if (currentTab.value === 'mylist' && authStore.isLoading) {
+        return true;
+    }
+
+    // それ以外の場合はロード完了 (allタブでauthStore.isLoadingがtrueでも、データがあれば表示する)
+    return false;
+});
+
+
+// =======================================================
+// ヘルパー関数 (変更なし)
 // =======================================================
 
 /**
  * APIから返された画像パスを、外部アクセス可能なフルURLに変換する
- * @param path Laravelの /storage/... から始まる相対パス
- * @returns フルURL
  */
 const getImageUrl = (path: string | null): string => {
   if (!path) {
-    return 'https://placehold.co/300x300/e0e0e0/333?text=No+Imag'; // フォールバックプレースホルダー
+    return placeholderImageUrl;
   }
   
-  // 1. フルURLが返ってきた場合 (http://...) はそのまま使う
   if (path.startsWith('http')) {
     return path;
   }
   
-  // 2. 相対パスが返ってきた場合、ASSET_BASE_URL と結合する
-  // Laravelのパスは既に "storage/images/..." となっているため、ASSET_BASE_URL (例: http://localhost) と結合する。
-  // Nuxt側の設定 (assetBaseUrl) が 'http://localhost' なら、
-  // 'http://localhost' + '/' + 'storage/images/...' となる
-  const normalizedPath = path.startsWith('/') ? path.substring(1) : path; // 先頭の / を削除
+  const baseUrl = ASSET_BASE_URL.endsWith('/') ? ASSET_BASE_URL.slice(0, -1) : ASSET_BASE_URL;
+  const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
   
-  // ASSET_BASE_URL には通常、末尾に / が含まれていないと仮定して / を追加
-  return `${ASSET_BASE_URL}/${normalizedPath}`;
+  return `${baseUrl}/${normalizedPath}`;
 };
 
 /**
@@ -156,8 +158,7 @@ const getImageUrl = (path: string | null): string => {
  */
 const onImageError = (e: Event, itemName: string) => {
   const target = e.target as HTMLImageElement;
-  target.onerror = null; // エラーの連鎖を防ぐ
-  // 商品名を使ってプレースホルダーを生成 (スペースを + に変換)
+  target.onerror = null;
   const placeholderText = itemName ? itemName.replace(/\s/g, '+') : 'Error';
   target.src = `https://placehold.co/300x300/e0e0e0/333?text=${placeholderText}`;
 };
@@ -167,42 +168,49 @@ const onImageError = (e: Event, itemName: string) => {
 // =======================================================
 
 const fetchItems = async (tab: string, search: string) => {
+  
+  // ★ 修正: 未ログインの場合はリダイレクトせず、APIコールをスキップしてUIにメッセージを表示させる
+  if (tab === 'mylist' && !isLoggedIn.value) {
+    console.log("[Skip Fetch] Not logged in and accessing mylist. Showing login message in UI.");
+    items.value = []; // リストを空にする
+    loading.value = false;
+    return; // APIコールを実行せずに終了
+  }
+  
   loading.value = true;
-  console.log(`Fetching items: tab=${tab}, search=${search}`);
+  console.log(`[Fetch] LoggedIn State: ${isLoggedIn.value}. Fetching items: tab=${tab}, search=${search}`);
 
-  // APIの完全なURLを構築
-  const apiUrl = `${API_BASE_URL}/items`; // ← API_BASE_URL を明示的に使用
+  const apiUrl = `${API_BASE_URL}/items`;
 
   try {
-    // 修正: $fetch を再度使用し、クエリパラメータを渡す
     const response = await $fetch(apiUrl, {
       query: { 
         tab: tab, 
         all_item_search: search,
       },
-      // APIリクエストに認証情報が必要な場合はここに追加:
-      // headers: { 'Authorization': `Bearer ${token.value}` } 
+      credentials: 'include',
     });
 
-    // 🚨 修正箇所: Laravel Controllerからのレスポンスは { items: [...] } 形式であるため、
-    // response.items を直接参照するロジックに統一します。
     const responseData = response as any;
     
     if (responseData && Array.isArray(responseData.items)) {
         items.value = responseData.items as Item[];
+        console.log("Fetched Items data structure:", items.value.slice(0, 3)); 
     } else {
-        // API側がJSONとしてパースできるレスポンスを返さなかった場合は、
-        // $fetchがエラーをスローするため、この警告は主にレスポンス構造が不正な場合に使用される
         console.warn("APIレスポンスの構造が不正です:", responseData);
         items.value = [];
     }
 
-    // 取得したアイテムの数をログに出力
     console.log(`Fetched ${items.value.length} items successfully.`);
 
-  } catch (e) {
-    console.error("商品の取得中にエラーが発生しました:", e);
-    // エラー時はユーザーに何も見せないか、空のリストを表示
+  } catch (e: any) {
+    if (e.response && e.response.status === 401 && tab === 'mylist') {
+        console.error("マイリストの取得中に認証エラー(401)が発生しました。トークン有効期限切れの可能性。");
+        // 401が返された場合は、ログアウト状態とみなし、リダイレクトする (こちらは残す)
+        router.push({ path: '/login' });
+    } else {
+        console.error("商品の取得中に予期せぬエラーが発生しました:", e);
+    }
     items.value = []; 
   } finally {
     loading.value = false;
@@ -210,26 +218,59 @@ const fetchItems = async (tab: string, search: string) => {
 };
 
 // =======================================================
-// Watcher: URLクエリの変更を監視し、データを再取得
+// Watcher: URLクエリとログイン状態の変更を監視し、データを再取得
 // =======================================================
 
-// route.query の変更を深く監視
+// 1. URLクエリの変更を監視
 watch(
   () => route.query,
-  (newQuery) => {
-    fetchItems(
-      newQuery.tab === "mylist" ? "mylist" : "all",
-      (newQuery.all_item_search as string) || ""
-    );
+  async (newQuery) => { // ★ async を追加
+    const nextTab = newQuery.tab === "mylist" ? "mylist" : "all";
+    const nextSearch = (newQuery.all_item_search as string) || "";
+
+    // マイリストに切り替える際、認証がまだ解決中でない場合は待機する
+    if (nextTab === 'mylist' && authStore.isLoading) {
+        console.log("[Watcher] MyList selected, waiting for auth resolution...");
+        // 認証解決を待つ
+        await authStore.waitForAuthResolution();
+        console.log("[Watcher] Auth resolved. Proceeding to fetch.");
+    }
+
+    fetchItems(nextTab, nextSearch);
   },
-  { immediate: true, deep: true } // コンポーネントロード時に即時実行
+  { deep: true }
 );
+
+// 2. ログイン状態の変更を監視 
+watch(isLoggedIn, (newStatus, oldStatus) => {
+  // 初回ロード時（oldStatusがundefinedなどの場合）は onMounted に任せる
+  if (oldStatus !== undefined && oldStatus !== newStatus) {
+    console.log(`[Watcher] LoggedIn status changed from ${oldStatus} to ${newStatus}. Re-fetching items.`);
+    
+    // ログイン/ログアウトが発生したら、現在のタブとクエリで再フェッチ
+    fetchItems(
+      currentTab.value,
+      currentSearchQuery.value
+    );
+  }
+});
+
+// 3. コンポーネントロード時に初回フェッチを実行
+onMounted(async () => { // ★ async を追加
+    // 認証状態の解決を待機する (isLoadingがfalseになるまで)
+    console.log("[onMounted] Waiting for auth resolution...");
+    await authStore.waitForAuthResolution(); 
+    console.log("[onMounted] Auth resolved. Proceeding to fetch items.");
+
+    fetchItems(
+      currentTab.value,
+      currentSearchQuery.value
+    );
+});
 </script>
 
 <style scoped>
-/* =======================================================
-   CSS (Bladeテンプレートから移植)
-   ======================================================= */
+/* ... (CSSは変更なし) ... */
 .main_contents {
   margin: 0 auto;
   max-width: 1400px;
@@ -241,15 +282,10 @@ watch(
   border-bottom: 3px solid #afafaf;
   position: relative;
   display: flex;
-
-  /* 🚨 修正: 左寄せに変更 (Flexboxのデフォルトの挙動) */
+  align-items: center; /* 垂直方向中央寄せ */
   justify-content: flex-start;
-
-  /* 🚨 修正: 左端からのパディングを追加して開始位置を調整 */
   padding-left: 100px;
-
-  /* タブ間のスペース */
-  gap: 50px; /* ここは間隔を少し広めに設定しました */
+  gap: 50px;
 }
 
 .recs,
@@ -258,15 +294,14 @@ watch(
   color: #999;
   font-size: 1.2rem;
   font-weight: bold;
-  padding: 10px 0;
+  /* 垂直中央に合わせるため、padding-bottomを調整 */
+  padding-bottom: 15px; 
   border-bottom: 3px solid transparent;
   transition: all 0.3s ease;
-  display: inline-block;
-  height: 100%;
-  line-height: 80px;
   box-sizing: border-box;
 }
 
+/* ホバーとアクティブのスタイルはそのまま維持 */
 .recs:hover,
 .mylists:hover {
   color: #666;
@@ -307,9 +342,8 @@ watch(
     flex: 0 0 calc(50% - 20px);
   }
   .main_select {
-    /* モバイルでは中央寄せに戻すか、パディングを小さくする */
-    justify-content: center; /* または flex-start */
-    padding-left: 20px; /* 小さな画面ではパディングを減らす */
+    justify-content: flex-start; 
+    padding-left: 20px; 
     gap: 30px;
   }
 }
@@ -346,21 +380,25 @@ watch(
   color: #333;
 }
 
-/* soldタグを画像に重ねるための親要素の調整 */
-.items_select_all a {
+/* soldタグを画像の上に重ねるためのスタイル */
+.items_select_all {
   position: relative;
 }
 .items_select_all .sold-text {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
+  /* 画像に重ねて中央付近に表示 */
+  top: 50%; 
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-10deg); 
   z-index: 10;
-  font-size: 1.2rem;
+  font-size: 1.5rem; 
   color: #ff4041;
-  font-weight: bold;
-  padding: 4px 8px;
+  font-weight: 900;
+  padding: 8px 16px;
   background-color: rgba(255, 255, 255, 0.9);
-  border: 2px solid #ff4041;
-  border-radius: 4px;
+  border: 4px solid #ff4041;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* クリックを透過させる */
 }
 </style>

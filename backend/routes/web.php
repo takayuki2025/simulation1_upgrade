@@ -3,10 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\Auth\AuthController; // AuthControllerを使用
+use App\Http\Controllers\FirebaseAuthController;
 // use App\Http\Controllers\Auth\EmailVerificationController; // 削除: AuthControllerに統合済み
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+
+use Illuminate\Support\Facades\Log; // Log を追加
 
 
 /*
@@ -23,22 +26,96 @@ use Illuminate\Http\Request;
 // =========================================================================
 // 1. Nuxt SPAのフォールバックルート (APIパスを完全に除外)
 // =========================================================================
-// 全てのGETリクエストはNuxtに任せるため、このビューを返す。
-Route::get('{any}', function () {
+// // 全てのGETリクエストはNuxtに任せるため、このビューを返す。
+// Route::get('{any}', function () {
+//     return view('welcome'); 
+// })
+//     // ★★★ 決定的な修正：/api/ で始まるパスは Web ルートで処理しない ★★★
+//     // これにより、POST /api/* のリクエストが Web ルートの処理に流れ込むのを防ぎます
+//     ->where('any', '^(?!api\/).*$')
+//     ->name('nuxt.fallback');
+
+// 1. Nuxt SPAのルート（/ にアクセスがあった場合のみビューを返す）
+// 通常はNginx/Apacheの設定で全てをindex.phpにリライトするため、これも不要な場合がありますが、
+// 安全のため残します。
+Route::get('/', function () {
     return view('welcome'); 
-})
-    // ★★★ 決定的な修正：/api/ で始まるパスは Web ルートで処理しない ★★★
-    // これにより、POST /api/* のリクエストが Web ルートの処理に流れ込むのを防ぎます
-    ->where('any', '^(?!api\/).*$')
-    ->name('nuxt.fallback');
+});
 
 
-Route::get('/login', function () {
+// 'web'ミドルウェアグループとCORSミドルウェアを適用
+Route::middleware(['web', HandleCors::class])->get('/login', function () {
     // APIサーバーとして動作するため、ログイン画面ではなく JSON 401 を返す
     return response()->json([
-        'message' => 'Unauthenticated.'
+        'message' => 'Unauthenticated. Access to this API endpoint requires proper authentication.'
     ], 401);
-})->name('login'); 
+})->name('login');
+
+
+// // ★ FirebaseAuthController の verifyEmail メソッドを Web ルートとして定義
+// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+//     ->middleware(['signed', 'throttle:6,1']) // 署名チェックとレート制限は残す
+//     ->name('verification.verify'); // 名前は Fortify のデフォルト名に合わせておく
+// ★★★ 診断的修正: 'signed' ミドルウェアを一時的に削除 ★★★
+// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+//     // ->middleware(['throttle:6,1']) // signed を削除
+//     ->name('verification.verify'); 
+
+
+
+// ★★★ 【デバッグ用1】セッションが生きているかを確認するルート ★★★
+// ログイン成功後にフロントエンドからこのURLを叩いてください
+Route::get('/debug/check-auth', function () {
+    $isAuthenticated = Auth::check();
+    $userId = Auth::id();
+    
+    // ログに出力
+    Log::info('!!! DEBUG: AUTH CHECK ROUTE HIT !!!', [
+        'is_authenticated' => $isAuthenticated,
+        'user_id' => $userId,
+        // セッションIDをログに出す (ブラウザの Cookie と比較可能)
+        'session_id_from_request' => session()->getId(),
+    ]);
+
+    // JSONレスポンスとして結果を返す
+    return response()->json([
+        'authenticated' => $isAuthenticated,
+        'user_id' => $userId,
+        'message' => $isAuthenticated ? 'Authenticated (認証済み)' : 'Unauthenticated (未認証)',
+        'session_driver' => config('session.driver'),
+    ], 200);
+
+})->middleware('web'); // webミドルウェアグループを適用
+
+// ★★★ 【デバッグ用2】CSRF Cookie 取得ルート (Sanctum) ★★★
+Route::get('/sanctum/csrf-cookie', function (\Illuminate\Http\Request $request) {
+    Log::info('!!! SANCTUM CSRF COOKIE ROUTE HIT !!!');
+    return response('')->cookie(
+        'XSRF-TOKEN', 
+        $request->session()->token(), 
+        config('session.lifetime') * 60,
+        config('session.path'),
+        config('session.domain'),
+        config('session.secure'),
+        false, // httpOnlyはfalse (JSで読み取る必要はないがSanctumのデフォルトに合わせる)
+        config('session.samesite')
+    );
+})->middleware(['web']);
+
+
+// ★★★ 【本番用】メール認証ルートをクロージャ（無名関数）で直接定義 ★★★
+// Route::get('/email/verify/{id}/{hash}', function ($id, $hash) {
+//     Log::info('!!! VERIFY ROUTE HIT SUCCESSFULLY !!!', ['id' => $id, 'hash' => $hash]); 
+//     return "Verification Route Hit! ID: {$id}. Please check Laravel logs for confirmation."; 
+// })
+//     ->name('verification.verify');
+
+
+
+// URL は /api/email/verify/{id}/{hash} となります
+// Route::get('/auth/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+//     // ->middleware(['signed']) // ★ デバッグのため、コメントアウトしたままです
+//     ->name('verification.verify');
 
 // // フロントページを表示し、持続検索機能とタブの切り替えを処理をするルーティング。
 // Route::get('/', [ItemController::class, 'index'])->name('front_page');

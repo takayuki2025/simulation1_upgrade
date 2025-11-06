@@ -21,20 +21,20 @@ export default defineNuxtConfig({
 
   // 修正: プラグインの明示的な登録
   plugins: [
-    "~/plugins/firebase.ts", // ← Firebase プラグインを明示的に登録
+    "~/plugins/00.firebase-service.client.ts",
+    "~/plugins/10.api-interceptor.client.ts",
+    "~/plugins/11.auth-state-resolver.client.ts",
+    "~/plugins/error-logout.ts",
   ],
 
   // Pinia 設定
   pinia: {
-    // Nuxtのエイリアス (~) を使ってストアの場所を明示的に指定
     storesDirs: ["~/stores"],
   },
 
   // エイリアス設定
   alias: {
-    // '@' を現在のディレクトリ（プロジェクトルート）に設定
     "@": currentDir,
-    // '~' のパス解決を Nuxt のルートディレクトリに強制
     "~": currentDir,
     "~/": currentDir,
   },
@@ -42,13 +42,13 @@ export default defineNuxtConfig({
   // 実行時設定 (クライアントとサーバーで利用可能)
   runtimeConfig: {
     public: {
-      // 確認: API Base URLを環境変数から取得。
-      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL,
+      // ★★★ API Base URLを環境変数から取得し、デフォルト値も設定 ★★★
+      apiBaseUrl:
+        process.env.NUXT_PUBLIC_API_BASE_URL || "https://laravel.test:4430/api",
+      assetBaseUrl:
+        process.env.NUXT_PUBLIC_ASSET_BASE_URL || "https://laravel.test:4430",
 
-      // ★★★ 画像参照用のベースURL: 'http://localhost:8000' を使用 ★★★
-      assetBaseUrl: process.env.NUXT_PUBLIC_ASSET_BASE_URL,
-
-      // Firebase 設定を環境変数から取得
+      // Firebase 設定
       firebaseApiKey: process.env.NUXT_PUBLIC_FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       firebaseProjectId: process.env.NUXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -64,7 +64,6 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: ["/app/assets/css/main.css"],
     },
-    // エイリアス解決をViteに強制するプラグインを維持
     plugins: [
       {
         name: "force-css-resolve",
@@ -80,33 +79,28 @@ export default defineNuxtConfig({
         },
       },
     ],
-    // ↓↓↓ 【重要】Viteがエイリアスを正しく解決できるように明示的に設定 ↓↓↓
     resolve: {
       alias: {
         "@": currentDir,
       },
     },
-    // ★★★ 修正箇所: プロキシ設定を復元 ★★★
     server: {
-      proxy: {
-        // /api から始まるリクエストを NUXT_PUBLIC_API_BASE_URL に転送
-        "/api": {
-          target: process.env.NUXT_PUBLIC_API_BASE_URL,
-          changeOrigin: true,
-        },
-        // Sanctum CSRF Cookie の取得パスも転送
-        "/sanctum/csrf-cookie": {
-          target: process.env.NUXT_PUBLIC_API_BASE_URL,
-          changeOrigin: true,
-        },
+      // 🔹 HTTPSをオフにする（CaddyがSSLを担当する）
+      https: false,
+      // 🔹 Nuxt開発サーバを外部（Caddy）から到達可能にする
+      host: "0.0.0.0",
+      port: 3000,
+      cors: true,
+      watch: {
+        usePolling: true,
       },
     },
   },
 
-  // 開発サーバーの設定
   devServer: {
+    // 🔹 念のためこちらも指定（Viteと重複してもOK）
+    host: "0.0.0.0",
     port: 3000,
-    host: "0.0.0.0", // Docker環境で外部からアクセス可能にする
     watch: {
       usePolling: true,
       interval: 100,

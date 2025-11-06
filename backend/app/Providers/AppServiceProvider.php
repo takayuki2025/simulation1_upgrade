@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
 
+use Illuminate\Support\Facades\URL; // ★追加
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -25,5 +27,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Cashier::calculateTaxes();
+
+
+
     }
 }

@@ -1,11 +1,33 @@
 services:
+
+  caddy:
+    image: caddy:2.7.5-alpine
+    restart: unless-stopped
+    ports:
+      # 標準のHTTP/HTTPSポートを公開
+      - "80:80"
+      - "4430:4430"
+      - "4431:4431"  # ★ Nuxt (新規追加)
+    volumes:
+      # Caddyの設定ファイル
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy/laravel.test.pem:/etc/caddy/laravel.test.pem:ro
+      - ./docker/caddy/laravel.test-key.pem:/etc/caddy/laravel.test-key.pem:ro
+      # Caddyが生成するSSL証明書とキーを保存
+      - caddy_data:/data
+    networks:
+      simulation1_network:
+        ipv4_address: 172.22.0.9 # 新しい固定IPを割り当て
+    depends_on:
+      - nginx # Nginxが起動してからCaddyを起動
+
   nginx:
     # image: nginx:1.21.1  <-- 汎用イメージからビルドに変更
     build:
       context: .
       dockerfile: ./docker/nginx/Dockerfile # ★ Nginx専用のDockerfileを使用
-    ports:
-      - "8000:80"
+    # ports:
+    #   - "8000:80"
     volumes:
       # Nginxがビルド成果物を内部でコピーするため、ソースコードのマウントは不要（削除）
       # - ./frontend:/var/www/frontend # <-- この行を削除
@@ -31,6 +53,8 @@ services:
     ports:
       - "9000:9000"
     # ----------------------------------------------------
+    environment:
+      - APP_URL=https://laravel.test:4430
     depends_on:
       - mysql
     networks:
@@ -104,7 +128,7 @@ services:
       - "3000:3000"
     working_dir: /app
     # ★ 修正箇所：npm run dev の後に、ホストオプション '-- --host 0.0.0.0' を追加
-    command: sh -c "VITE_FS_INOTIFY_LIMIT=524288 yarn dev --host 0.0.0.0"
+    command: sh -c "VITE_FS_INOTIFY_LIMIT=524288 yarn dev --host 0.0.0.0 --port 3000 --https false"
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.7
@@ -119,3 +143,5 @@ networks:
 
 volumes:
   mysql_data: ~
+  caddy_data: {}
+  caddy_config:

@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth; // ★ 追記：Authファサードをインポート
 use App\Http\Controllers\FirebaseAuthController;
 use App\Http\Controllers\Auth\AuthController; // ★ 修正 1: AuthController をインポート
 use App\Http\Controllers\ItemController;
@@ -14,6 +15,22 @@ use App\Http\Controllers\ItemController;
 // ログイン処理もこのエンドポイントを使用するように追加します。
 Route::post('/firebase/register', [FirebaseAuthController::class, 'registerAndLogin']);
 Route::post('/firebase/login', [FirebaseAuthController::class, 'registerAndLogin']); // ★ 追加: ログイン用ルート
+
+// // ★ 【重要修正】意図しないGETリクエストをブロックし、明確なエラーを返す
+// Route::get('/firebase/login', function () {
+//     return response()->json([
+//         'message' => 'The login endpoint only supports POST requests. Please check your client-side implementation.'
+//     ], 405);
+// });
+// Route::get('/firebase/register', function () {
+//     return response()->json([
+//         'message' => 'The registration endpoint only supports POST requests. Please check your client-side implementation.'
+//     ], 405);
+// });
+
+    // 認証処理
+Route::post('/logout', [AuthController::class, 'logout']);
+
 // Route::post('/firebase/auth', [FirebaseAuthController::class, 'registerAndLogin'])
 //     ->name('firebase.auth'); 
 
@@ -41,8 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-    // 認証処理
-    Route::post('/logout', [AuthController::class, 'logout']); 
+
     
     // メール認証の再送 (Webから移動)
     Route::post('/email/verification-notification', [AuthController::class, 'resend'])

@@ -1,5 +1,4 @@
 <template>
-  <!-- min-h-screen: 画面の高さいっぱい, bg-gray-100: 背景色 -->
   <div class="auth-wrapper mx-auto max-w-content bg-white shadow-xl min-h-screen">
     
     <header class="header bg-black shadow-md mx-auto max-w-content">
@@ -10,27 +9,34 @@
       </div>
     </header>
     
-    <!-- Main Content: 中央寄せのコンテナ -->
-    <main class="flex items-center justify-center pt-10 px-4">
-      <slot />
+    <main class="flex flex-col items-center justify-start pt-10 px-4">
+      
+      <div v-if="!authStore.isAuthResolved" class="flex flex-col items-center justify-center h-64 text-gray-500 w-full">
+          <svg class="animate-spin h-8 w-8 text-indigo-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p class="text-lg text-gray-800">認証サービスを準備中です...</p>
+      </div>
+      
+      <div v-show="authStore.isAuthResolved" class="w-full">
+          <slot />
+      </div>
+      
     </main>
     
   </div>
 </template>
 
 <script setup lang="ts">
-// 💡 useHeaderStateからロジックをインポートしますが、このレイアウトでは
-//    isAuthPageが常にtrueなので、ロジック自体は使用せず、依存関係を満たすためだけにインポート
-import { useHeaderState } from '../composables/useHeaderState';
-const { isLoggedIn, isLoading, handleLogout, handleSearch } = useHeaderState();
-// 変数を定義することで、テンプレート内でロジックが必要な場合に備える（今回はヘッダーHTMLにロジックが無いため不要）
+import { useAuthStore } from '~/stores/auth';
+
+// Piniaストアを使用
+const authStore = useAuthStore();
 </script>
 
 <style scoped>
-/*
-以前のカスタムCSSを削除し、Tailwind CSSを優先します。
-min-heightを調整して、ヘッダーの高さを考慮に入れます（h-16 = 64px を想定）
-*/
+/* カスタムCSSは元の指定を維持 */
 .max-w-content {
     max-width: 1400px;
 }
@@ -45,7 +51,7 @@ min-heightを調整して、ヘッダーの高さを考慮に入れます（h-16
 }
 
 main {
-  /* min-h-screen からヘッダーの高さ (約64px) を引く */
-  min-height: calc(100vh - 64px); 
+  /* min-h-screen からヘッダーの高さ (約56px: py-3で決定) を引くことで、適切な垂直スペースを確保 */
+  min-height: calc(100vh - 56px); 
 }
 </style>

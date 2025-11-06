@@ -13,8 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
 
         // --- Trust Proxies の設定 (Docker環境向け) ---
+        // 🚨 【修正箇所1】Caddyからのリクエストを全て信頼
         $middleware->trustProxies(at: [
-            '**' 
+            '**'
         ]);
 
         // --- CSRF検証からAPIルートを除外 ---
