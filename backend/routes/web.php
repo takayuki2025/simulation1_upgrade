@@ -35,60 +35,24 @@ use Illuminate\Support\Facades\Log; // Log を追加
 //     ->where('any', '^(?!api\/).*$')
 //     ->name('nuxt.fallback');
 
-// 1. Nuxt SPAのルート（/ にアクセスがあった場合のみビューを返す）
-// 通常はNginx/Apacheの設定で全てをindex.phpにリライトするため、これも不要な場合がありますが、
-// 安全のため残します。
-Route::get('/', function () {
+
+
+// =========================================================================
+// 1. Nuxt SPAのフォールバックルート (重要)
+//    /api/ 以外の全てのGETリクエストはNuxtの index.blade.php を返す
+// =========================================================================
+Route::get('/{any}', function () {
     return view('welcome'); 
-});
+})
+    // /api/ で始まるパスは Web ルートで処理しない
+    ->where('any', '^(?!api\/).*$')
+    ->name('nuxt.fallback');
 
 
-// 'web'ミドルウェアグループとCORSミドルウェアを適用
-Route::middleware(['web', HandleCors::class])->get('/login', function () {
-    // APIサーバーとして動作するため、ログイン画面ではなく JSON 401 を返す
-    return response()->json([
-        'message' => 'Unauthenticated. Access to this API endpoint requires proper authentication.'
-    ], 401);
-})->name('login');
-
-
-// // ★ FirebaseAuthController の verifyEmail メソッドを Web ルートとして定義
-// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-//     ->middleware(['signed', 'throttle:6,1']) // 署名チェックとレート制限は残す
-//     ->name('verification.verify'); // 名前は Fortify のデフォルト名に合わせておく
-// ★★★ 診断的修正: 'signed' ミドルウェアを一時的に削除 ★★★
-// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-//     // ->middleware(['throttle:6,1']) // signed を削除
-//     ->name('verification.verify'); 
-
-
-
-// ★★★ 【デバッグ用1】セッションが生きているかを確認するルート ★★★
-// ログイン成功後にフロントエンドからこのURLを叩いてください
-Route::get('/debug/check-auth', function () {
-    $isAuthenticated = Auth::check();
-    $userId = Auth::id();
-    
-    // ログに出力
-    Log::info('!!! DEBUG: AUTH CHECK ROUTE HIT !!!', [
-        'is_authenticated' => $isAuthenticated,
-        'user_id' => $userId,
-        // セッションIDをログに出す (ブラウザの Cookie と比較可能)
-        'session_id_from_request' => session()->getId(),
-    ]);
-
-    // JSONレスポンスとして結果を返す
-    return response()->json([
-        'authenticated' => $isAuthenticated,
-        'user_id' => $userId,
-        'message' => $isAuthenticated ? 'Authenticated (認証済み)' : 'Unauthenticated (未認証)',
-        'session_driver' => config('session.driver'),
-    ], 200);
-
-})->middleware('web'); // webミドルウェアグループを適用
-
-// ★★★ 【デバッグ用2】CSRF Cookie 取得ルート (Sanctum) ★★★
-Route::get('/sanctum/csrf-cookie', function (\Illuminate\Http\Request $request) {
+// =========================================================================
+// 2. Sanctum CSRF Cookie 取得ルート (webミドルウェア必須)
+// =========================================================================
+Route::get('/sanctum/csrf-cookie', function (Request $request) {
     Log::info('!!! SANCTUM CSRF COOKIE ROUTE HIT !!!');
     return response('')->cookie(
         'XSRF-TOKEN', 
@@ -97,10 +61,109 @@ Route::get('/sanctum/csrf-cookie', function (\Illuminate\Http\Request $request) 
         config('session.path'),
         config('session.domain'),
         config('session.secure'),
-        false, // httpOnlyはfalse (JSで読み取る必要はないがSanctumのデフォルトに合わせる)
+        false, 
         config('session.samesite')
     );
 })->middleware(['web']);
+
+
+// =========================================================================
+// 3. その他 Web ミドルウェアが必要なルート
+// =========================================================================
+
+// 認証が必要な場所へのアクセスを試みた際の login ルート (JSON 401を返す)
+Route::middleware(['web'])->get('/login', function () {
+    return response()->json([
+        'message' => 'Unauthenticated. Access to this API endpoint requires proper authentication.'
+    ], 401);
+})->name('login');
+
+
+// デバッグ用: セッションが生きているかを確認するルート
+Route::get('/debug/check-auth', function () {
+    $isAuthenticated = Auth::check();
+    $userId = Auth::id();
+    
+    Log::info('!!! DEBUG: AUTH CHECK ROUTE HIT !!!', [
+        'is_authenticated' => $isAuthenticated,
+        'user_id' => $userId,
+        'session_id_from_request' => session()->getId(),
+    ]);
+
+    return response()->json([
+        'authenticated' => $isAuthenticated,
+        'user_id' => $userId,
+        'message' => $isAuthenticated ? 'Authenticated (認証済み)' : 'Unauthenticated (未認証)',
+        'session_driver' => config('session.driver'),
+    ], 200);
+
+})->middleware('web');
+
+
+
+
+
+
+// // 1. Nuxt SPAのルート（/ にアクセスがあった場合のみビューを返す）
+// // 通常はNginx/Apacheの設定で全てをindex.phpにリライトするため、これも不要な場合がありますが、
+// // 安全のため残します。
+// Route::get('/', function () {
+//     return view('welcome'); 
+// });
+
+// // 'web'ミドルウェアグループとCORSミドルウェアを適用
+// Route::middleware(['web', HandleCors::class])->get('/login', function () {
+//     // APIサーバーとして動作するため、ログイン画面ではなく JSON 401 を返す
+//     return response()->json([
+//         'message' => 'Unauthenticated. Access to this API endpoint requires proper authentication.'
+//     ], 401);
+// })->name('login');
+
+// // ★★★ 【デバッグ用1】セッションが生きているかを確認するルート ★★★
+// // ログイン成功後にフロントエンドからこのURLを叩いてください
+// Route::get('/debug/check-auth', function () {
+//     $isAuthenticated = Auth::check();
+//     $userId = Auth::id();
+    
+//     // ログに出力
+//     Log::info('!!! DEBUG: AUTH CHECK ROUTE HIT !!!', [
+//         'is_authenticated' => $isAuthenticated,
+//         'user_id' => $userId,
+//         // セッションIDをログに出す (ブラウザの Cookie と比較可能)
+//         'session_id_from_request' => session()->getId(),
+//     ]);
+
+//     // JSONレスポンスとして結果を返す
+//     return response()->json([
+//         'authenticated' => $isAuthenticated,
+//         'user_id' => $userId,
+//         'message' => $isAuthenticated ? 'Authenticated (認証済み)' : 'Unauthenticated (未認証)',
+//         'session_driver' => config('session.driver'),
+//     ], 200);
+
+// })->middleware('web'); // webミドルウェアグループを適用
+
+// // ★★★ 【デバッグ用2】CSRF Cookie 取得ルート (Sanctum) ★★★
+// Route::get('/sanctum/csrf-cookie', function (\Illuminate\Http\Request $request) {
+//     Log::info('!!! SANCTUM CSRF COOKIE ROUTE HIT !!!');
+//     return response('')->cookie(
+//         'XSRF-TOKEN', 
+//         $request->session()->token(), 
+//         config('session.lifetime') * 60,
+//         config('session.path'),
+//         config('session.domain'),
+//         config('session.secure'),
+//         false, // httpOnlyはfalse (JSで読み取る必要はないがSanctumのデフォルトに合わせる)
+//         config('session.samesite')
+//     );
+// })->middleware(['web']);
+
+
+
+
+
+
+
 
 
 // ★★★ 【本番用】メール認証ルートをクロージャ（無名関数）で直接定義 ★★★

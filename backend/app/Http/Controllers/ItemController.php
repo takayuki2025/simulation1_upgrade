@@ -20,6 +20,7 @@ use App\Models\Good;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log; // Logをインポート
 
 
 class ItemController extends Controller 
@@ -189,32 +190,36 @@ class ItemController extends Controller
      */
     public function profile_revise(Request $request)
     {
-        // Route::middleware('auth:sanctum') で保護されているため、Auth::user() は認証済みユーザーを返す
+        // ★ デバッグログの追加: コントローラーに到達したことを確認
+        Log::info('*** [HIT] profile_revise Controller ***', ['url' => $request->fullUrl()]);
+        
+        if (Auth::check()) {
+            Log::info('PROFILE_REVISE: Auth Check OK', ['user_id' => Auth::id()]);
+        } else {
+            // ここに到達し、このログが出た場合、Sanctum認証が機能していません
+            Log::warning('PROFILE_REVISE: Auth Check FAILED - Auth::user() is null');
+        }
+
+        // 認証済みのユーザーを取得
         $user = Auth::user();
 
-        // 認証ミドルウェアが機能しているため、理論上は不要だが安全のため
+        // ユーザーが存在しない、または認証されていない場合は401エラーを返す
         if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            // このレスポンスが出た場合、クライアントはHTMLではなくJSON 401を受け取ります
+            return response()->json(['message' => 'Unauthenticated. Session or Token missing.'], 401);
         }
 
-        $page = $request->input('page', 'sell');
-        $items = collect();
-
-        // pageの値に応じてデータを取得し、JSONで扱いやすい形式に整形
-        if ($page === 'sell') {
-            // 出品した商品を取得
-            $items = Item::where('user_id', $user->id)->get();
-        } elseif ($page === 'buy') {
-            // 購入履歴（OrderHistory）から商品情報（itemリレーション）を取得
-            $orderHistories = OrderHistory::where('user_id', $user->id)->with('item')->get();
-            // Nuxt側で扱いやすいようにOrderHistoryオブジェクトの配列を返す
-            $items = $orderHistories;
-        }
-
+        // ユーザーに紐づく出品商品を取得 (ここでは一旦ユーザー情報のみ)
+        
+        // 取得したユーザーデータをJSON形式で返す
         return response()->json([
-            'user' => $user, // ユーザー情報をそのまま返す
-            'items' => $items, // 整形された商品リストを返す
-            'page' => $page, // 現在のページ情報も返す
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'profile' => $user->profile, // profile_reviseで必要な情報を返す
+                // 他のプロフィール関連のフィールド...
+            ],
         ]);
     }
 

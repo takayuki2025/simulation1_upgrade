@@ -1,24 +1,39 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'; 
+import { ref, watch, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig } from '#app';
-import { storeToRefs } from 'pinia'; 
+import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig, useAsyncData } from '#app';
+import { storeToRefs } from 'pinia';
+import { useApi } from '~/composables/useApi';
 
 // 認証が必要なページであることを示すミドルウェアを設定
 definePageMeta({
   layout: 'default',
 });
 
-// useNuxtApp().$api からカスタムAPIクライアントを取得
+// useNuxtApp().$api のチェックはuseApiに任せるため簡略化
 const { $api } = useNuxtApp();
 if (typeof $api !== 'function') {
   console.error("CRITICAL: $api instance is missing. Check plugins/api-interceptor.ts.");
 }
 
 const authStore = useAuthStore();
-const { isAuthenticated: isAuthed, token: storeToken } = storeToRefs(authStore); 
+const { isAuthenticated: isAuthed } = storeToRefs(authStore);
+const { authenticatedFetch } = useApi(); // useApi composableを呼び出し
 
-const user = ref<any | null>(null);
+// User interface, assuming it matches the backend model
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  uid: string;
+  email_verified_at: string | null;
+  post_number: string | null; 
+  address: string | null;      
+  building: string | null;     
+  user_image?: string | null;
+}
+
+const user = ref<User | null>(null);
 const form = ref<any>({
   name: '',
   post_number: '',
@@ -27,353 +42,503 @@ const form = ref<any>({
 });
 
 const profileErrors = ref<any>({});
-const imageError = ref(''); 
+const imageError = ref('');
 const successMessage = ref('');
-const isLoading = ref(true); 
+// 郵便番号検索中の状態は削除されました
 
-// ユーザー情報取得（初期表示時）
-const fetchUserProfile = async () => {
-  // ロード済みでユーザーデータがあればスキップ
-  if (user.value && !isLoading.value) { 
-    return;
-  }
-  
-  isLoading.value = true;
-  profileErrors.value = {};
-  
-  // 認証ストアの解決を待つ (重要な修正点)
-  await authStore.waitForAuthResolution(); 
+// 認証状態の解決を待つ (トップレベルawait)
+await authStore.waitForAuthResolution();
 
-  // 認証状態の確認
-  if (!isAuthed.value) { 
-      console.log("未認証のためプロフィールページからリダイレクトします。");
-      await navigateTo('/login');
-      return;
-  }
-  
-  // Sanctumセッションの確立を待つためのワンクッション（維持）
-  try {
-      console.log("セッション確立確認のためCSRFトークンを強制取得します...");
-      await authStore.getSanctumCsrfToken();
-      console.log("CSRFトークン取得完了。プロフィール取得へ移行します。");
-  } catch(e) {
-      console.error("CSRFトークン取得に失敗しました。セッションが切れている可能性があります。", e);
-      isLoading.value = false;
-      return;
-  }
-  
-  try {
-    // credentials: 'include' はグローバルインターセプターで設定済み
-    const response = await $api('mypage/profile', {}); 
+/**
+ * APIから取得したユーザーデータでフォームと状態を初期化する
+ * @param data APIから取得した生データ
+ */
+const initializeUserData = (data: any) => {
+    let fetchedUser: User | null = null;
+    
+    // 応答形式の検出ロジック
+    if (data && data.user) {
+        fetchedUser = data.user as User; 
+    } else if (data && data.id && data.name) {
+        fetchedUser = data as User;
+    } 
 
-    if (response && response.user) {
-        user.value = response.user; 
-        
-        form.value.name = response.user.name || '';
-        form.value.post_number = response.user.post_number || '';
-        form.value.address = response.user.address || '';
-        form.value.building = response.user.building || '';
-    } else {
-        console.warn('APIからユーザーデータが取得できませんでした。');
-        user.value = authStore.user; 
+    user.value = fetchedUser;
+    
+    if (user.value) {
+        // フォームへの値の代入ロジック（データがnullでも空文字列で安全に初期化）
+        form.value.name = user.value.name || '';
+        form.value.post_number = user.value.post_number || '';
+        form.value.address = user.value.address || '';
+        form.value.building = user.value.building || '';
     }
+};
 
+// ----------------------------------------------------------------
+// --- 1. useAsyncDataでのユーザー情報取得 ---
+
+const { pending, error } = useAsyncData(
+  'userProfile',
+  // useAsyncDataのファクトリ関数
+  async () => {
+    if (!isAuthed.value) {
+        // 認証されていない場合、APIコールをスキップしログインページへリダイレクト
+        console.log("未認証のためuseAsyncDataをスキップし、ログインへリダイレクトします。");
+        await navigateTo('/login');
+        return null; 
+    }
+    
+    // useApiのラッパーを通してAPIをコール
+    const response = await authenticatedFetch('mypage/profile', {});
+    return response;
+  },
+  {
+    // 認証が解決された後にのみフェッチを実行
+    lazy: true, // ページロード後に非同期でフェッチを開始
+    immediate: isAuthed.value, // 認証済みなら即時実行
+    transform: (response) => {
+        // データ取得後にフォームを初期化
+        initializeUserData(response);
+        return response;
+    },
+    // fetchに失敗した場合のエラーハンドリング
+    // useApi側で401リダイレクトを行うため、ここでは他のエラーを考慮
+    onError: (err) => {
+      console.error('プロフィールデータの初期ロードに失敗しました:', err);
+      successMessage.value = 'プロフィールデータのロードに失敗しました。';
+    }
+  }
+);
+
+// 初期ロード時の成功メッセージ処理
+onMounted(() => {
     const route = useRoute();
-    if (route.query.verified === 'true') {
+    if (user.value && route.query.verified === 'true') {
         successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
         console.log("メール認証完了。クエリパラメータを削除します。");
         
-        await navigateTo({ path: route.path }, { replace: true });
+        // クエリパラメータを削除してURLをクリーンにする
+        navigateTo({ path: route.path }, { replace: true });
     }
-
-  } catch (error: any) { 
-    if (error.response && error.response.status === 401) {
-        console.error('プロフィールデータの取得中に401エラー。インターセプターがリダイレクトを処理します。');
-        return;
-    }
-    
-    console.error('プロフィールデータの取得に失敗しました:', error);
-    successMessage.value = 'プロフィールデータのロードに失敗しました。';
-    user.value = authStore.user; 
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// ----------------------------------------------------
-// 修正点: onMountedフック内で初期データ取得をトリガーする
-// ----------------------------------------------------
-onMounted(() => {
-    console.log("onMounted: プロフィールデータ取得を開始します。");
-    fetchUserProfile();
 });
 
 
-// --- 画像アップロード処理 ---
+// ----------------------------------------------------------------
+// --- 2. 郵便番号からの住所検索機能 ---
+// 郵便番号の監視・検索ロジックはすべて削除されました。
+
+
+// ----------------------------------------------------------------
+// --- 3. 画像アップロード処理 (useApiを使用) ---
+
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
-  if (!file || !user.value) return; 
+  if (!file || !user.value) return;
 
   imageError.value = '';
   successMessage.value = '';
-
+  
   const formData = new FormData();
   formData.append('user_image', file);
 
   try {
-    await authStore.getSanctumCsrfToken(); 
-
-    const response: any = await $api('upload2', { 
-      method: 'POST',
+    // authenticatedFetchを使用
+    const response: any = await authenticatedFetch('upload2', { 
+      method: 'POST', 
       body: formData,
+      headers: {
+        'Accept': 'application/json',
+      }
     });
 
-    user.value.user_image = response.image_path; 
+    // ユーザーオブジェクトのuser_imageパスを更新
+    const imagePath = response.image_path || response.user_image;
+    if (imagePath) {
+        user.value!.user_image = imagePath; 
+    }
+    
     successMessage.value = '画像をアップロードしました。';
 
+
   } catch (error: any) {
-    console.error('画像アップロードに失敗:', error);
+    if (error.status === 401) {
+        // useApiでリダイレクトされるため、ここではメッセージを設定するだけ
+        successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+        return;
+    }
+    
+    console.error('画像アップロードに失敗:', error); 
     if (error.response && error.response.status === 422) {
       imageError.value = error.response._data.errors.user_image?.[0] || '無効なファイルです。';
-    } else if (error.response && error.response.status === 401) {
-      successMessage.value = 'セッションが切れました。再度ログインが必要です。';
-      return; 
     } else {
       imageError.value = 'アップロードに失敗しました。';
     }
   }
 };
 
-// --- プロフィール情報更新処理 ---
+// ----------------------------------------------------------------
+// --- 4. プロフィール情報更新処理 (useApiを使用) ---
+
 const handleProfileUpdate = async () => {
   profileErrors.value = {};
   successMessage.value = '';
-  if (!user.value) return; 
-
+  if (!user.value) return;
+  
   try {
-    await authStore.getSanctumCsrfToken(); 
-    
-    await $api('profile_update', { 
-      method: 'PATCH',
+    // authenticatedFetchを使用
+    const updateResponse: any = await authenticatedFetch('profile_update', { 
+      method: 'PATCH', 
       body: form.value,
     });
 
     successMessage.value = 'プロフィール情報を更新しました！';
     
-    // 成功時、すぐにリダイレクトせずにメッセージを表示するため、navigateToをコメントアウトします
-    // await navigateTo('/', { replace: true });
+    // サーバーからの更新応答が成功した場合、クライアント側のデータを同期させる
+    const updatedUser = updateResponse.user || updateResponse;
+    if (updatedUser && updatedUser.id) {
+        user.value = updatedUser as User;
+    }
+    
+    // フォームも最新の情報で再初期化
+    if (user.value) {
+        form.value.name = user.value.name || '';
+        form.value.post_number = user.value.post_number || '';
+        form.value.address = user.value.address || '';
+        form.value.building = user.value.building || '';
+    }
 
   } catch (error: any) {
-    console.error('プロフィール更新に失敗:', error);
+    if (error.status === 401) {
+        // useApiでリダイレクトされるため、ここではメッセージを設定するだけ
+        successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+        return;
+    }
+    
+    console.error('プロフィール更新に失敗:', error); 
     if (error.response && error.response.status === 422) {
+      // バリデーションエラー
       profileErrors.value = error.response._data.errors;
-    } else if (error.response && error.response.status === 401) {
-      successMessage.value = 'セッションが切れました。再度ログインが必要です。';
-      return; 
     } else {
       successMessage.value = '更新に失敗しました。再度お試しください。';
     }
   }
 };
 
+// ----------------------------------------------------------------
+// --- 5. ヘルパー関数 ---
 
 // プロフィール画像のURLを生成するヘルパー関数
 const getProfileImageUrl = (path: string | undefined | null) => {
+
+  const config = useRuntimeConfig().public;
+  let base = config.apiBaseUrl;
+
+  // /apiで終わっている場合は、それを削除してLaravelのルートURLにする
+  if (base.endsWith('/api')) {
+    base = base.substring(0, base.length - 4);
+  }
+
+  // デフォルト画像パス (Laravelの storage/images/default-profile2.jpg へのパス)
+  const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
+  const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`; 
+
   if (!path) {
-    return '/storage/images/default-profile2.jpg';
+    return DEFAULT_IMAGE_FULL_URL;
   }
-  const base = useRuntimeConfig().public.apiBaseUrl.replace(/\/api$/, '') || ''; 
-  
+
+  // URLがフルパスの場合はそのまま返す
   if (path.startsWith('http')) {
-      return path;
+    return path;
   }
-  
+
+  // データベースにパスが保存されている場合（例: storage/user_images/abc.jpg）
   return `${base}/${path.replace(/^\//, '')}`; 
 };
 
 </script>
 
 <template>
-  <div class="login_page">
-    <h2 class="title">プロフィール設定</h2>
-    
-    <!-- ロード中表示 -->
-    <div v-if="isLoading && !user" class="text-center p-8">
-        <p class="text-lg text-gray-500">データをロード中です...</p>
-    </div>
+<!-- Tailwindで基本のコンテナ設定を適用 -->
+<div class="login_page max-w-[1400px] mx-auto pt-5 pb-10">
+<h2 class="title">プロフィール設定</h2>
 
-    <!-- ユーザーデータが存在する場合のみ中身を描画するガード -->
-    <div v-else-if="user">
-      
-      <div v-if="successMessage" class="alert-success2">
-        {{ successMessage }}
+<!-- ロード中表示 -->
+<div v-if="pending" class="text-center p-8">
+    <p class="text-lg text-gray-500">データをロード中です...</p>
+</div>
+
+<!-- ユーザーデータが存在する場合のみ中身を描画するガード -->
+<div v-else-if="user" class="form-wrapper">
+  
+  <!-- 成功メッセージの表示 (元のCSSでは .alert-success2) -->
+  <div v-if="successMessage" class="alert-success2">
+    {{ successMessage }}
+  </div>
+
+  <!-- 画像アップロードフォーム -->
+  <form @submit.prevent class="item_sell_contents_box_line">
+    <div class="image_name">
+      <!-- 画像とボタンを横並びにするラッパーを追加 -->
+      <div class="image_button_row">
+        <!-- imgタグは user_image_css クラスでScoped CSSの制御下にある -->
+        <img 
+          :src="getProfileImageUrl(user.user_image)" 
+          alt="プロフィール画像" 
+          class="user_image_css"
+        />
+        <!-- ボタンは upload_submit クラスでScoped CSSの制御下にある -->
+        <button 
+          type="button" 
+          class="upload_submit" 
+          @click="$refs.fileInput.click()"
+          :disabled="pending"
+        >
+          画像を選択する
+        </button>
       </div>
+      <!-- Bladeのscriptタグで実現されていた自動送信は、Vueの @change イベントで実現 -->
+      <input 
+        type="file" 
+        name="user_image" 
+        ref="fileInput" 
+        style="display: none;" 
+        @change="handleImageUpload"
+        accept="image/*"
+      />
+    </div>
+    <div class="user_image_error_message">
+      {{ imageError }}
+    </div>
+  </form>
 
-      <!-- 画像アップロードフォーム -->
-      <form @submit.prevent class="item_sell_contents_box_line">
-        <div class="image_name">
-          <img 
-            :src="getProfileImageUrl(user.user_image)" 
-            alt="プロフィール画像" 
-            class="user_image_css"
-          />
-          <button type="button" class="upload_submit" @click="$refs.fileInput.click()">
-            画像を選択する
-          </button>
-          <input 
-            type="file" 
-            name="user_image" 
-            ref="fileInput" 
-            style="display: none;" 
-            @change="handleImageUpload"
-            accept="image/*"
-          />
-        </div>
-        <div class="user_image_error_message">
-          {{ imageError }}
-        </div>
-      </form>
-
-      <!-- プロフィール情報更新フォーム -->
-      <form @submit.prevent="handleProfileUpdate">
+  <!-- プロフィール情報更新フォーム -->
+  <form @submit.prevent="handleProfileUpdate">
+    
+    <!-- ユーザー名 -->
+    <div class="form-group">
         <label class="label_form_1">ユーザー名</label>
         <input type="text" class="name_form" name="name" v-model="form.name" />
         <div class="profile__error">
           {{ profileErrors.name ? profileErrors.name[0] : '' }}
         </div>
-        
-        <label class="label_form_2">郵便番号</label>
-        <input type="text" class="email_form" name="post_number" v-model="form.post_number" />
+    </div>
+    
+    <!-- 郵便番号 -->
+    <div class="form-group">
+        <label class="label_form_2">郵便番号 (7桁、ハイフンなし)</label>
+        <input 
+          type="text" 
+          class="email_form" 
+          name="post_number" 
+          v-model="form.post_number" 
+          placeholder="例: 1000001" 
+          maxlength="7"
+        />
         <div class="profile__error">
           {{ profileErrors.post_number ? profileErrors.post_number[0] : '' }}
         </div>
-        
+    </div>
+    
+    <!-- 住所 -->
+    <div class="form-group">
         <label class="label_form_3">住所</label>
-        <input type="text" class="password_form" name="address" v-model="form.address" />
+        <input type="text" class="password_form" name="address" v-model="form.address" placeholder="手動で入力してください" />
         <div class="profile__error">
           {{ profileErrors.address ? profileErrors.address[0] : '' }}
         </div>
-        
+    </div>
+    
+    <!-- 建物名 -->
+    <div class="form-group">
         <label class="label_form_4">建物名</label>
         <input type="text" class="password_form" name="building" v-model="form.building" />
         <div class="profile__error">
           {{ profileErrors.building ? profileErrors.building[0] : '' }}
         </div>
-        
-        <div class="submit">
-          <input type="submit" class="submit_form" value="更新する" />
-        </div>
-      </form>
     </div>
+    
+    <div class="submit">
+      <input type="submit" class="submit_form" value="更新する" :disabled="pending" />
+    </div>
+  </form>
+</div>
 
-    <!-- ユーザーデータが存在しない、かつロードが完了した場合 -->
-    <div v-else class="text-center p-8">
-        <p class="text-xl text-red-500">ユーザー情報がロードできませんでした。再度ログインしてください。</p>
-    </div>
-  </div>
+<!-- ユーザーデータが存在しない、かつロードが完了した場合 -->
+<div v-else class="text-center p-8">
+    <!-- エラー発生時または未認証リダイレクト後のメッセージ -->
+    <p v-if="error" class="text-xl text-red-500">ユーザー情報の取得中にエラーが発生しました。</p>
+    <p v-else class="text-xl text-red-500">ユーザー情報がロードできませんでした。再度ログインしてください。</p>
+</div>
+
+
+</div>
 </template>
 
 <style scoped>
-/* 以前のCSSを維持 */
+/*
+|--------------------------------------------------------------------------
+| スコープ付きCSS (元のCSSの99%再現を目指す)
+|--------------------------------------------------------------------------
+*/
+
+/* -------------------- 共通コンテナ -------------------- */
 .login_page {
-    text-align: center;
-    margin: 0 auto;
-    max-width: 1400px;
-    padding: 20px;
+text-align: center;
 }
+
 .title {
-    font-size: 2rem;
-    font-weight: bold;
-    margin-bottom: 2rem;
-    color: #4f46e5; 
+font-size: 2rem;
+font-weight: bold;
+margin-bottom: 2rem;
+color: #4f46e5;
 }
+
+.form-wrapper {
+display: inline-block;
+text-align: center;
+}
+
+/* -------------------- メッセージ・エラー -------------------- */
 .alert-success2 {
-    background-color: #d1fae5; 
-    color: #065f46; 
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid #34d399; 
+background-color: #d1fae5;
+color: #065f46;
+padding: 1rem;
+border-radius: 0.5rem;
+margin-bottom: 1.5rem;
+border: 1px solid #34d399;
 }
-.item_sell_contents_box_line {
-    border-bottom: 1px solid #e5e7eb; 
-    padding-bottom: 1.5rem;
-    margin-bottom: 1.5rem;
+
+
+.profile__error, .user_image_error_message {
+color: #ff5555;
+font-size: 15px;
+text-align: left;
+margin-top: -5px;
+margin-bottom: 5px;
+padding-left: 5px;
+width: 400px;
+margin-left: auto;
+margin-right: auto;
 }
-.image_name {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-.user_image_css {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 1rem;
-    border: 3px solid #6366f1; 
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-.upload_submit {
-    background-color: #6366f1; 
-    color: white;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    font-weight: 600;
-}
-.upload_submit:hover {
-    background-color: #4f46e5; 
-}
+
 .user_image_error_message {
-    color: #ef4444; 
-    margin-top: 0.5rem;
+text-align: center;
+position: relative;
+bottom: 20px;
 }
+
+/* -------------------- 画像アップロード (横並び調整) -------------------- */
+
+.item_sell_contents_box_line {
+display: block;
+padding-bottom: 0;
+margin-bottom: 0;
+}
+
+.image_name {
+display: flex;
+justify-content: center;
+align-items: center;
+padding-top: 35px;
+padding-bottom: 60px;
+position: relative;
+}
+
+/* 横並びを実現する新しいラッパー */
+.image_button_row {
+display: flex;
+align-items: center;
+gap: 30px;
+
+position: relative;
+right: 50px; 
+
+
+}
+
+.user_image_css {
+width: 100px;
+height: 100px;
+border-radius: 50%;
+overflow: hidden;
+object-fit: cover;
+object-position: center;
+position: static;
+}
+
+.upload_submit {
+position: static;
+margin: 0;
+
+color: #ff5555;
+font-weight: 700;
+background-color: white;
+border: 1px solid #ff5555;
+border-radius: 5px;
+padding: 5px 10px;
+cursor: pointer;
+white-space: nowrap;
+
+
+}
+
+/* -------------------- フォーム要素 -------------------- */
+
+.form-group {
+width: 400px;
+margin: 0 auto;
+text-align: center;
+}
+
 .label_form_1, .label_form_2, .label_form_3, .label_form_4 {
-    display: block;
-    text-align: left;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    color: #374151; 
+font-weight: 700;
+display: block;
+text-align: left;
+position: relative;
+left: 0;
 }
+
+.label_form_2 { margin-top: 30px; }
+.label_form_3 { margin-top: 30px; }
+.label_form_4 { margin-top: 30px; }
+
 .name_form, .email_form, .password_form {
-    width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid #d1d5db; 
-    border-radius: 0.375rem;
-    box-sizing: border-box;
+width: 400px;
+height: 30px;
+box-sizing: border-box;
+padding: 0 10px;
+margin-bottom: 10px; /* profile__errorとのスペースを確保するため調整 */
+border: 1px solid #d1d5db;
+border-radius: 3px;
 }
-.profile__error {
-    color: #ef4444; 
-    margin-top: -1rem;
-    margin-bottom: 1rem;
-    text-align: left;
-    font-size: 0.875rem;
-}
+
+/* -------------------- 送信ボタン -------------------- */
 .submit {
-    margin-top: 2rem;
+margin-top: 10px;
+display: block;
 }
+
 .submit_form {
-    background-color: #6366f1;
-    color: white;
-    padding: 1rem 2rem;
-    border: none;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    font-size: 1.125rem;
-    font-weight: 700;
-    transition: background-color 0.3s, transform 0.1s;
-    width: 100%;
+position: relative;
+top: 20px;
+width: 400px;
+height: 40px; /* 高さを少し大きくして押しやすく */
+margin: 30px auto;
+background-color: #ff5555;
+border: #ff5555;
+color: white;
+font-weight: 700;
+cursor: pointer;
+border-radius: 5px;
+transition: background-color 0.1s;
 }
+
 .submit_form:hover {
-    background-color: #4f46e5;
+background-color: #e54c4c;
 }
-.submit_form:active {
-    transform: scale(0.99);
+.submit_form:disabled {
+background-color: #9ca3af;
+cursor: not-allowed;
 }
 </style>

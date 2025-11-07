@@ -1,36 +1,40 @@
-import { useAuth } from "~/composables/useAuth";
-import { useRuntimeConfig, navigateTo } from "#app"; // Nuxt 3 の navigateTo をインポート
+import { useAuth } from "~/composables/useAuth"; // 💡 clearTokenのインポートを削除
+import { useRuntimeConfig, navigateTo, useCookie } from "#app";
+import type { NuxtApp } from "#app";
 
 export default defineNuxtPlugin((nuxtApp) => {
-  const { token, clearToken } = useAuth();
-  const config = useRuntimeConfig();
+  // 💡 clearToken は useAuth() の実行結果から取得するため、ここではインポートしない
 
-  // 🌟 $api カスタムインスタンスを定義
   const customFetch = $fetch.create({
-    baseURL: config.public.apiBaseUrl,
-
-    // ★★★ 修正(1): 認証情報 (Cookie) を必ず含めるように設定する ★★★
+    baseURL: useRuntimeConfig().public.apiBase,
     credentials: "include",
 
-    // --- 1. リクエストインターセプター: Authorizationヘッダーの付与とフラグ設定 ---
+    // --- 1. リクエストインターセプター: X-XSRF-TOKENヘッダーの付与 ---
     onRequest({ options }) {
-      // const currentToken = token.value; // Pinia/LocalStorageのトークンはCookie認証では不要
-
-      // if (currentToken) {
-      //   // ★★★ 修正(2): Bearerトークン付与を削除（またはコメントアウト）★★★
-      //   options.headers = options.headers || {};
-      //   options.headers = {
-      //     ...options.headers,
-      //     Authorization: `Bearer ${currentToken}`,
-      //   };
-      // }
+      // headersがない場合に備えて初期化を確実に行う
+      options.headers = options.headers || new Headers();
 
       // Acceptヘッダーが指定されていない場合にデフォルトでJSONを設定
-      if (!options.headers.Accept && !options.headers["accept"]) {
-        options.headers.Accept = "application/json";
+      if (!(options.headers.Accept || options.headers.get("Accept"))) {
+        options.headers.set("Accept", "application/json");
       }
 
-      // CSRFトークンヘッダーは、credentials: 'include' があれば $fetch が自動的に処理します。
+      // 💡 修正: CookieからXSRF-TOKENを読み取り、ヘッダーに設定する
+      if (process.client) {
+        // useCookie()はクライアント側でのみ動作
+        const xsrfCookie = useCookie("XSRF-TOKEN");
+        const tokenValue = xsrfCookie.value;
+
+        if (tokenValue) {
+          // XSRF-TOKEN Cookieの値を、X-XSRF-TOKEN ヘッダーとして送信
+          options.headers.set("X-XSRF-TOKEN", tokenValue);
+          console.log(
+            `[CSRF] X-XSRF-TOKEN set: ${tokenValue.substring(0, 10)}...`
+          );
+        } else {
+          console.warn("[CSRF] XSRF-TOKEN cookie not found.");
+        }
+      }
     },
 
     // --- 2. レスポンスエラーインターセプター: 401 Unauthorized の捕捉 ---
@@ -57,7 +61,8 @@ export default defineNuxtPlugin((nuxtApp) => {
           `🚨 [GLOBAL 401 INTERCEPTOR] 401エラーを捕捉: ${url}。強制ログアウト処理を実行します。`
         );
 
-        // クライアント側のトークンを削除 (Pinia/LocalStorageのクリーンアップ)
+        // 💡 修正: useAuth() を呼び出し、clearToken 関数を取得して実行
+        const { clearToken } = useAuth();
         clearToken();
 
         // ログインページへリダイレクト
