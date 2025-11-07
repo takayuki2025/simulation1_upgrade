@@ -65,18 +65,27 @@ class UsersTableSeeder extends Seeder
             ],
         ];
 
+        // 🚨 【修正ポイント１：DBからの強力なクリーンアップ】
+        // シード実行前に、メールアドレスに基づいてDBから既存ユーザーを強制削除します。
+        // これにより、UniqueConstraintViolationException の発生を回避します。
+        $emailsToCleanup = array_column($testUsers, 'email');
+        User::whereIn('email', $emailsToCleanup)->delete();
+        // ---------------------------------------------------------------------
+
         foreach ($testUsers as $userData) {
             $email = $userData['email'];
             $password = $userData['password'];
 
             // 1. Firebase Auth ユーザーを作成（既存なら削除して再作成）
             try {
-                // クリーンアップ: Firebase Auth と MySQL から既存ユーザーを削除
+                // クリーンアップ: Firebase Auth から既存ユーザーを削除
                 try {
                     $userRecord = $this->firebaseAuth->getUserByEmail($email);
                     $this->firebaseAuth->deleteUser($userRecord->uid);
+                    
                     // 削除時は email ではなく firebase_uid で検索
-                    User::where('firebase_uid', $userRecord->uid)->delete();
+                    // User::where('firebase_uid', $userRecord->uid)->delete(); 
+                    // ↑ 既に run() の冒頭でメールアドレスをキーに削除済みのためこの行は不要
                 } catch (\Exception $e) {
                     // ユーザーが存在しなかった場合は無視
                 }
@@ -95,7 +104,7 @@ class UsersTableSeeder extends Seeder
                     [
                         'name' => $userData['name'],
                         'email' => $email,
-                        // Laravel DBのパスワードはNOT NULL制約回避のためランダム文字列を設定（Firebaseで認証するためこのパスワードは使用しない）
+                        // Laravel DBのパスワードはNOT NULL制約回避のためランダム文字列を設定
                         'password' => Hash::make(\Illuminate\Support\Str::random(16)), 
                         'post_number' => $userData['post_number'],
                         'address' => $userData['address'],

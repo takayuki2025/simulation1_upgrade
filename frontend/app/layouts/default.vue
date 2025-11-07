@@ -3,8 +3,8 @@
   <div class="site-wrapper mx-auto max-w-content bg-white shadow-xl min-h-screen">
     
     <!-- 1. 認証状態の解決を待つローディング画面 (最優先で表示) -->
-    <!-- authStore.isResolvingAuth が isLoading と同じ役割を果たしていると仮定 -->
-    <div v-if="authStore.isResolvingAuth" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-[100]">
+    <!-- authStore.isAuthResolved が false の間、全画面をブロック -->
+    <div v-if="!authStore.isAuthResolved" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-[100]">
       <div class="flex flex-col items-center">
         <!-- シンプルなスピナー -->
         <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -39,7 +39,8 @@
           <div class="login_page0 flex space-x-4 items-center ml-auto">
             
             <!-- 認証が完了している場合の表示 -->
-            <template v-if="authStore.isAuthenticated">
+            <!-- ★★★ 修正箇所: authStore.isAuthenticated から authStore.user の有無のチェックに変更 ★★★ -->
+            <template v-if="authStore.user">
               <!-- ログイン済みユーザー向け (ログアウト、マイページ、出品) -->
               <button @click="handleLogout" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
                 ログアウト
@@ -73,10 +74,6 @@
       
       <!-- メインコンテンツ領域 -->
       <main class="main-content min-h-[calc(100vh-64px)] p-4 md:p-8">
-        <!-- 
-          ★★★ 修正: <NuxtPage /> を <slot /> に置き換えます。★★★ 
-          レイアウトファイルでは、ページコンテンツの挿入に <slot /> を使用します。
-        -->
         <slot />
       </main>
 
@@ -100,6 +97,7 @@ const searchQuery = ref(route.query.all_item_search || "");
 // ログアウト処理
 const handleLogout = async () => {
   try {
+    // authStore.logout() が完了すると authStore.user が null に更新されます。
     await authStore.logout();
     // ログアウト後、ホームにリダイレクト
     router.push("/");
@@ -143,6 +141,7 @@ const handleSearch = () => {
 }
 /* ヘッダーの高さに合わせてメインコンテンツの高さを調整（例としてヘッダーを64pxと仮定） */
 .main-content {
+  /* ヘッダーの高さを考慮して、ビューポートの残りの高さを確保 */
   min-height: calc(100vh - 64px); 
 }
 </style>

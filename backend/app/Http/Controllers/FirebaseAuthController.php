@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth; // ★ 追記：Authファサードをインポート
+use Illuminate\Support\Facades\Auth;
 use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 use App\Models\User;
 use Throwable;
@@ -37,18 +37,15 @@ class FirebaseAuthController extends Controller
         $idToken = $request->input('id_token');
 
         try {
-            // ★ DEBUG: Admin SDK初期化前
             Log::info('DEBUG: Start Firebase Auth instance acquisition.');
 
             $auth = app(FirebaseAuth::class); 
 
-            // ★ DEBUG: Admin SDK初期化後
             Log::info('DEBUG: Firebase Auth instance acquired. Start ID Token verification.');
 
             // IDトークンを検証
             $verifiedIdToken = $auth->verifyIdToken($idToken);
             
-            // ★ DEBUG: ID Token検証成功
             Log::info('DEBUG: ID Token successfully verified.');
             
             $uid = $verifiedIdToken->claims()->get('sub');
@@ -63,31 +60,44 @@ class FirebaseAuthController extends Controller
                 // ---------------------
                 // ★ 新規登録処理 / メール重複時の紐付け処理 ★
                 // ---------------------
-                $name = $request->input('name'); 
-                $email = $request->input('email'); 
+                $nameFromRequest = $request->input('name'); 
+                $emailFromRequest = $request->input('email'); 
+                $nameFromToken = $verifiedIdToken->claims()->get('name'); // ★ 追記: Firebaseトークンに含まれる名前を取得
 
-                $registerEmail = $emailFromToken ?? $email;
+                $registerEmail = $emailFromToken ?? $emailFromRequest;
                 
-                // ★ 修正箇所: nameが空の場合、メールアドレスのローカルパート（@より前）を使用する
-                if (empty($name) && !empty($registerEmail)) {
-                    // メールアドレスの @ より前の部分を抽出
+                // ★★★ 修正・改善箇所：名前の決定ロジックを優先順位に基づいて変更 ★★★
+                $registerName = null;
+
+                if (!empty($nameFromRequest)) {
+                    // 1. Requestで送られてきた名前を最優先
+                    $registerName = $nameFromRequest;
+                    Log::info('Name source: Request input.');
+                } elseif (!empty($nameFromToken)) {
+                    // 2. Requestの名前が空の場合、Firebaseトークンの表示名を使用
+                    $registerName = $nameFromToken;
+                    Log::info('Name source: Firebase Token.');
+                } elseif (!empty($registerEmail)) {
+                    // 3. どちらも空の場合、メールアドレスのローカルパートを最終手段として使用
                     $localPart = explode('@', $registerEmail)[0];
                     $registerName = $localPart;
+                    Log::warning('Name source: Fallback to Email Local Part.');
                 } else {
-                    $registerName = $name;
-                }
-                
-                // ★★★ データベースの制約に合わせて name の長さを制限する ★★★
-                $maxLength = 30; // usersテーブルのnameカラムの最大長に合わせて調整
-                if (mb_strlen($registerName) > $maxLength) {
-                    $registerName = mb_substr($registerName, 0, $maxLength);
-                    Log::warning("Name was truncated to {$maxLength} characters to fit database schema.");
+                     // どのソースからも名前が取得できない場合
+                     $registerName = null;
                 }
                 // ★★★ 修正箇所ここまで ★★★
                 
+                // データベースの制約に合わせて name の長さを制限する (既存のロジックを維持)
+                $maxLength = 30; // usersテーブルのnameカラムの最大長に合わせて調整
+                if (!empty($registerName) && mb_strlen($registerName) > $maxLength) {
+                    $registerName = mb_substr($registerName, 0, $maxLength);
+                    Log::warning("Name was truncated to {$maxLength} characters to fit database schema.");
+                }
+                
                 // 登録に必要な最終チェック
                 if (empty($registerName) || empty($registerEmail)) {
-                    Log::error("Registration attempt failed: Name/Email missing from both Request and Firebase claims for UID {$uid}.");
+                    Log::error("Registration attempt failed: Name/Email missing from all sources for UID {$uid}.");
                     return response()->json(['error' => 'User not found in database and name/email are required for registration.'], 400);
                 }
 
@@ -109,7 +119,7 @@ class FirebaseAuthController extends Controller
                     try {
                         $user = DB::transaction(function () use ($uid, $registerName, $registerEmail, $isEmailVerified) {
                             $newUser = User::create([
-                                'name' => $registerName, // ★ 修正された短いnameを使用
+                                'name' => $registerName, 
                                 'email' => $registerEmail,
                                 'password' => Hash::make($uid),
                                 'firebase_uid' => $uid,
@@ -125,8 +135,7 @@ class FirebaseAuthController extends Controller
                         Log::info("New user registered successfully with UID: {$uid}. Name used: {$registerName}");
                         
                     } catch (\Illuminate\Database\QueryException $e) {
-                        // ★★★ 新規登録失敗時のフォールバック処理 ★★★
-                        // SQLSTATE[23000] (Integrity constraint violation) を捕捉
+                        // 新規登録失敗時のフォールバック処理 (既存のロジックを維持)
                         if ($e->getCode() === '23000') {
                             Log::warning("Attempted registration failed due to Duplicate Entry, falling back to association check: {$registerEmail}");
                             
@@ -140,7 +149,6 @@ class FirebaseAuthController extends Controller
                                 $user->save();
                                 Log::info("Successfully associated existing user by email ({$registerEmail}) after failed insert.");
                             } else {
-                                // ここに到達した場合、データベースに致命的な矛盾があるため、元の例外をスロー
                                 Log::error("Critical Error: Duplicate entry detected but user not found on second check.");
                                 throw $e;
                             }
@@ -149,7 +157,6 @@ class FirebaseAuthController extends Controller
                             throw $e;
                         }
                     }
-                    // ★★★ 修正箇所ここまで ★★★
                 }
 
             } else {
@@ -166,20 +173,16 @@ class FirebaseAuthController extends Controller
                 }
             }
             
-            // ★ DEBUG: DB処理完了後
             Log::info('DEBUG: User check/registration completed successfully.');
 
 
             // 4. Sanctumトークンの生成
-            // $userがtry-catchまたはif-elseブロック内で確実に設定されていることを前提とする
             if (!$user) {
-                // 非常に稀なケースだが、ユーザーオブジェクトが設定されていない場合の安全策
                 Log::error("Authentication failed: User object is null after all registration/login attempts.");
                 return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
             }
             
-            // ★★★ 修正箇所: 強制的にDBから最新の状態を再ロードする (User::findを使うことでrefresh()よりも確実性を高める) ★★★
-            // ユーザーモデルのキャッシュ問題を解決するために、DBからIDで直接再取得する
+            // 強制的にDBから最新の状態を再ロードする (既存のロジックを維持)
             $user = User::find($user->id); 
             
             if (!$user) {
@@ -187,12 +190,10 @@ class FirebaseAuthController extends Controller
                 return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
             }
             Log::info('DEBUG: User model reloaded from database (User::find) to ensure latest verification status.');
-            // ★★★ 修正箇所ここまで ★★★
 
-            // ★★★ 【決定的な修正】Laravelセッションにログイン情報を強制的に書き込む ★★★
+            // Laravelセッションにログイン情報を強制的に書き込む (既存のロジックを維持)
             Auth::login($user); 
             Log::info('DEBUG: User successfully logged into web guard session using Auth::login.');
-            // ★★★ 修正箇所ここまで ★★★
 
             $user->tokens()->delete();
             Log::info('DEBUG: Old tokens deleted.');
@@ -201,7 +202,6 @@ class FirebaseAuthController extends Controller
             Log::info('DEBUG: New Sanctum token created.');
 
             // 5. JSONレスポンスを返す
-            // このログに出力される$user->email_verified_atがnullでないことを確認します
             Log::info('Returning user data (Sanctum/Firebase):', [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -210,7 +210,6 @@ class FirebaseAuthController extends Controller
                 'email_verified_at' => $user->email_verified_at,
             ]);
             
-            // ★ DEBUG: レスポンス直前
             Log::info('DEBUG: Preparing final JSON response.');
 
             return response()->json([
@@ -228,7 +227,6 @@ class FirebaseAuthController extends Controller
             Log::error("Firebase Invalid ID Token: " . $e->getMessage());
             return response()->json(['error' => 'Invalid Firebase ID Token.'], 401);
         } catch (Throwable $e) {
-            // 致命的なエラーもこれで捕捉できるようになります
             Log::error("Auth/Register Error: " . $e->getMessage());
             return response()->json(['error' => 'Server authentication failed.', 'details' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }

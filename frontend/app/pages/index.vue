@@ -6,7 +6,15 @@
     <!-- 💡 isPageLoading を使用: 商品データロード中、またはマイリストタブで認証確認中の場合にローディングを表示 -->
     <div v-if="isPageLoading" class="flex justify-center items-center h-48">
       <div class="animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"></div>
-      <p class="ml-4 text-lg text-gray-600">{{ currentTab.value === 'mylist' ? '認証状態を確認中...' : '商品を読み込み中...' }}</p>
+      <p class="ml-4 text-lg text-gray-600">
+        {{ 
+          authStore.isLoggingOut 
+            ? 'ログアウト処理中...' 
+            : currentTab.value === 'mylist' 
+              ? '認証状態を確認中...' 
+              : '商品を読み込み中...' 
+        }}
+      </p>
     </div>
 
     <div v-else>
@@ -50,7 +58,8 @@
             </div>
           </template>
           <div v-else class="text-center w-full py-10 text-gray-500">
-            <p>{{ currentTab.value === 'mylist' && !isLoggedIn ? 'マイリストを見るにはログインしてください。' : '該当する商品が見つかりませんでした。' }}</p>
+            <!-- テンプレート側のチェックは isUserLoggedOutComputed で維持 -->
+            <p>{{ currentTab.value === 'mylist' && isUserLoggedOutComputed ? 'マイリストを見るにはログインしてください。' : '該当する商品が見つかりませんでした。' }}</p>
           </div>
         </div>
     </div>
@@ -58,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from "vue";
+import { ref, watch, computed, onMounted, nextTick } from "vue"; 
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { $fetch } from "ofetch";
@@ -73,9 +82,6 @@ definePageMeta({
 const authStore = useAuthStore();
 const router = useRouter();
 const route = useRoute();
-
-const isLoggedIn = computed(() => authStore.isAuthenticated); 
-// authStore.isLoading は !authStore.isAuthResolved のエイリアス
 
 // =======================================================
 // runtimeConfig から API_BASE_URL, ASSET_BASE_URL を取得
@@ -109,30 +115,40 @@ const currentSearchQuery = computed(
 );
 
 const items = ref<Item[]>([]);
-const loading = ref(true); // ★ 商品データのロード状態 (true: ロード中, false: 完了)
+const loading = ref(true); 
 const placeholderImageUrl = 'https://placehold.co/300x300/e0e0e0/333?text=No+Image';
+
+// 画像の強制リフレッシュ用キーを導入
+const imageRefreshKey = ref(0);
 
 // =======================================================
 // テンプレートの v-if/v-else の判断に使用する computed
 // =======================================================
 
 const isPageLoading = computed(() => {
+    // ログアウト処理中であれば最優先でローディング表示
+    if (authStore.isLoggingOut) return true;
+
     // 1. 商品データ自体をロード中であれば、ロード中と見なす
     if (loading.value) return true; 
 
     // 2. マイリスト表示時、かつ、まだ認証状態が確定していない場合は、ロード中と見なす
-    //    (authStore.isLoading は !authStore.isAuthResolved の状態)
     if (currentTab.value === 'mylist' && authStore.isLoading) {
         return true;
     }
 
-    // それ以外の場合はロード完了 (allタブでauthStore.isLoadingがtrueでも、データがあれば表示する)
     return false;
+});
+
+// テンプレートのログインメッセージ表示に使用するComputed
+const isUserLoggedOutComputed = computed(() => {
+    // 認証が解決済み(isLoading=false)で、かつユーザーが存在しない場合に「ログアウト状態」と判断
+    return !authStore.isLoading && !authStore.user; 
 });
 
 
 // =======================================================
-// ヘルパー関数 (変更なし)
+// ヘルパー関数 (修正)
 // =======================================================
 
 /**
@@ -150,7 +166,10 @@ const getImageUrl = (path: string | null): string => {
   const baseUrl = ASSET_BASE_URL.endsWith('/') ? ASSET_BASE_URL.slice(0, -1) : ASSET_BASE_URL;
   const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
   
-  return `${baseUrl}/${normalizedPath}`;
+  // キャッシュバスターとして imageRefreshKey の値を付加
+  const cacheBuster = `?t=${imageRefreshKey.value}`;
+  
+  return `${baseUrl}/${normalizedPath}${cacheBuster}`;
 };
 
 /**
@@ -169,44 +188,72 @@ const onImageError = (e: Event, itemName: string) => {
 
 const fetchItems = async (tab: string, search: string) => {
   
-  // ★ 修正: 未ログインの場合はリダイレクトせず、APIコールをスキップしてUIにメッセージを表示させる
-  if (tab === 'mylist' && !isLoggedIn.value) {
+  const isAuthenticatedByStore = !!authStore.user; 
+  
+  // ログアウト処理中はAPIコールを完全にブロックする
+  if (authStore.isLoggingOut) {
+      console.log("[Skip Fetch] ログアウト処理中のためフェッチをブロック。");
+      items.value = [];
+      loading.value = false;
+      return;
+  }
+
+  // マイリストタブかつ未ログインの場合、フェッチをスキップ
+  if (tab === 'mylist' && !isAuthenticatedByStore) { 
     console.log("[Skip Fetch] Not logged in and accessing mylist. Showing login message in UI.");
     items.value = []; // リストを空にする
     loading.value = false;
-    return; // APIコールを実行せずに終了
+    imageRefreshKey.value++; // キーを更新する
+    return;
   }
   
   loading.value = true;
-  console.log(`[Fetch] LoggedIn State: ${isLoggedIn.value}. Fetching items: tab=${tab}, search=${search}`);
+  console.log(`[Fetch] Store Check: ${isAuthenticatedByStore}. User ID: ${authStore.user?.id || 'N/A'}. Fetching items: tab=${tab}, search=${search}`);
 
   const apiUrl = `${API_BASE_URL}/items`;
 
+  // --- 修正箇所: リクエストオプションを動的に定義 ---
+  // ログインしている場合のみ credentials: 'include' を設定する
+  const requestOptions: { query: any, credentials?: 'include' } = {
+    query: { 
+      tab: tab, 
+      all_item_search: search,
+    },
+  };
+
+  if (isAuthenticatedByStore) {
+    // 認証済みの場合、Cookieを含める
+    requestOptions.credentials = 'include';
+    console.log("[Fetch] Including 'credentials: include'.");
+  } else {
+    // 未認証の場合、Cookieを含めない (デフォルト動作)
+    console.log("[Fetch] Not including 'credentials: include'. (Anonymous access)");
+  }
+  // --------------------------------------------------
+
+
   try {
-    const response = await $fetch(apiUrl, {
-      query: { 
-        tab: tab, 
-        all_item_search: search,
-      },
-      credentials: 'include',
-    });
+    // 修正: requestOptions を渡す
+    const response = await $fetch(apiUrl, requestOptions);
 
     const responseData = response as any;
     
     if (responseData && Array.isArray(responseData.items)) {
         items.value = responseData.items as Item[];
+        // データが取得できたらキーを更新して強制リフレッシュ
+        imageRefreshKey.value++; 
         console.log("Fetched Items data structure:", items.value.slice(0, 3)); 
     } else {
         console.warn("APIレスポンスの構造が不正です:", responseData);
         items.value = [];
     }
 
-    console.log(`Fetched ${items.value.length} items successfully.`);
+    console.log(`Fetched ${items.value.length} items successfully. New Image Key: ${imageRefreshKey.value}`);
 
   } catch (e: any) {
     if (e.response && e.response.status === 401 && tab === 'mylist') {
-        console.error("マイリストの取得中に認証エラー(401)が発生しました。トークン有効期限切れの可能性。");
-        // 401が返された場合は、ログアウト状態とみなし、リダイレクトする (こちらは残す)
+        console.error("マイリストの取得中に認証エラー(401)が発生しました。トークン有効期限切れの可能性。強制ログアウトします。");
+        authStore.logout(); 
         router.push({ path: '/login' });
     } else {
         console.error("商品の取得中に予期せぬエラーが発生しました:", e);
@@ -224,28 +271,30 @@ const fetchItems = async (tab: string, search: string) => {
 // 1. URLクエリの変更を監視
 watch(
   () => route.query,
-  async (newQuery) => { // ★ async を追加
+  async (newQuery) => { 
     const nextTab = newQuery.tab === "mylist" ? "mylist" : "all";
     const nextSearch = (newQuery.all_item_search as string) || "";
 
-    // マイリストに切り替える際、認証がまだ解決中でない場合は待機する
     if (nextTab === 'mylist' && authStore.isLoading) {
         console.log("[Watcher] MyList selected, waiting for auth resolution...");
-        // 認証解決を待つ
         await authStore.waitForAuthResolution();
         console.log("[Watcher] Auth resolved. Proceeding to fetch.");
     }
+    
+    await nextTick();
 
     fetchItems(nextTab, nextSearch);
   },
   { deep: true }
 );
 
-// 2. ログイン状態の変更を監視 
-watch(isLoggedIn, (newStatus, oldStatus) => {
-  // 初回ロード時（oldStatusがundefinedなどの場合）は onMounted に任せる
-  if (oldStatus !== undefined && oldStatus !== newStatus) {
-    console.log(`[Watcher] LoggedIn status changed from ${oldStatus} to ${newStatus}. Re-fetching items.`);
+// 2. ログイン状態の変更を監視 (authStore.user の変化を監視)
+watch(() => authStore.user, (newUser, oldUser) => {
+  const newStatus = !!newUser;
+  const oldStatus = !!oldUser;
+
+  if (oldStatus !== newStatus) {
+    console.log(`[Watcher] Authentication status changed from ${oldStatus} to ${newStatus}. Re-fetching items.`);
     
     // ログイン/ログアウトが発生したら、現在のタブとクエリで再フェッチ
     fetchItems(
@@ -256,11 +305,12 @@ watch(isLoggedIn, (newStatus, oldStatus) => {
 });
 
 // 3. コンポーネントロード時に初回フェッチを実行
-onMounted(async () => { // ★ async を追加
-    // 認証状態の解決を待機する (isLoadingがfalseになるまで)
+onMounted(async () => { 
     console.log("[onMounted] Waiting for auth resolution...");
     await authStore.waitForAuthResolution(); 
     console.log("[onMounted] Auth resolved. Proceeding to fetch items.");
+    
+    await nextTick();
 
     fetchItems(
       currentTab.value,

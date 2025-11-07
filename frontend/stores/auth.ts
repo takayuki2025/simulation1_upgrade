@@ -4,8 +4,7 @@ import { useCookie, useRuntimeConfig, useNuxtApp } from "#app";
 // 新しいトークン管理Composableをインポート
 import { useAuth } from "~/composables/useAuth";
 
-// ★★★ 追記: 商品データを管理するストアをインポートしてください ★★★
-// 実際のファイルパスに合わせて修正が必要です
+// ★★★ 修正: itemStoreの適切なパスを仮定してインポート ★★★
 import { useItemStore } from "./item";
 
 // Firebaseのインポート
@@ -17,6 +16,7 @@ import {
   onAuthStateChanged,
   Unsubscribe,
   User as FirebaseAuthUser,
+  updateProfile, // ★ 追記: updateProfileをインポート
 } from "firebase/auth";
 
 // 1. interface User を Firebase と MySQL のデータ構造に合わせて定義
@@ -30,11 +30,11 @@ interface User {
 }
 
 interface AuthState {
-  // Piniaストアでは、Composablesから取得するトークンを使用するため、ここではnullのまま
   token: string | null;
   user: User | null;
   isInitialized: boolean;
-  isLoading: boolean;
+  isLoading: boolean; // 認証状態の解決が完了するまでtrue (isAuthResolvedの逆)
+  isLoggingOut: boolean;
   _authUnsubscribe: Unsubscribe | null;
   _sessionKeeperInterval: number | null;
 }
@@ -47,8 +47,12 @@ interface RegisterForm {
   password_confirmation: string;
 }
 
-// $fetch の型を定義 (グローバルな型定義に依存しないために、ここでanyを使用)
+// $fetch の型を定義
 declare const $fetch: typeof globalThis.fetch;
+
+// ★★★ 認証解決を待機するためのグローバルなPromise (ストア外に維持) ★★★
+let authPromise: Promise<void> | null = null;
+let resolveAuthPromise: (() => void) | null = null;
 
 /**
  * 【最終版】Firebase Auth インスタンスを安全に取得するヘルパー関数
@@ -60,39 +64,35 @@ const getFirebaseAuth = (): Auth | null => {
     return $firebaseAuth;
   }
   if (process.server) {
-    console.warn(
-      "Attempted to access Firebase Auth on the server. Returning null."
-    );
+    // サーバーサイドでは警告のみ
     return null;
   }
   console.error(
-    "CRITICAL: Firebase Authインスタンスが利用できません。nuxtApp.$firebaseAuth が null です。プラグイン（plugins/firebase.ts）の初期化設定を確認してください。"
+    "CRITICAL: Firebase Authインスタンスが利用できません。プラグインの初期化設定を確認してください。"
   );
   return null;
 };
 
-// 認証解決を待機するためのグローバルなPromise
-let authPromise: Promise<void> | null = null;
-let resolveAuthPromise: (() => void) | null = null;
-
 export const useAuthStore = defineStore("auth", {
   state: (): AuthState => ({
-    token: null, // useAuth()からリアクティブに取得するため、ここではnullを維持
+    token: null,
     user: null,
     isInitialized: false,
-    isLoading: true, // 認証状態の解決が完了するまでtrue
-    _authUnsubscribe: null, // 初期値はnull
-    _sessionKeeperInterval: null, // 初期値はnull
+    isLoading: true,
+    isLoggingOut: false,
+    _authUnsubscribe: null,
+    _sessionKeeperInterval: null,
   }),
 
   getters: {
     // 認証状態の確認を useAuth() のトークンに依存させる
     isAuthenticated: (state) => {
       const { isAuthenticated } = useAuth();
+      // userデータも確実に存在することを確認
       return isAuthenticated.value && !!state.user;
     },
     // 認証状態の解決が完了しているか（画面描画の準備完了）
-    isAuthResolved: (state) => !state.isLoading,
+    isAuthResolved: (state) => !state.isLoading, // ★★★ isAuthResolved は isLoading の逆 ★★★
     // メール認証が完了しているかどうかをチェックするゲッター
     isEmailVerified: (state) => !!state.user && !!state.user.email_verified_at,
   },
@@ -104,7 +104,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // APIのbaseURLを動的に取得する（変更なし）
+    // APIのbaseURLを動的に取得する
     // ----------------------------------------------------
     getApiBaseUrl(): string {
       const config = useRuntimeConfig();
@@ -120,7 +120,6 @@ export const useAuthStore = defineStore("auth", {
             "php"
           );
           const finalPhpBaseUrl = phpBaseUrl.replace(/:(\d+)/, ":9000");
-          // console.log(`[API Base] SSR (to PHP-FPM): ${finalPhpBaseUrl}`);
           return finalPhpBaseUrl;
         } catch (e) {
           console.error(
@@ -131,12 +130,11 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // console.log(`[API Base] Client (to Nginx): ${originalBaseUrl}`);
       return originalBaseUrl;
     },
 
     // ----------------------------------------------------
-    // Sanctum CSRF クッキーを取得するアクション（変更なし）
+    // Sanctum CSRF クッキーを取得するアクション
     // ----------------------------------------------------
     async getSanctumCsrfToken() {
       const config = useRuntimeConfig();
@@ -150,10 +148,6 @@ export const useAuthStore = defineStore("auth", {
       }
 
       const baseUrlForSanctum = config.public.apiBaseUrl.replace(/\/api$/, "");
-
-      console.log(
-        `[Sanctum CSRF] Fetching cookie from: ${baseUrlForSanctum}/sanctum/csrf-cookie`
-      );
 
       try {
         await fetcher("/sanctum/csrf-cookie", {
@@ -172,41 +166,30 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // 認証状態の解決を待機するアクション（変更なし）
+    // 認証状態の解決を待機するアクション
     // ----------------------------------------------------
     async waitForAuthResolution() {
-      if (!this.isInitialized) {
-        // initAuthがまだ呼ばれていない場合は、最初に呼び出す
+      if (!authPromise) {
+        if (this.isAuthResolved) {
+          return;
+        }
         await this.initAuth();
       }
 
-      if (this.isAuthResolved) {
-        return;
+      if (authPromise) {
+        await authPromise;
       }
-
-      // isLoading が false になるまで待機
-      await new Promise<void>((resolve) => {
-        const checkResolution = () => {
-          if (!this.isLoading) {
-            resolve();
-          } else {
-            setTimeout(checkResolution, 50); // 50msごとにチェック
-          }
-        };
-        checkResolution();
-      });
     },
 
     // ----------------------------------------------------
-    // セッションキーパー（Sanctumセッションの維持）ロジック
+    // セッションキーパー関連
     // ----------------------------------------------------
     async startSessionKeeper() {
-      // 既に動いている場合は何もしない
       if (this._sessionKeeperInterval) {
         return;
       }
 
-      const INTERVAL_TIME_MS = 5 * 60 * 1000; // 5分ごと (Sanctumのセッション期限が切れる前にリフレッシュする)
+      const INTERVAL_TIME_MS = 5 * 60 * 1000;
       const fetcher = globalThis.$fetch as typeof globalThis.fetch;
       const baseUrl = this.getApiBaseUrl();
       const $firebaseAuth = getFirebaseAuth();
@@ -219,9 +202,8 @@ export const useAuthStore = defineStore("auth", {
       }
 
       const keepSessionAlive = async () => {
-        // 認証済みかつメール認証済みであるかを確認
-        if (!this.isAuthenticated || !this.isEmailVerified) {
-          // ログアウト状態や未認証状態ならインターバルを停止
+        // isLoadingのチェックを追加。解決前は実行しない
+        if (this.isLoading || !this.isAuthenticated || !this.isEmailVerified) {
           this.stopSessionKeeper();
           return;
         }
@@ -233,11 +215,9 @@ export const useAuthStore = defineStore("auth", {
             return;
           }
 
-          // Firebase IDトークンを強制リフレッシュする
+          // ★ サーバーへのIDトークン送信でセッションを維持
           const newIdToken = await currentUser.getIdToken(true);
 
-          // Laravelのログインエンドポイントを叩いてSanctumセッションを延長
-          // APIパスを '/api/firebase/login' に変更
           await fetcher("/firebase/login", {
             baseURL: baseUrl,
             method: "POST",
@@ -249,29 +229,22 @@ export const useAuthStore = defineStore("auth", {
               Accept: "application/json",
             },
           });
-
-          // console.log("[Keeper] Sanctum session successfully refreshed.");
         } catch (error: any) {
           console.warn(
             "[Keeper] Session refresh failed (likely 401/403). Forcing local logout.",
             error
           );
-          // セッション維持に失敗した場合は、強制ログアウトさせる
+          // エラーが発生した場合は、確実にログアウト処理を走らせる
           this.logout();
         }
       };
 
-      // 初回はすぐに実行し、その後インターバルを設定
+      // 最初のセッション維持を実行してからインターバル開始
       await keepSessionAlive();
       this._sessionKeeperInterval = window.setInterval(
         keepSessionAlive,
         INTERVAL_TIME_MS
       ) as unknown as number;
-      console.log(
-        `[Keeper] Session keeper started, refreshing every ${
-          INTERVAL_TIME_MS / 60000
-        } minutes.`
-      );
     },
 
     stopSessionKeeper() {
@@ -283,7 +256,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // Sanctumセッション再確立（IDトークンからSanctumクッキーを再取得）
+    // Sanctumセッション再確立
     // ----------------------------------------------------
     async reEstablishSanctumSession(
       firebaseUser: FirebaseAuthUser
@@ -293,15 +266,8 @@ export const useAuthStore = defineStore("auth", {
       const { setToken, clearToken } = this._getAuthManager();
 
       try {
-        // IDトークンを強制リフレッシュして取得
         const idToken = await firebaseUser.getIdToken(true);
 
-        console.log(
-          "[ReEstablish] Attempting to re-establish Sanctum session via /api/firebase/login..."
-        );
-
-        // Laravelのログインエンドポイントを叩いてSanctumセッションを再確立
-        // APIパスを '/api/firebase/login' に変更
         const response: any = await fetcher("/firebase/login", {
           baseURL: baseUrl,
           method: "POST",
@@ -314,40 +280,34 @@ export const useAuthStore = defineStore("auth", {
           },
         });
 
-        // 成功した場合、Sanctumクッキーがセットされ、レスポンスが返る
         console.log(
           "[ReEstablish] Sanctum session re-established successfully."
         );
 
-        // 🌟 Pinia state (Sanctum Token)とuserを更新
         this.token = response.token;
         this.user = response.user as User;
-        setToken(response.token); // useAuth()を通じてLocalStorageに保存
+        setToken(response.token);
 
-        // 🌟 トークン設定直後にCSRFクッキーを強制的に再取得し、トークンが確実に適用されるためのワンクッションとする
+        // セッション確立の完了を待ってからCSRFトークンを取得
         await this.getSanctumCsrfToken();
-
-        // fetchUser() の呼び出しを削除します。（ログインAPIがユーザーデータを返却するため）
 
         return true;
       } catch (error: any) {
-        // 500 Internal Server Error など、ログイン失敗として扱う
         console.warn(
           "[ReEstablish] Failed to re-establish Sanctum session. Error:",
           error
         );
 
-        // 失敗した場合、セッションが完全に切れているか、サーバー側で問題が発生している
         this.token = null;
         this.user = null;
-        clearToken(); // useAuth()を通じてLocalStorageとPinia Stateをクリア
+        clearToken();
         this.stopSessionKeeper();
         return false;
       }
     },
 
     // ----------------------------------------------------
-    // 認証状態の初期化ロジック
+    // 認証状態の初期化ロジック (onAuthStateChangedのリスナー設定)
     // ----------------------------------------------------
     async initAuth() {
       if (this.isInitialized && !this.isLoading) {
@@ -361,7 +321,6 @@ export const useAuthStore = defineStore("auth", {
       }
 
       if (this.isLoading && this.isInitialized) {
-        console.log("[initAuth] Already initializing. Awaiting resolution...");
         await authPromise;
         return;
       }
@@ -370,104 +329,104 @@ export const useAuthStore = defineStore("auth", {
       this.isLoading = true;
       console.log("[initAuth] Starting authentication state resolution...");
 
-      try {
-        const $firebaseAuth = getFirebaseAuth();
+      const $firebaseAuth = getFirebaseAuth();
 
-        if (!$firebaseAuth) {
-          console.warn(
-            "[initAuth] Firebase Authインスタンスがnullのため、認証待機をスキップします。"
-          );
-          return;
-        }
+      if (!$firebaseAuth) {
+        console.warn(
+          "[initAuth] Firebase Authインスタンスがnullのため、認証待機をスキップします。"
+        );
+        this.isLoading = false;
+        if (resolveAuthPromise) resolveAuthPromise();
+        return;
+      }
 
-        this._authUnsubscribe = onAuthStateChanged(
-          $firebaseAuth,
-          async (user: FirebaseAuthUser | null) => {
-            const { token, clearToken } = this._getAuthManager();
+      // onAuthStateChangedのリスナー設定
+      this._authUnsubscribe = onAuthStateChanged(
+        $firebaseAuth,
+        async (user: FirebaseAuthUser | null) => {
+          const wasLoadingInitially = resolveAuthPromise !== null; // 初期解決中かどうか
 
-            const wasLoading = this.isLoading;
-            try {
-              if (user) {
-                // Firebaseユーザーがいる
+          // 初期解決中でない場合でも、状態変化を処理するためにisLoadingを一時的にtrueにする
+          if (!wasLoadingInitially) {
+            this.isLoading = true;
+          }
 
-                // Piniaのtoken stateをuseAuthから取得した値で同期
+          const { token, clearToken } = this._getAuthManager();
+
+          try {
+            if (user) {
+              let sanctumSuccess = true;
+
+              if (!token.value || !this.user) {
+                sanctumSuccess = await this.reEstablishSanctumSession(user);
+              } else {
                 this.token = token.value;
+              }
 
-                // SanctumトークンがLocalStorageに存在しない、またはPinia stateのユーザー情報がない場合のみ再確立を試みる
-                if (!token.value || !this.user) {
-                  console.log(
-                    "[initAuth] Sanctum token or user state missing. Attempting session re-establishment..."
-                  );
-
-                  const success = await this.reEstablishSanctumSession(user);
-                  if (!success) {
-                    // reEstablishSanctumSession内部で状態クリアが行われる
-                    return;
-                  }
-                }
-
-                // 状態が設定された後、メール認証状態を確認
+              if (sanctumSuccess) {
+                // Sanctumセッションが成功し、userデータがセットされた後
                 if (this.isAuthenticated && this.isEmailVerified) {
                   this.startSessionKeeper();
                 } else {
                   this.stopSessionKeeper();
                 }
               } else {
-                // Firebaseユーザーがいない（ログアウト状態）
+                // Sanctumセッション再確立に失敗した場合は、強制ログアウト状態にする
                 this.token = null;
                 this.user = null;
-                clearToken(); // useAuth()を通じてLocalStorageをクリア
+                clearToken();
                 this.stopSessionKeeper();
               }
-            } catch (e) {
-              console.warn(
-                "[initAuth/onAuthStateChanged] Unexpected error in logic flow, clearing state.",
-                e
-              );
+            } else {
+              // Firebaseユーザーがいない（ログアウト状態）
               this.token = null;
               this.user = null;
-              clearToken(); // useAuth()を通じてLocalStorageをクリア
+              clearToken();
               this.stopSessionKeeper();
-            } finally {
-              if (wasLoading) {
-                this.isLoading = false;
-                console.log(
-                  "✅ [onAuthStateChanged] Initial resolution finished."
-                );
-                if (resolveAuthPromise) {
-                  resolveAuthPromise();
-                  resolveAuthPromise = null;
-                  authPromise = null;
-                }
-              }
+            }
+          } catch (e) {
+            console.warn(
+              "[onAuthStateChanged] Unexpected error during session check, clearing state.",
+              e
+            );
+            this.token = null;
+            this.user = null;
+            clearToken();
+            this.stopSessionKeeper();
+          } finally {
+            // ★★★ 修正ポイント: 初期解決時のみresolvePromiseを呼び出すことを保証 ★★★
+            if (wasLoadingInitially && resolveAuthPromise) {
+              this.isLoading = false;
+
+              console.log(
+                "✅ [AuthStore:Resolved] Initial finished. isAuthenticated:",
+                this.isAuthenticated,
+                "User ID:",
+                this.user?.id
+              );
+
+              resolveAuthPromise();
+              resolveAuthPromise = null;
+              authPromise = null;
+            } else if (!wasLoadingInitially) {
+              // 後発イベントの場合は、isLoadingをfalseに戻す
+              this.isLoading = false;
             }
           }
-        );
-
-        await authPromise;
-      } catch (e: any) {
-        console.error("[initAuth] Unexpected error during setup:", e);
-        this.isLoading = false;
-      } finally {
-        if (this.isLoading) {
-          this.isLoading = false;
-          console.log("✅ [initAuth] Fallback: Forcing UI ready.");
-          if (resolveAuthPromise) {
-            resolveAuthPromise();
-            resolveAuthPromise = null;
-            authPromise = null;
-          }
         }
-      }
+      );
+
+      // onAuthStateChangedが最初に実行され、resolveAuthPromiseが呼ばれるのを待つ
+      await authPromise;
 
       console.log("[initAuth] Initial wait finished.");
     },
 
     // ----------------------------------------------------
-    // ログイン処理（セッションキーパーを開始）
+    // ログイン処理
     // ----------------------------------------------------
     async login(credentials: any) {
-      this.isLoading = true;
+      this.isLoading = true; // ログイン処理中はローディングを表示
 
       try {
         const $firebaseAuth = getFirebaseAuth();
@@ -485,12 +444,8 @@ export const useAuthStore = defineStore("auth", {
         );
         const firebaseUser = userCredential.user;
 
-        // IDトークンを強制リフレッシュせずに取得（ログイン時にリフレッシュされているはずなので）
         const idToken = await firebaseUser.getIdToken();
 
-        console.log("[LOGIN] Sending ID Token to Laravel...");
-
-        // APIパスを '/api/firebase/login' に変更
         const response: any = await fetcher("/firebase/login", {
           baseURL: baseUrl,
           method: "POST",
@@ -503,17 +458,11 @@ export const useAuthStore = defineStore("auth", {
           },
         });
 
-        console.log("[LOGIN] Laravel response received. Updating state.");
-
-        this.token = response.token; // Pinia state (Sanctum Token)
+        this.token = response.token;
         this.user = response.user as User;
-        setToken(response.token); // useAuth()を通じてLocalStorageに保存
+        setToken(response.token);
 
-        // 🌟 トークン設定後、すぐにCSRFクッキーを強制取得
-        // これがトークンをインターセプターに確実に適用させるためのワンクッションとなります
         await this.getSanctumCsrfToken();
-
-        // 登録/ログインAPIが最新のユーザー情報を返しているため、fetchUserの呼び出しを削除
 
         if (this.isEmailVerified) {
           this.startSessionKeeper();
@@ -521,6 +470,7 @@ export const useAuthStore = defineStore("auth", {
           this.stopSessionKeeper();
         }
 
+        // ログイン成功後、isLoadingをfalseにする
         this.isLoading = false;
       } catch (error: any) {
         this.isLoading = false;
@@ -531,7 +481,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // 新規登録処理（クッキーを確実にセット）
+    // 新規登録処理
     // ----------------------------------------------------
     async register(data: RegisterForm) {
       this.isLoading = true;
@@ -553,12 +503,23 @@ export const useAuthStore = defineStore("auth", {
           data.email,
           data.password
         );
-        const firebaseUser = userCredential.user;
-        const idToken = await firebaseUser.getIdToken();
+        let firebaseUser = userCredential.user;
+
+        // ★★★ 修正ポイント 1: Firebaseユーザーの表示名 (displayName) を更新 ★★★
+        console.log(
+          `[REGISTER] Updating Firebase profile with name: ${data.name}`
+        );
+        await updateProfile(firebaseUser, {
+          displayName: data.name,
+        });
+
+        // データベースに渡す前に、最新の情報（displayNameを含む）を反映させるため、
+        // IDトークンを強制的にリフレッシュします。
+        // これにより、IDトークンのクレームに 'name' が含まれるようになります。
+        const idToken = await firebaseUser.getIdToken(true); // trueを渡して強制リフレッシュ
 
         console.log("[REGISTER] ID Token retrieved. Sending to Laravel...");
 
-        // APIパスを '/api/firebase/register' に変更
         const response: any = await fetcher("/firebase/register", {
           baseURL: baseUrl,
           method: "POST",
@@ -568,12 +529,10 @@ export const useAuthStore = defineStore("auth", {
           },
           body: {
             id_token: idToken,
-            name: data.name,
+            name: data.name, // 登録時に入力された名前もLaravelに明示的に送る
             email: data.email,
           },
         });
-
-        console.log("[REGISTER] Laravel response received. Updating state.");
 
         if (!response || !response.token || !response.user) {
           throw new Error(
@@ -581,22 +540,15 @@ export const useAuthStore = defineStore("auth", {
           );
         }
 
-        this.token = response.token; // Pinia state (Sanctum Token)
+        this.token = response.token;
         this.user = response.user as User;
-        setToken(response.token); // useAuth()を通じてLocalStorageに保存
+        setToken(response.token);
 
-        // 🌟 トークン設定後、すぐにCSRFクッキーを強制取得
-        // これがトークンをインターセプターに確実に適用させるためのワンクッションとなります
         await this.getSanctumCsrfToken();
-
-        // 登録/ログインAPIが最新のユーザー情報を返しているため、fetchUserの呼び出しを削除
 
         this.stopSessionKeeper();
 
-        console.log(
-          "[REGISTER] Auth store state updated successfully. User is now logged in but REQUIRES email verification."
-        );
-
+        // 登録成功後、isLoadingをfalseにする
         this.isLoading = false;
       } catch (error: any) {
         this.isLoading = false;
@@ -607,7 +559,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // メール認証処理 (セッションリフレッシュ処理とキーパー開始を追加)
+    // メール認証処理
     // ----------------------------------------------------
     async verifyEmail(url: string) {
       const fetcher = globalThis.$fetch as typeof globalThis.fetch;
@@ -616,12 +568,7 @@ export const useAuthStore = defineStore("auth", {
       const urlObj = new URL(url, "http://dummy.com");
       const queryParams = urlObj.search;
 
-      console.log(
-        `[VERIFY] Sending verification request to: /email/verify${queryParams}`
-      );
-
       try {
-        // サーバー側のルーティングで/email/verifyがJSONを返すように調整が必要です。
         const verificationResponse: any = await fetcher(
           `/email/verify${queryParams}`,
           {
@@ -632,17 +579,8 @@ export const useAuthStore = defineStore("auth", {
           }
         );
 
-        console.log(
-          "[VERIFY] Verification successful. Response:",
-          verificationResponse
-        );
-
         if (verificationResponse && verificationResponse.user) {
           this.user = verificationResponse.user as User;
-
-          console.log(
-            "[VERIFY] Verification successful. Starting session refresh..."
-          );
 
           const $firebaseAuth = getFirebaseAuth();
           if (!$firebaseAuth || !$firebaseAuth.currentUser) {
@@ -652,15 +590,11 @@ export const useAuthStore = defineStore("auth", {
             return true;
           }
 
-          // セッション再確立を試みる
           const success = await this.reEstablishSanctumSession(
             $firebaseAuth.currentUser
           );
 
           if (success) {
-            console.log(
-              "[VERIFY] Session successfully refreshed with Laravel. User is now verified."
-            );
             this.startSessionKeeper();
             return true;
           }
@@ -670,11 +604,7 @@ export const useAuthStore = defineStore("auth", {
       } catch (error: any) {
         console.error("[VERIFY ERROR] Email verification failed:", error);
 
-        // リダイレクトではなく、サーバーから403エラーが返ってきた場合
         if (error.statusCode === 403) {
-          console.error(
-            "Verification failed: Forbidden (Likely invalid/expired signature)."
-          );
           throw new Error(
             "メール認証リンクの有効期限が切れているか、無効です。"
           );
@@ -685,29 +615,82 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // ログアウト処理
+    // ログアウト処理 (Firebase/Sanctum連携を考慮して修正)
     // ----------------------------------------------------
     async logout() {
       const fetcher = globalThis.$fetch as typeof globalThis.fetch;
       const config = useRuntimeConfig();
       const { clearToken } = this._getAuthManager();
 
-      // ★★★ 追記: Item Storeのインスタンスを取得 ★★★
       const itemStore = useItemStore();
 
+      // 1. フラグをtrueに設定
+      this.isLoggingOut = true;
       this.isLoading = true;
-
       this.stopSessionKeeper();
 
-      // ★★★ 修正: onAuthStateChanged の監視解除を削除 ★★★
-      // signOut() が onAuthStateChanged をトリガーし、そこで状態をクリアさせるため、
-      // ここで解除すると状態の同期が取れなくなる可能性があります。
+      // 2. UIの即時更新とデータのクリアを最優先
+      itemStore.$reset();
 
-      // 1. Firebaseからのサインアウト（クライアント側での認証状態クリア）
+      this.token = null;
+      this.user = null;
+      clearToken();
+
+      // ★★★ 修正ポイント 1: クッキーをアグレッシブに削除 ★★★
+      if (process.client) {
+        const cookies = ["laravel_session", "XSRF-TOKEN", "auth_token"];
+
+        cookies.forEach((name) => {
+          const cookieRef = useCookie(name);
+          if (cookieRef.value) {
+            cookieRef.value = null;
+            // path: '/' を付けて削除を強制
+            // @ts-ignore
+            useCookie(name, { path: "/", maxAge: 0, sameSite: "Lax" });
+          }
+
+          // 低レベルなdocument.cookieでの強制削除（より確実性が高い）
+          // 複数のパスで試行
+          document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+          document.cookie = `${name}=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+          document.cookie = `${name}=; Path=/sanctum; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+        });
+
+        console.log("[LOGOUT] Client-side cookies forcefully deleted.");
+      } else {
+        useCookie("laravel_session").value = null;
+        useCookie("XSRF-TOKEN").value = null;
+        useCookie("auth_token").value = null;
+      }
+
+      // 3. バックエンドのログアウトAPIを呼び出し (非同期)
+      if (typeof fetcher === "function") {
+        try {
+          await fetcher("/logout", {
+            baseURL: config.public.apiBaseUrl,
+            method: "POST",
+            credentials: "include",
+          });
+          console.log("[LOGOUT] Backend /logout API call successful.");
+        } catch (e: any) {
+          const status = e.response?.status;
+
+          if (status === 401 || status === 403 || status === 500) {
+            console.warn(
+              `[LOGOUT] Backend API failed with status ${status}. (Expected if session already invalid). Continuing local clear.`
+            );
+          } else {
+            console.error("Logout API failed with unexpected error.", e);
+          }
+        }
+      }
+
+      // 4. Firebaseからのサインアウト (非同期)
       try {
         const $firebaseAuth = getFirebaseAuth();
         if ($firebaseAuth) {
           await signOut($firebaseAuth);
+          console.log("[LOGOUT] Firebase SignOut successful.");
         }
       } catch (e: any) {
         if (
@@ -718,43 +701,18 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // 2. LaravelのログアウトAPIを呼び出し（サーバー側でのセッションクリア）
-      if (typeof fetcher === "function") {
-        try {
-          // Sanctumのセッションを確実に削除するため、APIを叩く
-          await fetcher("/logout", {
-            baseURL: config.public.apiBaseUrl,
-            method: "POST",
-            credentials: "include",
-          });
-        } catch (e: any) {
-          const status = e.response?.status;
-
-          if (status === 401 || status === 403 || status === 500) {
-            console.warn(
-              `[LOGOUT] Backend API failed with status ${status}. This is often expected if session is already weak/invalid. Continuing local clear.`
-            );
-          } else {
-            console.error("Logout API failed with unexpected error.", e);
-          }
-        }
+      // ★★★ 修正ポイント 2: ログアウト完了後、ページをリロードして強制的に非認証リクエストを発行させる ★★★
+      // これは最も確実な方法です。
+      if (process.client) {
+        window.location.reload();
       }
 
-      // 3. ローカルの状態を確実にクリア
-      // Firebaseの onAuthStateChanged がトリガーされるまでの保険として、ローカルの状態も即座にクリアします。
-      this.token = null;
-      this.user = null;
-      clearToken(); // useAuth()を通じてLocalStorageをクリア
-
-      // Cookieをクリア（Laravelセッションと古いauth_token）
-      useCookie("laravel_session").value = null;
-      useCookie("auth_token").value = null; // 念の為、useCookieもクリア
-
-      // ★★★ 追記: 商品ストアのデータをクリアする ★★★
-      // useItemStore の $reset() を呼び出します
-      itemStore.$reset();
-
+      // 5. すべての非同期処理が完了後、フラグをfalseに戻す (reloadで到達しない可能性が高いが、念のため)
       this.isLoading = false;
+      this.isLoggingOut = false;
+      console.log(
+        "[Logout] Complete. State cleared and isLoading/isLoggingOut set to false."
+      );
     },
 
     // ----------------------------------------------------
@@ -769,17 +727,15 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // ユーザー情報の読み込み (401/403ハンドリングを修正)
+    // ユーザー情報の読み込み
     // ----------------------------------------------------
     async fetchUser(isForce: boolean = false) {
-      // ★ $fetch ではなく $api を使用する (プラグインで提供されるカスタムインスタンス)
       const nuxtApp = useNuxtApp() as any;
-      const $api = nuxtApp.$api as typeof globalThis.$fetch; // $apiを型付け
+      const $api = nuxtApp.$api as typeof globalThis.$fetch;
       const { token: localToken, clearToken } = this._getAuthManager();
       const config = useRuntimeConfig();
 
       if (typeof $api !== "function") {
-        // SPAなので、$apiが関数でない場合はプラグインの初期化エラーです。
         console.error(
           "FetchUser Error: Custom $api is not available. APIプラグインが正しく読み込まれているか確認してください。"
         );
@@ -792,60 +748,47 @@ export const useAuthStore = defineStore("auth", {
         return;
       }
 
-      // Pinia state の token を更新
       this.token = localToken.value;
 
       try {
-        // $api を使用することで、Authorizationヘッダーの付与がプラグインに任せられる
         const user: User = await $api("/user", {
           baseURL: config.public.apiBaseUrl,
           credentials: "include",
-          // skipAutoLogout: true フラグを context に追加
           context: {
-            skipAutoLogout: true, // <-- 正しい位置: インターセプターに自動ログアウトをスキップするよう指示
+            skipAutoLogout: true,
           },
         });
 
         this.user = user;
-        // this.token は既に localToken.value で設定済み
-        console.log("[FetchUser] User data loaded successfully.");
       } catch (e: any) {
         const status = e.response?.status;
-        const shouldClear = status === 401; // 401: セッション切れはクリア必須
-        const shouldMaintain = status === 403; // 403: 権限なし(未認証ポリシー)は状態維持
+        const shouldClear = status === 401;
+        const shouldMaintain = status === 403;
 
         if (shouldClear) {
           console.warn(
             `[FetchUser] Received 401 Unauthorized. Clearing local state to force full re-auth.`
           );
-          // 401 の場合は、ローカル状態をクリアして、onAuthStateChangedの再実行を促す
           this.token = null;
           this.user = null;
-          clearToken(); // useAuth()を通じてLocalStorageをクリア
+          clearToken();
           this.stopSessionKeeper();
         } else if (shouldMaintain) {
           console.warn(
             `[FetchUser] Received 403 Forbidden (Likely unverified email). Maintaining local state to show prompt.`
           );
-          // 403 の場合、ローカル状態を維持し、ログアウトしない。
         } else {
           console.error(
             "[FetchUser] Failed to fetch user with unexpected error.",
             e
           );
-          // 予期せぬエラーの場合は安全のためにクリア
           this.token = null;
           this.user = null;
-          clearToken(); // useAuth()を通じてLocalStorageをクリア
+          clearToken();
           this.stopSessionKeeper();
         }
-
-        // fetchUserが失敗した場合でも、例外は再スローしない
         return;
       }
     },
   },
-
-
-
 });
