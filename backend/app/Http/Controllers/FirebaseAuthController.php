@@ -35,6 +35,10 @@ class FirebaseAuthController extends Controller
         ]);
 
         $idToken = $request->input('id_token');
+        
+        // ★ 修正点: SDKのシグネチャに合わせて、許容誤差 (leeway) を整数として定義
+        // クライアントの時刻ずれを吸収するため、300秒（5分）を設定します。
+        $leewayInSeconds = 300; 
 
         try {
             Log::info('DEBUG: Start Firebase Auth instance acquisition.');
@@ -44,7 +48,10 @@ class FirebaseAuthController extends Controller
             Log::info('DEBUG: Firebase Auth instance acquired. Start ID Token verification.');
 
             // IDトークンを検証
-            $verifiedIdToken = $auth->verifyIdToken($idToken);
+            // ★ 修正点:
+            //   - 第2引数 ($checkIfRevoked) は false (boolean)
+            //   - 第3引数 ($leewayInSeconds) は $leewayInSeconds (int)
+            $verifiedIdToken = $auth->verifyIdToken($idToken, false, $leewayInSeconds);
             
             Log::info('DEBUG: ID Token successfully verified.');
             
@@ -224,6 +231,7 @@ class FirebaseAuthController extends Controller
             ], 200);
 
         } catch (\Kreait\Firebase\Exception\Auth\InvalidToken $e) {
+            // "The token was issued in the future" のエラーはここで許容誤差によって吸収されます。
             Log::error("Firebase Invalid ID Token: " . $e->getMessage());
             return response()->json(['error' => 'Invalid Firebase ID Token.'], 401);
         } catch (Throwable $e) {

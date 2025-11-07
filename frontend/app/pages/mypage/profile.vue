@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig, useAsyncData } from '#app';
 import { storeToRefs } from 'pinia';
@@ -44,9 +44,8 @@ const form = ref<any>({
 const profileErrors = ref<any>({});
 const imageError = ref('');
 const successMessage = ref('');
-// 郵便番号検索中の状態は削除されました
 
-// 認証状態の解決を待つ (トップレベルawait)
+// 認証状態の解決を待つ (トップレベルawait: サーバーサイドで認証チェックを可能にする)
 await authStore.waitForAuthResolution();
 
 /**
@@ -75,8 +74,10 @@ const initializeUserData = (data: any) => {
 };
 
 // ----------------------------------------------------------------
-// --- 1. useAsyncDataでのユーザー情報取得 ---
+// --- 1. useAsyncDataでのユーザー情報取得 (SSR最適化) ---
 
+// useAsyncDataを使用することで、サーバーサイドでAPIコールを実行し、
+// データ取得済みの状態でHTMLをレンダリングします。
 const { pending, error } = useAsyncData(
   'userProfile',
   // useAsyncDataのファクトリ関数
@@ -84,6 +85,7 @@ const { pending, error } = useAsyncData(
     if (!isAuthed.value) {
         // 認証されていない場合、APIコールをスキップしログインページへリダイレクト
         console.log("未認証のためuseAsyncDataをスキップし、ログインへリダイレクトします。");
+        // Nuxt 3では、リダイレクトはサーバー/クライアントの両方で機能します
         await navigateTo('/login');
         return null; 
     }
@@ -93,18 +95,18 @@ const { pending, error } = useAsyncData(
     return response;
   },
   {
-    // 認証が解決された後にのみフェッチを実行
-    lazy: true, // ページロード後に非同期でフェッチを開始
-    immediate: isAuthed.value, // 認証済みなら即時実行
+    // lazy: true を削除 (または false を設定) することで、
+    // サーバーサイドでのデータ取得 (SSR) を確実に実行します。
+    // immediate: isAuthed.value, // 認証済みなら即時実行 (明確にするため残す)
     transform: (response) => {
         // データ取得後にフォームを初期化
         initializeUserData(response);
         return response;
     },
     // fetchに失敗した場合のエラーハンドリング
-    // useApi側で401リダイレクトを行うため、ここでは他のエラーを考慮
     onError: (err) => {
       console.error('プロフィールデータの初期ロードに失敗しました:', err);
+      // 401はuseApi側で処理されるため、ここでは他のエラーを考慮
       successMessage.value = 'プロフィールデータのロードに失敗しました。';
     }
   }
@@ -124,12 +126,7 @@ onMounted(() => {
 
 
 // ----------------------------------------------------------------
-// --- 2. 郵便番号からの住所検索機能 ---
-// 郵便番号の監視・検索ロジックはすべて削除されました。
-
-
-// ----------------------------------------------------------------
-// --- 3. 画像アップロード処理 (useApiを使用) ---
+// --- 2. 画像アップロード処理 (useApiを使用) ---
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -163,7 +160,6 @@ const handleImageUpload = async (event: Event) => {
 
   } catch (error: any) {
     if (error.status === 401) {
-        // useApiでリダイレクトされるため、ここではメッセージを設定するだけ
         successMessage.value = 'セッションが切れました。再度ログインが必要です。';
         return;
     }
@@ -178,7 +174,7 @@ const handleImageUpload = async (event: Event) => {
 };
 
 // ----------------------------------------------------------------
-// --- 4. プロフィール情報更新処理 (useApiを使用) ---
+// --- 3. プロフィール情報更新処理 (useApiを使用) ---
 
 const handleProfileUpdate = async () => {
   profileErrors.value = {};
@@ -210,7 +206,6 @@ const handleProfileUpdate = async () => {
 
   } catch (error: any) {
     if (error.status === 401) {
-        // useApiでリダイレクトされるため、ここではメッセージを設定するだけ
         successMessage.value = 'セッションが切れました。再度ログインが必要です。';
         return;
     }
@@ -226,7 +221,7 @@ const handleProfileUpdate = async () => {
 };
 
 // ----------------------------------------------------------------
-// --- 5. ヘルパー関数 ---
+// --- 4. ヘルパー関数 ---
 
 // プロフィール画像のURLを生成するヘルパー関数
 const getProfileImageUrl = (path: string | undefined | null) => {
