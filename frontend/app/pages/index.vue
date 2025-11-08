@@ -70,7 +70,9 @@
 import { ref, watch, computed, onMounted, nextTick } from "vue"; 
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useAuth } from "~/composables/useAuth"; // ★ 修正: useAuthをインポート
 import { $fetch } from "ofetch";
+import { useNuxtApp } from "#app"; // $api を使うため useNuxtApp をインポート
 
 definePageMeta({
   layout: 'default',
@@ -80,6 +82,7 @@ definePageMeta({
 // 認証ストアの取得と状態
 // =======================================================
 const authStore = useAuthStore();
+const { token: localToken } = useAuth(); // ★ 修正: ローカルトークンを取得
 const router = useRouter();
 const route = useRoute();
 
@@ -148,7 +151,7 @@ const isUserLoggedOutComputed = computed(() => {
 
 
 // =======================================================
-// ヘルパー関数 (修正)
+// ヘルパー関数 (修正なし)
 // =======================================================
 
 /**
@@ -183,7 +186,7 @@ const onImageError = (e: Event, itemName: string) => {
 };
 
 // =======================================================
-// データフェッチロジック (API連携)
+// データフェッチロジック (API連携) - ★ Bearerトークン付与を修正 ★
 // =======================================================
 
 const fetchItems = async (tab: string, search: string) => {
@@ -212,19 +215,24 @@ const fetchItems = async (tab: string, search: string) => {
 
   const apiUrl = `${API_BASE_URL}/items`;
 
-  // --- 修正箇所: リクエストオプションを動的に定義 ---
-  // ログインしている場合のみ credentials: 'include' を設定する
-  const requestOptions: { query: any, credentials?: 'include' } = {
+  // --- 修正箇所: リクエストオプションを動的に定義 (Headersを追加) ---
+  const requestOptions: { query: any, credentials?: 'include', headers?: Record<string, string> } = {
     query: { 
       tab: tab, 
       all_item_search: search,
     },
+    // baseURLは $fetch に渡せないためここでは指定しない (デフォルトで設定されている前提)
   };
-
-  if (isAuthenticatedByStore) {
-    // 認証済みの場合、Cookieを含める
-    requestOptions.credentials = 'include';
-    console.log("[Fetch] Including 'credentials: include'.");
+  
+  // ★★★ ログインしていてトークンがあれば、Authorizationヘッダーを設定 ★★★
+  const tokenValue = localToken.value;
+  if (tokenValue) {
+      requestOptions.credentials = 'include';
+      requestOptions.headers = {
+          // すでに他のヘッダーがある場合はマージすることを考慮するが、今回は直接上書き
+          'Authorization': `Bearer ${tokenValue}`
+      };
+      console.log("[Fetch] Including 'credentials: include' AND 'Authorization: Bearer' header.");
   } else {
     // 未認証の場合、Cookieを含めない (デフォルト動作)
     console.log("[Fetch] Not including 'credentials: include'. (Anonymous access)");
@@ -233,7 +241,8 @@ const fetchItems = async (tab: string, search: string) => {
 
 
   try {
-    // 修正: requestOptions を渡す
+    // $fetch は useNuxtApp().$fetch のエイリアスであるか、グローバルに利用可能な前提
+    // Nuxt 3 の場合はグローバルな $fetch を使用します。
     const response = await $fetch(apiUrl, requestOptions);
 
     const responseData = response as any;
@@ -251,6 +260,7 @@ const fetchItems = async (tab: string, search: string) => {
     console.log(`Fetched ${items.value.length} items successfully. New Image Key: ${imageRefreshKey.value}`);
 
   } catch (e: any) {
+    // ... (エラー処理は省略) ...
     if (e.response && e.response.status === 401 && tab === 'mylist') {
         console.error("マイリストの取得中に認証エラー(401)が発生しました。トークン有効期限切れの可能性。強制ログアウトします。");
         authStore.logout(); 
@@ -320,7 +330,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ... (CSSは変更なし) ... */
+/* ... (CSSは省略) ... */
 .main_contents {
   margin: 0 auto;
   max-width: 1400px;

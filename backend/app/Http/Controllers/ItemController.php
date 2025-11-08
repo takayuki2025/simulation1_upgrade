@@ -36,9 +36,17 @@ class ItemController extends Controller
         // URLのGETパラメータ'all_item_search'を取得
         $searchQuery = $request->query('all_item_search');
 
+        // ★★★ 修正点: Sanctumガードを使ってユーザーを取得 ★★★
+        // ルートにミドルウェアがない場合でも、リクエストヘッダーにトークンがあればユーザーを特定できます。
+        $user = Auth::guard('sanctum')->user();
+        $authId = $user ? $user->id : null;
+        
+        Log::info("ItemController@index called. AuthID (via sanctum guard): " . ($authId ?? 'N/A'));
+
+
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
-            $user = Auth::user();
+            // ここでは $user (sanctumガードで取得したもの) を使います。
             
             // 🚨 認証済みでなければマイリストは空のコレクション
             if (!$user) {
@@ -46,7 +54,7 @@ class ItemController extends Controller
             } else {
                 // Goodモデルを介して関連するItemを取得
                 $items = Good::where('user_id', $user->id)
-                    ->with('item')
+                    ->withCount(['comments', 'goods']) // mylist内のItemにもカウントを追加
                     ->get()
                     ->pluck('item')
                     ->filter(); // nullをフィルタリング
@@ -64,13 +72,12 @@ class ItemController extends Controller
             $query = Item::query();
             
             // 💡 認証済みユーザーの場合のみ、自身が出品した商品を除外する
-            $authId = Auth::id();
-            if ($authId) {
+            if ($authId) { // ★ 修正後の $authId を使用
                 // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
                 $query->where('user_id', '!=', $authId);
+                Log::info("ItemController@index: Filter applied. Excluding items by user {$authId}.");
             }
-            // 🚨 ここでは、上記 where 句は未認証ユーザーの場合実行されないため、
-            // Item::query() (全ての商品) がそのまま実行される。
+            // 🚨 Auth::id() が null の場合と同じく、where 句は実行されず全ての商品が取得される
 
             // 検索キーワードがあれば、クエリをフィルタリング
             if (!empty($searchQuery)) {

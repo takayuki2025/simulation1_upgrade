@@ -189,18 +189,18 @@ class FirebaseAuthController extends Controller
                 return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
             }
             
-            // 強制的にDBから最新の状態を再ロードする (既存のロジックを維持)
-            $user = User::find($user->id); 
+            // ★ 削除推奨行 1: ユーザーモデルの再ロード（Auth::loginのため不要）
+            // $user = User::find($user->id); 
             
             if (!$user) {
                 Log::error("Authentication failed: User not found in database after successful Firebase verification.");
                 return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
             }
-            Log::info('DEBUG: User model reloaded from database (User::find) to ensure latest verification status.');
-
-            // Laravelセッションにログイン情報を強制的に書き込む (既存のロジックを維持)
-            Auth::login($user); 
-            Log::info('DEBUG: User successfully logged into web guard session using Auth::login.');
+            Log::info('DEBUG: User model reloaded from database (User::find) to ensure latest verification status.'); // ★ ログも削除対象
+            
+            // ★ 削除必須行 2: Laravelセッション（Cookie）への強制ログイン処理
+            // Auth::login($user); 
+            // Log::info('DEBUG: User successfully logged into web guard session using Auth::login.'); // ★ ログも削除対象
 
             $user->tokens()->delete();
             Log::info('DEBUG: Old tokens deleted.');
@@ -251,7 +251,7 @@ class FirebaseAuthController extends Controller
         Log::info('--- VERIFY EMAIL METHOD STARTED ---'); // ★これを入れてログに表示されるか確認
         // フロントエンドURLを安全に取得（末尾のスラッシュを削除）
         // $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
-        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://laravel.test:4431'), '/');
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://laravel.test:4430'), '/'); // ★ 修正: Nuxtのポート番号を明示的に4430に設定（またはenvから取得）
 
         // 1. IDを使ってユーザーを直接検索
         $user = User::find($id);

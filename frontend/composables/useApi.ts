@@ -1,5 +1,6 @@
 import { useNuxtApp, navigateTo } from "#app";
-import { useAuthStore } from "@/stores/auth"; // @/stores/auth を直接インポート
+import { useAuthStore } from "@/stores/auth";
+import { useAuth } from "~/composables/useAuth"; // useAuthをインポート
 
 /**
  * カスタムAPIリクエストを行うためのコンポーザブル。
@@ -9,6 +10,7 @@ export const useApi = () => {
   // カスタムAPIクライアント($api)と認証ストアの取得
   const { $api } = useNuxtApp();
   const authStore = useAuthStore();
+  const { token: localToken } = useAuth(); // ★ 修正: useAuthからローカルトークンを取得
 
   if (typeof $api !== "function") {
     console.error(
@@ -25,7 +27,7 @@ export const useApi = () => {
    * @returns APIレスポンスデータ
    */
   const authenticatedFetch = async (url: string, options: any = {}) => {
-    // 1. CSRFトークンを強制取得し、セッションを確立
+    // 1. CSRFトークンを強制取得し、セッションを確立 (Sanctumセッション維持のため)
     try {
       console.log(
         `[useApi] セッション確立確認のためCSRFトークンを取得します (${url})`
@@ -36,15 +38,24 @@ export const useApi = () => {
         "[useApi] CSRFトークン取得に失敗。セッション切れの可能性。",
         e
       );
-      // トークン取得に失敗した場合も、401として扱いthrowする
       throw {
         status: 401,
         message: "セッションが切れました。再度ログインが必要です。",
       };
     }
 
+    // 2. ★★★ 修正: Bearerトークンをヘッダーに明示的に付与 ★★★
+    // これにより、Laravelの公開ルートでも Auth::guard('sanctum') が機能します。
+    if (localToken.value) {
+      options.headers = {
+        ...options.headers,
+        Authorization: `Bearer ${localToken.value}`,
+      };
+      console.log(`[useApi] Authorization Bearer Token set for ${url}.`);
+    }
+
     try {
-      // 2. 実際のAPIリクエスト実行
+      // 3. 実際のAPIリクエスト実行
       const response = await $api(url, options);
       return response;
     } catch (error: any) {
@@ -56,14 +67,12 @@ export const useApi = () => {
         await authStore.logout();
         await navigateTo("/login");
 
-        // 呼び出し元には処理を停止させるためのPromise.rejectを返す
         return Promise.reject({
           status: 401,
           message: "認証セッションが切れました。",
         });
       }
 
-      // 422バリデーションエラーやその他のエラーはそのままスローして呼び出し元で処理させる
       throw error;
     }
   };
