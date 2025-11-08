@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig, useAsyncData } from '#app';
+import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig } from '#app';
 import { storeToRefs } from 'pinia';
 import { useApi } from '~/composables/useApi';
 
-// 認証が必要なページであることを示すミドルウェアを設定
+// 認証が必要なページであることを示すミドルウェアを設定 (今回は設定済み)
 definePageMeta({
   layout: 'default',
 });
 
-// useNuxtApp().$api のチェックはuseApiに任せるため簡略化
 const { $api } = useNuxtApp();
 if (typeof $api !== 'function') {
   console.error("CRITICAL: $api instance is missing. Check plugins/api-interceptor.ts.");
@@ -44,25 +43,36 @@ const form = ref<any>({
 const profileErrors = ref<any>({});
 const imageError = ref('');
 const successMessage = ref('');
-
-// 認証状態の解決を待つ (トップレベルawait: サーバーサイドで認証チェックを可能にする)
-await authStore.waitForAuthResolution();
+const isLoading = ref(true); // CSRのため、ローディング状態を別途管理
+const route = useRoute();
 
 /**
- * APIから取得したユーザーデータでフォームと状態を初期化する
- * @param data APIから取得した生データ
+ * APIから取得したユーザーデータ、またはPiniaストアのデータで
+ * フォームと状態を初期化する
+ * @param apiData APIから取得した生データ (null/undefinedの可能性あり)
  */
-const initializeUserData = (data: any) => {
-    let fetchedUser: User | null = null;
+const initializeUserData = (apiData: any) => {
+    let sourceData: User | null = null;
     
-    // 応答形式の検出ロジック
-    if (data && data.user) {
-        fetchedUser = data.user as User; 
-    } else if (data && data.id && data.name) {
-        fetchedUser = data as User;
+    // 1. API応答に完全なユーザーデータがあるか確認
+    if (apiData && apiData.user) {
+        sourceData = apiData.user as User; 
+        console.log("【Init】API応答の完全なデータで初期化しました。");
     } 
-
-    user.value = fetchedUser;
+    // 2. API応答がユーザーオブジェクトそのものの形式であった場合
+    else if (apiData && apiData.id && apiData.name) {
+        sourceData = apiData as User;
+        console.log("【Init】API応答のユーザーオブジェクトで初期化しました。");
+    }
+    
+    // 3. APIデータが利用できない、またはデータ不足の場合、Piniaストアのデータで補完/フォールバック
+    if (!sourceData && authStore.user) {
+        sourceData = authStore.user as User;
+        console.log("【Init】APIデータ不足。Piniaストアの認証データで初期化しました。");
+    }
+    
+    // 状態とフォームに反映
+    user.value = sourceData;
     
     if (user.value) {
         // フォームへの値の代入ロジック（データがnullでも空文字列で安全に初期化）
@@ -70,58 +80,60 @@ const initializeUserData = (data: any) => {
         form.value.post_number = user.value.post_number || '';
         form.value.address = user.value.address || '';
         form.value.building = user.value.building || '';
+    } else {
+        // 最終的にデータが取得できなかった場合
+        console.error("【Init】ユーザー情報を特定できませんでした。");
+    }
+};
+
+/**
+ * クライアントサイドでのプロフィールデータ取得ロジック (CSR専用)
+ */
+const fetchUserProfile = async () => {
+    isLoading.value = true;
+    
+    await authStore.waitForAuthResolution();
+
+    if (!isAuthed.value) {
+        console.log("未認証のためログインへリダイレクトします。");
+        await navigateTo('/login');
+        isLoading.value = false;
+        return;
+    }
+    
+    // Piniaストアの基本データで一旦初期化（APIコール失敗時のフォールバックを確保）
+    initializeUserData(null); 
+
+    try {
+        // useApiのラッパーを通してAPIをコール
+        const response = await authenticatedFetch('mypage/profile', {});
+        
+        // APIからの応答でデータを更新
+        initializeUserData(response);
+        
+        // メール認証後のクエリパラメータ処理
+        if (user.value && route.query.verified === 'true') {
+            successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
+            console.log("メール認証完了。クエリパラメータを削除します。");
+            
+            // クエリパラメータを削除してURLをクリーンにする
+            navigateTo({ path: route.path }, { replace: true });
+        }
+        
+    } catch (err: any) {
+        console.error('プロフィールデータのロードに失敗しました:', err);
+        successMessage.value = 'プロフィールデータのロードに失敗しました。';
+        // 401はauthenticatedFetch側で処理されるため、ここでは警告表示のみ
+    } finally {
+        isLoading.value = false;
     }
 };
 
 // ----------------------------------------------------------------
-// --- 1. useAsyncDataでのユーザー情報取得 (SSR最適化) ---
+// --- ライフサイクルとマウント ---
 
-// useAsyncDataを使用することで、サーバーサイドでAPIコールを実行し、
-// データ取得済みの状態でHTMLをレンダリングします。
-const { pending, error } = useAsyncData(
-  'userProfile',
-  // useAsyncDataのファクトリ関数
-  async () => {
-    if (!isAuthed.value) {
-        // 認証されていない場合、APIコールをスキップしログインページへリダイレクト
-        console.log("未認証のためuseAsyncDataをスキップし、ログインへリダイレクトします。");
-        // Nuxt 3では、リダイレクトはサーバー/クライアントの両方で機能します
-        await navigateTo('/login');
-        return null; 
-    }
-    
-    // useApiのラッパーを通してAPIをコール
-    const response = await authenticatedFetch('mypage/profile', {});
-    return response;
-  },
-  {
-    // lazy: true を削除 (または false を設定) することで、
-    // サーバーサイドでのデータ取得 (SSR) を確実に実行します。
-    // immediate: isAuthed.value, // 認証済みなら即時実行 (明確にするため残す)
-    transform: (response) => {
-        // データ取得後にフォームを初期化
-        initializeUserData(response);
-        return response;
-    },
-    // fetchに失敗した場合のエラーハンドリング
-    onError: (err) => {
-      console.error('プロフィールデータの初期ロードに失敗しました:', err);
-      // 401はuseApi側で処理されるため、ここでは他のエラーを考慮
-      successMessage.value = 'プロフィールデータのロードに失敗しました。';
-    }
-  }
-);
-
-// 初期ロード時の成功メッセージ処理
 onMounted(() => {
-    const route = useRoute();
-    if (user.value && route.query.verified === 'true') {
-        successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
-        console.log("メール認証完了。クエリパラメータを削除します。");
-        
-        // クエリパラメータを削除してURLをクリーンにする
-        navigateTo({ path: route.path }, { replace: true });
-    }
+    fetchUserProfile();
 });
 
 
@@ -135,6 +147,7 @@ const handleImageUpload = async (event: Event) => {
 
   imageError.value = '';
   successMessage.value = '';
+  isLoading.value = true;
   
   const formData = new FormData();
   formData.append('user_image', file);
@@ -153,6 +166,7 @@ const handleImageUpload = async (event: Event) => {
     const imagePath = response.image_path || response.user_image;
     if (imagePath) {
         user.value!.user_image = imagePath; 
+        authStore.updateUser({ user_image: imagePath }); // Piniaストアも更新
     }
     
     successMessage.value = '画像をアップロードしました。';
@@ -170,6 +184,8 @@ const handleImageUpload = async (event: Event) => {
     } else {
       imageError.value = 'アップロードに失敗しました。';
     }
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -180,6 +196,7 @@ const handleProfileUpdate = async () => {
   profileErrors.value = {};
   successMessage.value = '';
   if (!user.value) return;
+  isLoading.value = true;
   
   try {
     // authenticatedFetchを使用
@@ -194,6 +211,8 @@ const handleProfileUpdate = async () => {
     const updatedUser = updateResponse.user || updateResponse;
     if (updatedUser && updatedUser.id) {
         user.value = updatedUser as User;
+        // Piniaストアのユーザー情報も更新（名前、住所など）
+        authStore.updateUser(updatedUser); 
     }
     
     // フォームも最新の情報で再初期化
@@ -217,6 +236,8 @@ const handleProfileUpdate = async () => {
     } else {
       successMessage.value = '更新に失敗しました。再度お試しください。';
     }
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -259,8 +280,9 @@ const getProfileImageUrl = (path: string | undefined | null) => {
 <h2 class="title">プロフィール設定</h2>
 
 <!-- ロード中表示 -->
-<div v-if="pending" class="text-center p-8">
-    <p class="text-lg text-gray-500">データをロード中です...</p>
+<div v-if="isLoading" class="text-center p-8">
+    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
+    <p class="text-lg text-gray-500 mt-3">データをロード中です...</p>
 </div>
 
 <!-- ユーザーデータが存在する場合のみ中身を描画するガード -->
@@ -287,7 +309,7 @@ const getProfileImageUrl = (path: string | undefined | null) => {
           type="button" 
           class="upload_submit" 
           @click="$refs.fileInput.click()"
-          :disabled="pending"
+          :disabled="isLoading"
         >
           画像を選択する
         </button>
@@ -354,16 +376,15 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     </div>
     
     <div class="submit">
-      <input type="submit" class="submit_form" value="更新する" :disabled="pending" />
+      <input type="submit" class="submit_form" value="更新する" :disabled="isLoading" />
     </div>
   </form>
 </div>
 
 <!-- ユーザーデータが存在しない、かつロードが完了した場合 -->
 <div v-else class="text-center p-8">
-    <!-- エラー発生時または未認証リダイレクト後のメッセージ -->
-    <p v-if="error" class="text-xl text-red-500">ユーザー情報の取得中にエラーが発生しました。</p>
-    <p v-else class="text-xl text-red-500">ユーザー情報がロードできませんでした。再度ログインしてください。</p>
+    <p v-if="!isAuthed.value" class="text-xl text-red-500">認証されていません。ログインページへ移動しています...</p>
+    <p v-else class="text-xl text-red-500">ユーザー情報がロードできませんでした。再度お試しください。</p>
 </div>
 
 

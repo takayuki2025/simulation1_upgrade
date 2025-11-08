@@ -36,7 +36,6 @@ class FirebaseAuthController extends Controller
 
         $idToken = $request->input('id_token');
         
-        // ★ 修正点: SDKのシグネチャに合わせて、許容誤差 (leeway) を整数として定義
         // クライアントの時刻ずれを吸収するため、300秒（5分）を設定します。
         $leewayInSeconds = 300; 
 
@@ -48,9 +47,6 @@ class FirebaseAuthController extends Controller
             Log::info('DEBUG: Firebase Auth instance acquired. Start ID Token verification.');
 
             // IDトークンを検証
-            // ★ 修正点:
-            //   - 第2引数 ($checkIfRevoked) は false (boolean)
-            //   - 第3引数 ($leewayInSeconds) は $leewayInSeconds (int)
             $verifiedIdToken = $auth->verifyIdToken($idToken, false, $leewayInSeconds);
             
             Log::info('DEBUG: ID Token successfully verified.');
@@ -73,7 +69,7 @@ class FirebaseAuthController extends Controller
 
                 $registerEmail = $emailFromToken ?? $emailFromRequest;
                 
-                // ★★★ 修正・改善箇所：名前の決定ロジックを優先順位に基づいて変更 ★★★
+                // ★★★ 名前決定ロジック ★★★
                 $registerName = null;
 
                 if (!empty($nameFromRequest)) {
@@ -93,7 +89,7 @@ class FirebaseAuthController extends Controller
                      // どのソースからも名前が取得できない場合
                      $registerName = null;
                 }
-                // ★★★ 修正箇所ここまで ★★★
+                // ★★★ 名前決定ロジックここまで ★★★
                 
                 // データベースの制約に合わせて name の長さを制限する (既存のロジックを維持)
                 $maxLength = 30; // usersテーブルのnameカラムの最大長に合わせて調整
@@ -209,25 +205,28 @@ class FirebaseAuthController extends Controller
             Log::info('DEBUG: New Sanctum token created.');
 
             // 5. JSONレスポンスを返す
-            Log::info('Returning user data (Sanctum/Firebase):', [
+            // ★★★ 修正箇所: user配列にプロフィール関連のフィールドを追加 ★★★
+            $userData = [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'uid' => $user->firebase_uid, 
                 'email_verified_at' => $user->email_verified_at,
-            ]);
+                // --- 追加したプロフィール関連フィールド ---
+                'post_number' => $user->post_number, 
+                'address' => $user->address,
+                'building' => $user->building,
+                'user_image' => $user->user_image,
+                // ----------------------------------------
+            ];
+            
+            Log::info('Returning user data (Sanctum/Firebase):', $userData);
             
             Log::info('DEBUG: Preparing final JSON response.');
 
             return response()->json([
                 'token' => $token,
-                'user' => [ 
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'uid' => $user->firebase_uid, 
-                    'email_verified_at' => $user->email_verified_at,
-                ], 
+                'user' => $userData,
             ], 200);
 
         } catch (\Kreait\Firebase\Exception\Auth\InvalidToken $e) {

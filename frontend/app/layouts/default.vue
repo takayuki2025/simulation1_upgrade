@@ -2,82 +2,73 @@
   <!-- サイト全体のラッパー -->
   <div class="site-wrapper mx-auto max-w-content bg-white shadow-xl min-h-screen">
     
-    <!-- 1. 認証状態の解決を待つローディング画面 (最優先で表示) -->
-    <!-- authStore.isAuthResolved が false の間、全画面をブロック -->
-    <div v-if="!authStore.isAuthResolved" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-[100]">
-      <div class="flex flex-col items-center">
-        <!-- シンプルなスピナー -->
-        <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="mt-4 text-gray-700 text-lg">認証状態を確認中...</p>
-      </div>
-    </div>
+    <!-- 
+      【重要な修正点】
+      App.vueが認証解決(isAuthResolved)を待って全画面をブロックする役割を担っているため、
+      レイアウトファイル内では、isAuthResolvedのチェックとローディング表示は不要です。
+      App.vueがtrueになった後で、このファイルがレンダリングされます。
+    -->
     
-    <!-- 2. 認証解決が完了したらヘッダーとコンテンツを表示 -->
-    <template v-else>
-      
-      <!-- ヘッダー部分 -->
-      <header class="header bg-black shadow-md mx-auto max-w-content">
-        <div class="header__inner flex justify-between items-center py-3 px-4">
-          
-          <NuxtLink to="/">
-            <img class="h-8 w-auto company" src="/image_icon/logo.svg" alt="会社名"> 
-          </NuxtLink>
-          
-          <!-- 検索フォーム -->
-          <form @submit.prevent="handleSearch" class="flex-grow max-w-lg mx-8 hidden md:block">
-            <input 
-              v-model="searchQuery"
-              type="text" 
-              class="search_form w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150" 
-              placeholder="　なにをお探しですか？"
-            />
-          </form>
+    <!-- 2. ヘッダーとコンテンツを表示 -->
+    
+    <!-- ヘッダー部分 -->
+    <header class="header bg-black shadow-md mx-auto max-w-content">
+      <div class="header__inner flex justify-between items-center py-3 px-4">
+        
+        <NuxtLink to="/">
+          <img class="h-8 w-auto company" src="/image_icon/logo.svg" alt="会社名"> 
+        </NuxtLink>
+        
+        <!-- 検索フォーム -->
+        <form @submit.prevent="handleSearch" class="flex-grow max-w-lg mx-8 hidden md:block">
+          <input 
+            v-model="searchQuery"
+            type="text" 
+            class="search_form w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150" 
+            placeholder="　なにをお探しですか？"
+          />
+        </form>
 
-          <div class="login_page0 flex space-x-4 items-center ml-auto">
+        <div class="login_page0 flex space-x-4 items-center ml-auto">
+          
+          <!-- 認証が完了している場合の表示 (authStore.user の有無で判断) -->
+          <template v-if="authStore.user">
+            <!-- ログイン済みユーザー向け (ログアウト、マイページ、出品) -->
+            <button @click="handleLogout" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
+              ログアウト
+            </button>
             
-            <!-- 認証が完了している場合の表示 -->
-            <!-- ★★★ 修正箇所: authStore.isAuthenticated から authStore.user の有無のチェックに変更 ★★★ -->
-            <template v-if="authStore.user">
-              <!-- ログイン済みユーザー向け (ログアウト、マイページ、出品) -->
-              <button @click="handleLogout" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
-                ログアウト
-              </button>
-              
-              <NuxtLink to="/mypage" class="login_page_2 text-white hover:text-red-500 transition duration-150 text-sm">
-                マイページ
-              </NuxtLink>
-              
-              <NuxtLink to="/sell" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
-                出品
-              </NuxtLink>
+            <NuxtLink to="/mypage" class="login_page_2 text-white hover:text-red-500 transition duration-150 text-sm">
+              マイページ
+            </NuxtLink>
+            
+            <NuxtLink to="/sell" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
+              出品
+            </NuxtLink>
 
-            </template>
-            <template v-else>
-              <!-- 未ログインユーザー向け (ログイン、新規登録、出品/ログインへ) -->
-              <NuxtLink to="/login" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
-                ログイン画面へ
-              </NuxtLink>
-              <NuxtLink to="/register" class="login_page_2 text-white hover:text-red-500 transition duration-150 text-sm">
-                新規登録画面へ
-              </NuxtLink>
-              <!-- 未ログイン時の出品はログインページへ誘導 -->
-              <NuxtLink to="/login" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
-                出品（ログイン）
-              </NuxtLink>
-            </template>
-          </div>
+          </template>
+          <template v-else>
+            <!-- 未ログインユーザー向け (ログイン、新規登録、出品/ログインへ) -->
+            <NuxtLink to="/login" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
+              ログイン画面へ
+            </NuxtLink>
+            <NuxtLink to="/register" class="login_page_2 text-white hover:text-red-500 transition duration-150 text-sm">
+              新規登録画面へ
+            </NuxtLink>
+            <!-- 未ログイン時の出品はログインページへ誘導 -->
+            <NuxtLink to="/login" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
+              出品（ログイン）
+            </NuxtLink>
+          </template>
         </div>
-      </header>
-      
-      <!-- メインコンテンツ領域 -->
-      <main class="main-content min-h-[calc(100vh-64px)] p-4 md:p-8">
-        <slot />
-      </main>
-
-    </template>
+      </div>
+    </header>
+    
+    <!-- メインコンテンツ領域 -->
+    <main class="main-content min-h-[calc(100vh-64px)] p-4 md:p-8">
+      <!-- App.vueで認証解決を待っているため、コンテンツは常に表示されます -->
+      <slot />
+    </main>
 
   </div>
 </template>

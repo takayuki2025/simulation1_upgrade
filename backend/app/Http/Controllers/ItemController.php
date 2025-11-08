@@ -197,36 +197,35 @@ class ItemController extends Controller
      */
     public function profile_revise(Request $request)
     {
-        // ★ デバッグログの追加: コントローラーに到達したことを確認
-        Log::info('*** [HIT] profile_revise Controller ***', ['url' => $request->fullUrl()]);
+        Log::info('*** [HIT] profile_revise (GET: プロフィール取得) Controller ***');
         
-        if (Auth::check()) {
-            Log::info('PROFILE_REVISE: Auth Check OK', ['user_id' => Auth::id()]);
-        } else {
-            // ここに到達し、このログが出た場合、Sanctum認証が機能していません
-            Log::warning('PROFILE_REVISE: Auth Check FAILED - Auth::user() is null');
+        // 認証チェック
+        if (!Auth::check()) {
+            Log::warning('PROFILE_REVISE_FETCH: Auth Check FAILED');
+            return response()->json(['message' => 'Unauthenticated. Token or Session missing.'], 401);
         }
 
-        // 認証済みのユーザーを取得
         $user = Auth::user();
-
-        // ユーザーが存在しない、または認証されていない場合は401エラーを返す
+        
         if (!$user) {
-            // このレスポンスが出た場合、クライアントはHTMLではなくJSON 401を受け取ります
-            return response()->json(['message' => 'Unauthenticated. Session or Token missing.'], 401);
+            return response()->json(['message' => 'User not found despite successful authentication.'], 401);
         }
 
-        // ユーザーに紐づく出品商品を取得 (ここでは一旦ユーザー情報のみ)
-        
+        Log::info('PROFILE_REVISE_FETCH: Profile data fetched successfully', ['user_id' => $user->id]);
+
         // 取得したユーザーデータをJSON形式で返す
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'profile' => $user->profile, // profile_reviseで必要な情報を返す
-                // 他のプロフィール関連のフィールド...
-            ],
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            // ★★★ ここに他のフィールドを追加！ ★★★
+            'post_number' => $user->post_number, 
+            'address' => $user->address,
+            'building' => $user->building,
+            'user_image' => $user->user_image,
+        ],
+            'message' => '現在のプロフィール情報を取得しました。'
         ]);
     }
 

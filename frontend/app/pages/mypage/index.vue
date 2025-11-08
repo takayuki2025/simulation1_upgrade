@@ -8,10 +8,8 @@ definePageMeta({
   layout: "default",
 });
 
-// 1. 【エラー修正】typeof の比較対象を文字列 'function' に修正
 const { $api } = useNuxtApp();
 if (typeof $api !== 'function') {
-  // 2. 【エラー修正】console.error の引数を文字列リテラルに修正
   console.error(`CRITICAL: $api instance is missing. Check plugins/api-interceptor.ts.`);
 }
 
@@ -42,7 +40,6 @@ interface Item {
 const user = ref<User | null>(null);
 const items = ref<Item[]>([]);
 
-// 3. 【エラー修正】form の初期値を正しいオブジェクト形式に修正
 const form = ref<any>({
   name: '', 
   post_number: '', 
@@ -50,63 +47,56 @@ const form = ref<any>({
   building: '',
 });
 
-// 4. 【改善】ref の型を明確化
 const profileErrors = ref<any>({});
 const imageError = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const isLoading = ref(true);
 
-// 5. 【エラー修正】computed の比較対象と返り値を文字列リテラルに修正
 const page = computed(() => (route.query.page === 'buy' ? 'buy' : 'sell'));
 
 // --- ユーザー情報取得（初期表示時）---
 const fetchUserProfile = async () => {
-  // すでにユーザー情報があればスキップ
-  if (user.value) return;
-
-  // 認証ストアの解決を待つ（認証状態が確定するまで待機）
+  // 認証ストアの解決を待つ
   isLoading.value = true;
   await authStore.waitForAuthResolution();
 
-  // 待機後に認証状態をチェック
-  // ⚠️ 修正: isAuthed.valueがtrueなのにリダイレクトされる原因のため、削除/コメントアウト ⚠️
-  // if (!isAuthed.value) {
-  //   console.log('未認証のためプロフィールページからリダイレクトします。');
-  //   await navigateTo('/login'); 
-  //   isLoading.value = false;
-  //   return;
-  // }
-
-  // 認証が解決しても、API通信時にセッション切れの可能性があるため、CSRFトークンは取得する
+  // 1. Piniaストアのユーザー情報を初期データとして設定
+  if (authStore.user) {
+    user.value = authStore.user as User;
+  } else {
+    // 認証情報がストアにもない場合はログインへリダイレクト
+    await navigateTo('/login');
+    isLoading.value = false;
+    return;
+  }
+  
+  // CSRFトークンを取得
   try {
-    // CSRFトークンを取得
     await authStore.getSanctumCsrfToken();
   } catch(e) {
-    // 8. 【エラー修正】console.error の引数を文字列リテラルに修正
     console.error('CSRFトークン取得に失敗しました。', e);
     isLoading.value = false;
     return;
   }
 
+  // 2. APIから最新の完全なプロフィールデータを取得
   try {
-    // 9. 【エラー修正】$api の第一引数をテンプレートリテラルに修正
-    const response: { user: User } = await $api(`mypage/profile`, {});
+    // responseの型は { user: User } または空オブジェクトやnullを想定
+    const response: { user?: User } = await $api(`mypage/profile`, {});
 
-    if (!response) {
-      console.warn(`APIから応答がありませんでした。`);
-      user.value = authStore.user as User;
-    } else if (response.user) {
-      user.value = response.user; 
-      
-      // フォームデータも更新
-      form.value.name = response.user.name || ``;
-      form.value.post_number = response.user.post_number || ``;
-      form.value.address = response.user.address || ``;
-      form.value.building = response.user.building || ``;
+    if (response && response.user) {
+      // 成功: APIからの最新データで上書き（これにより住所などの詳細情報が反映される）
+      user.value = response.user;
     } else {
-      console.warn(`API応答にユーザーデータが含まれていませんでした。`);
-      user.value = authStore.user as User;
+      // APIが'user'データを返さなかったが、ストアデータで継続するため警告ログは削除
+      // console.warn(`[Profile Fetch] API response missing 'user' object. Falling back to authStore data.`);
     }
+
+    // フォームデータも更新
+    form.value.name = user.value!.name || ``;
+    form.value.post_number = user.value!.post_number || ``;
+    form.value.address = user.value!.address || ``;
+    form.value.building = user.value!.building || ``;
 
     // メール認証後のクエリパラメータ処理
     if (route.query.verified === `true`) {
@@ -116,17 +106,13 @@ const fetchUserProfile = async () => {
 
   } catch (error: any) {
     if (error.response && error.response.status === 401) {
-      // 401エラー（未認証/セッション切れ）の場合のみログインページへリダイレクト
       console.log('401エラーを受信しました。ログインページへリダイレクトします。');
-      // 10. 【エラー修正】navigateTo の引数を文字列リテラルに修正
       await navigateTo('/login');
       return;
     }
-    // 11. 【エラー修正】console.error の引数を文字列リテラルに修正
     console.error('プロフィールデータの取得に失敗しました:', error);
-    // 12. 【エラー修正】successMessage の代入値を文字列リテラルに修正
     successMessage.value = 'プロフィールデータのロードに失敗しました。';
-    user.value = authStore.user as User;
+    // API取得失敗時も、最初に設定したPiniaストアのデータで継続するため、ここで特別な処理は不要
   } finally {
     isLoading.value = false;
   }
@@ -139,22 +125,14 @@ const fetchItems = async () => {
 
   await authStore.waitForAuthResolution();
 
-  // ⚠️ 修正: isAuthed.valueがtrueなのにリダイレクトされる原因のため、削除/コメントアウト ⚠️
-  // if (!isAuthed.value) { 
-  //   isLoading.value = false;
-  //   return;
-  // }
-
   try {
     const endpoint = `mypage/items?page=${page.value}`; 
     
-    // 13. 【エラー修正】$api の第一引数をテンプレートリテラルに修正
     const response: { items: Item[] } = await $api(endpoint, {}); 
     items.value = response.items || [];
     
   } catch (error: any) {
     console.error(`${page.value}商品の取得に失敗しました:`, error);
-    // 14. 【エラー修正】`&amp;&amp;` を `&&` に修正 (HTMLエンティティが誤って混入)
     if (error.response && error.response.status === 401) { 
       console.log(`401エラーを受信しました（アイテム取得）。ログインページへリダイレクトします。`);
       await navigateTo(`/login`);
@@ -176,13 +154,11 @@ const handleImageUpload = async (event: Event) => {
   const file = target.files?.[0];
   if (!file || !user.value) return;
 
-  // 15. 【エラー修正】代入値を null に修正
   imageError.value = null; 
   successMessage.value = null;
   isLoading.value = true;
 
   const formData = new FormData();
-  // 16. 【エラー修正】FormData.append の第一引数を文字列リテラルに修正
   formData.append('user_image', file);
 
   try {
@@ -197,20 +173,15 @@ const handleImageUpload = async (event: Event) => {
     successMessage.value = `画像をアップロードしました。`;
 
   } catch (error: any) {
-    // 17. 【エラー修正】console.error の引数を文字列リテラルに修正
     console.error('画像アップロードに失敗:', error);
     if (error.response && error.response.status === 422) {
-      // 18. 【エラー修正】文字列リテラルに修正
       imageError.value = error.response._data.errors.user_image?.[0] || '無効なファイルです。';
     }
     else if (error.response && error.response.status === 401) {
-      // 19. 【エラー修正】文字列リテラルに修正
       successMessage.value = 'セッションが切れました。再度ログインが必要です。';
-      // 20. 【エラー修正】navigateTo の引数を文字列リテラルに修正
       await navigateTo('/login'); 
       return;
     } else {
-      // 21. 【エラー修正】文字列リテラルに修正
       imageError.value = 'アップロードに失敗しました。';
     }
   } finally {
@@ -236,18 +207,14 @@ const handleProfileUpdate = async () => {
     successMessage.value = `プロフィール情報を更新しました！`;
 
   } catch (error: any) {
-    // 22. 【エラー修正】console.error の引数を文字列リテラルに修正
     console.error('プロフィール更新に失敗:', error);
     if (error.response && error.response.status === 422) {
       profileErrors.value = error.response._data.errors;
     } else if (error.response && error.response.status === 401) {
-      // 23. 【エラー修正】文字列リテラルに修正
       successMessage.value = 'セッションが切れました。再度ログインが必要です。';
-      // 24. 【エラー修正】navigateTo の引数を文字列リテラルに修正
       await navigateTo('/login');
       return;
     } else {
-      // 25. 【エラー修正】文字列リテラルに修正
       successMessage.value = '更新に失敗しました。再度お試しください。';
     }
   } finally {
@@ -261,34 +228,26 @@ const getProfileImageUrl = (path: string | undefined | null) => {
   const config = useRuntimeConfig().public;
   let base = config.apiBaseUrl;
 
-  // 26. 【エラー修正】endsWith の引数を文字列リテラルに修正
   if (base.endsWith('/api')) {
     base = base.substring(0, base.length - 4);
   }
 
-  // デフォルト画像パス (Laravelの storage/images/default-profile2.jpg へのパス)
-  // 27. 【エラー修正】代入値を文字列リテラルに修正
   const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
-  // 28. 【エラー修正】テンプレートリテラル内の変数を修正
   const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
 
   if (!path) {
     return DEFAULT_IMAGE_FULL_URL;
   }
 
-  // URLがフルパスの場合はそのまま返す
-  // 29. 【エラー修正】startsWith の引数を文字列リテラルに修正
   if (path.startsWith('http')) {
     return path;
   }
 
-  // パスがスラッシュで始まっている場合は削除し、安全に結合
   return `${base}/${path.replace(/^\//, ``)}`;
 };
 
 // ユーティリティ: プロフィール編集ページへ遷移
 const goToProfileEdit = () => {
-  // 30. 【修正】/mypage/profileから/profile_edit（通常使用されるパス）に戻す
   navigateTo('/mypage/profile');
 };
 </script>

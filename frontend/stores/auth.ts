@@ -1,10 +1,9 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
 import { useCookie, useRuntimeConfig, useNuxtApp } from "#app";
 // 新しいトークン管理Composableをインポート
 import { useAuth } from "~/composables/useAuth";
 
-// ★★★ 修正: itemStoreの適切なパスを仮定してインポート ★★★
+// itemStoreの適切なパスを仮定してインポート
 import { useItemStore } from "./item";
 
 // Firebaseのインポート
@@ -16,7 +15,7 @@ import {
   onAuthStateChanged,
   Unsubscribe,
   User as FirebaseAuthUser,
-  updateProfile, // ★ 追記: updateProfileをインポート
+  updateProfile,
 } from "firebase/auth";
 
 // 1. interface User を Firebase と MySQL のデータ構造に合わせて定義
@@ -27,6 +26,10 @@ interface User {
   uid: string; // Firebase UID
   email_verified_at: string | null;
   // ★ データベースに合わせて、必要な他のプロパティを追加
+  post_number: string | null; // 追加: 郵便番号
+  address: string | null; // 追加: 住所
+  building: string | null; // 追加: 建物名・アパート名
+  user_image: string | null; // 追加: ユーザー画像URL
 }
 
 interface AuthState {
@@ -45,6 +48,15 @@ interface RegisterForm {
   email: string;
   password: string;
   password_confirmation: string;
+}
+
+// ★ 追加: プロフィール更新フォームのデータ構造を定義
+interface ProfileUpdateForm {
+  name?: string;
+  post_number?: string | null;
+  address?: string | null;
+  building?: string | null;
+  user_image?: string | null;
 }
 
 // $fetch の型を定義
@@ -358,9 +370,13 @@ export const useAuthStore = defineStore("auth", {
               let sanctumSuccess = true;
 
               if (!token.value || !this.user) {
+                // トークンがない、またはユーザー情報がストアにない場合
                 sanctumSuccess = await this.reEstablishSanctumSession(user);
               } else {
                 this.token = token.value;
+                // ★ 修正点1: トークンがあるがユーザー情報が不完全な場合に備え、
+                //           /user APIから最新の完全な情報を取得する
+                await this.fetchUser();
               }
 
               if (sanctumSuccess) {
@@ -464,6 +480,10 @@ export const useAuthStore = defineStore("auth", {
 
         await this.getSanctumCsrfToken();
 
+        // ⚠️ 修正: 登録/ログインAPIがユーザー情報を返しているため、
+        // 連続で fetchUser を呼び出すのをやめ、401エラーを回避します。
+        // await this.fetchUser(true);
+
         if (this.isEmailVerified) {
           this.startSessionKeeper();
         } else {
@@ -509,9 +529,9 @@ export const useAuthStore = defineStore("auth", {
         console.log(
           `[REGISTER] Updating Firebase profile with name: ${data.name}`
         );
-        await updateProfile(firebaseUser, {
-          displayName: data.name,
-        });
+        // await updateProfile(firebaseUser, {
+        //   displayName: data.name,
+        // });
 
         // データベースに渡す前に、最新の情報（displayNameを含む）を反映させるため、
         // IDトークンを強制的にリフレッシュします。
@@ -546,6 +566,10 @@ export const useAuthStore = defineStore("auth", {
 
         await this.getSanctumCsrfToken();
 
+        // ⚠️ 修正: 登録/ログインAPIがユーザー情報を返しているため、
+        // 連続で fetchUser を呼び出すのをやめ、401エラーを回避します。
+        // await this.fetchUser(true);
+
         this.stopSessionKeeper();
 
         // 登録成功後、isLoadingをfalseにする
@@ -554,6 +578,84 @@ export const useAuthStore = defineStore("auth", {
         this.isLoading = false;
         this.stopSessionKeeper();
         console.error("Register Error Catch (Final):", error);
+        throw error;
+      }
+    },
+
+    // ----------------------------------------------------
+    // ★★★ プロフィール更新処理 (追加) ★★★
+    // ----------------------------------------------------
+    async updateUserProfile(data: ProfileUpdateForm): Promise<User> {
+      if (!this.isAuthenticated || !this.user) {
+        throw new Error("User must be authenticated to update profile.");
+      }
+
+      this.isLoading = true;
+
+      try {
+        const $firebaseAuth = getFirebaseAuth();
+        if (!$firebaseAuth || !$firebaseAuth.currentUser) {
+          throw new Error(
+            "Firebase Auth service or current user is unavailable."
+          );
+        }
+
+        const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+        const baseUrl = this.getApiBaseUrl();
+        const firebaseUser = $firebaseAuth.currentUser;
+
+        // 1. Firebase側の更新 (名前/ユーザー画像の変更のみFirebase Authで扱う)
+        const profileUpdates: {
+          displayName?: string;
+          photoURL?: string | null;
+        } = {};
+
+        if (data.name && data.name !== firebaseUser.displayName) {
+          profileUpdates.displayName = data.name;
+        }
+
+        // user_imageもFirebaseのphotoURLとして更新する場合
+        // if (data.user_image !== undefined && data.user_image !== firebaseUser.photoURL) {
+        //   profileUpdates.photoURL = data.user_image || null;
+        // }
+
+        if (Object.keys(profileUpdates).length > 0) {
+          console.log(`[PROFILE_UPDATE] Updating Firebase profile...`);
+          await updateProfile(firebaseUser, profileUpdates);
+
+          // IDトークンを強制リフレッシュして、新しいクレームを次回のAPIコールに含める
+          await firebaseUser.getIdToken(true);
+        }
+
+        // 2. Laravel側の更新 (全てのフィールドを更新)
+        // LaravelのAPIエンドポイントは /user/profile (PATCH) を想定します
+        const response: any = await fetcher("/user/profile", {
+          baseURL: baseUrl,
+          method: "PATCH",
+          body: data, // name, post_number, address, building, user_image
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        // 3. 成功した場合、ストアのユーザーデータを更新
+        if (response && response.user) {
+          this.user = response.user as User;
+        } else {
+          // レスポンスにuserオブジェクトがない場合（通常は返すべき）、送信したデータでローカルを更新
+          // ★修正: 既存のuserをベースに更新データをマージ
+          this.user = {
+            ...(this.user as User),
+            ...data,
+          } as User;
+        }
+
+        this.isLoading = false;
+        return this.user;
+      } catch (error: any) {
+        this.isLoading = false;
+        console.error("Profile Update Error:", error);
         throw error;
       }
     },
@@ -730,18 +832,11 @@ export const useAuthStore = defineStore("auth", {
     // ユーザー情報の読み込み
     // ----------------------------------------------------
     async fetchUser(isForce: boolean = false) {
-      const nuxtApp = useNuxtApp() as any;
-      const $api = nuxtApp.$api as typeof globalThis.$fetch;
+      const fetcher = globalThis.$fetch as typeof globalThis.fetch; // $fetchを使用
       const { token: localToken, clearToken } = this._getAuthManager();
       const config = useRuntimeConfig();
 
-      if (typeof $api !== "function") {
-        console.error(
-          "FetchUser Error: Custom $api is not available. APIプラグインが正しく読み込まれているか確認してください。"
-        );
-        return;
-      }
-
+      // トークンがない場合は何もしない
       if (!localToken.value) {
         this.user = null;
         this.token = null;
@@ -749,16 +844,28 @@ export const useAuthStore = defineStore("auth", {
       }
 
       this.token = localToken.value;
+      const baseUrl = this.getApiBaseUrl(); // NuxtのSSR/CSR環境に合わせて動的に取得
 
       try {
-        const user: User = await $api("/user", {
-          baseURL: config.public.apiBaseUrl,
+        // ★★★ 修正箇所: $fetchを使用し、Bearerトークンを明示的にヘッダーに追加 ★★★
+        const response: any = await fetcher("/user", {
+          baseURL: baseUrl,
+          method: "GET",
           credentials: "include",
+          headers: {
+            Authorization: `Bearer ${localToken.value}`, // Piniaストアのトークンを強制的に使用
+            Accept: "application/json",
+          },
           context: {
-            skipAutoLogout: true,
+            skipAutoLogout: true, // 401エラーをグローバルインターセプターで処理させない
           },
         });
+        // ★★★ 修正箇所ここまで ★★★
 
+        // 応答が { user: User } 形式の場合は調整
+        const user: User = response.user || response;
+
+        // 取得した完全なユーザー情報でストアを更新
         this.user = user;
       } catch (e: any) {
         const status = e.response?.status;
