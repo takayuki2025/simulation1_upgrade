@@ -46,25 +46,27 @@ Route::get('/{any}', function () {
 })
     // /api/ で始まるパスは Web ルートで処理しない
     ->where('any', '^(?!api\/).*$')
-    ->name('nuxt.fallback');
+    ->name('nuxt.fallback')
+    ->middleware(['web'])
+    ->methods(['GET']); // ★
 
 
 // =========================================================================
 // 2. Sanctum CSRF Cookie 取得ルート (webミドルウェア必須)
 // =========================================================================
-Route::get('/sanctum/csrf-cookie', function (Request $request) {
-    Log::info('!!! SANCTUM CSRF COOKIE ROUTE HIT !!!');
-    return response('')->cookie(
-        'XSRF-TOKEN', 
-        $request->session()->token(), 
-        config('session.lifetime') * 60,
-        config('session.path'),
-        config('session.domain'),
-        config('session.secure'),
-        false, 
-        config('session.samesite')
-    );
-})->middleware(['web']);
+// Route::get('/sanctum/csrf-cookie', function (Request $request) {
+//     Log::info('!!! SANCTUM CSRF COOKIE ROUTE HIT !!!');
+//     return response('')->cookie(
+//         'XSRF-TOKEN', 
+//         $request->session()->token(), 
+//         config('session.lifetime') * 60,
+//         config('session.path'),
+//         config('session.domain'),
+//         config('session.secure'),
+//         false, 
+//         config('session.samesite')
+//     );
+// })->middleware(['web']);
 
 
 // =========================================================================

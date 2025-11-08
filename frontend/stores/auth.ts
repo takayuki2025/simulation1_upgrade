@@ -529,9 +529,11 @@ export const useAuthStore = defineStore("auth", {
         console.log(
           `[REGISTER] Updating Firebase profile with name: ${data.name}`
         );
-        // await updateProfile(firebaseUser, {
-        //   displayName: data.name,
-        // });
+        // FirebaseのプロフィールはLaravel側の登録APIに任せるか、
+        // この後のIDトークンリフレッシュで自動的に反映されるのを期待する
+        await updateProfile(firebaseUser, {
+          displayName: data.name,
+        });
 
         // データベースに渡す前に、最新の情報（displayNameを含む）を反映させるため、
         // IDトークンを強制的にリフレッシュします。
@@ -583,7 +585,7 @@ export const useAuthStore = defineStore("auth", {
     },
 
     // ----------------------------------------------------
-    // ★★★ プロフィール更新処理 (追加) ★★★
+    // ★★★ プロフィール更新処理 (修正) ★★★
     // ----------------------------------------------------
     async updateUserProfile(data: ProfileUpdateForm): Promise<User> {
       if (!this.isAuthenticated || !this.user) {
@@ -593,6 +595,8 @@ export const useAuthStore = defineStore("auth", {
       this.isLoading = true;
 
       try {
+        const localToken = this._getAuthManager().token; // Sanctumトークンを取得
+
         const $firebaseAuth = getFirebaseAuth();
         if (!$firebaseAuth || !$firebaseAuth.currentUser) {
           throw new Error(
@@ -600,6 +604,7 @@ export const useAuthStore = defineStore("auth", {
           );
         }
 
+        // $fetch は Nuxt の useFetch/globalThis.$fetch に相当
         const fetcher = globalThis.$fetch as typeof globalThis.fetch;
         const baseUrl = this.getApiBaseUrl();
         const firebaseUser = $firebaseAuth.currentUser;
@@ -614,10 +619,7 @@ export const useAuthStore = defineStore("auth", {
           profileUpdates.displayName = data.name;
         }
 
-        // user_imageもFirebaseのphotoURLとして更新する場合
-        // if (data.user_image !== undefined && data.user_image !== firebaseUser.photoURL) {
-        //   profileUpdates.photoURL = data.user_image || null;
-        // }
+        // ... (user_imageのFirebase PhotoURL更新ロジックは省略)
 
         if (Object.keys(profileUpdates).length > 0) {
           console.log(`[PROFILE_UPDATE] Updating Firebase profile...`);
@@ -628,37 +630,75 @@ export const useAuthStore = defineStore("auth", {
         }
 
         // 2. Laravel側の更新 (全てのフィールドを更新)
-        // LaravelのAPIエンドポイントは /user/profile (PATCH) を想定します
-        const response: any = await fetcher("/user/profile", {
+        const apiPath = "/mypage/profile_update";
+
+        const requestBody = {
+          ...data,
+          _method: "PATCH", // LaravelにPATCHとして解釈させる魔法のフィールド
+        };
+
+        console.log(
+          `[PROFILE_UPDATE] Calling Laravel API: POST ${apiPath} with _method=PATCH`
+        );
+
+        // ★★★ 修正ポイント: Nuxtの $fetch は非200レスポンス時に自動でエラーを投げるが、
+        // ここではレスポンスが200でもHTMLが返ってきた場合のハンドリングを強化する
+
+        const response: any = await fetcher(apiPath, {
           baseURL: baseUrl,
-          method: "PATCH",
-          body: data, // name, post_number, address, building, user_image
+          method: "POST",
+          body: requestBody,
           credentials: "include",
           headers: {
             Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            Authorization: `Bearer ${localToken.value}`,
           },
         });
 
         // 3. 成功した場合、ストアのユーザーデータを更新
         if (response && response.user) {
           this.user = response.user as User;
+        } else if (
+          typeof response === "string" &&
+          response.startsWith("<!DOCTYPE html>")
+        ) {
+          // APIコールが成功ステータス(200 OK)を返したが、コンテンツがHTMLだった場合
+          console.error(
+            "⛔️ [FATAL ERROR] APIレスポンスが予期せずHTMLです。Laravel側のルーティング（認証またはCSRFミドルウェア）を確認してください。"
+          );
+          // HTMLレスポンスをそのまま処理させないためにエラーを投げる
+          throw new Error(
+            "API call returned HTML instead of JSON. Check Laravel routing/middleware."
+          );
         } else {
-          // レスポンスにuserオブジェクトがない場合（通常は返すべき）、送信したデータでローカルを更新
-          // ★修正: 既存のuserをベースに更新データをマージ
+          // レスポンスにuserオブジェクトがない場合、送信したデータでローカルを更新
           this.user = {
             ...(this.user as User),
             ...data,
           } as User;
         }
 
+        console.log(
+          "✅ [DEBUG] プロフィール更新APIコールが成功しました。ストアを更新します。"
+        );
+
         this.isLoading = false;
         return this.user;
       } catch (error: any) {
         this.isLoading = false;
-        console.error("Profile Update Error:", error);
+        console.error("Profile Update Error (Catch):", error);
+        // Laravelからエラーレスポンス（422など）が返ってきた場合、詳細なメッセージをログに出力
+        if (error.response?.data?.errors) {
+          console.error(
+            "Laravel Validation Errors:",
+            error.response.data.errors
+          );
+        }
         throw error;
       }
-    },
+    }, // ★★★ updateUserProfile 終わり ★★★
 
     // ----------------------------------------------------
     // メール認証処理
@@ -832,11 +872,10 @@ export const useAuthStore = defineStore("auth", {
     // ユーザー情報の読み込み
     // ----------------------------------------------------
     async fetchUser(isForce: boolean = false) {
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch; // $fetchを使用
+      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
       const { token: localToken, clearToken } = this._getAuthManager();
       const config = useRuntimeConfig();
 
-      // トークンがない場合は何もしない
       if (!localToken.value) {
         this.user = null;
         this.token = null;
@@ -844,30 +883,37 @@ export const useAuthStore = defineStore("auth", {
       }
 
       this.token = localToken.value;
-      const baseUrl = this.getApiBaseUrl(); // NuxtのSSR/CSR環境に合わせて動的に取得
+      const baseUrl = this.getApiBaseUrl();
 
       try {
-        // ★★★ 修正箇所: $fetchを使用し、Bearerトークンを明示的にヘッダーに追加 ★★★
         const response: any = await fetcher("/user", {
           baseURL: baseUrl,
           method: "GET",
           credentials: "include",
           headers: {
-            Authorization: `Bearer ${localToken.value}`, // Piniaストアのトークンを強制的に使用
+            Authorization: `Bearer ${localToken.value}`,
             Accept: "application/json",
           },
           context: {
-            skipAutoLogout: true, // 401エラーをグローバルインターセプターで処理させない
+            skipAutoLogout: true,
           },
         });
-        // ★★★ 修正箇所ここまで ★★★
 
-        // 応答が { user: User } 形式の場合は調整
+        // ★★★ 修正ポイント: HTMLレスポンスのチェック
+        if (
+          typeof response === "string" &&
+          response.startsWith("<!DOCTYPE html>")
+        ) {
+          console.error(
+            "⛔️ [FATAL ERROR] /user APIレスポンスが予期せずHTMLです。Laravel側のルーティング/ミドルウェアを確認してください。"
+          );
+          throw new Error("/user API call returned HTML instead of JSON.");
+        }
+
         const user: User = response.user || response;
-
-        // 取得した完全なユーザー情報でストアを更新
         this.user = user;
       } catch (e: any) {
+        // ... (エラー処理は省略せず、前のコードを保持)
         const status = e.response?.status;
         const shouldClear = status === 401;
         const shouldMaintain = status === 403;

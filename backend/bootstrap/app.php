@@ -44,10 +44,11 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: [
                 // \App\Http\Middleware\CorsMiddleware::class, // <-- これを削除！
                 \Illuminate\Http\Middleware\HandleCors::class,
-                \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+                // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             ],
             // 最後にルーティングバインディングを追加
             append: [
+                'throttle:api',
                 \Illuminate\Routing\Middleware\SubstituteBindings::class,
             ]
         );

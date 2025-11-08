@@ -16,7 +16,7 @@ if (typeof $api !== 'function') {
 }
 
 const authStore = useAuthStore();
-const { isAuthenticated: isAuthed } = storeToRefs(authStore);
+const { isAuthenticated: isAuthed, user: authUser } = storeToRefs(authStore); // authUserをストアから直接取得
 const { authenticatedFetch } = useApi(); // useApi composableを呼び出し
 
 // User interface, assuming it matches the backend model
@@ -102,11 +102,12 @@ const fetchUserProfile = async () => {
     }
     
     // Piniaストアの基本データで一旦初期化（APIコール失敗時のフォールバックを確保）
-    initializeUserData(null); 
+    // NOTE: authStore.user は storeToRefs で authUser になっているが、ここでは直接アクセス
+    initializeUserData(authStore.user); 
 
     try {
-        // useApiのラッパーを通してAPIをコール
-        const response = await authenticatedFetch('mypage/profile', {});
+        // ベースURLに対する絶対パスとして強制
+        const response = await authenticatedFetch('/mypage/profile', {}); 
         
         // APIからの応答でデータを更新
         initializeUserData(response);
@@ -122,15 +123,11 @@ const fetchUserProfile = async () => {
         
     } catch (err: any) {
         console.error('プロフィールデータのロードに失敗しました:', err);
-        successMessage.value = 'プロフィールデータのロードに失敗しました。';
         // 401はauthenticatedFetch側で処理されるため、ここでは警告表示のみ
     } finally {
         isLoading.value = false;
     }
 };
-
-// ----------------------------------------------------------------
-// --- ライフサイクルとマウント ---
 
 onMounted(() => {
     fetchUserProfile();
@@ -138,7 +135,7 @@ onMounted(() => {
 
 
 // ----------------------------------------------------------------
-// --- 2. 画像アップロード処理 (useApiを使用) ---
+// --- 2. 画像アップロード処理 (ストア更新のヘルパーメソッドがないため、ここで直接APIとストアを更新) ---
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -148,13 +145,14 @@ const handleImageUpload = async (event: Event) => {
   imageError.value = '';
   successMessage.value = '';
   isLoading.value = true;
+
+  console.log('【DEBUG】画像アップロード処理を開始します。'); 
   
   const formData = new FormData();
   formData.append('user_image', file);
 
   try {
-    // authenticatedFetchを使用
-    const response: any = await authenticatedFetch('upload2', { 
+    const response: any = await authenticatedFetch('/upload2', { 
       method: 'POST', 
       body: formData,
       headers: {
@@ -162,27 +160,34 @@ const handleImageUpload = async (event: Event) => {
       }
     });
 
+    console.log('【DEBUG】画像アップロードAPIコールが成功しました。', response); 
+
     // ユーザーオブジェクトのuser_imageパスを更新
     const imagePath = response.image_path || response.user_image;
     if (imagePath) {
         user.value!.user_image = imagePath; 
-        authStore.updateUser({ user_image: imagePath }); // Piniaストアも更新
+        
+        // --- ★ 修正ポイント: authStore.user を直接更新 (auth.tsで setAuthUser がないため) ★ ---
+        // Piniaストアの user オブジェクトを直接更新します
+        if (authStore.user) {
+            authStore.user.user_image = imagePath;
+        }
     }
     
     successMessage.value = '画像をアップロードしました。';
 
 
   } catch (error: any) {
+    console.error('【ERROR】画像アップロードに失敗しました:', error); 
     if (error.status === 401) {
         successMessage.value = 'セッションが切れました。再度ログインが必要です。';
         return;
     }
     
-    console.error('画像アップロードに失敗:', error); 
     if (error.response && error.response.status === 422) {
       imageError.value = error.response._data.errors.user_image?.[0] || '無効なファイルです。';
     } else {
-      imageError.value = 'アップロードに失敗しました。';
+      imageError.value = `アップロードに失敗しました (ステータス: ${error.status || '不明'})。`;
     }
   } finally {
     isLoading.value = false;
@@ -190,7 +195,7 @@ const handleImageUpload = async (event: Event) => {
 };
 
 // ----------------------------------------------------------------
-// --- 3. プロフィール情報更新処理 (useApiを使用) ---
+// --- 3. プロフィール情報更新処理 (ストアのアクションを利用) ---
 
 const handleProfileUpdate = async () => {
   profileErrors.value = {};
@@ -198,22 +203,21 @@ const handleProfileUpdate = async () => {
   if (!user.value) return;
   isLoading.value = true;
   
+  console.log('【DEBUG】プロフィール更新処理を開始します。');
+  console.log('【DEBUG】送信データ (form.value):', form.value);
+  
   try {
-    // authenticatedFetchを使用
-    const updateResponse: any = await authenticatedFetch('profile_update', { 
-      method: 'PATCH', 
-      body: form.value,
-    });
+    // --- ★ 修正ポイント: APIコールとストア更新を authStore.updateUserProfile に一任する ★ ---
+    // form.value は ProfileUpdateForm の型定義を満たしています
+    const updatedUser = await authStore.updateUserProfile(form.value); 
+    
+    // --- 成功時 ---
+    console.log('【DEBUG】プロフィール更新APIコールが成功しました。Piniaストアも更新されました。');
 
     successMessage.value = 'プロフィール情報を更新しました！';
     
-    // サーバーからの更新応答が成功した場合、クライアント側のデータを同期させる
-    const updatedUser = updateResponse.user || updateResponse;
-    if (updatedUser && updatedUser.id) {
-        user.value = updatedUser as User;
-        // Piniaストアのユーザー情報も更新（名前、住所など）
-        authStore.updateUser(updatedUser); 
-    }
+    // Piniaストアで更新された最新のデータでローカルの user と form を同期
+    user.value = updatedUser;
     
     // フォームも最新の情報で再初期化
     if (user.value) {
@@ -224,17 +228,21 @@ const handleProfileUpdate = async () => {
     }
 
   } catch (error: any) {
+    // --- エラー時 ---
+    const statusCode = error.status || (error.response ? error.response.status : '不明');
+    console.error(`【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`, error); 
+    
     if (error.status === 401) {
         successMessage.value = 'セッションが切れました。再度ログインが必要です。';
         return;
     }
     
-    console.error('プロフィール更新に失敗:', error); 
+    // Piniaアクション内で throw されたエラーの処理
     if (error.response && error.response.status === 422) {
       // バリデーションエラー
       profileErrors.value = error.response._data.errors;
     } else {
-      successMessage.value = '更新に失敗しました。再度お試しください。';
+      successMessage.value = `更新に失敗しました。(Status: ${statusCode}) 再度お試しください。`;
     }
   } finally {
     isLoading.value = false;
@@ -280,7 +288,8 @@ const getProfileImageUrl = (path: string | undefined | null) => {
 <h2 class="title">プロフィール設定</h2>
 
 <!-- ロード中表示 -->
-<div v-if="isLoading" class="text-center p-8">
+<div v-if="isLoading && !user" class="text-center p-8">
+    <!-- userが存在しない状態での初期ロード中のみ表示 -->
     <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
     <p class="text-lg text-gray-500 mt-3">データをロード中です...</p>
 </div>
@@ -350,7 +359,7 @@ const getProfileImageUrl = (path: string | undefined | null) => {
           name="post_number" 
           v-model="form.post_number" 
           placeholder="例: 1000001" 
-          maxlength="7"
+          maxlength="8"
         />
         <div class="profile__error">
           {{ profileErrors.post_number ? profileErrors.post_number[0] : '' }}

@@ -50,6 +50,11 @@ Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyE
 // ★★★ Sanctum 認証 API ルート (auth:sanctum ミドルウェアを使用) ★★★
 // **********************************************
 
+
+
+
+
+
 Route::middleware('auth:sanctum')->group(function () {
 // Route::middleware('firebase.verify')->group(function () { // <-- こちらを使用する場合はコメントアウトを外してください
 
@@ -71,9 +76,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 認証済みのユーザー情報を返す（Nuxtの `fetchUser` アクションで使用）
     Route::get('/mypage/profile', [ItemController::class, 'profile_revise'])->name('profile_edit');
+
+
     // プロフィール情報更新
-    Route::patch('/profile_update', [ItemController::class, 'profile_update']);
-    
+    // Route::patch('/profile_update', [ItemController::class, 'profile_update']);
+    Route::patch('/mypage/profile_update', [ItemController::class, 'profile_update']);
+
     // ユーザー画像アップロード
     Route::post('/upload2', [ItemController::class, 'user_image_upload']);
 

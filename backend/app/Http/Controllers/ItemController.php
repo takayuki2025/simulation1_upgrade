@@ -23,11 +23,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log; // Logをインポート
 
 
+
 class ItemController extends Controller 
 {
 
     // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
-    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
+    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。@
     public function index(Request $request)
     {
         // URLのGETパラメータ'tab'を取得。デフォルトは'all'
@@ -193,7 +194,7 @@ class ItemController extends Controller
 
     /**
      * マイページ用のプロフィールと商品リストをJSONで返す
-     * Route::get('/mypage/profile')に対応
+     * Route::get('/mypage/profile')に対応@@
      */
     public function profile_revise(Request $request)
     {
@@ -232,7 +233,7 @@ class ItemController extends Controller
 
 
     /**
-     * 認証済みのユーザーのプロフィール情報をJSONで返します。
+     * 認証済みのユーザーのプロフィール情報をJSONで返します。＠＠
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
@@ -308,84 +309,165 @@ class ItemController extends Controller
 
                                        // ItemController.php 内の修正
     public function profile_update(ProfileRequest $request)
-{
-    // ★ 修正: 認証済みユーザーを取得
-    $user = $request->user();
-
-    if (!$user) {
-        return response()->json(['message' => 'Authentication required.'], 401);
-    }
-
-    $updateData = $request->only('name', 'post_number', 'address', 'building');
-    
-    // ★ user_imageの処理は画像アップロードAPIに任せるため、削除
-    // 既存のLaravelコードでの $user->user_image = $request->input('user_image'); は削除
-    
-    $user->update($updateData);
-
-    // ★ JSONで成功レスポンスを返す（リダイレクトを削除）
-    return response()->json([
-        'success' => true,
-        'message' => 'プロフィールを更新しました。'
-    ], 200);
-}
-
-
-        public function update(AddressRequest $request, $itemId, $userId)
     {
-            $user = User::find($userId);
+        Log::info('*** [HIT] profile_update (PATCH: プロフィール更新) Controller ***');
 
-        if (!$user) {
-            return redirect()->back()->with('error', 'ユーザーが見つかりません。');
-        }
-        // リクエストから新しい住所情報を取得してユーザーを更新します。
-        // AddressRequestでバリデーション済みのため、直接アクセスします。
-            $user->update([
-                'post_number' => $request->post_number,
-                'address' => $request->address,
-                'building' => $request->building,
-        ]);
-
-        return redirect()->route('item_buy', ['item_id' => $itemId]);
-    }
-
-
-                                             // ItemController.php 内の修正
-    public function user_image_upload(ProfileImageRequest $request)
-    {
-    // ★ 修正: 認証済みユーザーを取得
+        // 認証済みユーザーを取得
         $user = $request->user();
 
         if (!$user) {
+            Log::warning('PROFILE_UPDATE: Auth Check FAILED');
+            return response()->json(['message' => 'Authentication required.'], 401);
+        }
+
+        // name, post_number, address, building のみを取得
+        $updateData = $request->only('name', 'post_number', 'address', 'building');
+        
+        // データベースを更新
+        $user->update($updateData);
+
+        // ★★★ 修正点1: 更新後の最新ユーザー情報を取得して返す ★★★
+        // フロントエンドの Pinia Store の user オブジェクトを直接更新できるようにするため
+        $latestUser = User::find($user->id); 
+
+        Log::info('PROFILE_UPDATE: Profile updated successfully', ['user_id' => $user->id]);
+
+        // JSONで成功レスポンスを返す
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィールを更新しました。',
+            'user' => [
+                'id' => $latestUser->id,
+                'name' => $latestUser->name,
+                'email' => $latestUser->email,
+                'uid' => $latestUser->uid, // Firebase UIDも返却
+                'email_verified_at' => $latestUser->email_verified_at,
+                'post_number' => $latestUser->post_number, 
+                'address' => $latestUser->address,
+                'building' => $latestUser->building,
+                'user_image' => $latestUser->user_image,
+            ]
+        ], 200);
+    }
+
+    /**
+     * 購入時の配送先住所を更新する（リダイレクトをJSONレスポンスに変更）＠＠
+     *
+     * @param AddressRequest $request
+     * @param int $itemId
+     * @param int $userId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function update(AddressRequest $request, $itemId, $userId)
+    {
+        Log::info('*** [HIT] update (住所更新) Controller ***');
+
+        // 認証済みユーザーを取得（ここではURLの$userIdを使用せず、Auth::id()との一致を確認すべきだが、既存ロジックを尊重）
+        // 既存ロジック: $userIdのユーザーを探す
+        $user = User::find($userId);
+
+        if (!$user) {
+            Log::warning("ADDRESS_UPDATE: User ID $userId not found");
+            return response()->json(['message' => 'ユーザーが見つかりません。'], 404);
+        }
+
+        // ★ 修正点: ログインユーザーと更新対象ユーザーが一致するか確認するロジックを追加すべき
+        if (Auth::id() != $user->id) {
+            Log::error("ADDRESS_UPDATE: Unauthorized attempt to update user ID $userId by Auth user " . Auth::id());
+            return response()->json(['message' => '更新権限がありません。'], 403);
+        }
+        
+        // リクエストから新しい住所情報を取得してユーザーを更新します。
+        $user->update([
+            'post_number' => $request->post_number,
+            'address' => $request->address,
+            'building' => $request->building,
+        ]);
+
+        // ★★★ 修正点2: リダイレクトを削除し、JSONで成功レスポンスを返す ★★★
+        // フロントエンドはこれを受け取った後、自身で遷移する
+        Log::info('ADDRESS_UPDATE: Address updated successfully', ['user_id' => $user->id, 'item_id' => $itemId]);
+        
+        // 更新後の最新ユーザー情報を返すことで、Pinia Store を最新の状態に保つ
+        return response()->json([
+            'success' => true,
+            'message' => '住所を更新しました。',
+            'redirect_item_id' => $itemId,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'uid' => $user->uid, 
+                'email_verified_at' => $user->email_verified_at,
+                'post_number' => $user->post_number, 
+                'address' => $user->address,
+                'building' => $user->building,
+                'user_image' => $user->user_image,
+            ]
+        ], 200);
+    }
+    
+    /**
+     * ユーザー画像（アバター）をアップロードする
+     *
+     * @param ProfileImageRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function user_image_upload(ProfileImageRequest $request)
+    {
+        Log::info('*** [HIT] user_image_upload (画像アップロード) Controller ***');
+        
+        // 認証済みユーザーを取得
+        $user = $request->user();
+
+        if (!$user) {
+            Log::warning('IMAGE_UPLOAD: Auth Check FAILED');
             return response()->json(['message' => 'Authentication required.'], 401);
         }
 
         if ($request->hasFile('user_image') && $request->file('user_image')->isValid()) {
-        // ファイル名生成と保存のロジックは変更なし
+            
+            // ファイル名生成と保存のロジック
             $extension = $request->user_image->getClientOriginalExtension();
             $randomName = 'user_image_' . Str::random(30) . '.' . $extension;
+            // storage/app/public/user_images に保存
             $path = $request->user_image->storeAs('public/user_images', $randomName);
             $dbPath = str_replace('public/', '', $path);
-            $storagePath = 'storage/' . $dbPath;
+            // storage/user_images/filename.ext の形式でDBに保存
+            $storagePath = 'storage/' . $dbPath; 
 
-        // DBアップデート処理
+            // DBアップデート処理
             $user->update([
                 'user_image' => $storagePath 
             ]);
 
-        // ★ JSONで成功レスポンスを返す（リダイレクトを削除）
+            // ★★★ 修正点3: 最新のユーザー情報と画像パスをJSONで返す ★★★
+            $latestUser = User::find($user->id); 
+
+            Log::info('IMAGE_UPLOAD: Image uploaded and profile updated successfully', ['user_id' => $user->id, 'path' => $storagePath]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'ユーザーイメージをアップロードしました。',
-            '   image_path' => $storagePath 
+                'user' => [
+                    'id' => $latestUser->id,
+                    'name' => $latestUser->name,
+                    'email' => $latestUser->email,
+                    'uid' => $latestUser->uid, 
+                    'email_verified_at' => $latestUser->email_verified_at,
+                    'post_number' => $latestUser->post_number, 
+                    'address' => $latestUser->address,
+                    'building' => $latestUser->building,
+                    'user_image' => $latestUser->user_image,
+                ]
             ], 200);
-
-            }
+        }
     
-    // 画像ファイルがない場合のエラー処理
+        // 画像ファイルがない場合のエラー処理
+        Log::error('IMAGE_UPLOAD: No valid image file provided.');
         return response()->json([
             'success' => false,
-            'message' => '画像ファイルがありません。'
+            'message' => '画像ファイルが有効ではありません。'
         ], 400);
     }
 
