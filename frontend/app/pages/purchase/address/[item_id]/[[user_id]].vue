@@ -97,11 +97,27 @@ const fetchCurrentAddress = async () => {
     }
 
     // 1. 認証状態の解決を待つ
+    // Piniaストアが初期化され、最新のユーザー情報が確定するのを待つ
     await authStore.waitForAuthResolution();
 
-    if (!isAuthenticated.value) {
-        errorMessage.value = '認証されていません。ログインページへ移動します。';
-        setTimeout(() => router.push('/login'), 1000);
+    // ★ 修正ポイント1: 認証チェックの厳格化
+    if (!isAuthenticated.value || !authUser.value || String(authUser.value.id) !== pUserId) {
+        // ユーザーが認証されていない OR Piniaにユーザーデータがない OR URLのユーザーIDとPiniaのユーザーIDが一致しない
+        console.error(
+            `[AUTH ERROR] isAuthenticated: ${isAuthenticated.value}, ` +
+            `Store User ID: ${authUser.value?.id} (${typeof authUser.value?.id}), ` +
+            `Route User ID: ${pUserId} (${typeof pUserId})`
+        );
+        
+        // 認証されていない場合はログインページへ
+        if (!isAuthenticated.value) {
+            errorMessage.value = '認証されていません。ログインページへ移動します。';
+            setTimeout(() => router.push('/login'), 1000);
+        } else if (String(authUser.value.id) !== pUserId) {
+            // 認証済みだが、URLのユーザーIDが現在ログイン中のユーザーと異なる場合
+             errorMessage.value = '権限がありません。ログイン中のユーザーとURLのユーザーIDが一致しません。';
+        }
+
         isLoading.value = false;
         return;
     }
@@ -138,6 +154,13 @@ const fetchCurrentAddress = async () => {
         const statusCode = error.status || (error.response ? error.response.status : '不明');
         
         errorMessage.value = error.message || `住所情報の取得中に予期せぬエラーが発生しました (Status: ${statusCode})。`;
+        
+        // ★ 修正ポイント2: APIコールが401/403を返した場合、強制的にリダイレクト
+        if (statusCode === 401 || statusCode === 403) {
+             errorMessage.value = '認証情報が無効です。ログインページへ移動します。';
+             setTimeout(() => router.push('/login'), 1000);
+        }
+        
     } finally {
         isLoading.value = false;
     }
@@ -156,6 +179,7 @@ const submitAddressUpdate = async () => {
 
   try {
     await authStore.waitForAuthResolution();
+    // ここでも再度認証チェックを行う
     if (!authStore.isAuthenticated) {
         errorMessage.value = 'セッションが切れました。再度ログインが必要です。';
         setTimeout(() => router.push('/login'), 1500);
@@ -197,6 +221,13 @@ const submitAddressUpdate = async () => {
     
     const statusCode = error.status || (error.response ? error.response.status : '不明');
     
+    // ★ 修正ポイント2: 送信時にも401/403をチェック
+    if (statusCode === 401 || statusCode === 403) {
+        errorMessage.value = 'セッションが無効です。再度ログインが必要です。';
+        setTimeout(() => router.push('/login'), 1500);
+        return;
+    }
+    
     if (statusCode === 422) {
       serverErrors.value = error.response._data.errors || {};
       errorMessage.value = '入力内容に誤りがあります。ご確認ください。';
@@ -213,10 +244,27 @@ const submitAddressUpdate = async () => {
 // ==========================
 // ライフサイクル & ウォッチ (パラメータの確定を監視)
 // ==========================
+
+// ★ 修正ポイント3: Piniaストアのユーザー情報変更を監視し、フェッチをトリガーする
+watch(authUser, (newUser, oldUser) => {
+    // ユーザーが変わった（IDが異なる、または古いユーザーがいたが新しいユーザーがいなくなった）場合
+    // 新規ログイン/ログアウトを検知
+    const userIdChanged = (!!newUser && !!oldUser && newUser.id !== oldUser.id) || (!newUser !== !oldUser);
+
+    if (userIdChanged) {
+         console.log('--- WATCH: Pinia user state changed (New Login/Logout). Re-fetching data. ---');
+         // item_idとuser_idが揃っているか確認してフェッチを再実行
+         if (itemId.value && userIdFromRoute.value) {
+            fetchCurrentAddress(); 
+         }
+    }
+});
+
+
 watch(() => route.params, (newParams) => {
     
     // 💡 デバッグログを追加
-    console.log('--- WATCH: route.params update detected ---');
+    console.log('--- WATCH: route.params update detected (Initial Load/Navigation) ---');
     console.log('New Params Object:', JSON.stringify(newParams));
     
     // 💥 修正ポイント: 'item_id' キーを優先して取得
@@ -233,6 +281,7 @@ watch(() => route.params, (newParams) => {
     // エラーメッセージをリセットして再ロードに備える
     errorMessage.value = '';
     
+    // ルートパラメータが変更されたとき、かつ必要なIDが揃っているとき
     if (pItemId && pUserId) {
         // パラメータが揃ったらフェッチをトリガー
         console.log('✅ Both IDs available. Triggering fetchCurrentAddress.');

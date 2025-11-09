@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, watch } from 'vue'; 
 import { useAuthStore } from '@/stores/auth';
 import { useRoute, navigateTo, useNuxtApp, useRuntimeConfig } from '#app';
 import { storeToRefs } from 'pinia';
@@ -16,7 +16,8 @@ if (typeof $api !== 'function') {
 }
 
 const authStore = useAuthStore();
-const { isAuthenticated: isAuthed, user: authUser } = storeToRefs(authStore); // authUserをストアから直接取得
+// authUserをストアから直接取得 (リアクティブ)
+const { isAuthenticated: isAuthed, user: authUser } = storeToRefs(authStore); 
 const { authenticatedFetch } = useApi(); // useApi composableを呼び出し
 
 // User interface, assuming it matches the backend model
@@ -57,32 +58,32 @@ const initializeUserData = (apiData: any) => {
     // 1. API応答に完全なユーザーデータがあるか確認
     if (apiData && apiData.user) {
         sourceData = apiData.user as User; 
-        console.log("【Init】API応答の完全なデータで初期化しました。");
     } 
     // 2. API応答がユーザーオブジェクトそのものの形式であった場合
     else if (apiData && apiData.id && apiData.name) {
         sourceData = apiData as User;
-        console.log("【Init】API応答のユーザーオブジェクトで初期化しました。");
     }
     
-    // 3. APIデータが利用できない、またはデータ不足の場合、Piniaストアのデータで補完/フォールバック
+    // 3. Piniaストアのデータで補完/フォールバック
     if (!sourceData && authStore.user) {
         sourceData = authStore.user as User;
-        console.log("【Init】APIデータ不足。Piniaストアの認証データで初期化しました。");
     }
     
     // 状態とフォームに反映
     user.value = sourceData;
     
     if (user.value) {
-        // フォームへの値の代入ロジック（データがnullでも空文字列で安全に初期化）
+        // フォームへの値の代入ロジック
         form.value.name = user.value.name || '';
         form.value.post_number = user.value.post_number || '';
         form.value.address = user.value.address || '';
         form.value.building = user.value.building || '';
     } else {
-        // 最終的にデータが取得できなかった場合
-        console.error("【Init】ユーザー情報を特定できませんでした。");
+        // データがない場合、フォームを確実に空にする
+        form.value.name = '';
+        form.value.post_number = '';
+        form.value.address = '';
+        form.value.building = '';
     }
 };
 
@@ -92,32 +93,30 @@ const initializeUserData = (apiData: any) => {
 const fetchUserProfile = async () => {
     isLoading.value = true;
     
-    console.log("【Auth Check】認証解決を待機します...");
+    // Piniaの認証解決を待つ (非同期処理の完了を保証)
     await authStore.waitForAuthResolution();
     
     const currentUserId = authUser.value?.id;
-    console.log(`【Auth Check】解決後: isAuthed.value = ${isAuthed.value}, authUser.value?.id = ${currentUserId || 'N/A'}`);
 
-    if (!isAuthed.value) {
-        // ★ 修正ロジック: IDは存在するのに認証フラグがfalseなら、トークンが無効なので強制ログアウトする
-        if (currentUserId) {
-            console.warn(`【Auth Error】ID ${currentUserId} のデータは残存していますが、認証トークンが無効です。ストアをクリアし、ログインへリダイレクトします。`);
-            await authStore.logout(); // 強制的にストアの状態をリセット
-        } else {
-            console.log("【Auth Fail】ユーザー認証情報が見つからないため、ログインへリダイレクトします。");
+    if (!isAuthed.value || !currentUserId) {
+        // 認証されていない、またはIDがない場合
+        if (authUser.value) {
+            // IDは残っているが認証フラグが偽なら、トークンが無効の可能性が高い
+            await authStore.$reset(); 
         }
         
         // リダイレクト処理
-        await navigateTo('/login');
+        if (process.client && route.path !== '/login') {
+            await navigateTo('/login');
+        }
         isLoading.value = false;
         return;
     }
     
-    // Piniaストアの基本データで一旦初期化（APIコール失敗時のフォールバックを確保）
+    // Piniaストアの現在のデータで一旦初期化（ローディング中に何も表示されないのを避ける）
     initializeUserData(authStore.user); 
 
     try {
-        // ベースURLに対する絶対パスとして強制
         const response = await authenticatedFetch('/mypage/profile', {}); 
         
         // APIからの応答でデータを更新
@@ -126,27 +125,62 @@ const fetchUserProfile = async () => {
         // メール認証後のクエリパラメータ処理
         if (user.value && route.query.verified === 'true') {
             successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
-            console.log("メール認証完了。クエリパラメータを削除します。");
-            
-            // クエリパラメータを削除してURLをクリーンにする
-            navigateTo({ path: route.path }, { replace: true });
+            if (process.client) {
+                navigateTo({ path: route.path }, { replace: true });
+            }
         }
         
     } catch (err: any) {
         console.error('プロフィールデータのロードに失敗しました:', err);
-        // 401はauthenticatedFetch側で処理されるため、ここでは警告表示のみ
+        // 401エラー（トークン無効）の場合は強制的にログアウト
+        if (err.status === 401 || (err.response && err.response.status === 401)) {
+             await authStore.logout();
+             successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+             user.value = null; 
+             initializeUserData(null);
+        }
     } finally {
         isLoading.value = false;
     }
 };
 
-onMounted(() => {
-    fetchUserProfile();
+// ★★★ 状態監視ロジックの強化（コンポーネントが生きている間の状態変化に対応） ★★★
+watch(authUser, async (newUser, oldUser) => {
+    const newUserId = newUser?.id;
+    const oldUserId = oldUser?.id;
+
+    // ユーザーIDが変更された、または認証状態がログイン/ログアウト間で遷移したか
+    const userIdChanged = newUserId !== oldUserId;
+    const authStateTransition = (!!newUser !== !!oldUser);
+    
+    // 最初のマウント時 (oldUserがnull/undefined) または大きな状態変更時
+    const shouldFetch = userIdChanged || authStateTransition || (newUser && !oldUser && !oldUserId);
+
+    if (shouldFetch) {
+        console.log(`--- WATCH: User state transition detected (ID: ${oldUserId || 'N/A'} -> ${newUserId || 'N/A'}). Resetting local state and triggering fetch. ---`);
+        
+        // ユーザーが明確に変わった、またはログアウトした場合は、UIの古いデータをクリア
+        if (userIdChanged || !newUser) {
+            // ローカル状態を即座にクリアし、ローディング状態へ遷移させる
+            user.value = null;
+            form.value.name = '';
+            form.value.post_number = '';
+            form.value.address = '';
+            form.value.building = '';
+            successMessage.value = '';
+            profileErrors.value = {};
+        }
+
+        // データをフェッチ
+        await fetchUserProfile(); 
+    }
+}, {
+    immediate: true, // コンポーネントが最初にマウントされた時にも実行
 });
 
 
 // ----------------------------------------------------------------
-// --- 2. 画像アップロード処理 (修正: レスポンスの user オブジェクト全体でストアを更新) ---
+// --- 2. 画像アップロード処理 ---
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -156,8 +190,6 @@ const handleImageUpload = async (event: Event) => {
   imageError.value = '';
   successMessage.value = '';
   isLoading.value = true;
-
-  console.log('【DEBUG】画像アップロード処理を開始します。'); 
   
   const formData = new FormData();
   formData.append('user_image', file);
@@ -171,9 +203,6 @@ const handleImageUpload = async (event: Event) => {
       }
     });
 
-    console.log('【DEBUG】画像アップロードAPIコールが成功しました。レスポンス:', response); 
-
-    // --- ★ 修正ポイント: response.user (Laravelから返された最新のユーザーオブジェクト) で全体を上書き ★ ---
     if (response && response.user) {
       const updatedUser: User = response.user;
       
@@ -184,10 +213,7 @@ const handleImageUpload = async (event: Event) => {
       authStore.$patch({
           user: updatedUser
       });
-      
-      console.log('【DEBUG】Piniaストアとローカル状態を最新のユーザーオブジェクトで更新しました。');
     }
-    // --------------------------------------------------------------------------------------------
     
     successMessage.value = '画像をアップロードしました。';
 
@@ -218,17 +244,11 @@ const handleProfileUpdate = async () => {
   if (!user.value) return;
   isLoading.value = true;
   
-  console.log('【DEBUG】プロフィール更新処理を開始します。');
-  console.log('【DEBUG】送信データ (form.value):', form.value);
-  
   try {
     // APIコールとストア更新を authStore.updateUserProfile に一任する
-    // form.value は ProfileUpdateForm の型定義を満たしています
     const updatedUser = await authStore.updateUserProfile(form.value); 
     
     // --- 成功時 ---
-    console.log('【DEBUG】プロフィール更新APIコールが成功しました。Piniaストアも更新されました。');
-
     successMessage.value = 'プロフィール情報を更新しました！';
     
     // Piniaストアで更新された最新のデータでローカルの user と form を同期
@@ -298,13 +318,13 @@ const getProfileImageUrl = (path: string | undefined | null) => {
 </script>
 
 <template>
-<!-- Tailwindで基本のコンテナ設定を適用 -->
-<div class="login_page max-w-[1400px] mx-auto pt-5 pb-10">
+<!-- ★★★ key属性を保持: ユーザーIDが変わるとコンポーネント全体を強制再生成 ★★★ -->
+<div class="login_page max-w-[1400px] mx-auto pt-5 pb-10" :key="authUser?.id || 'unauthenticated'">
 <h2 class="title">プロフィール設定</h2>
 
 <!-- ロード中表示 -->
 <div v-if="isLoading && !user" class="text-center p-8">
-    <!-- userが存在しない状態での初期ロード中のみ表示 -->
+    <!-- userが存在しない状態での初期ロード中、またはリセット後のロード中のみ表示 -->
     <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
     <p class="text-lg text-gray-500 mt-3">データをロード中です...</p>
 </div>
