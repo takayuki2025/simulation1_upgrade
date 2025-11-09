@@ -2,13 +2,6 @@
   <!-- サイト全体のラッパー -->
   <div class="site-wrapper mx-auto max-w-content bg-white shadow-xl min-h-screen">
     
-    <!-- 
-      【重要な修正点】
-      App.vueが認証解決(isAuthResolved)を待って全画面をブロックする役割を担っているため、
-      レイアウトファイル内では、isAuthResolvedのチェックとローディング表示は不要です。
-      App.vueがtrueになった後で、このファイルがレンダリングされます。
-    -->
-    
     <!-- 2. ヘッダーとコンテンツを表示 -->
     
     <!-- ヘッダー部分 -->
@@ -33,7 +26,7 @@
           
           <!-- 認証が完了している場合の表示 (authStore.user の有無で判断) -->
           <template v-if="authStore.user">
-            <!-- ログイン済みユーザー向け (ログアウト、マイページ、出品) -->
+            <!-- ログイン済みユーザー向け (ログアウト、マイページ) -->
             <button @click="handleLogout" class="login_page_1 text-white hover:text-red-500 transition duration-150 text-sm">
               ログアウト
             </button>
@@ -42,7 +35,8 @@
               マイページ
             </NuxtLink>
             
-            <NuxtLink to="/sell" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
+            <!-- 【修正後】出品ボタンの遷移先をメール認証状態によって切り替える -->
+            <NuxtLink :to="sellLinkTarget" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
               出品
             </NuxtLink>
 
@@ -66,7 +60,6 @@
     
     <!-- メインコンテンツ領域 -->
     <main class="main-content min-h-[calc(100vh-64px)] p-4 md:p-8">
-      <!-- App.vueで認証解決を待っているため、コンテンツは常に表示されます -->
       <slot />
     </main>
 
@@ -76,7 +69,8 @@
 <script setup lang="ts">
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
-import { ref } from "vue";
+import { ref, computed } from "vue";
+// storeToRefs は今回は使用しません。
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -85,12 +79,26 @@ const router = useRouter();
 // 検索フォーム用のローカルな状態
 const searchQuery = ref(route.query.all_item_search || "");
 
+/**
+ * 出品リンクの遷移先を動的に決定するComputedプロパティ
+ * - ユーザーがログインしており、かつメール認証が完了していれば '/sell'
+ * - それ以外（未ログイン、またはメール未認証）の場合は '/login'
+ */
+const sellLinkTarget = computed(() => {
+  // Piniaストアに直接アクセスして user と hasVerifiedEmail の状態を確認
+  // これにより、storeToRefsによるデストラクチャリングのエラーを回避します。
+  if (authStore.user && authStore.hasVerifiedEmail) {
+    return '/sell';
+  }
+  // それ以外の場合は /login (未ログイン時も、ログイン済みだが未認証時も)
+  return '/login';
+});
+
+
 // ログアウト処理
 const handleLogout = async () => {
   try {
-    // authStore.logout() が完了すると authStore.user が null に更新されます。
     await authStore.logout();
-    // ログアウト後、ホームにリダイレクト
     router.push("/");
   } catch (error) {
     console.error("Logout failed:", error);
@@ -104,7 +112,7 @@ const handleSearch = () => {
     path: "/",
     query: {
       tab: currentTab,
-      all_item_search: searchQuery.value || undefined, // 空文字の場合はクエリを削除
+      all_item_search: searchQuery.value || undefined, 
     },
   });
 };
@@ -116,23 +124,18 @@ const handleSearch = () => {
     max-width: 1400px;
 }
 .site-wrapper {
-  /* ヘッダーコンポーネントとして、影はここで保持してもOKです */
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 .company {
-    /* imgタグのデフォルトマージンを上書きし、左寄せを確保 */
     margin-left: 0 !important; 
 }
 .login_page0 {
   white-space: nowrap; 
 }
-/* 未ログイン時のリンクも白文字で見えるように調整 */
 .login_page0 a {
     color: white; 
 }
-/* ヘッダーの高さに合わせてメインコンテンツの高さを調整（例としてヘッダーを64pxと仮定） */
 .main-content {
-  /* ヘッダーの高さを考慮して、ビューポートの残りの高さを確保 */
   min-height: calc(100vh - 64px); 
 }
 </style>

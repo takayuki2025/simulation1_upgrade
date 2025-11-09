@@ -21,6 +21,7 @@ use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log; // Logをインポート
+use Illuminate\Http\JsonResponse;
 
 
 
@@ -112,83 +113,186 @@ class ItemController extends Controller
 
         public function item_detail_show($item_id)
     {
-            $item = Item::findOrFail($item_id);
+        // 商品が存在しない場合は404エラーを返す
+        $item = Item::with('user')->findOrFail($item_id); // 出品者情報も取得できるようにwith('user')を追加
 
-        if ($item->remain == 0) {
-            $item->price = 'sold';
+        $user = Auth::user();
+        $isFavorited = false;
+        
+        // 商品IDに関連するコメントを取得 (ユーザー情報もロード)
+        $comments = Comment::with('user')->where('item_id', $item_id)->get();
+        
+        // お気に入り数のカウント
+        $favoritesCount = Good::where('item_id', $item->id)->count();
+
+        if ($user) {
+            // ログインユーザーがこの商品を気に入っているかチェック
+            $isFavorited = Good::where('item_id', $item->id)
+                ->where('user_id', $user->id)
+                ->exists();
         }
 
-            $item_id = $item->id;
-            $comments = Comment::where('item_id',$item_id)->get();
+        // 最終的なデータ構造を構築
+        $data = [
+            'item' => $item,
+            'comments' => $comments,
+            'isFavorited' => $isFavorited,
+            'favoritesCount' => $favoritesCount,
+            'userId' => $user ? $user->id : null, // ログインユーザーID
+            'isLoggedIn' => $user !== null,
+        ];
 
-
-            $user = Auth::user();
-            $isFavorited = false; // デフォルト値を`false`に設定
-            $favoritesCount = Good::where('item_id', $item->id)->count();
-
-            if ($user) {
-            $isFavorited = Good::where('item_id', $item->id)
-            ->where('user_id', $user->id)
-            ->exists();
-            }
-            // 商品が存在しない場合のエラー処理（推奨）
-            if (!$item) {
-            // 例として、404ページを表示
-            abort(404);
-    }
-            return view('item_detail',compact('item' ,'item_id','comments', 'isFavorited','favoritesCount','user'));
+        // JSON形式でデータを返す
+        return response()->json($data);
     }
 
 
-    public function item_buy_show($item_id)
+    public function item_buy_show($item_id): JsonResponse
     {
-        // ←で戻るでページに移動したとしてもとしてもメール認証完了していないと購入ページには移動できないようにです。
-        if (Auth::check() && !Auth::user()->hasVerifiedEmail()) {
-            // 強制的にログイン画面へリダイレクト
-            return redirect('/login');
+        // 1. 認証チェック
+        // 通常、このチェックはroutes/api.phpでmiddleware('auth:sanctum')などを使って行いますが、
+        // コントローラ内で明示的にチェックする場合は以下のようになります。
+        if (!Auth::check()) {
+            // 未認証の場合、401 Unauthorizedを返す
+            return response()->json([
+                'message' => 'Unauthenticated. Please log in.',
+                'code' => 'UNAUTHENTICATED'
+            ], 401);
         }
 
         $user = Auth::user();
 
-        $item = Item::find($item_id);
-
-        if (!$item) {
-            abort(404);
+        // 2. メール認証チェック
+        if (!$user->hasVerifiedEmail()) {
+            // メール認証が完了していない場合、403 Forbiddenと専用コードを返す
+            // フロントエンドはこのコードを見て、メール認証ページへリダイレクトします。
+            return response()->json([
+                'message' => 'Email address is not verified. Please verify your email.',
+                'code' => 'EMAIL_UNVERIFIED'
+            ], 403);
         }
 
-        return view('item_buy', [
-            'item' => $item,
-            'item_id' => $item->id,
-            'user' => $user,
-        ]);
+        // 3. 商品の取得
+        $item = Item::with(['user:id,name,user_image', 'categories:id,name', 'favorites'])->find($item_id);
+
+        if (!$item) {
+            // 商品が見つからない場合、404 Not Foundを返す
+            return response()->json([
+                'message' => 'Item not found.'
+            ], 404);
+        }
+
+        // 4. 売り切れチェック (itemモデルに is_sold というアクセサまたはカラムがあると仮定)
+        if ($item->is_sold ?? false) { 
+             return response()->json([
+                'message' => 'This item is already sold.',
+                'code' => 'ITEM_SOLD'
+            ], 400); // 400 Bad Request
+        }
+
+        // 5. JSONデータの整形と返却
+        // フロントエンドが必要とするデータを集約して返します
+        return response()->json([
+            'item' => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'price' => $item->price,
+                'explain' => $item->explain,
+                'item_image' => $item->item_image,
+                'condition' => $item->condition,
+                'brand' => $item->brand,
+                'categories' => $item->categories->pluck('name'),
+                // 'is_sold' => $item->is_sold ?? false, // フロント側で再度チェックできる
+                'seller' => $item->user,
+            ],
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                // ... 他のユーザー情報（住所など、購入に必要な情報）
+            ],
+            'message' => 'Purchase details retrieved successfully.'
+        ], 200);
     }
 
 
-        public function item_purchase_edit($item_id,$user_id)
+        public function item_purchase_edit($item_id, $user_id): JsonResponse
     {
-            // URLのuser_idが認証済みユーザーのIDと一致することを確認する。
-            if (Auth::id() != $user_id) {
-            abort(403, 'Unauthorized action.');
-            }
+        // 1. 認証チェック（ミドルウェアで行うのが理想的だが、ここでは明示的に確認）
+        if (!Auth::check()) {
+            return response()->json([
+                'message' => 'Unauthenticated. Please log in.',
+                'code' => 'UNAUTHENTICATED'
+            ], 401);
+        }
 
-            $user = Auth::user();
+        // 2. 認可チェック: URLのuser_idが認証済みユーザーのIDと一致することを確認する。
+        if (Auth::id() != $user_id) {
+            // 認可エラーの場合、403 Forbiddenを返す
+            return response()->json([
+                'message' => 'Unauthorized action. The user ID in the URL does not match the authenticated user.',
+                'code' => 'UNAUTHORIZED_USER'
+            ], 403);
+        }
 
-            $item = Item::findOrFail($item_id);
+        $user = Auth::user();
 
-        return view('address',compact('user','item_id','user_id','item'));
+        // 3. 商品の取得
+        $item = Item::find($item_id);
+
+        if (!$item) {
+            // 商品が見つからない場合、404 Not Foundを返す
+            return response()->json([
+                'message' => 'Item not found.'
+            ], 404);
+        }
+
+        // 4. JSONデータの整形と返却
+        // 編集ページに必要な情報（商品サマリーとユーザーの現在の住所情報）を返します。
+        return response()->json([
+            'item' => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'price' => $item->price,
+            ],
+            'user_address' => [
+                // ユーザーモデルから住所関連のフィールドを抽出して返します。
+                'id' => $user->id,
+                'name' => $user->name,
+                'post_number' => $user->post_number, // ユーザーモデルに存在する前提
+                'address' => $user->address,         // ユーザーモデルに存在する前提
+                'building' => $user->building,       // ユーザーモデルに存在する前提
+            ],
+            'message' => 'Address edit details retrieved successfully.'
+        ], 200);
     }
 
 
     public function item_sell_show(Request $request)
     {
-        // ←で戻るでページに移動したとしてもとしてもメール認証完了していないと購入ページには移動できないようにです。
-        if (Auth::check() && !Auth::user()->hasVerifiedEmail()) {
-            // ログインページへリダイレクトします
-            return redirect('/login');
+        // 1. ユーザーがログインしているかチェック
+        if (!Auth::check()) {
+            return response()->json([
+                'message' => '未認証です。',
+            ], 401); // 401 Unauthorized
         }
 
-        $items = Item::all();
-        return view('item_sell', compact('items'));
+        $user = Auth::user();
+
+        // 2. メール認証が完了しているかチェック
+        // 元のロジック: (Auth::check() && !Auth::user()->hasVerifiedEmail()) の場合 /login へリダイレクト
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'メール認証が完了していません。',
+            ], 403); // 403 Forbidden
+        }
+
+        // 認証とメール認証が完了していれば、通常は商品の詳細リストを返す必要はないが、
+        // 元のBladeではItem::all()を取得していたため、空の成功レスポンス、またはメタデータを返す。
+        // 今回は単純にアクセス成功を示す。
+        return response()->json([
+            'message' => '出品ページへのアクセスが許可されました。',
+            // 'items' => Item::all(), // 取得が必要なければコメントアウト
+        ], 200);
     }
 
 
@@ -307,7 +411,7 @@ class ItemController extends Controller
 
 // ユーザー情報の更新。画像アップロードの処理
 
-                                       // ItemController.php 内の修正
+                                       // ItemController.php 内の修正＠＠
     public function profile_update(ProfileRequest $request)
     {
         Log::info('*** [HIT] profile_update (PATCH: プロフィール更新) Controller ***');
@@ -351,7 +455,7 @@ class ItemController extends Controller
     }
 
     /**
-     * 購入時の配送先住所を更新する（リダイレクトをJSONレスポンスに変更）＠＠
+     * 購入時の配送先住所を更新する（リダイレクトをJSONレスポンスに変更）
      *
      * @param AddressRequest $request
      * @param int $itemId
@@ -408,7 +512,7 @@ class ItemController extends Controller
     }
     
     /**
-     * ユーザー画像（アバター）をアップロードする
+     * ユーザー画像（アバター）をアップロードする＠＠
      *
      * @param ProfileImageRequest $request
      * @return \Illuminate\Http\JsonResponse
@@ -560,7 +664,12 @@ class ItemController extends Controller
 
         public function thanks_sell_create(ExhibitionRequest $request)
     {
-        $item = $request->only([
+        // ExhibitionRequestで基本的なバリデーションと認証は処理されているはず
+        if (!Auth::check()) {
+            return response()->json(['message' => '認証が必要です。'], 401);
+        }
+
+        $itemData = $request->only([
             'name',
             'price',
             'brand',
@@ -569,49 +678,75 @@ class ItemController extends Controller
             'item_image',
         ]);
 
-        // カテゴリーデータを明示的に取得し、JSON形式に変換
+        // カテゴリーデータを明示的に取得し、JSON形式に変換 (DB保存の元のロジックを再現)
         $selectedCategories = $request->input('category');
-        $item['category'] = json_encode($selectedCategories);
+        // $selectedCategoriesは配列として期待されるため、LaravelのDBロジックに合わせてJSON文字列にエンコード
+        $itemData['category'] = json_encode($selectedCategories);
 
         // ログインユーザーIDとremainを付与
-        $item['user_id'] = auth()->id();
-        $item['remain'] = 1;
+        $itemData['user_id'] = auth()->id();
+        $itemData['remain'] = 1;
 
         // データベースに商品を保存
-        Item::create($item);
+        try {
+            $item = Item::create($itemData);
+        } catch (\Exception $e) {
+            // DB保存失敗時のエラーハンドリング
+            return response()->json([
+                'message' => '商品の登録に失敗しました。',
+                'error' => $e->getMessage()
+            ], 500);
+        }
 
-        return view('thanks_sell');
+        // 成功時は、サンクスページ表示のための成功レスポンスを返却
+        return response()->json([
+            'message' => '商品が正常に出品されました。',
+            'item_id' => $item->id,
+        ], 201); // 201 Created
     }
 
         // 出品商品画像アップロード処理
         public function item_image_upload(Request $request)
     {
+        // 認証チェック (Middlewareで処理することを推奨しますが、明示的に記述)
+        if (!Auth::check()) {
+            return response()->json(['message' => '認証が必要です。'], 401);
+        }
+
         $rules = [
-            'item_image' => 'required|mimes:jpeg,png',
+            'item_image' => 'required|file|mimes:jpeg,png|max:2048', // maxサイズを追加推奨
         ];
 
         $messages = [
             'item_image.required' => '商品画像ファイルをアップロードしてください。',
             'item_image.mimes' => '商品画像ファイルは.jpegまたは.png形式でアップロードしてください。',
+            // 'item_image.max' => 'ファイルサイズは2MB以内にしてください。',
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
 
         if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
+            // バリデーション失敗時は422 Unprocessable Entityを返し、エラー詳細を含める
+            return response()->json([
+                'message' => 'バリデーションエラー',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         // ファイル名にランダムな文字列を付与
-        $extension = $request->file('item_image')->getClientOriginalExtension();
+        $file = $request->file('item_image');
+        $extension = $file->getClientOriginalExtension();
         $randomName = 'item_image_' . Str::random(30) . '.' . $extension;
 
-        // 画像を保存
-        $path = $request->item_image->storeAs('public/item_images', $randomName);
-        $dbPath = str_replace('public/', '', $path);
+        // 画像を保存 (storage/app/public/item_images に保存される)
+        $path = $file->storeAs('public/item_images', $randomName);
+        $dbPath = str_replace('public/', 'storage/', $path); // URL/DB保存用パス (例: storage/item_images/...)
 
-        return redirect()->back()->with('success', '商品画像アップロードできました！')->with('image_path', 'storage/' . $dbPath);
+        // 成功時は、フロントエンドで利用する保存パスをJSONで返却
+        return response()->json([
+            'message' => '商品画像アップロードできました！',
+            'image_path' => $dbPath,
+        ], 201); // 201 Created
     }
 
 

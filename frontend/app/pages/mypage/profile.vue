@@ -26,9 +26,9 @@ interface User {
   email: string;
   uid: string;
   email_verified_at: string | null;
-  post_number: string | null; 
-  address: string | null;      
-  building: string | null;     
+  post_number: string | null;
+  address: string | null;
+  building: string | null;
   user_image?: string | null;
 }
 
@@ -92,17 +92,28 @@ const initializeUserData = (apiData: any) => {
 const fetchUserProfile = async () => {
     isLoading.value = true;
     
+    console.log("【Auth Check】認証解決を待機します...");
     await authStore.waitForAuthResolution();
+    
+    const currentUserId = authUser.value?.id;
+    console.log(`【Auth Check】解決後: isAuthed.value = ${isAuthed.value}, authUser.value?.id = ${currentUserId || 'N/A'}`);
 
     if (!isAuthed.value) {
-        console.log("未認証のためログインへリダイレクトします。");
+        // ★ 修正ロジック: IDは存在するのに認証フラグがfalseなら、トークンが無効なので強制ログアウトする
+        if (currentUserId) {
+            console.warn(`【Auth Error】ID ${currentUserId} のデータは残存していますが、認証トークンが無効です。ストアをクリアし、ログインへリダイレクトします。`);
+            await authStore.logout(); // 強制的にストアの状態をリセット
+        } else {
+            console.log("【Auth Fail】ユーザー認証情報が見つからないため、ログインへリダイレクトします。");
+        }
+        
+        // リダイレクト処理
         await navigateTo('/login');
         isLoading.value = false;
         return;
     }
     
     // Piniaストアの基本データで一旦初期化（APIコール失敗時のフォールバックを確保）
-    // NOTE: authStore.user は storeToRefs で authUser になっているが、ここでは直接アクセス
     initializeUserData(authStore.user); 
 
     try {
@@ -135,7 +146,7 @@ onMounted(() => {
 
 
 // ----------------------------------------------------------------
-// --- 2. 画像アップロード処理 (ストア更新のヘルパーメソッドがないため、ここで直接APIとストアを更新) ---
+// --- 2. 画像アップロード処理 (修正: レスポンスの user オブジェクト全体でストアを更新) ---
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -160,19 +171,23 @@ const handleImageUpload = async (event: Event) => {
       }
     });
 
-    console.log('【DEBUG】画像アップロードAPIコールが成功しました。', response); 
+    console.log('【DEBUG】画像アップロードAPIコールが成功しました。レスポンス:', response); 
 
-    // ユーザーオブジェクトのuser_imageパスを更新
-    const imagePath = response.image_path || response.user_image;
-    if (imagePath) {
-        user.value!.user_image = imagePath; 
-        
-        // --- ★ 修正ポイント: authStore.user を直接更新 (auth.tsで setAuthUser がないため) ★ ---
-        // Piniaストアの user オブジェクトを直接更新します
-        if (authStore.user) {
-            authStore.user.user_image = imagePath;
-        }
+    // --- ★ 修正ポイント: response.user (Laravelから返された最新のユーザーオブジェクト) で全体を上書き ★ ---
+    if (response && response.user) {
+      const updatedUser: User = response.user;
+      
+      // 1. ローカルのリアクティブ状態を更新
+      user.value = updatedUser; 
+      
+      // 2. Piniaストアの状態を更新
+      authStore.$patch({
+          user: updatedUser
+      });
+      
+      console.log('【DEBUG】Piniaストアとローカル状態を最新のユーザーオブジェクトで更新しました。');
     }
+    // --------------------------------------------------------------------------------------------
     
     successMessage.value = '画像をアップロードしました。';
 
@@ -207,7 +222,7 @@ const handleProfileUpdate = async () => {
   console.log('【DEBUG】送信データ (form.value):', form.value);
   
   try {
-    // --- ★ 修正ポイント: APIコールとストア更新を authStore.updateUserProfile に一任する ★ ---
+    // APIコールとストア更新を authStore.updateUserProfile に一任する
     // form.value は ProfileUpdateForm の型定義を満たしています
     const updatedUser = await authStore.updateUserProfile(form.value); 
     

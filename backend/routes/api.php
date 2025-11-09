@@ -77,7 +77,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // 認証済みのユーザー情報を返す（Nuxtの `fetchUser` アクションで使用）
     Route::get('/mypage/profile', [ItemController::class, 'profile_revise'])->name('profile_edit');
 
-
     // プロフィール情報更新
     // Route::patch('/profile_update', [ItemController::class, 'profile_update']);
     Route::patch('/mypage/profile_update', [ItemController::class, 'profile_update']);
@@ -85,10 +84,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // ユーザー画像アップロード
     Route::post('/upload2', [ItemController::class, 'user_image_upload']);
 
+    // 購入前情報画面表示
+    Route::get('/purchase/{item_id}', [ItemController::class, 'item_buy_show']);
+
+    // 出品画面表示
+    Route::get('/sell', [ItemController::class, 'item_sell_show']);
     // 出品処理（POST）
     Route::post('/items', [ItemController::class, 'thanks_sell_create']); // /thanks_sell -> /items
     Route::post('/upload', [ItemController::class, 'item_image_upload']); // 商品画像アップロード
     
+    // 配送先編集画面表示
+    Route::get('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'item_purchase_edit']);
+
     // 購入処理関連
     Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update']); 
     Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create'); 

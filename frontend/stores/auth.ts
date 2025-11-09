@@ -4,7 +4,7 @@ import { useCookie, useRuntimeConfig, useNuxtApp } from "#app";
 import { useAuth } from "~/composables/useAuth";
 
 // itemStoreの適切なパスを仮定してインポート
-import { useItemStore } from "./item";
+import { useItemStore } from "./item"; // ★ 依存関係として残す
 
 // Firebaseのインポート
 import {
@@ -772,7 +772,19 @@ export const useAuthStore = defineStore("auth", {
       this.stopSessionKeeper();
 
       // 2. UIの即時更新とデータのクリアを最優先
-      itemStore.$reset();
+
+      // ★★★ 修正ポイント: itemStore.$reset() を itemStore.clearData() に置き換え ★★★
+      // itemStore.$reset(); // <-- エラーの原因
+      if (typeof itemStore.clearData === "function") {
+        itemStore.clearData();
+        console.log("[LOGOUT] itemStore.clearData() called.");
+      } else {
+        // itemStoreで clearData() が実装されていない場合のフォールバック
+        // ItemStoreを自分で定義する場合は、clearData()を実装することが望ましい
+        console.warn(
+          "🍍: itemStore.clearData() is not defined. Item store data may persist."
+        );
+      }
 
       this.token = null;
       this.user = null;

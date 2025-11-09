@@ -1,17 +1,16 @@
-import { useNuxtApp, navigateTo, useRuntimeConfig } from "#app"; // useRuntimeConfigをインポート
+import { useNuxtApp, navigateTo, useRuntimeConfig } from "#app";
 import { useAuthStore } from "@/stores/auth";
 import { useAuth } from "~/composables/useAuth";
 
 /**
  * カスタムAPIリクエストを行うためのコンポーザブル。
- * 認証済みエンドポイント向けに、CSRFトークンの取得と認証エラー(401)のハンドリングを一元化します。
+ * 認証済みエンドポイント向けに、認証エラー(401)のハンドリングとBearerトークンの付与を一元化します。
  */
 export const useApi = () => {
   const { $api } = useNuxtApp();
   const authStore = useAuthStore();
-  const { token: localToken } = useAuth();
+  const { token: localToken } = useAuth(); // Bearerトークンを取得
 
-  // ★ 修正: runtimeConfigからAPIベースURLを取得
   const config = useRuntimeConfig();
   const apiBaseUrl = config.public.apiBaseUrl;
 
@@ -29,28 +28,10 @@ export const useApi = () => {
    * @returns APIレスポンスデータ
    */
   const authenticatedFetch = async (url: string, options: any = {}) => {
-    // ★★★ 核心の修正: APIベースURLを強制的に結合して絶対URLを生成 ★★★
-    // 例: https://laravel.test:4430/api + /mypage/profile_update
-    // urlの先頭スラッシュを安全に処理
+    // 1. APIベースURLを強制的に結合して絶対URLを生成
     const apiPath = `${apiBaseUrl}${url.startsWith("/") ? url : "/" + url}`;
 
     console.log(`[useApi] 最終リクエストURLを構築: ${apiPath}`); // デバッグログ
-
-    // 1. CSRFトークンを強制取得し、セッションを確立 (Sanctumセッション維持のため)
-    try {
-      console.log(`[useApi] セッション確立確認のためCSRFトークンを取得します`);
-      // CSRFトークン取得処理 (ベースURLは設定により自動でSanctumのルートに飛びます)
-      await authStore.getSanctumCsrfToken();
-    } catch (e) {
-      console.error(
-        "[useApi] CSRFトークン取得に失敗。セッション切れの可能性。",
-        e
-      );
-      throw {
-        status: 401,
-        message: "セッションが切れました。再度ログインが必要です。",
-      };
-    }
 
     // 2. Bearerトークンをヘッダーに明示的に付与
     if (localToken.value) {
@@ -58,12 +39,13 @@ export const useApi = () => {
         ...options.headers,
         Authorization: `Bearer ${localToken.value}`,
       };
-      console.log(`[useApi] Authorization Bearer Token set.`);
+      console.log(`[useApi] Authorization Bearer Token set. (Bearer Token Auth Mode)`);
+    } else {
+        console.warn(`[useApi] Bearer Token is missing for ${apiPath}. Proceeding without token.`);
     }
 
     try {
       // 3. 実際のAPIリクエスト実行
-      // ここで、絶対URL (apiPath) を渡すことで、Nuxtの誤ったホスト解決を防ぎます。
       const response = await $api(apiPath, options);
       return response;
     } catch (error: any) {
@@ -75,6 +57,7 @@ export const useApi = () => {
         await authStore.logout();
         await navigateTo("/login");
 
+        // Promise.rejectでチェーンを中断
         return Promise.reject({
           status: 401,
           message: "認証セッションが切れました。",
