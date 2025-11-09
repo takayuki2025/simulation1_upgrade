@@ -16,7 +16,7 @@ if (typeof $api !== 'function') {
 }
 
 const authStore = useAuthStore();
-// authUserをストアから直接取得 (リアクティブ)
+// isAuthenticated と authUser をストアから取得 (リアクティブ)
 const { isAuthenticated: isAuthed, user: authUser } = storeToRefs(authStore); 
 const { authenticatedFetch } = useApi(); // useApi composableを呼び出し
 
@@ -44,8 +44,9 @@ const form = ref<any>({
 const profileErrors = ref<any>({});
 const imageError = ref('');
 const successMessage = ref('');
-const isLoading = ref(true); // CSRのため、ローディング状態を別途管理
+const isLoading = ref(true); 
 const route = useRoute();
+const fileInput = ref<HTMLInputElement | null>(null);
 
 /**
  * APIから取得したユーザーデータ、またはPiniaストアのデータで
@@ -89,34 +90,29 @@ const initializeUserData = (apiData: any) => {
 
 /**
  * クライアントサイドでのプロフィールデータ取得ロジック (CSR専用)
+ * NOTE: 認証チェックとリダイレクトは watch(isAuthed) に一任する
  */
 const fetchUserProfile = async () => {
-    isLoading.value = true;
+    // 既にローディング中でなければ、開始
+    if (!isLoading.value) {
+        isLoading.value = true;
+    }
     
     // Piniaの認証解決を待つ (非同期処理の完了を保証)
-    await authStore.waitForAuthResolution();
+    // ここでストアがストレージからトークンをロードし、認証状態を確定させます
+    await authStore.waitForAuthResolution(); 
     
-    const currentUserId = authUser.value?.id;
-
-    if (!isAuthed.value || !currentUserId) {
-        // 認証されていない、またはIDがない場合
-        if (authUser.value) {
-            // IDは残っているが認証フラグが偽なら、トークンが無効の可能性が高い
-            await authStore.$reset(); 
-        }
-        
-        // リダイレクト処理
-        if (process.client && route.path !== '/login') {
-            await navigateTo('/login');
-        }
+    // fetchUserProfileが呼ばれた時点で、ウォッチャーにより認証済み(isAuthed=true)であることが前提
+    if (!isAuthed.value) {
+        // 念のため
         isLoading.value = false;
         return;
     }
-    
-    // Piniaストアの現在のデータで一旦初期化（ローディング中に何も表示されないのを避ける）
-    initializeUserData(authStore.user); 
 
     try {
+        // Piniaストアの現在のデータで一旦初期化（ロード中の表示回避）
+        initializeUserData(authStore.user); 
+        
         const response = await authenticatedFetch('/mypage/profile', {}); 
         
         // APIからの応答でデータを更新
@@ -126,58 +122,68 @@ const fetchUserProfile = async () => {
         if (user.value && route.query.verified === 'true') {
             successMessage.value = 'メール認証が完了しました！引き続きサービスをご利用いただけます。';
             if (process.client) {
-                navigateTo({ path: route.path }, { replace: true });
+                // クエリパラメータを削除し、クリーンなURLにする
+                await navigateTo({ path: route.path }, { replace: true });
             }
         }
         
     } catch (err: any) {
         console.error('プロフィールデータのロードに失敗しました:', err);
-        // 401エラー（トークン無効）の場合は強制的にログアウト
-        if (err.status === 401 || (err.response && err.response.status === 401)) {
-             await authStore.logout();
+        const status = err.status || (err.response && err.response.status);
+        
+        // ★★★ 401エラー（トークン無効）の場合は強制的にログアウトし、ウォッチャーにリダイレクトを任せる ★★★
+        if (status === 401) {
+             console.log(`401エラーを検出しました。ログアウトをトリガーします。`);
+             await authStore.logout(); // Piniaストアの isAuthed が false になる
              successMessage.value = 'セッションが切れました。再度ログインが必要です。';
-             user.value = null; 
-             initializeUserData(null);
+             
+             // ここで return し、isAuthedウォッチャーがリダイレクトを処理する
+             return; 
+        } else {
+             successMessage.value = `データのロード中に予期せぬエラーが発生しました。(Status: ${status || '不明'})`;
         }
     } finally {
         isLoading.value = false;
     }
 };
 
-// ★★★ 状態監視ロジックの強化（コンポーネントが生きている間の状態変化に対応） ★★★
-watch(authUser, async (newUser, oldUser) => {
-    const newUserId = newUser?.id;
-    const oldUserId = oldUser?.id;
-
-    // ユーザーIDが変更された、または認証状態がログイン/ログアウト間で遷移したか
-    const userIdChanged = newUserId !== oldUserId;
-    const authStateTransition = (!!newUser !== !!oldUser);
-    
-    // 最初のマウント時 (oldUserがnull/undefined) または大きな状態変更時
-    const shouldFetch = userIdChanged || authStateTransition || (newUser && !oldUser && !oldUserId);
-
-    if (shouldFetch) {
-        console.log(`--- WATCH: User state transition detected (ID: ${oldUserId || 'N/A'} -> ${newUserId || 'N/A'}). Resetting local state and triggering fetch. ---`);
+// ★★★ 修正箇所: 認証状態の変化を監視し、非認証になったら即座にリダイレクト ★★★
+// これにより、他のコンポーネントからのログアウトも確実に補足し、リダイレクトさせます。
+watch(isAuthed, async (newIsAuthed, oldIsAuthed) => {
+    // コンポーネントがクライアント側で実行されていることを確認
+    if (process.client) {
         
-        // ユーザーが明確に変わった、またはログアウトした場合は、UIの古いデータをクリア
-        if (userIdChanged || !newUser) {
-            // ローカル状態を即座にクリアし、ローディング状態へ遷移させる
+        // (A) ログアウトが検知された場合 (認証済み -> 非認証への遷移)
+        if (oldIsAuthed && !newIsAuthed) {
+            console.log('--- WATCH (isAuthed): Unauthenticated state detected. Clearing local state and redirecting. ---');
+            
+            // ローカルの状態を確実にクリア
             user.value = null;
-            form.value.name = '';
-            form.value.post_number = '';
-            form.value.address = '';
-            form.value.building = '';
-            successMessage.value = '';
-            profileErrors.value = {};
+            initializeUserData(null); // フォームもクリア
+            successMessage.value = 'セッションが終了しました。';
+            
+            // 即座にリダイレクト
+            if (route.path !== '/login') {
+                await navigateTo('/login');
+            }
+            isLoading.value = false;
+            return; // ログアウト処理が優先されるため、ここで終了
         }
 
-        // データをフェッチ
-        await fetchUserProfile(); 
+        // (B) ログイン状態、または初回マウント時に認証済みの場合 (true -> true も含む)
+        if (newIsAuthed) {
+            console.log('--- WATCH (isAuthed): Authenticated state detected. Triggering fetchUserProfile. ---');
+            await fetchUserProfile(); 
+        } else if (!newIsAuthed && oldIsAuthed === undefined) {
+             // (C) 初回マウント時で未認証の場合
+             isLoading.value = false;
+             // リダイレクトは (A) のロジックで最終的に担保されるか、
+             // Nuxtの認証ミドルウェアによって処理されます。
+        }
     }
-}, {
+}, { 
     immediate: true, // コンポーネントが最初にマウントされた時にも実行
 });
-
 
 // ----------------------------------------------------------------
 // --- 2. 画像アップロード処理 ---
@@ -200,6 +206,7 @@ const handleImageUpload = async (event: Event) => {
       body: formData,
       headers: {
         'Accept': 'application/json',
+        // FormDataを使う場合、Content-Typeはブラウザに任せるのが一般的
       }
     });
 
@@ -221,7 +228,9 @@ const handleImageUpload = async (event: Event) => {
   } catch (error: any) {
     console.error('【ERROR】画像アップロードに失敗しました:', error); 
     if (error.status === 401) {
-        successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+        // 401エラーの場合、ログアウト処理をトリガー
+        await authStore.logout();
+        // リダイレクトは isAuthed ウォッチャーが処理
         return;
     }
     
@@ -232,6 +241,10 @@ const handleImageUpload = async (event: Event) => {
     }
   } finally {
     isLoading.value = false;
+    // ファイル入力フィールドをリセットして、同じファイルを再度選択できるようにする
+    if (fileInput.value) {
+        fileInput.value.value = '';
+    }
   }
 };
 
@@ -268,7 +281,9 @@ const handleProfileUpdate = async () => {
     console.error(`【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`, error); 
     
     if (error.status === 401) {
-        successMessage.value = 'セッションが切れました。再度ログインが必要です。';
+        // 401エラーの場合、ログアウト処理をトリガー
+        await authStore.logout();
+        // リダイレクトは isAuthed ウォッチャーが処理
         return;
     }
     
@@ -352,7 +367,7 @@ const getProfileImageUrl = (path: string | undefined | null) => {
         <button 
           type="button" 
           class="upload_submit" 
-          @click="$refs.fileInput.click()"
+          @click="fileInput.click()"
           :disabled="isLoading"
         >
           画像を選択する
@@ -427,7 +442,7 @@ const getProfileImageUrl = (path: string | undefined | null) => {
 
 <!-- ユーザーデータが存在しない、かつロードが完了した場合 -->
 <div v-else class="text-center p-8">
-    <p v-if="!isAuthed.value" class="text-xl text-red-500">認証されていません。ログインページへ移動しています...</p>
+    <p v-if="!isAuthed" class="text-xl text-red-500">認証されていません。ログインページへ移動しています...</p>
     <p v-else class="text-xl text-red-500">ユーザー情報がロードできませんでした。再度お試しください。</p>
 </div>
 

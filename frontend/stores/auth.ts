@@ -1,10 +1,12 @@
 import { defineStore } from "pinia";
 import { useCookie, useRuntimeConfig, useNuxtApp } from "#app";
+import { ref, computed } from "vue";
+
 // 新しいトークン管理Composableをインポート
 import { useAuth } from "~/composables/useAuth";
 
 // itemStoreの適切なパスを仮定してインポート
-import { useItemStore } from "./item"; // ★ 依存関係として残す
+import { useItemStore } from "./item";
 
 // Firebaseのインポート
 import {
@@ -18,39 +20,34 @@ import {
   updateProfile,
 } from "firebase/auth";
 
-// 1. interface User を Firebase と MySQL のデータ構造に合わせて定義
+// ----------------------------------------------------
+// 1. インターフェース定義
+// ----------------------------------------------------
 interface User {
   id: number; // MySQL ID
   name: string;
   email: string;
   uid: string; // Firebase UID
   email_verified_at: string | null;
-  // ★ データベースに合わせて、必要な他のプロパティを追加
-  post_number: string | null; // 追加: 郵便番号
-  address: string | null; // 追加: 住所
-  building: string | null; // 追加: 建物名・アパート名
-  user_image: string | null; // 追加: ユーザー画像URL
+  post_number: string | null;
+  address: string | null;
+  building: string | null;
+  user_image: string | null;
 }
 
-interface AuthState {
-  token: string | null;
-  user: User | null;
-  isInitialized: boolean;
-  isLoading: boolean; // 認証状態の解決が完了するまでtrue (isAuthResolvedの逆)
-  isLoggingOut: boolean;
-  _authUnsubscribe: Unsubscribe | null;
-  _sessionKeeperInterval: number | null;
+// ストアで使用する認証済みユーザー情報
+export interface AuthUser extends Partial<User> {
+  uid: string;
+  email: string | null;
 }
 
-// 登録フォームのデータ構造を定義（型安全性を高めるため）
+// フォームのデータ構造
 interface RegisterForm {
   name: string;
   email: string;
   password: string;
   password_confirmation: string;
 }
-
-// ★ 追加: プロフィール更新フォームのデータ構造を定義
 interface ProfileUpdateForm {
   name?: string;
   post_number?: string | null;
@@ -59,15 +56,13 @@ interface ProfileUpdateForm {
   user_image?: string | null;
 }
 
-// $fetch の型を定義
 declare const $fetch: typeof globalThis.fetch;
 
-// ★★★ 認証解決を待機するためのグローバルなPromise (ストア外に維持) ★★★
-let authPromise: Promise<void> | null = null;
-let resolveAuthPromise: (() => void) | null = null;
-
+// ----------------------------------------------------
+// 3. ヘルパー関数
+// ----------------------------------------------------
 /**
- * 【最終版】Firebase Auth インスタンスを安全に取得するヘルパー関数
+ * Firebase Auth インスタンスを安全に取得するヘルパー関数
  */
 const getFirebaseAuth = (): Auth | null => {
   const nuxtApp = useNuxtApp() as any;
@@ -76,7 +71,6 @@ const getFirebaseAuth = (): Auth | null => {
     return $firebaseAuth;
   }
   if (process.server) {
-    // サーバーサイドでは警告のみ
     return null;
   }
   console.error(
@@ -85,875 +79,836 @@ const getFirebaseAuth = (): Auth | null => {
   return null;
 };
 
-export const useAuthStore = defineStore("auth", {
-  state: (): AuthState => ({
-    token: null,
-    user: null,
-    isInitialized: false,
-    isLoading: true,
-    isLoggingOut: false,
-    _authUnsubscribe: null,
-    _sessionKeeperInterval: null,
-  }),
+// ----------------------------------------------------
+// 4. Pinia ストア定義 (Composition API Style)
+// ----------------------------------------------------
+export const useAuthStore = defineStore("auth", () => {
+  // --- STATE (Ref) ---
+  const token = ref<string | null>(null);
+  const user = ref<AuthUser | null>(null);
+  const isAuthReady = ref(false); // 認証状態の初期ロードが完了したか
+  const isLoading = ref(false); // 認証処理中かどうか
+  const isLoggingOut = ref(false);
 
-  getters: {
-    // 認証状態の確認を useAuth() のトークンに依存させる
-    isAuthenticated: (state) => {
-      const { isAuthenticated } = useAuth();
-      // userデータも確実に存在することを確認
-      return isAuthenticated.value && !!state.user;
-    },
-    // 認証状態の解決が完了しているか（画面描画の準備完了）
-    isAuthResolved: (state) => !state.isLoading, // ★★★ isAuthResolved は isLoading の逆 ★★★
-    // メール認証が完了しているかどうかをチェックするゲッター
-    isEmailVerified: (state) => !!state.user && !!state.user.email_verified_at,
-  },
+  // 内部状態 (initAuthのPromise管理 - ハングアップ対策)
+  const _authUnsubscribe = ref<Unsubscribe | null>(null);
+  const _sessionKeeperInterval = ref<number | null>(null);
+  const _authInitPromise = ref<Promise<void> | null>(null);
+  let _resolveAuthInitPromise: (() => void) | null = null; // リゾルバを保持するための変数
 
-  actions: {
-    // useAuth Composableのインスタンスを取得
-    _getAuthManager() {
-      return useAuth();
-    },
+  // --- GETTERS (Computed) ---
+  const _getAuthManager = () => useAuth();
 
-    // ----------------------------------------------------
-    // APIのbaseURLを動的に取得する
-    // ----------------------------------------------------
-    getApiBaseUrl(): string {
-      const config = useRuntimeConfig();
+  const isLoggedIn = computed(() => {
+    const { isAuthenticated } = _getAuthManager();
+    return isAuthenticated.value && !!user.value;
+  });
 
-      const originalBaseUrl = config.public.apiBaseUrl;
+  const isAuthenticated = isLoggedIn;
+  const isAuthResolved = computed(() => isAuthReady.value);
 
-      // Nuxtのサーバーサイド（Dockerコンテナ内）で実行されている場合
-      if (process.server) {
-        try {
-          const url = new URL(originalBaseUrl);
-          const phpBaseUrl = originalBaseUrl.replace(
-            url.host.split(":")[0],
-            "php"
-          );
-          const finalPhpBaseUrl = phpBaseUrl.replace(/:(\d+)/, ":9000");
-          return finalPhpBaseUrl;
-        } catch (e) {
-          console.error(
-            "[API Base] Failed to parse API Base URL for SSR. Using original.",
-            e
-          );
-          return originalBaseUrl.replace(/\/api$/, "") + ":9000/api";
-        }
-      }
+  const isEmailVerified = computed(() => {
+    const userData = user.value as User | null;
+    return !!userData && !!userData.email_verified_at;
+  });
 
-      return originalBaseUrl;
-    },
+  // --- ACTIONS (Functions) ---
 
-    // ----------------------------------------------------
-    // Sanctum CSRF クッキーを取得するアクション
-    // ----------------------------------------------------
-    async getSanctumCsrfToken() {
-      const config = useRuntimeConfig();
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+  // ----------------------------------------------------
+  // $resetの実装 (Piniaセットアップストアで必須かつクリーンアップ集約)
+  // ----------------------------------------------------
+  const $reset = () => {
+    console.log("🔄 [AuthStore:RESET] Local state reset initiated.");
 
-      if (!config.public.apiBaseUrl) {
-        console.warn(
-          "[Sanctum CSRF] apiBaseUrl is not set. Skipping CSRF token fetch."
-        );
-        return;
-      }
+    // 1. STATEを初期値に戻す
+    token.value = null;
+    user.value = null;
+    isAuthReady.value = false;
+    isLoading.value = false;
+    isLoggingOut.value = false;
 
-      const baseUrlForSanctum = config.public.apiBaseUrl.replace(/\/api$/, "");
+    // 2. 内部的なPromiseと購読の状態をリセット
+    if (_authUnsubscribe.value) {
+      _authUnsubscribe.value();
+      _authUnsubscribe.value = null;
+    }
 
+    // Session Keeperの停止
+    stopSessionKeeper();
+
+    // 3. 認証Promiseをリセット (ハングアップ対策の最重要部分)
+    // 実行中であれば解決し、次の initAuth が新しい Promise を作成できるようにする
+    if (_resolveAuthInitPromise) {
+      console.log("🛠️ [AuthStore:RESET] Resolving pending auth init promise.");
+      _resolveAuthInitPromise();
+      _resolveAuthInitPromise = null;
+    }
+    _authInitPromise.value = null;
+  };
+
+  // ----------------------------------------------------
+  // APIのbaseURLを動的に取得する
+  // ----------------------------------------------------
+  const getApiBaseUrl = (): string => {
+    const config = useRuntimeConfig();
+
+    const originalBaseUrl = config.public.apiBaseUrl;
+
+    if (process.server) {
       try {
-        await fetcher("/sanctum/csrf-cookie", {
-          baseURL: baseUrlForSanctum,
-          method: "GET",
-          credentials: "include",
-        });
-
-        console.log("[Sanctum CSRF] CSRF cookie fetched successfully.");
-      } catch (error) {
-        console.error("[Sanctum CSRF] Failed to fetch CSRF cookie:", error);
-        throw new Error(
-          "Failed to communicate with the backend to establish session."
+        const url = new URL(originalBaseUrl);
+        const phpBaseUrl = originalBaseUrl.replace(
+          url.host.split(":")[0],
+          "php"
         );
-      }
-    },
-
-    // ----------------------------------------------------
-    // 認証状態の解決を待機するアクション
-    // ----------------------------------------------------
-    async waitForAuthResolution() {
-      if (!authPromise) {
-        if (this.isAuthResolved) {
-          return;
-        }
-        await this.initAuth();
-      }
-
-      if (authPromise) {
-        await authPromise;
-      }
-    },
-
-    // ----------------------------------------------------
-    // セッションキーパー関連
-    // ----------------------------------------------------
-    async startSessionKeeper() {
-      if (this._sessionKeeperInterval) {
-        return;
-      }
-
-      const INTERVAL_TIME_MS = 5 * 60 * 1000;
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-      const baseUrl = this.getApiBaseUrl();
-      const $firebaseAuth = getFirebaseAuth();
-
-      if (!$firebaseAuth) {
+        const finalPhpBaseUrl = phpBaseUrl.replace(/:(\d+)/, ":9000");
+        return finalPhpBaseUrl;
+      } catch (e) {
         console.error(
-          "[Keeper] Firebase Auth is not available. Cannot start session keeper."
+          "[API Base] Failed to parse API Base URL for SSR. Using original.",
+          e
         );
+        return originalBaseUrl.replace(/\/api$/, "") + ":9000/api";
+      }
+    }
+
+    return originalBaseUrl;
+  };
+
+  // ----------------------------------------------------
+  // Sanctum CSRF クッキーを取得するアクション
+  // ----------------------------------------------------
+  const getSanctumCsrfToken = async () => {
+    const config = useRuntimeConfig();
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+
+    if (!config.public.apiBaseUrl) {
+      console.warn(
+        "[Sanctum CSRF] apiBaseUrl is not set. Skipping CSRF token fetch."
+      );
+      return;
+    }
+
+    const baseUrlForSanctum = config.public.apiBaseUrl.replace(/\/api$/, "");
+
+    try {
+      await fetcher("/sanctum/csrf-cookie", {
+        baseURL: baseUrlForSanctum,
+        method: "GET",
+        credentials: "include",
+      });
+
+      console.log("[Sanctum CSRF] CSRF cookie fetched successfully.");
+    } catch (error) {
+      console.error("[Sanctum CSRF] Failed to fetch CSRF cookie:", error);
+      throw new Error(
+        "Failed to communicate with the backend to establish session."
+      );
+    }
+  };
+
+  // ----------------------------------------------------
+  // 認証状態の解決を待機するアクション
+  // ----------------------------------------------------
+  const waitForAuthResolution = async () => {
+    if (isAuthResolved.value) {
+      return;
+    }
+
+    if (!_authInitPromise.value) {
+      await initAuth();
+    }
+
+    if (_authInitPromise.value) {
+      await _authInitPromise.value;
+    }
+  };
+
+  // ----------------------------------------------------
+  // セッションキーパー関連
+  // ----------------------------------------------------
+  const stopSessionKeeper = () => {
+    if (_sessionKeeperInterval.value) {
+      window.clearInterval(_sessionKeeperInterval.value);
+      _sessionKeeperInterval.value = null;
+      console.log("[Keeper] Session keeper stopped.");
+    }
+  };
+
+  const startSessionKeeper = async () => {
+    if (_sessionKeeperInterval.value) {
+      return;
+    }
+
+    const INTERVAL_TIME_MS = 5 * 60 * 1000;
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+    const baseUrl = getApiBaseUrl();
+    const $firebaseAuth = getFirebaseAuth();
+
+    if (!$firebaseAuth) {
+      console.error(
+        "[Keeper] Firebase Auth is not available. Cannot start session keeper."
+      );
+      return;
+    }
+
+    const keepSessionAlive = async () => {
+      if (isLoading.value || !isAuthenticated.value || !isEmailVerified.value) {
+        stopSessionKeeper();
         return;
       }
 
-      const keepSessionAlive = async () => {
-        // isLoadingのチェックを追加。解決前は実行しない
-        if (this.isLoading || !this.isAuthenticated || !this.isEmailVerified) {
-          this.stopSessionKeeper();
+      try {
+        const currentUser = $firebaseAuth.currentUser;
+        if (!currentUser) {
+          stopSessionKeeper();
           return;
         }
 
-        try {
-          const currentUser = $firebaseAuth.currentUser;
-          if (!currentUser) {
-            this.stopSessionKeeper();
-            return;
-          }
+        const newIdToken = await currentUser.getIdToken(true);
 
-          // ★ サーバーへのIDトークン送信でセッションを維持
-          const newIdToken = await currentUser.getIdToken(true);
-
-          await fetcher("/firebase/login", {
-            baseURL: baseUrl,
-            method: "POST",
-            body: {
-              id_token: newIdToken,
-            },
-            credentials: "include",
-            headers: {
-              Accept: "application/json",
-            },
-          });
-        } catch (error: any) {
-          console.warn(
-            "[Keeper] Session refresh failed (likely 401/403). Forcing local logout.",
-            error
-          );
-          // エラーが発生した場合は、確実にログアウト処理を走らせる
-          this.logout();
-        }
-      };
-
-      // 最初のセッション維持を実行してからインターバル開始
-      await keepSessionAlive();
-      this._sessionKeeperInterval = window.setInterval(
-        keepSessionAlive,
-        INTERVAL_TIME_MS
-      ) as unknown as number;
-    },
-
-    stopSessionKeeper() {
-      if (this._sessionKeeperInterval) {
-        window.clearInterval(this._sessionKeeperInterval);
-        this._sessionKeeperInterval = null;
-        console.log("[Keeper] Session keeper stopped.");
-      }
-    },
-
-    // ----------------------------------------------------
-    // Sanctumセッション再確立
-    // ----------------------------------------------------
-    async reEstablishSanctumSession(
-      firebaseUser: FirebaseAuthUser
-    ): Promise<boolean> {
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-      const baseUrl = this.getApiBaseUrl();
-      const { setToken, clearToken } = this._getAuthManager();
-
-      try {
-        const idToken = await firebaseUser.getIdToken(true);
-
-        const response: any = await fetcher("/firebase/login", {
+        await fetcher("/firebase/login", {
           baseURL: baseUrl,
           method: "POST",
           body: {
-            id_token: idToken,
+            id_token: newIdToken,
           },
           credentials: "include",
           headers: {
             Accept: "application/json",
           },
         });
-
-        console.log(
-          "[ReEstablish] Sanctum session re-established successfully."
-        );
-
-        this.token = response.token;
-        this.user = response.user as User;
-        setToken(response.token);
-
-        // セッション確立の完了を待ってからCSRFトークンを取得
-        await this.getSanctumCsrfToken();
-
-        return true;
       } catch (error: any) {
         console.warn(
-          "[ReEstablish] Failed to re-establish Sanctum session. Error:",
+          "[Keeper] Session refresh failed (likely 401/403). Forcing local logout.",
           error
         );
-
-        this.token = null;
-        this.user = null;
-        clearToken();
-        this.stopSessionKeeper();
-        return false;
+        await logout();
       }
-    },
+    };
 
-    // ----------------------------------------------------
-    // 認証状態の初期化ロジック (onAuthStateChangedのリスナー設定)
-    // ----------------------------------------------------
-    async initAuth() {
-      if (this.isInitialized && !this.isLoading) {
-        return;
-      }
+    await keepSessionAlive();
+    _sessionKeeperInterval.value = window.setInterval(
+      keepSessionAlive,
+      INTERVAL_TIME_MS
+    ) as unknown as number;
+  };
 
-      if (!authPromise) {
-        authPromise = new Promise<void>((resolve) => {
-          resolveAuthPromise = resolve;
-        });
-      }
+  // ----------------------------------------------------
+  // Sanctumセッション再確立
+  // ----------------------------------------------------
+  const reEstablishSanctumSession = async (
+    firebaseUser: FirebaseAuthUser
+  ): Promise<boolean> => {
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+    const baseUrl = getApiBaseUrl();
+    const { setToken, clearToken } = _getAuthManager();
 
-      if (this.isLoading && this.isInitialized) {
-        await authPromise;
-        return;
-      }
+    try {
+      const idToken = await firebaseUser.getIdToken(true);
 
-      this.isInitialized = true;
-      this.isLoading = true;
-      console.log("[initAuth] Starting authentication state resolution...");
+      const response: any = await fetcher("/firebase/login", {
+        baseURL: baseUrl,
+        method: "POST",
+        body: {
+          id_token: idToken,
+        },
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-      const $firebaseAuth = getFirebaseAuth();
+      console.log("[ReEstablish] Sanctum session re-established successfully.");
 
-      if (!$firebaseAuth) {
-        console.warn(
-          "[initAuth] Firebase Authインスタンスがnullのため、認証待機をスキップします。"
+      token.value = response.token;
+      user.value = response.user as User;
+      setToken(response.token);
+
+      await getSanctumCsrfToken();
+
+      return true;
+    } catch (error: any) {
+      console.warn(
+        "[ReEstablish] Failed to re-establish Sanctum session. Error:",
+        error
+      );
+
+      $reset();
+      clearToken();
+      return false;
+    }
+  };
+
+  // ----------------------------------------------------
+  // ユーザー情報の読み込み (独立した関数)
+  // ----------------------------------------------------
+  const fetchUser = async (isForce: boolean = false) => {
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+    const { token: localToken, clearToken } = _getAuthManager();
+
+    if (!localToken.value) {
+      user.value = null;
+      token.value = null;
+      return;
+    }
+
+    token.value = localToken.value;
+    const baseUrl = getApiBaseUrl();
+
+    try {
+      const response: any = await fetcher("/user", {
+        baseURL: baseUrl,
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localToken.value}`,
+          Accept: "application/json",
+        },
+        context: {
+          skipAutoLogout: true,
+        },
+      });
+
+      if (
+        typeof response === "string" &&
+        response.startsWith("<!DOCTYPE html>")
+      ) {
+        console.error(
+          "⛔️ [FATAL ERROR] /user APIレスポンスが予期せずHTMLです。Laravel側のルーティング/ミドルウェアを確認してください。"
         );
-        this.isLoading = false;
-        if (resolveAuthPromise) resolveAuthPromise();
-        return;
+        throw new Error("/user API call returned HTML instead of JSON.");
       }
 
-      // onAuthStateChangedのリスナー設定
-      this._authUnsubscribe = onAuthStateChanged(
-        $firebaseAuth,
-        async (user: FirebaseAuthUser | null) => {
-          const wasLoadingInitially = resolveAuthPromise !== null; // 初期解決中かどうか
+      const userData: User = response.user || response;
+      user.value = userData;
+    } catch (e: any) {
+      const status = e.response?.status;
+      const shouldClear = status === 401;
+      const shouldMaintain = status === 403;
 
-          // 初期解決中でない場合でも、状態変化を処理するためにisLoadingを一時的にtrueにする
-          if (!wasLoadingInitially) {
-            this.isLoading = true;
-          }
+      if (shouldClear) {
+        console.warn(
+          `[FetchUser] Received 401 Unauthorized. Clearing local state to force full re-auth.`
+        );
+        $reset(); // 401の場合も $reset でクリーンアップ
+        clearToken();
+      } else if (shouldMaintain) {
+        console.warn(
+          `[FetchUser] Received 403 Forbidden (Likely unverified email). Maintaining local state to show prompt.`
+        );
+      } else {
+        console.error(
+          "[FetchUser] Failed to fetch user with unexpected error.",
+          e
+        );
+        $reset(); // その他の予期せぬエラーも $reset でクリーンアップ
+        clearToken();
+      }
+      return;
+    }
+  };
 
-          const { token, clearToken } = this._getAuthManager();
+  const forceFetchUser = async () => {
+    if (!isAuthenticated.value) {
+      console.warn("[ForceFetch] Not authenticated. Aborting force fetch.");
+      return;
+    }
+    await fetchUser(true);
+  };
 
-          try {
-            if (user) {
-              let sanctumSuccess = true;
+  // ----------------------------------------------------
+  // 認証状態の初期化ロジック (ハングアップ対策を強化)
+  // ----------------------------------------------------
+  const initAuth = async () => {
+    // 1. 解決済みか、既に実行中であれば、実行中のPromiseを待機して終了
+    if (isAuthReady.value) {
+      return;
+    }
+    if (isLoading.value && _authInitPromise.value) {
+      await _authInitPromise.value;
+      return;
+    }
 
-              if (!token.value || !this.user) {
-                // トークンがない、またはユーザー情報がストアにない場合
-                sanctumSuccess = await this.reEstablishSanctumSession(user);
+    // 2. Promiseの作成
+    if (!_authInitPromise.value) {
+      _authInitPromise.value = new Promise<void>((resolve) => {
+        _resolveAuthInitPromise = resolve;
+      });
+    }
+
+    isLoading.value = true;
+    console.log("[initAuth] Starting authentication state resolution...");
+
+    const $firebaseAuth = getFirebaseAuth();
+
+    if (!$firebaseAuth) {
+      console.warn(
+        "[initAuth] Firebase Authインスタンスがnullのため、認証待機をスキップします。"
+      );
+      isLoading.value = false;
+      // Firebaseが利用できない場合も、待機していたPromiseを解決し、アプリの描画を続行させる
+      if (_resolveAuthInitPromise) _resolveAuthInitPromise();
+      return;
+    }
+
+    // 3. onAuthStateChangedのリスナー設定
+    if (_authUnsubscribe.value) {
+      _authUnsubscribe.value();
+    }
+
+    _authUnsubscribe.value = onAuthStateChanged(
+      $firebaseAuth,
+      async (firebaseUser: FirebaseAuthUser | null) => {
+        // onAuthStateChangedが最初に実行されたかどうかの判定を保持
+        const isInitialRun = _resolveAuthInitPromise !== null;
+
+        if (!isInitialRun) {
+          isLoading.value = true;
+        }
+
+        const { token: localToken, clearToken } = _getAuthManager();
+
+        try {
+          if (firebaseUser) {
+            let sanctumSuccess = true;
+
+            // ローカルトークンやユーザー情報がない場合、Sanctumセッションの再確立を試みる
+            if (!localToken.value || !user.value) {
+              sanctumSuccess = await reEstablishSanctumSession(firebaseUser);
+            } else {
+              token.value = localToken.value;
+              await fetchUser();
+            }
+
+            if (sanctumSuccess) {
+              if (isAuthenticated.value && isEmailVerified.value) {
+                await startSessionKeeper();
               } else {
-                this.token = token.value;
-                // ★ 修正点1: トークンがあるがユーザー情報が不完全な場合に備え、
-                //           /user APIから最新の完全な情報を取得する
-                await this.fetchUser();
-              }
-
-              if (sanctumSuccess) {
-                // Sanctumセッションが成功し、userデータがセットされた後
-                if (this.isAuthenticated && this.isEmailVerified) {
-                  this.startSessionKeeper();
-                } else {
-                  this.stopSessionKeeper();
-                }
-              } else {
-                // Sanctumセッション再確立に失敗した場合は、強制ログアウト状態にする
-                this.token = null;
-                this.user = null;
-                clearToken();
-                this.stopSessionKeeper();
+                stopSessionKeeper();
               }
             } else {
-              // Firebaseユーザーがいない（ログアウト状態）
-              this.token = null;
-              this.user = null;
+              $reset();
               clearToken();
-              this.stopSessionKeeper();
             }
-          } catch (e) {
-            console.warn(
-              "[onAuthStateChanged] Unexpected error during session check, clearing state.",
-              e
-            );
-            this.token = null;
-            this.user = null;
+          } else {
+            // Firebaseユーザーがいない（ログアウト状態、またはセッション切れ）
+            $reset();
             clearToken();
-            this.stopSessionKeeper();
-          } finally {
-            // ★★★ 修正ポイント: 初期解決時のみresolvePromiseを呼び出すことを保証 ★★★
-            if (wasLoadingInitially && resolveAuthPromise) {
-              this.isLoading = false;
-
-              console.log(
-                "✅ [AuthStore:Resolved] Initial finished. isAuthenticated:",
-                this.isAuthenticated,
-                "User ID:",
-                this.user?.id
-              );
-
-              resolveAuthPromise();
-              resolveAuthPromise = null;
-              authPromise = null;
-            } else if (!wasLoadingInitially) {
-              // 後発イベントの場合は、isLoadingをfalseに戻す
-              this.isLoading = false;
-            }
           }
+        } catch (e) {
+          console.warn(
+            "[onAuthStateChanged] Unexpected error during session check, clearing state.",
+            e
+          );
+          $reset();
+          clearToken();
+        } finally {
+          // 初回実行時のみ、待機していた Promise を解決し、フラグを更新
+          if (isInitialRun && _resolveAuthInitPromise) {
+            isLoading.value = false;
+            isAuthReady.value = true;
+
+            console.log(
+              "✅ [AuthStore:Resolved] Initial finished. isAuthenticated:",
+              isAuthenticated.value,
+              "User ID:",
+              user.value?.id
+            );
+
+            _resolveAuthInitPromise();
+            _resolveAuthInitPromise = null;
+            _authInitPromise.value = null; // Promiseをnullに戻す
+          } else if (!isInitialRun) {
+            // 後発イベントの場合は、isLoadingをfalseに戻す
+            isLoading.value = false;
+          }
+        }
+      }
+    );
+
+    // 4. onAuthStateChangedの初回実行によるPromise解決を待つ
+    await _authInitPromise.value;
+
+    console.log("[initAuth] Initial wait finished.");
+  };
+
+  // ----------------------------------------------------
+  // ログイン処理 (変更なし)
+  // ----------------------------------------------------
+  const login = async (credentials: any) => {
+    isLoading.value = true;
+    try {
+      const $firebaseAuth = getFirebaseAuth();
+      if (!$firebaseAuth)
+        throw new Error("Firebase Auth service is unavailable for login.");
+      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+      const baseUrl = getApiBaseUrl();
+      const { setToken } = _getAuthManager();
+
+      const userCredential = await signInWithEmailAndPassword(
+        $firebaseAuth,
+        credentials.email,
+        credentials.password
+      );
+      const firebaseUser = userCredential.user;
+      const idToken = await firebaseUser.getIdToken();
+
+      const response: any = await fetcher("/firebase/login", {
+        baseURL: baseUrl,
+        method: "POST",
+        body: { id_token: idToken },
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+
+      token.value = response.token;
+      user.value = response.user as User;
+      setToken(response.token);
+
+      await getSanctumCsrfToken();
+
+      if (isEmailVerified.value) {
+        await startSessionKeeper();
+      } else {
+        stopSessionKeeper();
+      }
+      isLoading.value = false;
+    } catch (error: any) {
+      isLoading.value = false;
+      stopSessionKeeper();
+      console.error("Login Error Catch:", error);
+      throw error;
+    }
+  };
+
+  // ----------------------------------------------------
+  // 新規登録処理 (変更なし)
+  // ----------------------------------------------------
+  const register = async (data: RegisterForm) => {
+    isLoading.value = true;
+    try {
+      const $firebaseAuth = getFirebaseAuth();
+      if (!$firebaseAuth)
+        throw new Error(
+          "Firebase Auth service is unavailable for registration."
+        );
+      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+      const baseUrl = getApiBaseUrl();
+      const { setToken } = _getAuthManager();
+
+      console.log("[REGISTER] Starting Firebase user creation...");
+      const userCredential = await createUserWithEmailAndPassword(
+        $firebaseAuth,
+        data.email,
+        data.password
+      );
+      let firebaseUser = userCredential.user;
+
+      console.log(
+        `[REGISTER] Updating Firebase profile with name: ${data.name}`
+      );
+      await updateProfile(firebaseUser, { displayName: data.name });
+
+      const idToken = await firebaseUser.getIdToken(true);
+      console.log("[REGISTER] ID Token retrieved. Sending to Laravel...");
+
+      const response: any = await fetcher("/firebase/register", {
+        baseURL: baseUrl,
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        body: { id_token: idToken, name: data.name, email: data.email },
+      });
+
+      if (!response || !response.token || !response.user) {
+        throw new Error(
+          "Registration succeeded but failed to receive user authentication data from backend."
+        );
+      }
+
+      token.value = response.token;
+      user.value = response.user as User;
+      setToken(response.token);
+
+      await getSanctumCsrfToken();
+      stopSessionKeeper();
+      isLoading.value = false;
+    } catch (error: any) {
+      isLoading.value = false;
+      stopSessionKeeper();
+      console.error("Register Error Catch (Final):", error);
+      throw error;
+    }
+  };
+
+  // ----------------------------------------------------
+  // プロフィール更新処理 (変更なし)
+  // ----------------------------------------------------
+  const updateUserProfile = async (
+    data: ProfileUpdateForm
+  ): Promise<AuthUser> => {
+    if (!isAuthenticated.value || !user.value) {
+      throw new Error("User must be authenticated to update profile.");
+    }
+    isLoading.value = true;
+    try {
+      const localToken = _getAuthManager().token;
+      const $firebaseAuth = getFirebaseAuth();
+      if (!$firebaseAuth || !$firebaseAuth.currentUser) {
+        throw new Error(
+          "Firebase Auth service or current user is unavailable."
+        );
+      }
+      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+      const baseUrl = getApiBaseUrl();
+      const firebaseUser = $firebaseAuth.currentUser;
+
+      const profileUpdates: {
+        displayName?: string;
+        photoURL?: string | null;
+      } = {};
+
+      if (data.name && data.name !== firebaseUser.displayName) {
+        profileUpdates.displayName = data.name;
+      }
+
+      if (Object.keys(profileUpdates).length > 0) {
+        console.log(`[PROFILE_UPDATE] Updating Firebase profile...`);
+        await updateProfile(firebaseUser, profileUpdates);
+        await firebaseUser.getIdToken(true);
+      }
+
+      const apiPath = "/mypage/profile_update";
+      const requestBody = { ...data, _method: "PATCH" };
+
+      const response: any = await fetcher(apiPath, {
+        baseURL: baseUrl,
+        method: "POST",
+        body: requestBody,
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          Authorization: `Bearer ${localToken.value}`,
+        },
+      });
+
+      if (response && response.user) {
+        user.value = response.user as User;
+      } else if (
+        typeof response === "string" &&
+        response.startsWith("<!DOCTYPE html>")
+      ) {
+        console.error(
+          "⛔️ [FATAL ERROR] APIレスポンスが予期せずHTMLです。Laravel側のルーティング（認証またはCSRFミドルウェア）を確認してください。"
+        );
+        throw new Error(
+          "API call returned HTML instead of JSON. Check Laravel routing/middleware."
+        );
+      } else {
+        user.value = { ...(user.value as User), ...data } as User;
+      }
+
+      console.log(
+        "✅ [DEBUG] プロフィール更新APIコールが成功しました。ストアを更新します。"
+      );
+      isLoading.value = false;
+      return user.value;
+    } catch (error: any) {
+      isLoading.value = false;
+      console.error("Profile Update Error (Catch):", error);
+      if (error.response?.data?.errors) {
+        console.error("Laravel Validation Errors:", error.response.data.errors);
+      }
+      throw error;
+    }
+  };
+
+  // ----------------------------------------------------
+  // メール認証処理 (変更なし)
+  // ----------------------------------------------------
+  const verifyEmail = async (url: string) => {
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+    const baseUrl = getApiBaseUrl();
+
+    const urlObj = new URL(url, "http://dummy.com");
+    const queryParams = urlObj.search;
+
+    try {
+      const verificationResponse: any = await fetcher(
+        `/email/verify${queryParams}`,
+        {
+          baseURL: baseUrl,
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
         }
       );
 
-      // onAuthStateChangedが最初に実行され、resolveAuthPromiseが呼ばれるのを待つ
-      await authPromise;
-
-      console.log("[initAuth] Initial wait finished.");
-    },
-
-    // ----------------------------------------------------
-    // ログイン処理
-    // ----------------------------------------------------
-    async login(credentials: any) {
-      this.isLoading = true; // ログイン処理中はローディングを表示
-
-      try {
-        const $firebaseAuth = getFirebaseAuth();
-        if (!$firebaseAuth)
-          throw new Error("Firebase Auth service is unavailable for login.");
-
-        const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-        const baseUrl = this.getApiBaseUrl();
-        const { setToken } = this._getAuthManager();
-
-        const userCredential = await signInWithEmailAndPassword(
-          $firebaseAuth,
-          credentials.email,
-          credentials.password
-        );
-        const firebaseUser = userCredential.user;
-
-        const idToken = await firebaseUser.getIdToken();
-
-        const response: any = await fetcher("/firebase/login", {
-          baseURL: baseUrl,
-          method: "POST",
-          body: {
-            id_token: idToken,
-          },
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        this.token = response.token;
-        this.user = response.user as User;
-        setToken(response.token);
-
-        await this.getSanctumCsrfToken();
-
-        // ⚠️ 修正: 登録/ログインAPIがユーザー情報を返しているため、
-        // 連続で fetchUser を呼び出すのをやめ、401エラーを回避します。
-        // await this.fetchUser(true);
-
-        if (this.isEmailVerified) {
-          this.startSessionKeeper();
-        } else {
-          this.stopSessionKeeper();
-        }
-
-        // ログイン成功後、isLoadingをfalseにする
-        this.isLoading = false;
-      } catch (error: any) {
-        this.isLoading = false;
-        this.stopSessionKeeper();
-        console.error("Login Error Catch:", error);
-        throw error;
-      }
-    },
-
-    // ----------------------------------------------------
-    // 新規登録処理
-    // ----------------------------------------------------
-    async register(data: RegisterForm) {
-      this.isLoading = true;
-
-      try {
-        const $firebaseAuth = getFirebaseAuth();
-        if (!$firebaseAuth)
-          throw new Error(
-            "Firebase Auth service is unavailable for registration."
-          );
-
-        const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-        const baseUrl = this.getApiBaseUrl();
-        const { setToken } = this._getAuthManager();
-
-        console.log("[REGISTER] Starting Firebase user creation...");
-        const userCredential = await createUserWithEmailAndPassword(
-          $firebaseAuth,
-          data.email,
-          data.password
-        );
-        let firebaseUser = userCredential.user;
-
-        // ★★★ 修正ポイント 1: Firebaseユーザーの表示名 (displayName) を更新 ★★★
-        console.log(
-          `[REGISTER] Updating Firebase profile with name: ${data.name}`
-        );
-        // FirebaseのプロフィールはLaravel側の登録APIに任せるか、
-        // この後のIDトークンリフレッシュで自動的に反映されるのを期待する
-        await updateProfile(firebaseUser, {
-          displayName: data.name,
-        });
-
-        // データベースに渡す前に、最新の情報（displayNameを含む）を反映させるため、
-        // IDトークンを強制的にリフレッシュします。
-        // これにより、IDトークンのクレームに 'name' が含まれるようになります。
-        const idToken = await firebaseUser.getIdToken(true); // trueを渡して強制リフレッシュ
-
-        console.log("[REGISTER] ID Token retrieved. Sending to Laravel...");
-
-        const response: any = await fetcher("/firebase/register", {
-          baseURL: baseUrl,
-          method: "POST",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
-          body: {
-            id_token: idToken,
-            name: data.name, // 登録時に入力された名前もLaravelに明示的に送る
-            email: data.email,
-          },
-        });
-
-        if (!response || !response.token || !response.user) {
-          throw new Error(
-            "Registration succeeded but failed to receive user authentication data from backend."
-          );
-        }
-
-        this.token = response.token;
-        this.user = response.user as User;
-        setToken(response.token);
-
-        await this.getSanctumCsrfToken();
-
-        // ⚠️ 修正: 登録/ログインAPIがユーザー情報を返しているため、
-        // 連続で fetchUser を呼び出すのをやめ、401エラーを回避します。
-        // await this.fetchUser(true);
-
-        this.stopSessionKeeper();
-
-        // 登録成功後、isLoadingをfalseにする
-        this.isLoading = false;
-      } catch (error: any) {
-        this.isLoading = false;
-        this.stopSessionKeeper();
-        console.error("Register Error Catch (Final):", error);
-        throw error;
-      }
-    },
-
-    // ----------------------------------------------------
-    // ★★★ プロフィール更新処理 (修正) ★★★
-    // ----------------------------------------------------
-    async updateUserProfile(data: ProfileUpdateForm): Promise<User> {
-      if (!this.isAuthenticated || !this.user) {
-        throw new Error("User must be authenticated to update profile.");
-      }
-
-      this.isLoading = true;
-
-      try {
-        const localToken = this._getAuthManager().token; // Sanctumトークンを取得
+      if (verificationResponse && verificationResponse.user) {
+        user.value = verificationResponse.user as User;
 
         const $firebaseAuth = getFirebaseAuth();
         if (!$firebaseAuth || !$firebaseAuth.currentUser) {
-          throw new Error(
-            "Firebase Auth service or current user is unavailable."
+          console.warn(
+            "[VERIFY] Current Firebase user is null. Skipping session refresh."
           );
+          return true;
         }
 
-        // $fetch は Nuxt の useFetch/globalThis.$fetch に相当
-        const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-        const baseUrl = this.getApiBaseUrl();
-        const firebaseUser = $firebaseAuth.currentUser;
-
-        // 1. Firebase側の更新 (名前/ユーザー画像の変更のみFirebase Authで扱う)
-        const profileUpdates: {
-          displayName?: string;
-          photoURL?: string | null;
-        } = {};
-
-        if (data.name && data.name !== firebaseUser.displayName) {
-          profileUpdates.displayName = data.name;
-        }
-
-        // ... (user_imageのFirebase PhotoURL更新ロジックは省略)
-
-        if (Object.keys(profileUpdates).length > 0) {
-          console.log(`[PROFILE_UPDATE] Updating Firebase profile...`);
-          await updateProfile(firebaseUser, profileUpdates);
-
-          // IDトークンを強制リフレッシュして、新しいクレームを次回のAPIコールに含める
-          await firebaseUser.getIdToken(true);
-        }
-
-        // 2. Laravel側の更新 (全てのフィールドを更新)
-        const apiPath = "/mypage/profile_update";
-
-        const requestBody = {
-          ...data,
-          _method: "PATCH", // LaravelにPATCHとして解釈させる魔法のフィールド
-        };
-
-        console.log(
-          `[PROFILE_UPDATE] Calling Laravel API: POST ${apiPath} with _method=PATCH`
+        const success = await reEstablishSanctumSession(
+          $firebaseAuth.currentUser
         );
 
-        // ★★★ 修正ポイント: Nuxtの $fetch は非200レスポンス時に自動でエラーを投げるが、
-        // ここではレスポンスが200でもHTMLが返ってきた場合のハンドリングを強化する
-
-        const response: any = await fetcher(apiPath, {
-          baseURL: baseUrl,
-          method: "POST",
-          body: requestBody,
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            Authorization: `Bearer ${localToken.value}`,
-          },
-        });
-
-        // 3. 成功した場合、ストアのユーザーデータを更新
-        if (response && response.user) {
-          this.user = response.user as User;
-        } else if (
-          typeof response === "string" &&
-          response.startsWith("<!DOCTYPE html>")
-        ) {
-          // APIコールが成功ステータス(200 OK)を返したが、コンテンツがHTMLだった場合
-          console.error(
-            "⛔️ [FATAL ERROR] APIレスポンスが予期せずHTMLです。Laravel側のルーティング（認証またはCSRFミドルウェア）を確認してください。"
-          );
-          // HTMLレスポンスをそのまま処理させないためにエラーを投げる
-          throw new Error(
-            "API call returned HTML instead of JSON. Check Laravel routing/middleware."
-          );
-        } else {
-          // レスポンスにuserオブジェクトがない場合、送信したデータでローカルを更新
-          this.user = {
-            ...(this.user as User),
-            ...data,
-          } as User;
-        }
-
-        console.log(
-          "✅ [DEBUG] プロフィール更新APIコールが成功しました。ストアを更新します。"
-        );
-
-        this.isLoading = false;
-        return this.user;
-      } catch (error: any) {
-        this.isLoading = false;
-        console.error("Profile Update Error (Catch):", error);
-        // Laravelからエラーレスポンス（422など）が返ってきた場合、詳細なメッセージをログに出力
-        if (error.response?.data?.errors) {
-          console.error(
-            "Laravel Validation Errors:",
-            error.response.data.errors
-          );
-        }
-        throw error;
-      }
-    }, // ★★★ updateUserProfile 終わり ★★★
-
-    // ----------------------------------------------------
-    // メール認証処理
-    // ----------------------------------------------------
-    async verifyEmail(url: string) {
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-      const baseUrl = this.getApiBaseUrl();
-
-      const urlObj = new URL(url, "http://dummy.com");
-      const queryParams = urlObj.search;
-
-      try {
-        const verificationResponse: any = await fetcher(
-          `/email/verify${queryParams}`,
-          {
-            baseURL: baseUrl,
-            method: "GET",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          }
-        );
-
-        if (verificationResponse && verificationResponse.user) {
-          this.user = verificationResponse.user as User;
-
-          const $firebaseAuth = getFirebaseAuth();
-          if (!$firebaseAuth || !$firebaseAuth.currentUser) {
-            console.warn(
-              "[VERIFY] Current Firebase user is null. Skipping session refresh."
-            );
-            return true;
-          }
-
-          const success = await this.reEstablishSanctumSession(
-            $firebaseAuth.currentUser
-          );
-
-          if (success) {
-            this.startSessionKeeper();
-            return true;
-          }
-        }
-
-        return false;
-      } catch (error: any) {
-        console.error("[VERIFY ERROR] Email verification failed:", error);
-
-        if (error.statusCode === 403) {
-          throw new Error(
-            "メール認証リンクの有効期限が切れているか、無効です。"
-          );
-        }
-
-        throw error;
-      }
-    },
-
-    // ----------------------------------------------------
-    // ログアウト処理 (Firebase/Sanctum連携を考慮して修正)
-    // ----------------------------------------------------
-    async logout() {
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-      const config = useRuntimeConfig();
-      const { clearToken } = this._getAuthManager();
-
-      const itemStore = useItemStore();
-
-      // 1. フラグをtrueに設定
-      this.isLoggingOut = true;
-      this.isLoading = true;
-      this.stopSessionKeeper();
-
-      // 2. UIの即時更新とデータのクリアを最優先
-
-      // ★★★ 修正ポイント: itemStore.$reset() を itemStore.clearData() に置き換え ★★★
-      // itemStore.$reset(); // <-- エラーの原因
-      if (typeof itemStore.clearData === "function") {
-        itemStore.clearData();
-        console.log("[LOGOUT] itemStore.clearData() called.");
-      } else {
-        // itemStoreで clearData() が実装されていない場合のフォールバック
-        // ItemStoreを自分で定義する場合は、clearData()を実装することが望ましい
-        console.warn(
-          "🍍: itemStore.clearData() is not defined. Item store data may persist."
-        );
-      }
-
-      this.token = null;
-      this.user = null;
-      clearToken();
-
-      // ★★★ 修正ポイント 1: クッキーをアグレッシブに削除 ★★★
-      if (process.client) {
-        const cookies = ["laravel_session", "XSRF-TOKEN", "auth_token"];
-
-        cookies.forEach((name) => {
-          const cookieRef = useCookie(name);
-          if (cookieRef.value) {
-            cookieRef.value = null;
-            // path: '/' を付けて削除を強制
-            // @ts-ignore
-            useCookie(name, { path: "/", maxAge: 0, sameSite: "Lax" });
-          }
-
-          // 低レベルなdocument.cookieでの強制削除（より確実性が高い）
-          // 複数のパスで試行
-          document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
-          document.cookie = `${name}=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
-          document.cookie = `${name}=; Path=/sanctum; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
-        });
-
-        console.log("[LOGOUT] Client-side cookies forcefully deleted.");
-      } else {
-        useCookie("laravel_session").value = null;
-        useCookie("XSRF-TOKEN").value = null;
-        useCookie("auth_token").value = null;
-      }
-
-      // 3. バックエンドのログアウトAPIを呼び出し (非同期)
-      if (typeof fetcher === "function") {
-        try {
-          await fetcher("/logout", {
-            baseURL: config.public.apiBaseUrl,
-            method: "POST",
-            credentials: "include",
-          });
-          console.log("[LOGOUT] Backend /logout API call successful.");
-        } catch (e: any) {
-          const status = e.response?.status;
-
-          if (status === 401 || status === 403 || status === 500) {
-            console.warn(
-              `[LOGOUT] Backend API failed with status ${status}. (Expected if session already invalid). Continuing local clear.`
-            );
-          } else {
-            console.error("Logout API failed with unexpected error.", e);
-          }
+        if (success) {
+          await startSessionKeeper();
+          return true;
         }
       }
-
-      // 4. Firebaseからのサインアウト (非同期)
-      try {
-        const $firebaseAuth = getFirebaseAuth();
-        if ($firebaseAuth) {
-          await signOut($firebaseAuth);
-          console.log("[LOGOUT] Firebase SignOut successful.");
-        }
-      } catch (e: any) {
-        if (
-          !e.message.includes("Firebase Auth service is not available") &&
-          !e.message.includes("on the server")
-        ) {
-          console.error("Firebase SignOut failed:", e);
-        }
+      return false;
+    } catch (error: any) {
+      console.error("[VERIFY ERROR] Email verification failed:", error);
+      if (error.statusCode === 403) {
+        throw new Error("メール認証リンクの有効期限が切れているか、無効です。");
       }
+      throw error;
+    }
+  };
 
-      // ★★★ 修正ポイント 2: ログアウト完了後、ページをリロードして強制的に非認証リクエストを発行させる ★★★
-      // これは最も確実な方法です。
-      if (process.client) {
-        window.location.reload();
-      }
+  // ----------------------------------------------------
+  // ログアウト処理
+  // ----------------------------------------------------
+  const logout = async () => {
+    const fetcher = globalThis.$fetch as typeof globalThis.fetch;
+    const config = useRuntimeConfig();
+    const { clearToken } = _getAuthManager();
+    const itemStore = useItemStore();
 
-      // 5. すべての非同期処理が完了後、フラグをfalseに戻す (reloadで到達しない可能性が高いが、念のため)
-      this.isLoading = false;
-      this.isLoggingOut = false;
-      console.log(
-        "[Logout] Complete. State cleared and isLoading/isLoggingOut set to false."
+    // 1. フラグをtrueに設定
+    isLoggingOut.value = true;
+    isLoading.value = true;
+
+    // 2. UIの即時更新とデータのクリア
+    $reset();
+
+    if (typeof itemStore.clearData === "function") {
+      itemStore.clearData();
+      console.log("[LOGOUT] itemStore.clearData() called.");
+    } else {
+      console.warn(
+        "🍍: itemStore.clearData() is not defined. Item store data may persist."
       );
-    },
+    }
 
-    // ----------------------------------------------------
-    // 認証済みの前提でユーザー情報を強制的に再読み込みするアクション
-    // ----------------------------------------------------
-    async forceFetchUser() {
-      if (!this.isAuthenticated) {
-        console.warn("[ForceFetch] Not authenticated. Aborting force fetch.");
-        return;
-      }
-      await this.fetchUser(true);
-    },
+    // トークンのクッキー/ストレージをクリア
+    clearToken();
 
-    // ----------------------------------------------------
-    // ユーザー情報の読み込み
-    // ----------------------------------------------------
-    async fetchUser(isForce: boolean = false) {
-      const fetcher = globalThis.$fetch as typeof globalThis.fetch;
-      const { token: localToken, clearToken } = this._getAuthManager();
-      const config = useRuntimeConfig();
+    if (process.client) {
+      const cookies = ["laravel_session", "XSRF-TOKEN", "auth_token"];
 
-      if (!localToken.value) {
-        this.user = null;
-        this.token = null;
-        return;
-      }
-
-      this.token = localToken.value;
-      const baseUrl = this.getApiBaseUrl();
-
-      try {
-        const response: any = await fetcher("/user", {
-          baseURL: baseUrl,
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Authorization: `Bearer ${localToken.value}`,
-            Accept: "application/json",
-          },
-          context: {
-            skipAutoLogout: true,
-          },
-        });
-
-        // ★★★ 修正ポイント: HTMLレスポンスのチェック
-        if (
-          typeof response === "string" &&
-          response.startsWith("<!DOCTYPE html>")
-        ) {
-          console.error(
-            "⛔️ [FATAL ERROR] /user APIレスポンスが予期せずHTMLです。Laravel側のルーティング/ミドルウェアを確認してください。"
-          );
-          throw new Error("/user API call returned HTML instead of JSON.");
+      cookies.forEach((name) => {
+        const cookieRef = useCookie(name);
+        if (cookieRef.value) {
+          cookieRef.value = null;
+          useCookie(name, { path: "/", maxAge: 0, sameSite: "Lax" });
         }
+        document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+        document.cookie = `${name}=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+        document.cookie = `${name}=; Path=/sanctum; Expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+      });
 
-        const user: User = response.user || response;
-        this.user = user;
+      console.log("[LOGOUT] Client-side cookies forcefully deleted.");
+    } else {
+      useCookie("laravel_session").value = null;
+      useCookie("XSRF-TOKEN").value = null;
+      useCookie("auth_token").value = null;
+    }
+
+    // 3. バックエンドのログアウトAPIを呼び出し (非同期)
+    if (typeof fetcher === "function") {
+      try {
+        await fetcher("/logout", {
+          baseURL: config.public.apiBaseUrl,
+          method: "POST",
+          credentials: "include",
+        });
+        console.log("[LOGOUT] Backend /logout API call successful.");
       } catch (e: any) {
-        // ... (エラー処理は省略せず、前のコードを保持)
         const status = e.response?.status;
-        const shouldClear = status === 401;
-        const shouldMaintain = status === 403;
-
-        if (shouldClear) {
+        if (status === 401 || status === 403 || status === 500) {
           console.warn(
-            `[FetchUser] Received 401 Unauthorized. Clearing local state to force full re-auth.`
-          );
-          this.token = null;
-          this.user = null;
-          clearToken();
-          this.stopSessionKeeper();
-        } else if (shouldMaintain) {
-          console.warn(
-            `[FetchUser] Received 403 Forbidden (Likely unverified email). Maintaining local state to show prompt.`
+            `[LOGOUT] Backend API failed with status ${status}. (Expected if session already invalid). Continuing local clear.`
           );
         } else {
-          console.error(
-            "[FetchUser] Failed to fetch user with unexpected error.",
-            e
-          );
-          this.token = null;
-          this.user = null;
-          clearToken();
-          this.stopSessionKeeper();
+          console.error("Logout API failed with unexpected error.", e);
         }
-        return;
       }
-    },
-  },
+    }
+
+    // 4. Firebaseからのサインアウト (非同期)
+    try {
+      const $firebaseAuth = getFirebaseAuth();
+      if ($firebaseAuth) {
+        await signOut($firebaseAuth);
+        console.log("[LOGOUT] Firebase SignOut successful.");
+      }
+    } catch (e: any) {
+      if (
+        !e.message.includes("Firebase Auth service is not available") &&
+        !e.message.includes("on the server")
+      ) {
+        console.error("Firebase SignOut failed:", e);
+      }
+    }
+
+    // 5. ログアウト完了後、ページをリロードして強制的に非認証リクエストを発行させる
+    if (process.client) {
+      // 🚨 修正: window.location.reload()の直前にフラグを解除することで、フリーズ状態を解消します
+      isLoading.value = false;
+      isLoggingOut.value = false;
+
+      console.log("🚀 [LOGOUT] Forcing window reload to ensure clean state.");
+      window.location.reload();
+
+      // 以前のコードのこの行は、リロードが実行されたため到達しません
+      // isLoading.value = false;
+      // isLoggingOut.value = false;
+    }
+  };
+
+  // ----------------------------------------------------
+  // 公開する状態、ゲッター、アクションを返す
+  // ----------------------------------------------------
+  return {
+    // State
+    token,
+    user,
+    isLoading,
+    isLoggingOut,
+    isAuthReady,
+
+    // Getters
+    isLoggedIn,
+    isAuthenticated,
+    isAuthResolved,
+    isEmailVerified,
+
+    // Actions
+    getApiBaseUrl,
+    getSanctumCsrfToken,
+    waitForAuthResolution,
+    initAuth,
+    login,
+    register,
+    updateUserProfile,
+    verifyEmail,
+    logout,
+    fetchUser,
+    forceFetchUser,
+    $reset, // カスタム実装した $reset を公開
+    stopSessionKeeper,
+    startSessionKeeper,
+  };
 });

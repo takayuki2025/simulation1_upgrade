@@ -36,7 +36,7 @@
             </NuxtLink>
             
             <!-- 【修正後】出品ボタンの遷移先をメール認証状態によって切り替える -->
-            <NuxtLink :to="sellLinkTarget" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
+            <NuxtLink :to="'/sell'" class="login_page_3 bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition duration-150 text-sm font-semibold">
               出品
             </NuxtLink>
 

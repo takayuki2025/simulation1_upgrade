@@ -1,47 +1,63 @@
 <script setup lang="ts">
-// I. 依存関係
-import { ref } from 'vue'; // Vueの基本機能
-import { useRouter } from 'vue-router'; // ルーティング機能
-import { useAuthStore } from '@/stores/auth'; // 認証ストア
-import { storeToRefs } from 'pinia'; // Piniaストア状態の展開
-import { useApi } from '~/composables/useApi'; // 認証付きAPI通信クライアント
+import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router'; // Nuxtでは useNuxtApp().$router または useRouter()
+import { useAuthStore } from '@/stores/auth'; // 実際のストアパスに変更してください
+import { useAuth } from '~/composables/useAuth'; // 実際のコンポーザブルパスに変更してください
+import { $fetch } from 'ofetch'; // Nuxtの $fetch を使用
+import { useRuntimeConfig } from '#app';
 
-// II. 型定義
-interface ItemForm {
-  item_image: string | null; // DB保存パス ('storage/item_images/...')
-  category: string[];
-  condition: string | null;
-  name: string | null;
-  brand: string | null;
-  explain: string | null;
-  price: number | null;
-}
+// =======================================================
+// I. 依存関係の初期化と設定
+// =======================================================
 
-// III. 初期化
+// 実際のNuxtランタイムコンフィグからAPIベースURLを取得
+const config = useRuntimeConfig();
+const API_BASE_URL = config.public.apiBaseUrl;
+
 const router = useRouter();
 const authStore = useAuthStore();
-const { isAuthenticated, hasVerifiedEmail } = storeToRefs(authStore); // メール認証状態も利用
-const { authenticatedFetch } = useApi();
+const { token: localToken } = useAuth(); // 認証トークンを取得するComposables
 
-// UIフィードバックのための状態Ref
+// Pinia Storeから必要な状態を取得
+const isAuthenticated = computed(() => !!authStore.user);
+const hasVerifiedEmail = computed(() => !!authStore.user?.email_verified_at);
+
+// =======================================================
+// II. 型定義と状態管理
+// =======================================================
+
+interface ItemForm {
+    item_image: string | null; // アップロード後のサーバーパス
+    category: string[];
+    condition: string | null;
+    name: string | null;
+    brand: string | null;
+    explain: string | null;
+    price: number | null;
+}
+
 const isSubmitting = ref(false);
 const isImageUploading = ref(false);
-const serverErrors = ref<{ [key: string]: string | string[] }>({});
+const isLoading = ref(true); // 認証チェックのためのローディング状態
+
+// サーバーエラーの型
+const serverErrors = ref<{ [key: string]: string | string[] | undefined }>({});
 const successMessage = ref('');
 const errorMessage = ref('');
+const fileInput = ref<HTMLInputElement | null>(null); // ファイルインプットへの参照
 
-// フォームRef
+// フォームの初期状態
 const form = ref<ItemForm>({
-  item_image: null,
-  category: [],
-  condition: null,
-  name: null,
-  brand: null,
-  explain: null,
-  price: null,
+    item_image: null,
+    category: [],
+    condition: null,
+    name: null,
+    brand: null,
+    explain: null,
+    price: null,
 });
 
-// カテゴリーリストと状態リスト
+// 選択肢データ
 const categories = [
     'ファッション', '家電', 'インテリア', 'レディース', 'メンズ',
     'コスメ', '本', 'ゲーム', 'スポーツ', 'キッチン',
@@ -49,50 +65,88 @@ const categories = [
 ];
 const conditions = ['良好', '目立った傷や汚れなし', 'やや傷や汚れあり', '状態が悪い'];
 
-// IV. ロジック
+// =======================================================
+// III. ロジック (認証チェック、API通信)
+// =======================================================
 
 /**
- * ページアクセス時の認証チェック
- * コントローラーロジック (Auth::check() && !Auth::user()->hasVerifiedEmail()) を再現
+ * 認証チェックとアクセス制御
  */
 const checkAuthentication = async () => {
     isLoading.value = true;
-    try {
-        await authStore.waitForAuthResolution();
-        
-        // ログインしていない、またはメール認証が完了していない場合、リダイレクト
-        if (!isAuthenticated.value || !hasVerifiedEmail.value) {
-            errorMessage.value = 'メール認証が完了していません。ログインページへリダイレクトします。';
-            setTimeout(() => router.push('/login'), 1500);
-            return false;
-        }
-    } catch (e) {
-        console.error("Auth check failed:", e);
-        errorMessage.value = '認証チェック中にエラーが発生しました。';
-        setTimeout(() => router.push('/login'), 1500);
+    // authStore.waitForAuthResolution() は、認証ストアがサーバーから初期ユーザー情報を取得するのを待つ関数を想定
+    await authStore.waitForAuthResolution();
+
+    if (!isAuthenticated.value || !hasVerifiedEmail.value) {
+        console.log('[Auth Check] 未認証またはメール未確認。/loginへリダイレクト。');
+        errorMessage.value = 'アクセス権限がありません。ログインページへリダイレクト中です。';
+        setTimeout(() => router.push('/login'), 1500); // 実際のパスに合わせて修正
         return false;
-    } finally {
-        isLoading.value = false;
     }
+
+    isLoading.value = false;
     return true;
 };
 
 // コンポーネントロード時に認証チェックを実行
-const isLoading = ref(true);
-checkAuthentication();
+onMounted(() => {
+    checkAuthentication();
+});
 
 
 /**
- * 画像選択・アップロード処理 (Route::post('/upload', ...)) を再現
+ * 認証付きAPIフェッチヘルパー
+ * (汎用的なComposableを使用する場合は置き換えてください)
+ */
+async function authenticatedFetch(endpoint: string, options: any) {
+    const token = localToken.value;
+    if (!token) {
+        // トークンがない場合、401エラーとして扱う
+        throw { status: 401, message: '認証トークンが見つかりません。' };
+    }
+
+    const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        // FormDataの場合は'Content-Type'を明示的に設定しない（ブラウザに任せる）
+        ...options.headers,
+    };
+
+    try {
+        const fullUrl = `${API_BASE_URL}${endpoint}`;
+        const response = await $fetch(fullUrl, {
+            ...options,
+            headers,
+        });
+        return response;
+    } catch (error: any) {
+        // ofetchのエラー構造を考慮してエラーを投げる
+        const status = error.statusCode || error.status || 500;
+        const data = error.data || error.response?._data;
+
+        if (status === 422 && data && data.errors) {
+            // Laravelのバリデーションエラーを整形して投げる
+            throw { status: 422, errors: data.errors };
+        } else if (status === 401) {
+            // 認証エラー
+            throw { status: 401, message: 'セッションの有効期限が切れています。再ログインしてください。' };
+        }
+        // その他のエラー
+        throw { status, message: error.message || '予期せぬAPIエラーが発生しました。' };
+    }
+}
+
+
+/**
+ * 画像選択・アップロード処理
  */
 const handleImageUpload = async (event: Event) => {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
 
     const file = input.files[0];
-    
     isImageUploading.value = true;
-    serverErrors.value.item_image = undefined; // 画像関連のエラーをクリア
+    serverErrors.value.item_image = undefined; // エラーをリセット
     successMessage.value = '';
     errorMessage.value = '';
 
@@ -100,567 +154,286 @@ const handleImageUpload = async (event: Event) => {
         const formData = new FormData();
         formData.append('item_image', file);
 
-        // 1. APIコール (item_image_uploadロジックの再現)
+        // /upload エンドポイントに POST
         const response: any = await authenticatedFetch('/upload', {
             method: 'POST',
-            body: formData, // FormDataを直接送信
-            contentType: 'multipart/form-data', // ヘッダーを自動設定させる
+            body: formData,
+            // FormDataを使うため、headersのContent-Typeは設定しない
+            headers: { 'Content-Type': undefined } as any, // TypeScriptを黙らせるハック
         });
 
-        // 2. 成功時の処理 (パスとメッセージの取得)
-        // サーバーから返されるデータ構造に合わせる必要がありますが、ここではシミュレーションとして
-        // サーバーがセッションではなくJSONでパスを返すものと仮定します。
-        
-        // 💡 サーバーの応答をセッションからJSONへ変更推奨ですが、元の処理を再現するため、
-        // サーバーが成功時にパスをJSONで返すことを想定します。
-        
-        // 仮の成功シミュレーション (サーバー応答からパスを取得)
-        // 実際はLaravel側でJSON応答に変更が必要です。
-        const uploadedPath = response.image_path || 'storage/item_images/temp_uploaded_' + file.name;
-        
+        const uploadedPath = response.image_path; // サーバーからの保存パス
         form.value.item_image = uploadedPath;
-        successMessage.value = '商品画像アップロードできました！';
-        
+        successMessage.value = '商品画像をアップロードできました！';
     } catch (error: any) {
         console.error('画像アップロードエラー:', error);
-        
-        const statusCode = error.status || (error.response ? error.response.status : '不明');
-        
-        if (statusCode === 422) {
-             // 422: Laravelからのバリデーションエラーを処理
-            serverErrors.value.item_image = error.response?._data?.errors?.item_image || '画像ファイルが無効です。';
+        if (error.status === 422) {
+            // 422バリデーションエラーの場合
+            const errorData = error.errors;
+            serverErrors.value.item_image = errorData?.item_image || '画像ファイルが無効です。';
         } else {
-            errorMessage.value = error.message || `画像アップロード中に予期せぬエラーが発生しました (Status: ${statusCode})。`;
+            // その他エラー
+            errorMessage.value = error.message || `画像アップロード中に予期せぬエラーが発生しました (Status: ${error.status})。`;
         }
-        
     } finally {
         isImageUploading.value = false;
-        // ファイルインプットをリセットして同じファイルを再度選択できるようにする
+        // ファイルインプットをリセット
         if (input) input.value = '';
     }
 };
 
 /**
- * フォームの送信処理 (Route::post('/items', ...)) を再現
+ * フォームの送信処理 (商品出品)
  */
 const submitNewData = async () => {
-    if (isSubmitting.value || !form.value.item_image) return; // 画像がない場合は送信不可
+    // 早期リターン
+    if (isSubmitting.value || isLoading.value || !isAuthenticated.value || !hasVerifiedEmail.value) return;
 
     isSubmitting.value = true;
     serverErrors.value = {};
     successMessage.value = '';
     errorMessage.value = '';
 
-    // カテゴリーのバリデーションをフロントで仮チェック
-    if (form.value.category.length === 0) {
-        serverErrors.value.category = 'カテゴリーを一つ以上選択してください。';
+    // 画像未アップロードのクライアントサイドチェック（APIコール前に表示）
+    if (!form.value.item_image) {
+        serverErrors.value.item_image = ['商品画像をアップロードしてください。'];
+        errorMessage.value = '入力内容に誤りがあります。ご確認ください。';
         isSubmitting.value = false;
         return;
     }
 
     try {
-        // 1. 認証チェック
-        if (!(await checkAuthentication())) return;
-        
-        // 2. APIコール (thanks_sell_createロジックの再現)
-        const response: any = await authenticatedFetch('/items', { // Laravel側のエンドポイントに合わせて'/items'を使用
+        // /items エンドポイントに POST
+        await authenticatedFetch('/items', {
             method: 'POST',
             body: {
                 ...form.value,
-                price: form.value.price ? Number(form.value.price) : null,
-                // カテゴリーはバックエンドでJSONエンコードされるため、配列のまま送信
+                // priceがnullでないことを確認し、数値型として送信
+                price: form.value.price !== null ? Number(form.value.price) : null,
             },
         });
 
-        console.log('[DEBUG: ItemSell] API Response:', response);
+        successMessage.value = '商品を出品しました。サンクスページへ移動します。';
 
-        // 成功: データベース保存成功後、サンクスページへリダイレクト
-        successMessage.value = '商品を出品し、サンクスページへ移動します。';
-
+        // 成功時のリダイレクト
         setTimeout(() => {
-            router.push('/thanks_sell'); // thanks_sellビューに相当するルートへ遷移
+            router.push('/sell/thanks'); // 実際のサンクスページパスに修正
         }, 1500);
 
     } catch (error: any) {
         console.error('出品エラー:', error);
-        
-        const statusCode = error.status || (error.response ? error.response.status : '不明');
-        
-        if (statusCode === 422) {
-            // 422: Laravelからのバリデーションエラーを処理
-            serverErrors.value = error.response?._data?.errors || {};
+        if (error.status === 422) {
+            // 422バリデーションエラーの場合
+            serverErrors.value = error.errors || {};
             errorMessage.value = '入力内容に誤りがあります。ご確認ください。';
+        } else if (error.status === 401) {
+            // 401認証エラー
+            errorMessage.value = error.message || '認証エラーが発生しました。再ログインしてください。';
+            // ログインページへリダイレクト
+            setTimeout(() => router.push('/login'), 1500);
         } else {
-            errorMessage.value = error.message || `出品中に予期せぬエラーが発生しました (Status: ${statusCode})。`;
+            // その他エラー
+            errorMessage.value = error.message || `出品中に予期せぬエラーが発生しました (Status: ${error.status})。`;
         }
-        
     } finally {
         isSubmitting.value = false;
     }
 };
+
+/**
+ * 画像選択ボタンクリックで隠されたファイルインプットをクリックする関数
+ */
+const triggerFileInput = () => {
+    fileInput.value?.click();
+};
 </script>
 
 <template>
-    <div v-if="isLoading" class="loading-overlay">
-        認証状態を確認中です...
-    </div>
-    
-    <div v-else-if="!isAuthenticated || !hasVerifiedEmail" class="error-message">
-        {{ errorMessage || 'アクセス権限がありません。ログインページへリダイレクト中です。' }}
-    </div>
+<div class="flex justify-center py-10 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
+    <div class="w-full max-w-2xl bg-white p-8 sm:p-10 shadow-xl rounded-xl border border-gray-100">
 
-    <div v-else class="item_sell_contents">
-        <div class="item_sell_contents_box">
-            <div class="small_box">
+        <div v-if="isLoading" class="flex items-center justify-center min-h-[50vh]">
+            <p class="text-lg text-gray-700 p-8">認証状態を確認中です...</p>
+        </div>
+        <div v-else-if="!isAuthenticated || !hasVerifiedEmail" class="flex items-center justify-center min-h-[50vh]">
+            <div class="text-red-700 p-8 bg-white shadow-lg rounded-lg">
+                {{ errorMessage || 'アクセス権限がありません。ログインページへリダイレクト中です。' }}
+            </div>
+        </div>
 
-                <h1 class="item_sell_contents_box_title">商品の出品</h1>
+        <div v-else>
+            <h1 class="text-3xl font-bold text-gray-800 text-center mb-8 border-b pb-4">
+                商品の出品
+            </h1>
 
-                <!-- エラー/成功メッセージ表示エリア -->
-                <div v-if="successMessage" class="alert-success">
-                    {{ successMessage }}
-                </div>
-                <div v-else-if="errorMessage" class="alert_error">
-                    {{ errorMessage }}
-                </div>
+            <div v-if="successMessage" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-md" role="alert">
+                {{ successMessage }}
+            </div>
+            <div v-else-if="errorMessage" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md" role="alert">
+                {{ errorMessage }}
+            </div>
 
-                <!-- 商品画像フォーム -->
-                <label class="item_sell_contents_box_imagetitle">商品画像</label>
-                <div class="item_sell_contents_box_line">
-                    
-                    <button 
-                        type="button" 
-                        class="upload_submit" 
-                        :disabled="isImageUploading"
-                        @click="() => {
-                            const fileInput = $refs.fileInput as HTMLInputElement;
-                            if (fileInput) fileInput.click();
-                        }"
+            <section class="mb-8 border-b pb-6">
+                <label class="block text-lg font-bold text-gray-700 mb-4">
+                    商品画像 <span class="text-red-500 text-sm">(必須)</span>
+                </label>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center space-y-4 bg-gray-50 min-h-[150px]">
+                    <button
+                        type="button"
+                        class="px-6 py-2 text-red-600 font-semibold border-2 border-red-600 bg-white rounded-full hover:bg-red-50 transition duration-150 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isImageUploading || isSubmitting"
+                        @click="triggerFileInput"
                     >
                         {{ isImageUploading ? 'アップロード中...' : '画像を選択する' }}
                     </button>
-                    <!-- ファイル選択インプット (非表示) -->
-                    <input 
-                        type="file" 
-                        ref="fileInput" 
-                        @change="handleImageUpload" 
-                        style="display: none;" 
+                    <input
+                        type="file"
+                        ref="fileInput"
+                        @change="handleImageUpload"
+                        style="display: none;"
                         accept="image/jpeg, image/png"
                     >
-                    
-                    <!-- 画像アップロードエラー表示 -->
-                    <div v-if="serverErrors.item_image" class="alert_error">
+                    <div v-if="serverErrors.item_image" class="text-red-500 text-sm font-medium">
                         {{ Array.isArray(serverErrors.item_image) ? serverErrors.item_image[0] : serverErrors.item_image }}
                     </div>
-                    
-                    <div v-if="form.item_image" class="image-preview-area">
-                        <p>✅ 画像が選択されました。</p>
-                        <!-- ここに画像プレビューを表示する処理を追加可能 -->
-                    </div>
+                    <div v-if="form.item_image" class="text-green-600 font-medium text-sm mt-2">
+                        <p>✅ 画像がアップロードされました。</p>
+                        </div>
                 </div>
+            </section>
 
-                <div class="sell_title1">
-                    <h2>商品の詳細</h2>
-                </div>
+            <form @submit.prevent="submitNewData">
+                <section class="mb-10">
+                    <h2 class="text-xl font-bold text-gray-700 border-b-2 border-gray-200 pb-2 mb-6">
+                        商品の詳細
+                    </h2>
 
-                <!-- メイン出品フォーム -->
-                <form @submit.prevent="submitNewData">
-                    
-                    <div class="sell_title1_1">
-                        <label>カテゴリー</label>
-                        <br><br>
-                        <div class="category-buttons-container">
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">カテゴリー <span class="text-red-500 text-sm">(必須)</span></label>
+                        <div class="flex flex-wrap justify-center gap-2 px-0 py-2 category-buttons-container">
                             <template v-for="(cat, index) in categories" :key="index">
-                                <input 
-                                    type="checkbox" 
-                                    :id="`cat${index + 1}`" 
-                                    :value="cat" 
+                                <input
+                                    type="checkbox"
+                                    :id="`cat${index}`"
+                                    :value="cat"
                                     class="category-checkbox-input"
                                     v-model="form.category"
                                 >
-                                <label :for="`cat${index + 1}`" class="category-checkbox-label">{{ cat }}</label>
+                                <label :for="`cat${index}`" class="category-checkbox-label">
+                                    {{ cat }}
+                                </label>
                             </template>
                         </div>
-                        <div v-if="serverErrors.category" class="error">
-                             {{ Array.isArray(serverErrors.category) ? serverErrors.category[0] : serverErrors.category }}
+                        <div v-if="serverErrors.category" class="text-red-500 text-sm mt-2">
+                            {{ Array.isArray(serverErrors.category) ? serverErrors.category[0] : serverErrors.category }}
                         </div>
-                        <br>
                     </div>
 
-                    <div class="sell_title1_2">
-                        <label>商品の状態</label>
-                        <select class="select_box" v-model="form.condition">
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">商品の状態 <span class="text-red-500 text-sm">(必須)</span></label>
+                        <select
+                            class="w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2"
+                            v-model="form.condition"
+                        >
                             <option :value="null" disabled>選択してください</option>
                             <option v-for="(cond, index) in conditions" :key="index" :value="cond">{{ cond }}</option>
                         </select>
-                        <div v-if="serverErrors.condition" class="error">
+                        <div v-if="serverErrors.condition" class="text-red-500 text-sm mt-2">
                             {{ Array.isArray(serverErrors.condition) ? serverErrors.condition[0] : serverErrors.condition }}
                         </div>
                     </div>
+                </section>
 
-                    <div class="sell_title2">
-                        <h2>商品名と説明</h2>
-                    </div>
+                <section class="mb-10">
+                    <h2 class="text-xl font-bold text-gray-700 border-b-2 border-gray-200 pb-2 mb-6">
+                        商品名と説明
+                    </h2>
 
-                    <div class="sell_title2_1">
-                        <label>商品名</label>
-                        <input type="text" class="sell_item_form" v-model="form.name">
-                        <div v-if="serverErrors.name" class="error">
-                             {{ Array.isArray(serverErrors.name) ? serverErrors.name[0] : serverErrors.name }}
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">商品名 <span class="text-red-500 text-sm">(必須)</span></label>
+                        <input type="text" class="w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2" v-model="form.name">
+                        <div v-if="serverErrors.name" class="text-red-500 text-sm mt-2">
+                            {{ Array.isArray(serverErrors.name) ? serverErrors.name[0] : serverErrors.name }}
                         </div>
                     </div>
 
-                    <div class="sell_title2_2">
-                        <label>ブランド名</label>
-                        <input type="text" class="sell_item_form" v-model="form.brand">
-                         <div v-if="serverErrors.brand" class="error">
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">ブランド名</label>
+                        <input type="text" class="w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2" v-model="form.brand">
+                        <div v-if="serverErrors.brand" class="text-red-500 text-sm mt-2">
                             {{ Array.isArray(serverErrors.brand) ? serverErrors.brand[0] : serverErrors.brand }}
                         </div>
                     </div>
 
-                    <div class="sell_title2_3">
-                        <label>商品の説明</label>
-                        <textarea class="sell_item_form_textarea" v-model="form.explain"></textarea>
-                        <div v-if="serverErrors.explain" class="error">
-                             {{ Array.isArray(serverErrors.explain) ? serverErrors.explain[0] : serverErrors.explain }}
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">商品の説明 <span class="text-red-500 text-sm">(必須)</span></label>
+                        <textarea class="w-full border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2 min-h-[120px] resize-y" v-model="form.explain"></textarea>
+                        <div v-if="serverErrors.explain" class="text-red-500 text-sm mt-2">
+                            {{ Array.isArray(serverErrors.explain) ? serverErrors.explain[0] : serverErrors.explain }}
                         </div>
                     </div>
 
-                    <div class="sell_title2_4">
-                        <label>販売価格</label>
-                        <input type="text" class="sell_item_form2" v-model.number="form.price" inputmode="numeric">
-                        <span class="currency-symbol">¥</span>
-                        <div v-if="serverErrors.price" class="error">
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-3">販売価格 <span class="text-red-500 text-sm">(必須)</span></label>
+                        <div class="relative">
+                            <span class="currency-symbol absolute left-3 top-1/2 transform -translate-y-1/2 text-xl font-semibold text-gray-500">
+                                ¥
+                            </span>
+                            <input
+                                type="text"
+                                class="w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 pl-10 pr-2 text-right text-lg font-semibold"
+                                v-model.number="form.price"
+                                inputmode="numeric"
+                            >
+                        </div>
+                        <div v-if="serverErrors.price" class="text-red-500 text-sm mt-2">
                             {{ Array.isArray(serverErrors.price) ? serverErrors.price[0] : serverErrors.price }}
                         </div>
                     </div>
+                </section>
 
-                    <div class="sell_title3">
-                        <!-- item_imageはv-modelのformに含まれているため、hidden inputは不要 -->
-                        <button type="submit" class="sell_item_submit" :disabled="isSubmitting || !form.item_image">
-                            {{ isSubmitting ? '出品処理中...' : '出品する' }}
-                        </button>
-                        <div v-if="!form.item_image && !isImageUploading" class="error mt-3">
-                            <br>商品画像をアップロードしてください。
-                        </div>
+                <div class="mt-10">
+                    <button
+                        type="submit"
+                        class="w-full py-3 bg-red-600 text-white text-lg font-bold rounded-lg shadow-md hover:bg-red-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isSubmitting || isImageUploading || !form.item_image"
+                    >
+                        {{ isSubmitting ? '出品処理中...' : '出品する' }}
+                    </button>
+                    <div v-if="!form.item_image && !isImageUploading && !isSubmitting" class="text-red-500 text-sm mt-3 text-center">
+                        商品画像をアップロードしてください。
                     </div>
-                </form>
-
-            </div>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 </template>
 
 <style scoped>
-/* ==============================================================
-   元のCSSを忠実に再現 (99%デザイン再現のため、固定値と相対配置を維持)
-   ============================================================== */
-
-/* Loading State */
-.loading-overlay, .error-message {
-    text-align: center;
-    padding: 50px;
-    font-size: 1.2rem;
-    color: #5f5f5f;
-}
-
-/* Font/Base Styles */
-label {
-    font-weight: bold;
-}
-
-/* Layout Container */
-.item_sell_contents {
-    display: flex;
-    text-align: center;
-    justify-content: center;
-    margin: 0 auto;
-    max-width: 1400px;
-}
-
-.item_sell_contents_box {
-    display: flex;
-    height: 1500px; /* 高さを固定 */
-    width: 600px; /* 幅を固定 */
-    text-align: center;
-    justify-content: center;
-}
-
-.small_box {
-    width: 100%;
-    text-align: center;
-    justify-content: center;
-}
-
-.item_sell_contents_box_title {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 30px;
-}
-
-/* --- Image Upload Section --- */
-.item_sell_contents_box_imagetitle {
-    position: relative;
-    right: 260px; /* 固定オフセット */
-}
-
-.item_sell_contents_box_line {
-    border: 1px dotted black;
-    height: 100px;
-    padding-top: 5px; 
-}
-
-.upload_submit {
-    position: relative;
-    top: 35px;
-    color: #ff5655;
-    font-weight: bold;
-    border: 2px solid #ff5655;
-    background-color: white;
-    height: 35px;
-    border-radius: 5px;
-    padding: 0 15px;
-    cursor: pointer;
-}
-
-.upload_submit:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.image-preview-area {
-    position: relative;
-    top: 40px;
-    color: #799d90;
-    font-weight: bold;
-    font-size: 14px;
-}
-
-
-/* --- 商品の詳細 (カテゴリ・状態) --- */
-.sell_title1  {
-    margin-top: 30px;
-    border-bottom: 1px solid #5f5f5f;
-    color: #5f5f5f;
-    padding-bottom: 5px;
-}
-
-.sell_title1 h2 {
-    position: relative;
-    right: 240px; /* 固定オフセット */
-    font-size: 18px;
-}
-
-.sell_title1_1 {
-    margin-top: 30px;
-    position: relative;
-}
-.sell_title1_1 label {
-    position: relative;
-    right: 250px; /* 固定オフセット */
-}
-
-.category-buttons-container {
-    position: relative;
-    left: 260px; /* 固定オフセット */
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: flex-start; 
-    align-items: center;
-    width: 100%; 
-    max-width: 600px;
-}
-
 /* カテゴリーボタンのスタイル */
 .category-checkbox-input {
     display: none;
 }
 
 .category-checkbox-label {
-    /* スタイルの固定値維持 */
-    height: 8px; 
-    font-size: 9px;
-    margin: 5px;
-    display: inline-block;
-    padding: 8px 16px;
-    border: 2px solid #ff5655;
-    color: #ff5655;
-    border-radius: 9999px;
+    padding: 6px 14px;
+    font-size: 0.75rem; /* text-xs */
+    font-weight: 600; /* font-semibold */
+    border: 2px solid #ef4444; /* red-500 */
+    color: #ef4444;
+    border-radius: 9999px; /* rounded-full */
     cursor: pointer;
     background-color: white;
-    transition: background-color 0.2s, border-color 0.2s;
-    line-height: 8px;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    line-height: 1;
     white-space: nowrap;
 }
 
 .category-checkbox-input:checked+.category-checkbox-label {
-    background-color: #ff5655;
+    background-color: #ef4444; /* red-500 */
     color: #fff;
-    border-color: #ff5655;
+    border-color: #ef4444;
 }
-
-/* 商品の状態 */
-.sell_title1_2 {
-    margin-top: 20px;
-}
-
-.sell_title1_2 label{
-    display: block;
-    position: relative;
-    right: 250px;
-    margin-bottom: 10px;
-}
-
-.select_box {
-    width: 600px;
-    height: 35px; 
-    border: 1px solid #ccc;
-    padding: 0 5px;
-}
-
-
-/* --- 商品名と説明 --- */
-.sell_title2 {
-    margin-top: 40px;
-    color: #5f5f5f;
-    border-bottom: 1px solid #5f5f5f;
-    padding-bottom: 5px;
-}
-
-.sell_title2 h2{
-    position: relative;
-    right: 230px;
-    font-size: 18px;
-}
-
-/* フォームフィールド共通スタイル */
-.sell_item_form, .sell_item_form2, .sell_item_form_textarea {
-    width: 600px;
-    border: 1px solid #ccc;
-    padding: 5px;
-    box-sizing: border-box;
-}
-
-.sell_item_form {
-    height: 35px;
-}
-
-.sell_item_form_textarea {
-    height: 130px;
-    resize: none;
-}
-
-.sell_item_form2 {
-    height: 35px;
-    text-align: right;
-    padding-right: 35px; 
-}
-
-/* 個別ラベルの位置調整 (固定オフセット維持) */
-.sell_title2_1 label{
-    display: block;
-    margin-top: 30px;
-    position: relative;
-    right: 275px;
-}
-
-.sell_title2_2 label {
-    display: block;
-    margin-top: 30px;
-    position: relative;
-    right: 260px;
-}
-
-.sell_title2_3 label {
-    display: block;
-    margin-top: 30px;
-    position: relative;
-    right: 260px;
-}
-
-.sell_title2_4 label {
-    display: block;
-    margin-top: 30px;
-    position: relative;
-    right: 265px;
-}
-
-/* 販売価格の¥マーク */
-.currency-symbol {
-    position: relative;
-    right: 280px; /* 固定オフセット */
-    bottom: 35px;
-    font-size: 20px;
-    font-weight: 700;
-}
-
-/* --- 送信ボタン --- */
-.sell_title3 {
-    margin-top: 80px;
-}
-
-.sell_item_submit {
-    background-color: #ff5655;
-    border: 1px solid #ff5655; 
-    color: white;
-    font-size: 18px;
-    font-weight: 800;
-    border-radius: 3px;
-    width: 600px; 
-    height: 50px;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
-.sell_item_submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* --- メッセージ/エラー --- */
-.alert-success {
-    position: relative !important;
-    top: 40px !important;
-    color: #28a745!important;
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
-    padding: 8px;
-    border-radius: 4px;
-    width: 600px;
-    margin: 0 auto 50px auto; /* 下の要素との隙間調整 */
-}
-
-.alert_error {
-    position: relative;
-    top: 40px;
-    color: red;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    padding: 8px;
-    border-radius: 4px;
-    width: 600px;
-    margin: 0 auto 50px auto; /* 下の要素との隙間調整 */
-}
-
-.error {
-    color: red;
-    font-size: 14px;
-    margin-top: 5px;
-    text-align: left;
-    width: 600px;
-    margin: 0 auto;
-}
-
-/* フォーム直下の個別のエラー修正 */
-.sell_title1_1 .error,
-.sell_title1_2 .error,
-.sell_title2_1 .error,
-.sell_title2_2 .error,
-.sell_title2_3 .error,
-.sell_title2_4 .error {
-    text-align: left;
-    margin-left: auto;
-    margin-right: auto;
-    width: 600px;
-}
-
 </style>
+

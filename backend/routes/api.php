@@ -89,10 +89,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 出品画面表示
     Route::get('/sell', [ItemController::class, 'item_sell_show']);
-    // 出品処理（POST）
-    Route::post('/items', [ItemController::class, 'thanks_sell_create']); // /thanks_sell -> /items
-    Route::post('/upload', [ItemController::class, 'item_image_upload']); // 商品画像アップロード
-    
+    // 出品登録と画像処理
+    Route::post('/items', [ItemController::class, 'thanks_sell_create']); // 商品出品処理
+    Route::post('/upload', [ItemController::class, 'item_image_upload']); // 商品画像アップロード処理
+
     // 配送先編集画面表示
     Route::get('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'item_purchase_edit']);
 

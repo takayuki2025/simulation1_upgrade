@@ -708,6 +708,21 @@ class ItemController extends Controller
         // 出品商品画像アップロード処理
         public function item_image_upload(Request $request)
     {
+        // リクエストの全データをログに出力 (必ず配列を渡す)
+    \Log::info('画像アップロードリクエスト受信', $request->all()); 
+    
+    // ファイルの存在を確認しながらログに出力
+    $file = $request->file('item_image');
+    if ($file) {
+        \Log::info('ファイル受信成功', ['filename' => $file->getClientOriginalName(), 'size' => $file->getSize()]);
+    } else {
+        // null の場合は、メッセージとしてログに出力
+        \Log::warning('ファイルが見つかりません (null)', $request->all()); 
+    }
+
+
+
+
         // 認証チェック (Middlewareで処理することを推奨しますが、明示的に記述)
         if (!Auth::check()) {
             return response()->json(['message' => '認証が必要です。'], 401);
