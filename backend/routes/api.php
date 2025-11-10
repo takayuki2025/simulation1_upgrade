@@ -73,6 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // 💡 認証済み必須のAPIエンドポイント
     // ----------------------------------------------------
     Route::get('/mypage', [ItemController::class, 'profile_show'])->name('profile');
+    // ★★★ 追記: マイページの商品リスト取得エンドポイント ★★★
+    Route::get('/mypage/items', [ItemController::class, 'fetch_mypage_items']);
 
     // 認証済みのユーザー情報を返す（Nuxtの `fetchUser` アクションで使用）
     Route::get('/mypage/profile', [ItemController::class, 'profile_revise'])->name('profile_edit');
@@ -105,7 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/comment', [ItemController::class, 'comment_create']); 
 
     // いいね機能
-    Route::post('/items/{item}/favorite', [ItemController::class, 'favorite']);
+    Route::post('/items/{item}/favorite', [ItemController::class, 'apiFavorite']);
 });
 
 

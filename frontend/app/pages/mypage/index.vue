@@ -32,9 +32,9 @@ interface User {
 interface Item {
   id: number;
   name: string;
-  item_image: string;
+  item_image: string; // 商品画像のパス
   remain: number;
-  item?: Item;
+  item?: Item; // 'buy'ページの場合に購入情報に含まれる商品データ
 }
 // --- 状態管理 ---
 const user = ref<User | null>(null);
@@ -120,14 +120,19 @@ const fetchUserProfile = async () => {
 
 // --- 商品リスト取得処理 ---
 const fetchItems = async () => {
+  // ユーザープロフィールのロードが完了していることを確認
+  if (!user.value) {
+      await fetchUserProfile(); // プロフィールが未ロードならロードを試みる
+  }
+  if (!user.value) return; // 認証されていない場合はここで終了
+
   isLoading.value = true;
   items.value = [];
-
-  await authStore.waitForAuthResolution();
 
   try {
     const endpoint = `mypage/items?page=${page.value}`; 
     
+    // バックエンドから商品リストを取得する
     const response: { items: Item[] } = await $api(endpoint, {}); 
     items.value = response.items || [];
     
@@ -136,6 +141,8 @@ const fetchItems = async () => {
     if (error.response && error.response.status === 401) { 
       console.log(`401エラーを受信しました（アイテム取得）。ログインページへリダイレクトします。`);
       await navigateTo(`/login`);
+    } else {
+       // 商品取得エラーは致命的ではないため、ロード状態のみ解除
     }
   } finally {
     isLoading.value = false;
@@ -148,7 +155,7 @@ onMounted(() => {
   fetchUserProfile();
 });
 
-// --- 画像アップロード処理 ---
+// --- 画像アップロード処理 (省略) ---
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
@@ -189,7 +196,7 @@ const handleImageUpload = async (event: Event) => {
   }
 };
 
-// --- プロフィール情報更新処理 ---
+// --- プロフィール情報更新処理 (省略) ---
 const handleProfileUpdate = async () => {
   profileErrors.value = {};
   successMessage.value = null;
@@ -222,27 +229,33 @@ const handleProfileUpdate = async () => {
   }
 };
 
-// プロフィール画像のURLを生成するヘルパー関数
-const getProfileImageUrl = (path: string | undefined | null) => {
-
+// 汎用アセットURL生成ヘルパー関数
+const getAssetUrl = (path: string | undefined | null, isProfileImage: boolean = false) => {
   const config = useRuntimeConfig().public;
   let base = config.apiBaseUrl;
 
+  // LaravelのルートURLを取得するために、末尾の '/api' を取り除く
   if (base.endsWith('/api')) {
     base = base.substring(0, base.length - 4);
   }
 
-  const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
-  const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
-
+  // path が存在しない、または空の場合は、プロフィール画像の場合のみデフォルトを返し、
+  // 商品画像の場合は空文字列を返すことで画像タグのロードエラーを防ぐ
   if (!path) {
-    return DEFAULT_IMAGE_FULL_URL;
+    if (isProfileImage) {
+      const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
+      return `${base}/${DEFAULT_IMAGE_PATH}`;
+    }
+    // 商品画像の場合はパスがないので空文字列を返し、v-ifで表示を制御する
+    return '';
   }
 
+  // 既に絶対URLならそのまま返す
   if (path.startsWith('http')) {
     return path;
   }
 
+  // 相対パスの場合、ベースURLと結合して絶対URLを生成
   return `${base}/${path.replace(/^\//, ``)}`;
 };
 
@@ -265,7 +278,8 @@ const goToProfileEdit = () => {
 <div v-if="user && !isLoading" class="profile_page">
 <div class="profile_header">
 <div class="profile_header_1">
-<img :src="getProfileImageUrl(user.user_image)" alt="プロフィール画像" class="user_image_css">
+<!-- プロフィール画像にはデフォルト画像が必要なので isProfileImage=true を渡す -->
+<img :src="getAssetUrl(user.user_image, true)" alt="プロフィール画像" class="user_image_css">
 <h2 class="user_name_css">{{ user.name }}</h2>
 
         <div class="user_edit_css1">
@@ -297,7 +311,9 @@ const goToProfileEdit = () => {
         <div v-for="item in items" :key="item.id" class="items_select_all">
             
             <NuxtLink v-if="page === 'sell'" :to="`/item/${item.id}`" class="mypage_item_">
-                <img :src="getProfileImageUrl(item.item_image)" :alt="item.name + 'の商品写真'">
+                <!-- item.item_image が存在する場合のみ画像を表示し、パスを絶対URLに変換 -->
+                <img v-if="item.item_image" :src="getAssetUrl(item.item_image)" :alt="item.name + 'の商品写真'">
+                <div v-else class="no-image-placeholder">No Image</div>
                 <div class="item-details">
                     <label>{{ item.name }}</label>
                     <span v-if="item.remain === 0" class="sold-text">sold</span>
@@ -305,7 +321,9 @@ const goToProfileEdit = () => {
             </NuxtLink>
             
             <NuxtLink v-else-if="page === 'buy' && item.item" :to="`/item/${item.item.id}`" class="mypage_item_">
-                <img :src="getProfileImageUrl(item.item.item_image)" :alt="item.item.name + 'の商品写真'">
+                <!-- item.item.item_image が存在する場合のみ画像を表示し、パスを絶対URLに変換 -->
+                <img v-if="item.item.item_image" :src="getAssetUrl(item.item.item_image)" :alt="item.item.name + 'の商品写真'">
+                <div v-else class="no-image-placeholder">No Image</div>
                 <div class="item-details">
                     <label>{{ item.item.name }}</label>
                     <span v-if="item.item.remain === 0" class="sold-text">sold</span>
@@ -404,6 +422,19 @@ width: 100%;
 aspect-ratio: 1 / 1;
 object-fit: cover;
 display: block;
+}
+
+/* 画像がない場合のプレースホルダーのスタイル */
+.no-image-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #a0a0a0;
+  font-size: 16px;
+  border: 1px dashed #ccc;
 }
 
 .item-details {

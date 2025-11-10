@@ -22,6 +22,8 @@ use Stripe\Checkout\Session;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log; // Logをインポート
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+
 
 
 
@@ -114,17 +116,42 @@ class ItemController extends Controller
         public function item_detail_show($item_id)
     {
         // 商品が存在しない場合は404エラーを返す
-        $item = Item::with('user')->findOrFail($item_id); // 出品者情報も取得できるようにwith('user')を追加
+        $item = Item::with('user')->findOrFail($item_id);
 
-        $user = Auth::user();
+        // 💡 修正: item_image の値を Storage::url() を使ってフルURLに変換する
+        if ($item->item_image) {
+            $imagePath = $item->item_image;
+            
+            // データベースに保存されているパスから 'storage/' プレフィックスを削除する
+            // Storage::url() は 'storage/app/public' からの相対パス（例: 'item_images/HDD+Hard+Disk.jpg'）を期待するため。
+            $cleanPath = Str::startsWith($imagePath, 'storage/') 
+                ? substr($imagePath, 8) // 'storage/' (8文字) を削除
+                : $imagePath;
+
+            // Storage::url() を使用してフルURLを生成
+            // これにより、Nuxt側でベースURLの結合が不要になり、特殊文字のエンコードも適切に行われる
+            $item->item_image = Storage::url($cleanPath);
+            
+            // ★★★ デバッグログ: Nuxtに返されるフルURLを確認 ★★★
+            Log::info("ItemController@item_detail_show: Full URL for Nuxt: " . $item->item_image);
+            
+        } else {
+            // item_image が null の場合に対応
+            $item->item_image = null;
+        }
+
+        // 商品詳細とコメント、お気に入り状態などを取得するロジックをここに追加
+        // 以下のロジックは以前のバージョンと、ユーザーが提供した「Laravel ItemController show method」の内容を統合して再現します。
+        
+        $user = auth('sanctum')->user();
         $isFavorited = false;
         
         // 商品IDに関連するコメントを取得 (ユーザー情報もロード)
-        $comments = Comment::with('user')->where('item_id', $item_id)->get();
+        $comments = Comment::with('user')->where('item_id', $item->id)->get();
         
         // お気に入り数のカウント
         $favoritesCount = Good::where('item_id', $item->id)->count();
-
+    
         if ($user) {
             // ログインユーザーがこの商品を気に入っているかチェック
             $isFavorited = Good::where('item_id', $item->id)
@@ -132,18 +159,15 @@ class ItemController extends Controller
                 ->exists();
         }
 
-        // 最終的なデータ構造を構築
-        $data = [
+        return response()->json([
             'item' => $item,
             'comments' => $comments,
-            'isFavorited' => $isFavorited,
-            'favoritesCount' => $favoritesCount,
-            'userId' => $user ? $user->id : null, // ログインユーザーID
+            'is_favorited' => $isFavorited,
+            'favorites_count' => $favoritesCount,
+            'userId' => $user ? $user->id : null,
             'isLoggedIn' => $user !== null,
-        ];
+        ]);
 
-        // JSON形式でデータを返す
-        return response()->json($data);
     }
 
 
@@ -365,6 +389,51 @@ class ItemController extends Controller
         ]);
     }
 
+
+    /**
+     * マイページに表示する出品/購入済み商品リストを取得
+     * API: GET /api/mypage/items?page=sell or ?page=buy
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function fetch_mypage_items(Request $request)
+    {
+        // ★デバッグポイント 1: メソッド開始を記録 (最重要)
+        Log::info('--- fetch_mypage_items method STARTING ---');
+
+        if (!Auth::check()) {
+            // ★デバッグポイント 2: 認証失敗を記録
+            Log::warning('Mypage fetch FAILED: User not authenticated.');
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+        
+        // ★デバッグポイント 3: 認証成功とユーザーIDを記録
+        $user = Auth::user();
+        Log::info("Mypage fetch SUCCESS: Authenticated User ID: {$user->id}");
+
+        $pageType = $request->query('page', 'sell'); 
+
+        $items = [];
+
+        if ($pageType === 'sell') {
+            $items = Item::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+            
+            // ★デバッグポイント 4: 取得件数を確認
+            Log::info("Mypage (SELL) Item count: " . $items->count());
+                
+        } else if ($pageType === 'buy') {
+            // ... (buyロジックは今回は省略)
+        } else {
+            return response()->json(['message' => 'Invalid page type.'], 400);
+        }
+        
+        return response()->json([
+            'items' => $items,
+            'user_id' => $user->id,
+        ]);
+    }
 
                                      // ItemController.php 内の修正（例: メソッド名を getUserProfile に変更）
     public function getUserProfile(Request $request)
@@ -721,8 +790,6 @@ class ItemController extends Controller
     }
 
 
-
-
         // 認証チェック (Middlewareで処理することを推奨しますが、明示的に記述)
         if (!Auth::check()) {
             return response()->json(['message' => '認証が必要です。'], 401);
@@ -748,13 +815,30 @@ class ItemController extends Controller
             ], 422);
         }
 
+        // ファイル保存のロジックに進める前に、デバッグログを追記！
+        \Log::info('✅ 認証チェックをスキップし、ファイル保存ロジックへ。');
+
         // ファイル名にランダムな文字列を付与
         $file = $request->file('item_image');
+
+        // --- 💡 ここにデバッグログを追加 ---
+        if (!$file) {
+        \Log::error('❌ ファイルが Null です。致命的なリクエスト失敗。');
+        return response()->json(['message' => 'ファイルがリクエストに含まれていません。'], 400);
+        }
+        \Log::info('✅ ファイルオブジェクトの存在を確認。');
+
         $extension = $file->getClientOriginalExtension();
+
+        \Log::info('✅ 拡張子の取得に成功。'); // 💡 この行が記録されるか確認！
+
         $randomName = 'item_image_' . Str::random(30) . '.' . $extension;
+        \Log::info('✅ ランダムファイル名の生成に成功。'); // 💡 追加のログ
 
         // 画像を保存 (storage/app/public/item_images に保存される)
         $path = $file->storeAs('public/item_images', $randomName);
+        \Log::info('✅ ファイル保存の実行に成功。'); // 💡 追加のログ
+
         $dbPath = str_replace('public/', 'storage/', $path); // URL/DB保存用パス (例: storage/item_images/...)
 
         // 成功時は、フロントエンドで利用する保存パスをJSONで返却
@@ -767,38 +851,53 @@ class ItemController extends Controller
 
 // いいね・コメント機能関係
 
-        public function favorite(Request $request, Item $item)
+        public function apiFavorite(Request $request, Item $item)
     {
-            $user = Auth::user();
+        // 💡 auth:sanctumミドルウェアにより、認証済みユーザーが取得できている
+        $user = $request->user(); 
 
         if (!$user) {
-
-        return redirect()->route('login')->with('error', 'いいね機能を利用するにはログインが必要です。');
+            // auth:sanctumが失敗した場合に備えておくが、通常はミドルウェアで401が返る
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-            // 既にいいねしているかチェック
-            $existingGood = Good::where('item_id', $item->id)
-                ->where('user_id', $user->id)
-                ->first();
+            
+        $isFavorited = false;
+        $existingGood = Good::where('item_id', $item->id)->where('user_id', $user->id)->first();
 
         if ($existingGood) {
             // 既にいいねしている場合は、いいねを削除
             $existingGood->delete();
+            $isFavorited = false;
         } else {
             // いいねしていない場合は、新しく作成
-            Good::create([
-                'item_id' => $item->id,
-                'user_id' => $user->id,
-            ]);
+            Good::create(['item_id' => $item->id, 'user_id' => $user->id]);
+            $isFavorited = true;
         }
-                return back();
+        
+        // 💡 成功したJSONレスポンスを返す
+        $favoritesCount = Good::where('item_id', $item->id)->count();
+
+        return response()->json([
+            'message' => $isFavorited ? 'Liked' : 'Unliked',
+            'is_favorited' => $isFavorited, // 現在の状態
+            'favorites_count' => $favoritesCount, // 最新のいいね数
+        ]);
     }
 
 
         public function comment_create(CommentRequest $request)
     {
+        // auth()ヘルパーはAPIトークン認証（Sanctumガード）の場合、
+        // ユーザーが認証されていればそのユーザーを返します。
+        $userId = auth('sanctum')->id(); // 認証済みのユーザーIDをSanctumガードで取得
+
+        if (!$userId) {
+            // ユーザーが認証されていない場合はエラーを返す
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
         $comment = $request->input('comment');
         $itemId = $request->input('item_id');
-        $userId = auth()->id();
 
         $word = [
             'comment' => $comment,
@@ -806,8 +905,19 @@ class ItemController extends Controller
             'item_id' => $itemId,
         ];
 
-        Comment::create($word);
+        // データベースにコメントを作成
+        $newComment = Comment::create($word);
+        
+        // 💡 修正: APIリクエストなので、リダイレクトではなくJSONレスポンスを返す
+        // ステータスコード201 (Created) と作成されたコメントのデータを返すと、
+        // Nuxt側でコメントリストを更新しやすくなります。
 
-        return redirect()->route('item_detail', ['item_id' => $itemId])->with('success', 'コメントが送信されました。');
+        // コメントユーザー情報をロードしてクライアントに返す
+        $newComment->load('user');
+
+        return response()->json([
+            'message' => 'コメントが正常に投稿されました。',
+            'comment' => $newComment, // クライアントがリアルタイム更新に利用可能
+        ], 201);
     }
 }

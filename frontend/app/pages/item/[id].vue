@@ -1,262 +1,350 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router'; // ★ 追記: useRouterをインポート
-import { useItemStore } from '@/stores/item'; 
-import { useAuthStore } from "@/stores/auth"; 
-import { useAuth } from "~/composables/useAuth"; 
+import { useRoute, useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
+import { useItemStore } from '@/stores/item';
+import { useAuthStore } from '@/stores/auth';
+import { useAuth } from '~/composables/useAuth';
 
 // =======================================================
-// 認証ストアとトークンの取得
+// ストア・ルータ初期化
 // =======================================================
-const authStore = useAuthStore();
-const { token: localToken } = useAuth(); 
-
-// --- コメントコンポーネント (単一ファイル制約のためここで定義) ---
-const CommentSection = {
-  setup() {
-    const itemStore = useItemStore();
-    const authStore = useAuthStore(); 
-    const newComment = ref('');
-    const commentError = ref('');
-
-    const isLoggedIn = computed(() => authStore.user !== null); 
-
-    const submitComment = async () => {
-      commentError.value = '';
-      if (!newComment.value.trim()) {
-        commentError.value = 'コメントを入力してください。';
-        return;
-      }
-      if (!isLoggedIn.value) { 
-        commentError.value = 'コメントを投稿するにはログインが必要です。';
-        return;
-      }
-      
-      await itemStore.postComment(newComment.value); 
-      
-      if (itemStore.errors.length === 0) {
-        newComment.value = '';
-      } else {
-        commentError.value = itemStore.errors.value.join(', '); 
-      }
-    };
-
-    return { itemStore, newComment, commentError, submitComment, isLoggedIn }; 
-  },
-  template: `
-    <div class="space-y-6">
-      <div v-if="isLoggedIn" class="bg-gray-50 p-4 rounded-lg shadow">
-        <textarea
-          v-model="newComment"
-          rows="3"
-          placeholder="コメントを入力..."
-          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-        ></textarea>
-        <p v-if="commentError" class="text-sm text-red-500 mt-1">{{ commentError }}</p>
-        <button
-          @click="submitComment"
-          class="mt-3 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition duration-150"
-        >
-          コメントを投稿
-        </button>
-      </div>
-      <div v-else class="text-center p-4 bg-yellow-50 rounded-lg text-yellow-800">
-        <p>コメントを投稿するにはログインが必要です。</p>
-      </div>
-
-      <div v-if="itemStore.comments.length > 0" class="border-t pt-4">
-        <div 
-          v-for="comment in itemStore.comments" 
-          :key="comment.id" 
-          class="border-b last:border-b-0 py-4"
-        >
-          <div class="flex items-start mb-2">
-            <img class="h-8 w-8 rounded-full object-cover mr-3" :src="comment.user.user_image || 'https://placehold.co/100x100/A0AEC0/FFFFFF?text=User'" :alt="comment.user.name + ' Avatar'">
-            <div class="flex flex-col">
-              <span class="text-sm font-semibold text-gray-900">{{ comment.user.name }}</span>
-              <span class="text-xs text-gray-500">{{ new Date(comment.created_at).toLocaleString() }}</span>
-            </div>
-          </div>
-          <p class="text-gray-700 pl-11 whitespace-pre-line">{{ comment.comment }}</p>
-        </div>
-      </div>
-      <div v-else class="text-center py-4 text-gray-500">
-        まだコメントはありません。
-      </div>
-    </div>
-  `
-};
-// ------------------------------------------------------------------------
-
-const itemStore = useItemStore();
 const route = useRoute();
-const router = useRouter(); // ★ 追記: useRouterをインスタンス化
+const router = useRouter();
+const itemStore = useItemStore();
+const authStore = useAuthStore();
+const { token: localToken, isAuthenticated } = useAuth(); // localToken はリアクティブ
 
-// ★ 追記: 購入ページへ遷移する関数
+const itemId = ref<number | null>(null);
+const isLoading = ref(true);
+const error = ref('');
+
+// ストアから必要なリアクティブな状態を取得
+const {
+  item,
+  isFavorited,
+  favoritesCount,
+  errors: itemErrors,
+  comments
+} = storeToRefs(itemStore);
+const { user } = storeToRefs(authStore);
+
+const newComment = ref('');
+const commentErrors = ref<string[]>([]);
+
+// ... (Computed Properties 省略)
+
+const canInteract = computed(() => isAuthenticated.value && user.value?.id !== item.value?.user_id);
+const isOwner = computed(() => isAuthenticated.value && user.value?.id === item.value?.user_id);
+const isSoldOut = computed(() => (item.value?.remain ?? 0) < 1);
+const itemCategories = computed(() => {
+  if (!item.value?.category) return [];
+  try {
+    // categoryプロパティはstoreでstring型に固定されているため、JSON.parseを試みる
+    const categories = JSON.parse(item.value.category);
+    return Array.isArray(categories) ? categories : [item.value.category];
+  } catch (e) {
+    // パースに失敗した場合、文字列のまま返す
+    return [item.value.category];
+  }
+});
+
+
+// =======================================================
+// データ取得 (修正箇所)
+// =======================================================
+const fetchData = async (id: number) => {
+  try {
+    isLoading.value = true;
+    error.value = '';
+    // 1. 認証状態の解決を待つ (Authストアのロジックが完了するのを待つ)
+    await authStore.waitForAuthResolution();
+    // ★★★ 修正: トークンがセットされるまで待機するロジックをより確実に実装 ★★★
+    if (isAuthenticated.value) {
+      console.log('User is authenticated. Waiting for token...');
+      const maxWait = 2000; // 最大2秒待機
+      const interval = 100;
+      let waited = 0;
+
+      // localToken が null でなくなるまで、または最大待機時間までループ
+      while (!localToken.value && waited < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, interval));
+        waited += interval;
+      }
+
+      if (!localToken.value) {
+        // トークンが取得できなかった場合はエラーログを出して続行 (Laravelが false を返す)
+        console.warn(`Authentication token could not be loaded within ${maxWait}ms.`);
+      }
+    }
+    // ★★★ 修正終わり ★★★
+    // 💡 トークン状態の最終確認ログ (デバッグ用)
+    console.log('Token check before API call:', localToken.value ? '✅ Token EXISTS' : '❌ Token MISSING');
+
+    // 2. 商品詳細情報をフェッチ (トークンが null の場合は null が渡される)
+    await itemStore.fetchItemDetail(id, localToken.value);
+    // itemStoreにエラーが残っていれば、それを表示
+    if (itemErrors.value.length > 0) {
+      error.value = itemErrors.value[0];
+    }
+
+  } catch (e: any) {
+    error.value = 'データの取得中にエラーが発生しました。';
+  } finally {
+    // 💡 最終的な状態をデバッグログに出力
+    console.log('--- Final Component State (fetchData end) ---');
+    console.log('Is Favorited:', isFavorited.value);
+    // 💡 追加デバッグログ: 画像パスの最終確認
+    if (item.value) {
+        console.log('Final Item Image Path:', item.value.item_image);
+    }
+    isLoading.value = false;
+  }
+};
+
+// ... (機能ロジック 省略)
+
+const submitFavorite = async () => {
+  if (!item.value || !isAuthenticated.value) {
+    router.push('/login');
+    return;
+  }
+  await itemStore.toggleFavorite(localToken.value);
+  if (itemErrors.value.length > 0) {
+    // alertは使用禁止のため、メッセージを一時的に表示するUIなどに置き換えることが推奨されますが、
+    // 既存コードに合わせるため、ここでは暫定的に維持します。
+    // alert(itemErrors.value[0]);
+    console.error("お気に入りエラー:", itemErrors.value[0]);
+  }
+};
+
+const submitComment = async () => {
+  commentErrors.value = [];
+  if (!item.value || !isAuthenticated.value) {
+    router.push('/login');
+    return;
+  }
+  if (newComment.value.trim() === '') {
+    commentErrors.value.push('コメントを入力してください');
+    return;
+  }
+  try {
+    // トークンがnullでないことを保証
+    await itemStore.postComment(newComment.value, localToken.value!);
+    if (itemStore.errors.length > 0) {
+      commentErrors.value = itemStore.errors;
+    } else {
+      newComment.value = '';
+    }
+  } catch (e: any) {
+    commentErrors.value.push('コメント投稿中に予期せぬエラーが発生しました。');
+  }
+};
+
 const navigateToPurchase = () => {
-  // 1. ログイン状態の確認
-  if (!authStore.user) {
-    alert('購入するにはログインが必要です。');
-    // ログインページへリダイレクトすることも考慮
-    // router.push('/login'); 
-    return;
-  }
-
-  // 2. 売り切れ状態の確認
-  if (itemStore.isSold) {
-    alert('この商品は売り切れました。');
-    return;
-  }
-
-  // 3. 商品IDの確認と遷移
-  if (itemStore.item && itemStore.item.id) {
-    // Vue Routerで `/purchase/:itemId` のようなルートに遷移
-    // Laravel側でBlade表示のための /purchase/{item_id} ルートが定義されている場合、
-    // 実際にはそのパスへブラウザをリダイレクトする必要があります。
-    // SPAのVue Routerでページ遷移させる場合は `/purchase/${itemStore.item.id}` を使用します。
-    // 今回はSPA内でページ遷移させることを想定し、Vue Routerの push を使用します。
-    router.push(`/purchase/${itemStore.item.id}`);
-    
-    // 【補足】もしLaravelのRoute::get('/purchase/{item_id}', ...) に直接ブラウザを遷移させる（SPAを抜ける）場合は、
-    // window.location.href = `/purchase/${itemStore.item.id}`; 
-    // と記述します。しかし、通常のVue/Nuxtプロジェクトでは `router.push` が推奨されます。
+  if (isOwner.value) {
+    router.push('/mypage');
+  } else if (isAuthenticated.value && item.value) {
+    router.push(`/purchase/${item.value.id}`);
+  } else {
+    router.push('/login');
   }
 };
 
 
+// =======================================================
+// onMounted
+// =======================================================
 onMounted(async () => {
-  // 1. 認証状態の解決を待つ (見本ファイルと同様の重要なステップ)
-  console.log("[onMounted] Waiting for auth resolution...");
-  await authStore.waitForAuthResolution(); 
-  console.log("[onMounted] Auth resolved. Proceeding to fetch item detail.");
+  const idParam = route.params.id;
+  const id = Array.isArray(idParam) ? parseInt(idParam[0]) : parseInt(idParam as string);
 
-  // 2. ルートパラメータからIDを取得
-  const itemIdParam = route.params.id;
-  
-  const itemId = Number(itemIdParam); 
-
-  // 3. 有効な数値であることを確認してストアアクションを呼び出す
-  if (!isNaN(itemId) && itemId > 0) {
-    console.log("商品IDを取得:", itemId);
-
-    // ★ 修正された ItemStore アクション (トークンを含める) を呼び出す
-    // ItemStoreのfetchItemDetail内でlocalToken.valueを使う実装を想定
-    await itemStore.fetchItemDetail(itemId, localToken.value); 
-  } else {
-    itemStore.errors.value.push("URLから有効な商品IDが取得できませんでした。");
-    console.error("URLから有効な商品IDが取得できませんでした。取得した値:", itemIdParam);
+  if (isNaN(id)) {
+    error.value = '無効な商品IDです。';
+    isLoading.value = false;
+    return;
   }
+  itemId.value = id;
+  await fetchData(id);
 });
 </script>
 
 <template>
-  <div class="p-4 sm:p-6 bg-gray-50 min-h-screen">
-    <div v-if="itemStore.isLoading" class="text-center py-10">
-      <p class="text-xl text-indigo-600 font-semibold">読み込み中...</p>
-    </div>
+<div class="item_detail_wrapper bg-gray-100 min-h-screen">
+<div class="item_detail_contents">
+<div v-if="isLoading" class="loading-overlay text-center py-20 w-full">
+<p class="text-xl font-semibold text-gray-600">商品情報を読み込み中...</p>
+</div>
 
-    <div v-else-if="itemStore.errors.length" class="max-w-4xl mx-auto bg-white shadow-lg rounded-xl p-8">
-      <h2 class="text-2xl font-bold text-red-600 mb-4">エラーが発生しました</h2>
-      <p v-for="error in itemStore.errors" :key="error" class="text-red-500 mb-2">{{ error }}</p>
-      <p class="text-gray-600 mt-4">ルーティングやサーバー側のエラーを確認してください。</p>
-    </div>
+<div v-else-if="error || (itemErrors && itemErrors.length)" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md my-10 w-full max-w-5xl mx-auto">
+<p class="font-bold">データの取得エラー</p>
+<p v-if="error">{{ error }}</p>
+<p v-for="err in itemErrors" :key="err">{{ err }}</p>
+</div>
 
-    <div v-else-if="itemStore.item" class="max-w-4xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
-      <div class="md:flex">
-        <div class="md:flex-shrink-0">
-          <img 
-            :src="itemStore.item.item_image" 
-            alt="商品画像" 
-            class="h-64 w-full object-cover md:w-64 rounded-t-xl md:rounded-l-xl md:rounded-t-none"
-            onerror="this.onerror=null; this.src='https://placehold.co/600x400/D1D5DB/1F2937?text=No+Image';"
-          >
-        </div>
-        <div class="p-8 flex flex-col justify-between w-full">
-          <div>
-            <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold">
-              {{ itemStore.item.condition }} / {{ itemStore.item.brand || 'ブランド不明' }}
-            </div>
-            <h1 class="block mt-1 text-4xl leading-tight font-extrabold text-gray-900">
-              {{ itemStore.item.name }}
-            </h1>
-            <p class="mt-2 text-2xl font-bold text-gray-800">
-              ¥ {{ itemStore.displayPrice }}
-            </p>
-          </div>
-          <div class="mt-4 flex flex-col space-y-3">
-            <button 
-              @click="itemStore.toggleFavorite(localToken.value)"
-              :disabled="!authStore.user"
-              class="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-all duration-200"
-              :class="{
-                'bg-red-500 hover:bg-red-600 text-white': itemStore.isFavorited,
-                'bg-white text-red-500 border-red-500 hover:bg-red-50': !itemStore.isFavorited
-              }"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
-              </svg>
-              お気に入り ({{ itemStore.favoritesCount }})
-            </button>
+<div v-else-if="item" class="flex flex-wrap lg:flex-nowrap w-full max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
+<div class="item_detail_image p-4 lg:p-8 w-full lg:w-1/2">
+<img
+:src="item.item_image"
+alt="商品写真"
+class="item_detail_image1 w-full h-auto object-cover rounded-lg shadow-md"
+onerror="this.onerror=null; this.src='https://placehold.co/450x450/D1D5DB/1F2937?text=No+Image';"
+/>
+</div>
 
-            <button 
-              @click="navigateToPurchase"
-              :disabled="itemStore.isSold || !authStore.user"
-              class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg transition-all duration-200"
-              :class="{
-                'bg-indigo-600 hover:bg-indigo-700 text-white': !itemStore.isSold && authStore.user,
-                'bg-gray-400 text-white cursor-not-allowed': itemStore.isSold || !authStore.user
-              }"
-            >
-              {{ itemStore.isSold ? '売り切れ' : (!authStore.user ? 'ログインして購入' : '購入する') }}
-            </button>
+<div class="information p-4 lg:p-8 w-full lg:w-1/2 space-y-4">
+<div class="item_detail_name">
+<h2 class="text-3xl font-extrabold text-gray-800">{{ item.name }}</h2>
+</div>
 
-            <div class="mt-4 pt-4 border-t border-gray-100">
-              <span class="text-xs text-gray-500">出品者:</span>
-              <div class="flex items-center mt-1">
-                <img class="h-10 w-10 rounded-full object-cover mr-3" :src="itemStore.item.user.user_image || 'https://placehold.co/100x100/A0AEC0/FFFFFF?text=User'" alt="User Avatar">
-                <span class="text-sm font-medium text-gray-900">{{ itemStore.item.user.name }}</span>
-                <span v-if="itemStore.isSeller" class="ml-2 text-xs font-semibold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full">自分</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+<div class="item_detail_brand text-sm text-gray-600">
+<p class="item_detail_brand_1 font-semibold">ブランド名</p>
+<p class="item_detail_brand_2">{{ item.brand || '未登録' }}</p>
+</div>
 
-      <div class="p-8">
-        <h2 class="text-2xl font-bold text-gray-900 mb-4 border-b pb-2">商品の説明</h2>
-        <p class="text-gray-700 whitespace-pre-line">{{ itemStore.item.explain }}</p>
+<div class="item_detail_price">
+<h2 v-if="isSoldOut" class="text-3xl font-bold text-red-500 bg-red-100 px-3 py-1 rounded inline-block">SOLD OUT</h2>
+<h2 v-else class="text-3xl font-bold text-gray-900">
+<span class="price_after text-xl font-normal">¥</span>{{ item.price ? item.price.toLocaleString() : '---' }}<span class="price_after text-lg font-normal"> (税込)</span>
+</h2>
+</div>
 
-        <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">カテゴリ</h2>
-        <div class="flex flex-wrap gap-2">
-          <span 
-            v-for="cat in itemStore.parsedCategories" 
-            :key="cat"
-            class="px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-full"
-          >
-            {{ cat }}
-          </span>
-        </div>
+<div class="space-y-6 pt-4">
+<!-- 💡 修正: アイコンとカウント部分を整理し、Flexboxで間隔を調整 -->
+<div class="flex items-center space-x-8">
+<!-- お気に入りボタン -->
+<div class="flex items-center">
+<button
+v-if="canInteract"
+@click="submitFavorite"
+type="button"
+class="text-3xl transition-transform transform hover:scale-110 active:scale-90 p-0 m-0 leading-none focus:outline-none"
+>
+<!-- 💡 ハートアイコンに変更 -->
+<span :class="{'text-red-500': isFavorited}" class="heart_icon text-4xl">
+{{ isFavorited ? '❤️' : '🤍' }}
+</span>
+</button>
+<span v-else class="text-3xl text-gray-400 leading-none">
+🤍
+</span>
+<p class="text-xl ml-2 font-semibold text-gray-600">{{ favoritesCount }}</p>
+</div>
 
-        <h2 class="text-2xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">コメント ({{ itemStore.comments.length }})</h2>
-        <CommentSection />
-      </div>
+<!-- コメントアイコンとカウント -->
+<div class="flex items-center">
+<!-- 💡 コメントアイコンを Lucide の SVG アイコン風に変更 -->
+<svg
+xmlns="http://www.w3.org/2000/svg"
+width="32"
+height="32"
+viewBox="0 0 24 24"
+fill="none"
+stroke="currentColor"
+stroke-width="1.8"
+stroke-linecap="round"
+stroke-linejoin="round"
+class="text-gray-500"
+>
+<path d="M21 11.5a8.38 8.38 0 0 1-.6 3.2 12.16 12.16 0 0 1-1.9 2.5c-.8 1.1-1.7 2-2.8 2.5a5.77 5.77 0 0 1-3.6 0c-1.1-.5-2.1-1.4-2.8-2.5a12.16 12.16 0 0 1-1.9-2.5 8.38 8.38 0 0 1-.6-3.2"/>
+<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+<path d="M8 10h8"/>
+</svg>
 
-    </div>
+<p class="text-xl ml-2 font-semibold text-gray-600">{{ comments ? comments.length : 0 }}</p>
+</div>
+</div>
+
+<div class="item_detail_form pt-4">
+<button
+@click="navigateToPurchase"
+:disabled="isSoldOut && !isOwner"
+:class="{
+  'w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg': true,
+  'bg-red-600 text-white hover:bg-red-700 active:bg-red-800': !isSoldOut,
+  'bg-gray-400 text-gray-700 cursor-not-allowed': isSoldOut && !isOwner
+}"
+>
+<span v-if="isOwner">マイページへ移動する</span>
+<span v-else-if="isAuthenticated && !isSoldOut">購入手続きへ</span>
+<span v-else-if="isAuthenticated && isSoldOut">SOLD OUT</span>
+<span v-else>ログインして購入</span>
+</button>
+</div>
+</div>
+
+<div class="item_detail_explain mt-8 border-t border-gray-200 pt-6">
+<h2 class="text-xl font-bold text-gray-800 mb-2">商品説明</h2>
+<h3 class="explain_word text-gray-700 whitespace-pre-wrap">{{ item.explain }}</h3>
+</div>
+<div class="item_detail_category mt-8 border-t border-gray-200 pt-6">
+<div>
+<h2 class="text-xl font-bold text-gray-800 mb-2">商品情報</h2>
+<div class="flex flex-col space-y-2">
+  <div class="flex items-center space-x-4">
+    <p class="w-24 text-gray-600 font-medium">カテゴリー</p>
+    <ul v-if="itemCategories.length" class="flex flex-wrap gap-2">
+      <li v-for="(category, index) in itemCategories" :key="index" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-full">
+        {{ category }}
+      </li>
+    </ul>
+    <p v-else class="text-gray-500">カテゴリーは登録されていません。</p>
   </div>
+</div>
+</div>
+</div>
+<div class="item_detail_condition mt-4">
+<div class="flex items-center space-x-4">
+  <p class="w-24 text-gray-600 font-medium">商品の状態</p>
+  <p class="text-gray-700 font-semibold">{{ item.condition || '未登録' }}</p>
+</div>
+</div>
+
+<div class="item_detail_comment_history mt-10 border-t border-gray-200 pt-6">
+<div class="comment_count_flex flex justify-between items-center mb-4">
+<h2 class="text-xl font-bold text-gray-800">コメント</h2>
+<span class="comments_count text-gray-500">({{ comments ? comments.length : 0 }})</span>
+</div>
+<div v-if="comments && comments.length > 0" class="max-h-80 overflow-y-auto pr-2 pt-2 space-y-4">
+<div v-for="comment in comments" :key="comment.id" class="comment border-b border-gray-100 pb-3">
+<div class="comment_name_image flex items-center space-x-3">
+<img
+:src="comment.user.user_image || 'https://placehold.co/40x40/D1D5DB/1F2937?text=U'"
+alt="プロフィール画像"
+class="user_image_css w-10 h-10 rounded-full object-cover"
+>
+<p class="comment_name font-semibold text-gray-800">{{ comment.user.name }}</p>
+</div>
+<p class="comment-text ml-10 mt-1 text-gray-700 whitespace-pre-wrap">{{ comment.comment }}</p>
+<small class="text-xs ml-10 text-gray-500 block mt-1">投稿日時: {{ new Date(comment.created_at).toLocaleString() }}</small>
+</div>
+</div>
+<p v-else class="mt-4 ml-5 text-gray-500 text-sm">まだコメントはありません。</p>
+</div>
+
+<div class="item_detail_comment_form mt-10">
+<h2 v-if="isAuthenticated" class="comment_word text-xl font-bold text-gray-800 mb-4">商品へのコメント</h2>
+<div v-if="commentErrors.length > 0" class='bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded'>
+<ul>
+<li v-for="(err, index) in commentErrors" :key="index" class="text-sm">{{ err }}</li>
+</ul>
+</div>
+<form v-if="isAuthenticated" @submit.prevent="submitComment" class="comment_form space-y-3">
+<textarea v-model="newComment" rows="5" placeholder="コメントを入力してください" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none text-gray-700"></textarea>
+<button type="submit" class="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200">コメントを送信する</button>
+</form>
+<div v-else class="text-center p-4 border border-dashed rounded-lg">
+<a @click.prevent="router.push('/login')" class="text-red-600 font-semibold cursor-pointer hover:underline">ログインしてコメントする</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 </template>
 
 <style scoped>
-/*
- * スタイルは前回のものをそのまま使用
- */
-.loading-overlay, .error-display {
-    text-align: center;
-    padding: 100px;
-    font-size: 1.5em;
-    color: #555;
-}
-
+/* Tailwind CSSとの併用を考慮したBladeCSSの再現 */
 .item_detail_contents {
     display: flex;
     justify-content: center;
@@ -285,28 +373,77 @@ onMounted(async () => {
     width: 50%;
     max-width: 450px;
     min-width: 300px;
-    padding:50px;
+    padding: 50px;
 }
 
-.item_detail_name {
+.item_detail_name h2 {
     max-width: 75%;
     overflow: hidden;
     font-size: 22px;
 }
 
-.item_detail_brand_2 {
-    max-width: 50%;
-    overflow: hidden;
-}
-.item_detail_icon {
-    display: flex;
+/* BladeのCSSで要素に設定されていたleftやpositionのオフセットをTailwindで上書きするため、ここではリセット/調整をしています。*/
+.information h2, .information h3, .information p {
+    margin-left: 0 !important; 
+    position: static; /* h3, pのleft: 20pxをリセット */
 }
 
-.item_detail_explain{
-    max-width: 320px;
-    word-break: break-all;
-    overflow-wrap: break-word;
+.information > div > h2, 
+.information > div > div > h2, 
+.item_detail_explain h2, 
+.item_detail_category h2, 
+.item_detail_comment_history h2 {
+    font-size: 1.25rem; 
+    font-weight: bold; 
 }
+
+.item_detail_brand {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+.item_detail_brand_1 {
+    font-weight: 700;
+    font-size: 14px;
+}
+.item_detail_brand_2 {
+    position: relative; 
+    left: 50px; /* Bladeのleft: 50pxを維持 */
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.item_detail_price {
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+.item_detail_price h2 {
+    font-size: 26px;
+}
+.price_after {
+    font-size: 19px;
+    font-weight: 500;
+}
+
+/* 💡 修正後のアイコンコンテナ: Flexboxでシンプルに配置 */
+/* .item_detail_icon クラスは削除し、親要素の Tailwind flex space-x-8 を使用 */
+
+/* 💡 お気に入りボタンのカスタムCSSを修正 */
+.heart_icon {
+    /* ♥️ (黒ハート) は 'filled' の意味で赤色に、♡ (白ハート) は 'unfilled' の意味で灰色に */
+    /* text-red-500 クラスで色が変わるように、ここで基本の色を調整 */
+    color: currentColor; /* Tailwindクラスによる色指定を許可 */
+}
+
+.item_detail_icon {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+/* 旧CSSを削除/コメントアウト */
+/* .favorite_button, .star_text, .ster_icon_1, .ster_icon_2, .favorites_count, .comments_icon, .comments_count0 は削除または調整 */
+
 
 .explain_word {
     word-break: break-all;
@@ -315,17 +452,58 @@ onMounted(async () => {
     white-space: pre-wrap;
     word-wrap: break-word;
     line-height: 1.6;
+    margin-left: 20px; /* h3のleft: 20pxをmarginで代替 */
+    font-size: 14px;
 }
 
-.item_detail_category {
+.category_views {
     display: flex;
+    flex-wrap: wrap;
+    padding-left: 0; 
+    margin-top: 10px;
+}
+.category_mark01 {
+    position: relative;
+    right: 22px; /* category_mark01のright: 22pxを維持 */
+    font-weight: 700;
+    list-style: none;
+}
+.category_mark {
+    position: relative;
+    left: 20px; /* category_markのleft: 20pxを維持 */
+    margin-right: 10px;
+    list-style: none;
+    background-color: #d9d9d9;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 20px;
+    padding: 2px 5px;
 }
 
 .item_detail_condition {
     display: flex;
+    align-items: center;
+}
+.item_detail_condition_1 {
+    font-size: 16px;
+    font-weight: 700;
+}
+.item_detail_condition_2 {
+    position: relative;
+    left: 50px; /* item_detail_condition_2のleft: 50pxを維持 */
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
 }
 
-.info_submit {
+.info_submit, .comment_submit {
     width: 350px;
     height: 30px;
     font-weight: bold;
@@ -336,161 +514,49 @@ onMounted(async () => {
     background-color: #ff5555;
     text-decoration: none;
     text-align: center;
-    line-height: 30px; 
+    line-height: 30px;
+    cursor: pointer;
+    border-radius: 0;
+    border-width: 0; /* Tailwindでborderが適用されるのを避ける */
+}
+.comment_submit {
+    margin-top: 15px;
+    font-weight: 800;
 }
 
+.comment_count_flex {
+    display: flex;
+    align-items: center;
+    color: #5f5f5f;
+}
+.comments_count {
+    position: relative;
+    top: 0;
+    margin-left: 10px;
+    font-size: 14px;
+    font-weight: normal;
+}
 .comment {
     max-width: 320px;
     word-break: break-all;
     overflow-wrap: break-word;
-    margin-bottom: 20px; 
+    margin-top: 15px;
     padding-top: 10px;
     border-top: 1px dashed #ccc;
 }
-
-.comment:first-of-type {
-    border-top: none;
-}
-
 .comment-text {
     font-weight: 600;
     white-space: pre-wrap;
     word-wrap: break-word;
     line-height: 1.6;
-}
-
-.comment_submit {
-    width: 350px;
-    height: 30px;
-    margin-top: 15px;
-    display: block;
-    color: aliceblue;
-    border: #ff5555;
-    background-color: #ff5555;
-    text-decoration: none;
-    text-align: center;
-    font-weight: 800;
-    line-height: 30px; 
-}
-
-h3 {
-    position: relative;
-    left: 20px;
+    margin-left: 50px;
     font-size: 14px;
 }
-
-p {
-    position: relative;
-    left: 20px;
-    font-size: 14px;
-}
-
-.price_after {
-    font-size: 19px;
-    font-weight: 500;
-}
-
-.item_detail_icon p {
-    position: relative;
-    top: 15px;
-    left: 40px;
-}
-
-.error_massage {
-    color: red;
-    list-style-type: none;
-    padding-left: 0;
-    margin-top: 10px;
-}
-
-.info_submit {
-    text-decoration: none;
-    text-align: center;
-}
-
-.category_views {
-    display: flex;
-    padding-left: 0; 
-}
-
-.item_detail_brand {
-    display: flex;
-}
-
-.item_detail_brand_1 {
-    font-weight: 700;
-}
-
-.item_detail_brand_2 {
-    position: relative;
-    left: 50px;
-    font-weight: 600;
-}
-
-.category_mark01 {
-    position: relative;
-    right: 22px;
-    font-weight: 700;
-    list-style: none;
-}
-
-.category_mark {
-    position: relative;
-    left: 20px;
-    margin-right: 10px;
-    list-style: none;
-    background-color: #d9d9d9;
-    border-radius: 10px;
-    font-size: 13px;
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    width: 70px;
-    font-size: 11px;
-    font-weight: 600;
-    height: 20px; 
-}
-
-.item_detail_condition_1 {
-    font-size: 16px;
-
-}
-
-.item_detail_condition_2 {
-    position: relative;
-    left: 50px;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-}
-
-.comment_count_flex {
-    display: flex;
-    color: #5f5f5f;
-}
-
 .comment_name_image {
     display: flex;
     align-items: center;
     margin-bottom: 5px;
 }
-
-.comment_name {
-    position: relative;
-    bottom: 0px;
-    left: 10px; 
-    font-size: 17px;
-    font-weight: 700;
-}
-
-.comment_word {
-    position: relative;
-    top: 8px;
-    font-size: 18px;
-}
-
 .user_image_css {
     width: 40px;
     height: 40px;
@@ -499,66 +565,29 @@ p {
     object-fit: cover;
     object-position: center;
     position: relative;
-    left: 20px; 
+    left: 0px; 
+}
+.comment_name {
+    position: relative;
+    left: 10px; 
+    font-size: 17px;
+    font-weight: 700;
+}
+.item_detail_comment_form h2 {
+    font-size: 18px;
+    position: relative;
+    top: 8px;
+    margin-bottom: 10px;
+}
+textarea {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.favorite_button {
-    position: relative;
-    left: 27px;
-    bottom: 15px;
-    font-size: 30px;
-    border: none;
-    margin: 0;
-    padding: 0;
-    background-color: transparent; 
-    cursor: pointer;
-}
-
-.star_text {
-    position: relative;
-    left: 56px;
-    bottom: 18px;
-    font-size: 30px;
-}
-
-.user_ster_icon {
-    position: relative;
-    left: 31px;
-    font-size: 30px;
-}
-
-.ster_icon_1 {
-    position: relative;
-    right: 7px;
-    color: black;
-    font-size: 30px; 
-}
-
-.ster_icon_2 {
-    position: relative;
-    right: 4px;
-    font-size: 30px !important;
-    color: rgb(0, 0, 0);
-}
-
-.comments_count0 {
-    margin-left: 30px;
-    position: relative;
-    left: 50px;
-    top: 20px;
-}
-
-.comments_count {
-    position: relative;
-    top: 27px;
-    margin-left: 10px;
-}
-
-.comments_icon {
-    position: relative;
-    left: 90px;
-    bottom: 15px;
-    font-size: 28px;
+.error_massage {
+    color: red;
+    list-style-type: none;
+    padding-left: 0;
+    margin-top: 10px;
 }
 
 @media (max-width: 768px) {

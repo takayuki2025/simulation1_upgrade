@@ -39,6 +39,13 @@
 https://laravel.test:4430 {
     tls /etc/caddy/laravel.test.pem /etc/caddy/laravel.test-key.pem
     reverse_proxy http://nginx:80 {
+
+        transport http {
+            read_timeout 10m
+            write_timeout 10m
+            dial_timeout 5s
+        }
+
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-Proto https

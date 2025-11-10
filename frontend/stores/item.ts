@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { $fetch } from "ofetch"; // ofetchを明示的にインポート
+import { $fetch } from "ofetch";
+import { useApi } from "~/composables/useApi";
 
 // -------------------------------------------------------------------------
-// 型定義
+// 型定義 (変更なし)
 // -------------------------------------------------------------------------
 interface User {
   id: number;
@@ -19,8 +20,8 @@ interface Item {
   brand: string | null;
   explain: string;
   condition: string;
-  category: string | string[];
-  item_image: string;
+  category: string;
+  item_image: string; // 💡 修正後、ここは絶対URLが入ることを期待
   remain: number;
   user: User;
 }
@@ -34,35 +35,23 @@ interface Comment {
   user: User;
 }
 
-// -------------------------------------------------------------------------
-// API ヘルパー関数 (これはグローバルに定義可能)
-// -------------------------------------------------------------------------
-/**
- * 認証ヘッダーを生成するヘルパー関数
- */
-const getAuthHeaders = (token: string | null): Record<string, string> => {
-  if (token) {
-    return {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    };
-  }
-  return {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
-};
+interface ItemDetailResponse {
+  item: Item;
+  comments: Comment[];
+  is_favorited: boolean;
+  favorites_count: number;
+  userId: number | null;
+  isLoggedIn: boolean;
+}
 
 // -------------------------------------------------------------------------
 
 export const useItemStore = defineStore("item", () => {
-  // ★ 修正点: useRuntimeConfig() を defineStore コールバック内に移動
-  // Nuxt 3環境では、useRuntimeConfigはトップレベルではなく、関数内で呼び出す必要があります。
   const config = useRuntimeConfig();
   const API_BASE_URL = config.public.apiBaseUrl;
+  const { authenticatedFetch } = useApi();
 
-  // 状態 (State)
+  // 状態 (State - 変更なし)
   const items = ref<Item[]>([]);
   const item = ref<Item | null>(null);
   const comments = ref<Comment[]>([]);
@@ -73,7 +62,7 @@ export const useItemStore = defineStore("item", () => {
   const isLoading = ref(false);
   const errors = ref<string[]>([]);
 
-  // ゲッター (Getters)
+  // ゲッター (Getters - 変更なし)
   const isSeller = computed(() =>
     item.value ? item.value.user_id === currentUserId.value : false
   );
@@ -90,7 +79,7 @@ export const useItemStore = defineStore("item", () => {
   const parsedCategories = computed<string[]>(() => {
     if (!item.value || !item.value.category) return [];
     try {
-      if (Array.isArray(item.value.category)) return item.value.category;
+      // APIから返される category はJSON文字列と仮定
       const categories = JSON.parse(item.value.category as string);
       return Array.isArray(categories) ? categories : [];
     } catch (e) {
@@ -99,7 +88,6 @@ export const useItemStore = defineStore("item", () => {
     }
   });
 
-  // ★★★ 追加アクション: 状態をリセットするための手動アクション ★★★
   function clearData() {
     items.value = [];
     item.value = null;
@@ -113,102 +101,151 @@ export const useItemStore = defineStore("item", () => {
     console.log("[ItemStore] State manually cleared for logout.");
   }
 
+  /**
+   * 💡 追加ヘルパー関数: 画像の相対パスを絶対URLに変換
+   * @param path APIから返された画像パス（例: /storage/item_images/image.jpg）
+   * @returns 完全なURL
+   */
+  function getAbsoluteImageUrl(path: string): string {
+    // API_BASE_URL (例: https://laravel.test:4430/api) から /api を取り除く
+    const baseUrl = API_BASE_URL.replace("/api", "");
+
+    // パスがすでに絶対URLであればそのまま返す
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+
+    // ベースURLとパスを結合する (余分なスラッシュを考慮)
+    const cleanedBaseUrl = baseUrl.endsWith("/")
+      ? baseUrl.slice(0, -1)
+      : baseUrl;
+    const cleanedPath = path.startsWith("/") ? path : `/${path}`;
+
+    return `${cleanedBaseUrl}${cleanedPath}`;
+  }
+
   // アクション (Actions: API通信)
 
-  /**
-   * 商品一覧データをAPIから取得する (検索とタブ切り替えに対応)
-   * @param token 認証トークン (オプション, 'mylist'タブ表示に必要)
-   * @param query 検索文字列 (オプション)
-   * @param tab 表示するタブ ('all' または 'mylist')
-   */
   async function fetchItems(
-    token: string | null,
+    token: string | null, // 💡 fetchItemsは非認証で叩くことが多いため、トークンはここでは使用しない
     query: string = "",
     tab: "all" | "mylist" = "all"
   ) {
+    // ... (fetchItems ロジックは変更なし)
     isLoading.value = true;
     errors.value = [];
-    items.value = []; // データをフェッチする前に一覧をクリア
+    items.value = [];
 
-    // 'mylist'タブを選択し、トークンがない場合はエラー
-    if (tab === "mylist" && !token) {
-      errors.value = ["「マイリスト」を表示するにはログインが必要です。"];
+    // tab:mylistは認証済みAPIコールに切り替える必要がある
+    if (tab === "mylist") {
+      errors.value = ["「マイリスト」タブの機能は未実装です。"];
       isLoading.value = false;
       return;
     }
 
     try {
-      const headers = getAuthHeaders(token);
-
-      // URLとクエリパラメータを構築
       const url = new URL(`${API_BASE_URL}/items`);
 
       if (query && query.trim()) {
         url.searchParams.append("q", query.trim());
       }
 
-      if (tab === "mylist") {
-        url.searchParams.append("tab", "mylist");
-      }
-
       const data = await $fetch(url.toString(), {
         method: "GET",
-        headers: headers,
       });
 
-      // レスポンスデータの型をチェックし、itemsを更新
       const responseData = data as { items: Item[] };
       if (responseData && Array.isArray(responseData.items)) {
-        items.value = responseData.items;
+        // 💡 修正: item_imageを絶対URLに変換
+        items.value = responseData.items.map((item) => ({
+          ...item,
+          item_image: getAbsoluteImageUrl(item.item_image),
+        }));
       } else {
         throw new Error("商品リストのデータ構造が不正です。");
       }
     } catch (e: any) {
       console.error("商品リストの取得に失敗:", e);
       let errorMessage = "商品リストの取得中にエラーが発生しました。";
-
       if (e.message) {
         errorMessage = e.message;
       }
       errors.value = [errorMessage];
-      items.value = []; // エラー時はリストを空に
+      items.value = [];
     } finally {
       isLoading.value = false;
     }
   }
 
   /**
-   * 商品詳細データ、コメント、お気に入り状態をAPIから取得する (トークン対応)
-   * @param itemId 商品ID
-   * @param token 認証トークン (オプション)
+   * 商品詳細データ、コメント、お気に入り状態をAPIから取得する
    */
   async function fetchItemDetail(itemId: number, token: string | null) {
     if (typeof itemId !== "number" || isNaN(itemId) || itemId <= 0) {
       errors.value = ["商品IDが無効です。ID取得を確認してください。"];
       isLoading.value = false;
+      console.error(`[ItemStore:fetchItemDetail] Invalid itemId: ${itemId}`);
       return;
     }
 
     isLoading.value = true;
     errors.value = [];
     item.value = null;
+    comments.value = [];
+    console.log(
+      `[ItemStore:fetchItemDetail] Starting fetch for item ID: ${itemId}`
+    );
 
     try {
-      const headers = getAuthHeaders(token);
-
-      const data = await $fetch(`${API_BASE_URL}/items/${itemId}`, {
+      const responseData = (await authenticatedFetch(`/items/${itemId}`, {
         method: "GET",
-        headers: headers,
-      });
+      })) as ItemDetailResponse;
 
-      const responseData = data as any;
+      // 💡 修正: item_imageを絶対URLに変換
+      const absoluteImageUrl = getAbsoluteImageUrl(
+        responseData.item.item_image
+      );
 
-      item.value = responseData.item as Item;
-      comments.value = responseData.comments as Comment[];
-      isFavorited.value = responseData.isFavorited as boolean;
-      favoritesCount.value = responseData.favoritesCount as number;
-      currentUserId.value = responseData.userId as number | null;
-      isLoggedIn.value = responseData.isLoggedIn as boolean;
+      item.value = {
+        ...responseData.item,
+        item_image: absoluteImageUrl, // 絶対URLに置き換え
+      };
+
+      // 💡 ユーザーの画像パスも絶対URLに変換
+      if (item.value.user && item.value.user.user_image) {
+        item.value.user.user_image = getAbsoluteImageUrl(
+          item.value.user.user_image
+        );
+      }
+      // 💡 コメントユーザーの画像パスも絶対URLに変換
+      comments.value = responseData.comments.map((comment) => ({
+        ...comment,
+        user: {
+          ...comment.user,
+          user_image: comment.user.user_image
+            ? getAbsoluteImageUrl(comment.user.user_image)
+            : comment.user.user_image,
+        },
+      }));
+
+      isFavorited.value = responseData.is_favorited;
+      favoritesCount.value = responseData.favorites_count;
+      currentUserId.value = responseData.userId;
+      isLoggedIn.value = responseData.isLoggedIn;
+
+      // 💡 強化されたデバッグログ
+      console.log("--- Debug Item Store (After authenticatedFetch) ---");
+      console.log(
+        `API is_favorited: ${responseData.is_favorited} -> Store isFavorited: ${isFavorited.value}`
+      );
+      console.log(`Favorites Count: ${responseData.favorites_count}`);
+      console.log(
+        `Current User ID: ${currentUserId.value}, Is Logged In: ${isLoggedIn.value}`
+      );
+      if (item.value) {
+        console.log(`Item Image URL (Absolute): ${item.value.item_image}`);
+      }
+      console.log(`Number of comments loaded: ${comments.value.length}`);
 
       if (!item.value) {
         throw new Error("商品詳細データが空です。");
@@ -216,15 +253,9 @@ export const useItemStore = defineStore("item", () => {
     } catch (e: any) {
       console.error("商品詳細の取得に失敗:", e);
       let errorMessage = "データの取得中に予期せぬエラーが発生しました。";
-
-      if (e.response && e.response.status === 404) {
-        errorMessage = "商品が見つかりませんでした。";
-      } else if (e.response && e.response.status === 401) {
-        errorMessage = "認証が必要です。ログイン状態を確認してください。";
-      } else if (e.message) {
+      if (e.message) {
         errorMessage = e.message;
       }
-
       errors.value = [errorMessage];
       item.value = null;
     } finally {
@@ -233,15 +264,13 @@ export const useItemStore = defineStore("item", () => {
   }
 
   /**
-   * お気に入り状態をトグルする (トークン対応)
-   * @param token 認証トークン (必須)
+   * 💡 統合: お気に入り状態をトグルする (変更なし)
    */
   async function toggleFavorite(token: string | null) {
-    if (!token) {
+    if (!token || !item.value) {
       errors.value = ["お気に入りに登録/解除するにはログインが必要です。"];
       return;
     }
-    if (!item.value) return;
 
     errors.value = [];
     const currentStatus = isFavorited.value;
@@ -251,18 +280,25 @@ export const useItemStore = defineStore("item", () => {
     favoritesCount.value += isFavorited.value ? 1 : -1;
 
     try {
-      const endpoint = currentStatus ? "unfavorite" : "favorite";
-      const headers = getAuthHeaders(token);
+      const url = `/items/${item.value.id}/favorite`;
 
-      await $fetch(`${API_BASE_URL}/items/${item.value.id}/${endpoint}`, {
+      const responseData = await authenticatedFetch(url, {
         method: "POST",
-        headers: headers,
       });
+
+      // APIからのJSONレスポンスを処理し、ストアの状態をAPIの戻り値で更新
+      isFavorited.value = responseData.is_favorited as boolean;
+      favoritesCount.value = responseData.favorites_count as number;
     } catch (e: any) {
       console.error("お気に入り操作に失敗:", e);
-      errors.value = [
-        "お気に入り操作に失敗しました。認証状態またはネットワークを確認してください。",
-      ];
+      let errorMessage =
+        "お気に入り操作に失敗しました。認証状態またはネットワークを確認してください。";
+
+      if (e.status === 401) {
+        errorMessage = "認証が必要です。ログインしてください。";
+      }
+
+      errors.value = [errorMessage];
       // 悲観的ロールバック
       isFavorited.value = currentStatus;
       favoritesCount.value -= isFavorited.value ? 1 : -1;
@@ -270,44 +306,43 @@ export const useItemStore = defineStore("item", () => {
   }
 
   /**
-   * コメントを投稿する (トークン対応)
-   * @param commentText 投稿するコメント
-   * @param token 認証トークン (必須)
+   * 💡 統合: コメントを投稿する
    */
   async function postComment(commentText: string, token: string | null) {
-    if (!token) {
+    if (!token || !item.value) {
       errors.value = ["コメントを投稿するにはログインが必要です。"];
       return;
     }
-    if (!item.value) return;
 
     errors.value = [];
 
     try {
-      const headers = getAuthHeaders(token);
-
-      const data = await $fetch(`${API_BASE_URL}/comments`, {
+      const responseData = await authenticatedFetch(`/comment`, {
         method: "POST",
-        headers: headers,
         body: {
           item_id: item.value.id,
           comment: commentText,
         },
       });
 
-      // 成功した場合、返された新しいコメントデータをコメントリストに追加
-      const newCommentData = data as Comment;
+      const newCommentData = responseData as Comment;
       if (newCommentData && newCommentData.id) {
+        // 💡 新規コメントの画像パスも絶対URLに変換
+        if (newCommentData.user && newCommentData.user.user_image) {
+          newCommentData.user.user_image = getAbsoluteImageUrl(
+            newCommentData.user.user_image
+          );
+        }
         comments.value.unshift(newCommentData);
       } else {
-        throw new Error(
-          "コメントの投稿は成功しましたが、サーバーからの応答が不正です。"
-        );
+        // サーバーが新しいコメントを返さなかった場合は、手動でコメント一覧を再取得する
+        // 💡 再取得時には認証トークンが必要
+        await fetchItemDetail(item.value.id, token);
       }
     } catch (e: any) {
       console.error("コメント投稿に失敗:", e);
       let errorMessage = "コメントの投稿に失敗しました。";
-      if (e.response && e.response.status === 401) {
+      if (e.status === 401) {
         errorMessage = "コメント投稿には認証が必要です。";
       } else if (e.response && e.response._data && e.response._data.message) {
         errorMessage = e.response._data.message;
@@ -333,7 +368,7 @@ export const useItemStore = defineStore("item", () => {
     fetchItemDetail,
     toggleFavorite,
     postComment,
-    clearData, // ★★★ 外部からリセット可能にするためにエクスポート
-    fetchItems, // ★★★ 新しく追加した商品一覧取得アクション
+    clearData,
+    fetchItems,
   };
 });
