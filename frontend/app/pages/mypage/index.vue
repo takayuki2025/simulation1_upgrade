@@ -14,7 +14,8 @@ if (typeof $api !== 'function') {
 }
 
 const authStore = useAuthStore();
-const { isAuthenticated: isAuthed } = storeToRefs(authStore);
+// PiniaストアからisAuthenticatedとtokenを取得
+const { isAuthenticated: isAuthed, token } = storeToRefs(authStore); 
 const route = useRoute();
 
 // --- 型定義 ---
@@ -56,41 +57,39 @@ const page = computed(() => (route.query.page === 'buy' ? 'buy' : 'sell'));
 
 // --- ユーザー情報取得（初期表示時）---
 const fetchUserProfile = async () => {
-  // 認証ストアの解決を待つ
   isLoading.value = true;
-  await authStore.waitForAuthResolution();
+  await authStore.waitForAuthResolution(); // 認証ストアの解決を待つ
 
-  // 1. Piniaストアのユーザー情報を初期データとして設定
-  if (authStore.user) {
-    user.value = authStore.user as User;
-  } else {
-    // 認証情報がストアにもない場合はログインへリダイレクト
+  // 1. 認証チェック
+  // Piniaストアのユーザー情報またはトークンがない場合はログインへリダイレクト
+  if (!authStore.user || !token.value) { // ★ 認証トークンもチェックに追加 ★
+    console.log('ユーザー情報または認証トークンがないため、ログインへリダイレクトします。');
     await navigateTo('/login');
     isLoading.value = false;
     return;
   }
   
-  // CSRFトークンを取得
+  // Piniaストアのユーザー情報を初期データとして設定
+  user.value = authStore.user as User;
+
+  // 2. CSRFトークンを取得 (Sanctumセッションの確立)
   try {
+    // Sanctum認証がBearer認証と併用されている場合、これはセッション確立に重要
     await authStore.getSanctumCsrfToken();
   } catch(e) {
-    console.error('CSRFトークン取得に失敗しました。', e);
-    isLoading.value = false;
-    return;
+    // CSRFトークン取得失敗は、認証が切れている可能性を示唆
+    console.error('CSRFトークン取得に失敗しました。認証失敗とみなし、継続またはリダイレクトを試みます。', e);
+    // CSRF取得失敗でも、Bearerトークンが有効なら次のAPIコールで認証される可能性があるため、処理は継続します。
   }
 
-  // 2. APIから最新の完全なプロフィールデータを取得
+  // 3. APIから最新の完全なプロフィールデータを取得
   try {
     // responseの型は { user: User } または空オブジェクトやnullを想定
     const response: { user?: User } = await $api(`mypage/profile`, {});
 
     if (response && response.user) {
-      // 成功: APIからの最新データで上書き（これにより住所などの詳細情報が反映される）
       user.value = response.user;
-    } else {
-      // APIが'user'データを返さなかったが、ストアデータで継続するため警告ログは削除
-      // console.warn(`[Profile Fetch] API response missing 'user' object. Falling back to authStore data.`);
-    }
+    } 
 
     // フォームデータも更新
     form.value.name = user.value!.name || ``;
@@ -105,14 +104,16 @@ const fetchUserProfile = async () => {
     }
 
   } catch (error: any) {
+    // 401エラーはグローバルインターセプター (plugins/api-interceptor.client.ts) で処理されるはずです。
+    // そのため、ここで手動で401チェックを入れるのは冗長になりますが、
+    // 念のため、グローバルインターセプターが機能しなかった場合のエラー処理を残しておきます。
     if (error.response && error.response.status === 401) {
-      console.log('401エラーを受信しました。ログインページへリダイレクトします。');
+      console.log('401エラーを捕捉しました（fetchUserProfile）。グローバルインターセプターが作動しない場合、ここでリダイレクト。');
       await navigateTo('/login');
       return;
     }
     console.error('プロフィールデータの取得に失敗しました:', error);
     successMessage.value = 'プロフィールデータのロードに失敗しました。';
-    // API取得失敗時も、最初に設定したPiniaストアのデータで継続するため、ここで特別な処理は不要
   } finally {
     isLoading.value = false;
   }
@@ -121,10 +122,11 @@ const fetchUserProfile = async () => {
 // --- 商品リスト取得処理 ---
 const fetchItems = async () => {
   // ユーザープロフィールのロードが完了していることを確認
-  if (!user.value) {
+  // ここで user.value が null の場合、fetchUserProfile() でリダイレクトされているはず
+  if (!user.value || !token.value) { // ★ トークンも再チェック
       await fetchUserProfile(); // プロフィールが未ロードならロードを試みる
   }
-  if (!user.value) return; // 認証されていない場合はここで終了
+  if (!user.value || !token.value) return; // 認証されていない場合はここで終了
 
   isLoading.value = true;
   items.value = [];
@@ -132,14 +134,16 @@ const fetchItems = async () => {
   try {
     const endpoint = `mypage/items?page=${page.value}`; 
     
-    // バックエンドから商品リストを取得する
+    // バックエンドから商品リストを取得する ($apiが自動で認証ヘッダーを付与)
+    // LaravelのItemモデルのアクセサがitem_imageを絶対URLに変換して返すことを想定
     const response: { items: Item[] } = await $api(endpoint, {}); 
     items.value = response.items || [];
     
   } catch (error: any) {
     console.error(`${page.value}商品の取得に失敗しました:`, error);
     if (error.response && error.response.status === 401) { 
-      console.log(`401エラーを受信しました（アイテム取得）。ログインページへリダイレクトします。`);
+      // 401エラーはグローバルインターセプターが処理するはずですが、念のためログとリダイレクト
+      console.log(`401エラーを捕捉しました（アイテム取得）。ログインページへリダイレクトします。`);
       await navigateTo(`/login`);
     } else {
        // 商品取得エラーは致命的ではないため、ロード状態のみ解除
@@ -229,34 +233,48 @@ const handleProfileUpdate = async () => {
   }
 };
 
-// 汎用アセットURL生成ヘルパー関数
+// --- 汎用アセットURL生成ヘルパー関数 (修正箇所) ---
 const getAssetUrl = (path: string | undefined | null, isProfileImage: boolean = false) => {
+  // 1. path が存在しない、または空の場合は、デフォルト画像を返す
+  if (!path) {
+    if (isProfileImage) {
+      const config = useRuntimeConfig().public;
+      let base = config.apiBaseUrl;
+      // LaravelのルートURLを取得するために、末尾の '/api' を取り除く
+      if (base.endsWith('/api')) {
+        base = base.substring(0, base.length - 4);
+      }
+      const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
+      // 確実にベースURLを付与してデフォルト画像パスを生成
+      return `${base.replace(/\/$/, '')}/${DEFAULT_IMAGE_PATH}`;
+    }
+    // 商品画像の場合はパスがないので空文字列を返す
+    return '';
+  }
+
+  // 2. pathがURL形式（http:// または https:// で始まる）であれば、そのまま返す
+  // これにより、バックエンドで絶対パスに変換されている場合はそのまま利用
+  const isAbsoluteUrl = /^https?:\/\//i.test(path);
+  if (isAbsoluteUrl) {
+    return path;
+  }
+  
+  // 3. パスが絶対URL形式でなく、/storage/などで始まっている場合
+  // 開発環境によってはベースURLを付与してURLを完成させる必要がある
+  
   const config = useRuntimeConfig().public;
   let base = config.apiBaseUrl;
-
+  
   // LaravelのルートURLを取得するために、末尾の '/api' を取り除く
   if (base.endsWith('/api')) {
     base = base.substring(0, base.length - 4);
   }
-
-  // path が存在しない、または空の場合は、プロフィール画像の場合のみデフォルトを返し、
-  // 商品画像の場合は空文字列を返すことで画像タグのロードエラーを防ぐ
-  if (!path) {
-    if (isProfileImage) {
-      const DEFAULT_IMAGE_PATH = 'storage/images/default-profile2.jpg';
-      return `${base}/${DEFAULT_IMAGE_PATH}`;
-    }
-    // 商品画像の場合はパスがないので空文字列を返し、v-ifで表示を制御する
-    return '';
-  }
-
-  // 既に絶対URLならそのまま返す
-  if (path.startsWith('http')) {
-    return path;
-  }
-
-  // 相対パスの場合、ベースURLと結合して絶対URLを生成
-  return `${base}/${path.replace(/^\//, ``)}`;
+  
+  // ベースURLとパスを結合する（重複スラッシュを避ける）
+  const cleanBase = base.replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  
+  return `${cleanBase}/${cleanPath}`;
 };
 
 // ユーティリティ: プロフィール編集ページへ遷移
@@ -311,7 +329,7 @@ const goToProfileEdit = () => {
         <div v-for="item in items" :key="item.id" class="items_select_all">
             
             <NuxtLink v-if="page === 'sell'" :to="`/item/${item.id}`" class="mypage_item_">
-                <!-- item.item_image が存在する場合のみ画像を表示し、パスを絶対URLに変換 -->
+                <!-- item.item_image が存在する場合のみ画像を表示し、修正された getAssetUrl を使用 -->
                 <img v-if="item.item_image" :src="getAssetUrl(item.item_image)" :alt="item.name + 'の商品写真'">
                 <div v-else class="no-image-placeholder">No Image</div>
                 <div class="item-details">
@@ -321,7 +339,7 @@ const goToProfileEdit = () => {
             </NuxtLink>
             
             <NuxtLink v-else-if="page === 'buy' && item.item" :to="`/item/${item.item.id}`" class="mypage_item_">
-                <!-- item.item.item_image が存在する場合のみ画像を表示し、パスを絶対URLに変換 -->
+                <!-- item.item.item_image が存在する場合のみ画像を表示し、修正された getAssetUrl を使用 -->
                 <img v-if="item.item.item_image" :src="getAssetUrl(item.item.item_image)" :alt="item.item.name + 'の商品写真'">
                 <div v-else class="no-image-placeholder">No Image</div>
                 <div class="item-details">

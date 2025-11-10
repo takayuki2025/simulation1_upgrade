@@ -32,7 +32,13 @@ const { user } = storeToRefs(authStore);
 const newComment = ref('');
 const commentErrors = ref<string[]>([]);
 
-// ... (Computed Properties 省略)
+
+// ★★★ 修正箇所 1: 画像のベースURL設定 (現状の値を維持) ★★★
+const IMAGE_BASE_URL = 'https://laravel.test:4430/';
+// ★★★ 修正箇所 1 終わり ★★★
+
+
+// ... (既存の Computed Properties)
 
 const canInteract = computed(() => isAuthenticated.value && user.value?.id !== item.value?.user_id);
 const isOwner = computed(() => isAuthenticated.value && user.value?.id === item.value?.user_id);
@@ -50,8 +56,52 @@ const itemCategories = computed(() => {
 });
 
 
+// ★★★ 修正箇所 2: 完全な画像URLを生成するComputed Propertyを更新（二重結合と画像表示の失敗を同時に解消） ★★★
+const fullImageUrl = computed(() => {
+  if (!item.value || !item.value.item_image) {
+    // 商品情報がない、または画像パスがない場合は、プレースホルダーURLを返す
+    return 'https://placehold.co/450x450/D1D5DB/1F2937?text=No+Image';
+  }
+  let imagePath = item.value.item_image;
+
+  // 1. Pathが既に絶対URLならそのまま返す
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    
+    // 💡 念のため、二重結合の原因だった「フルURLの中にベースURLが再び現れる」パターンを検知し修正する
+    // これはAPIのデータが病的な場合にのみ必要
+    const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
+    
+    // パスの中にベースURLが2回以上含まれていないかチェック
+    if (imagePath.includes(base) && imagePath.indexOf(base) !== imagePath.lastIndexOf(base)) {
+        // 例: '.../storage/https://laravel.test:4430/storage/...' の場合、2回目のベースURLから切り出す
+        const correctedPathIndex = imagePath.lastIndexOf(base);
+        return imagePath.substring(correctedPathIndex);
+    }
+    
+    return imagePath;
+  }
+
+  // 2. ベースURLを正規化（末尾のスラッシュを必ず持つ）
+  const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
+  
+  // 3. imagePathから先頭の `/` や `storage/` などのプレフィックスを全て除去し、クリーンな相対パスを得る
+  // 正規表現: パスの先頭にある `/` または `storage/` を全て削除する
+  let cleanPath = imagePath.replace(/^(\/|storage\/)+/, '');
+
+  // 4. ベースURL + /storage/ + クリーンなパス を結合
+  // これがLaravelの静的ファイルアクセスに期待される最終的な形式
+  const finalUrl = `${base}storage/${cleanPath}`;
+  
+  // 💡 修正後のデバッグログ
+  console.log('Computed Full Image URL (Final Normalized V2):', finalUrl);
+  
+  return finalUrl;
+});
+// ★★★ 修正箇所 2 終わり ★★★
+
+
 // =======================================================
-// データ取得 (修正箇所)
+// データ取得
 // =======================================================
 const fetchData = async (id: number) => {
   try {
@@ -96,7 +146,9 @@ const fetchData = async (id: number) => {
     console.log('Is Favorited:', isFavorited.value);
     // 💡 追加デバッグログ: 画像パスの最終確認
     if (item.value) {
-        console.log('Final Item Image Path:', item.value.item_image);
+        console.log('Original Item Image Path:', item.value.item_image);
+        // ★★★ 修正後のデバッグログ: 変換後の完全なURLを出力 ★★★
+        console.log('Computed Full Image URL:', fullImageUrl.value);
     }
     isLoading.value = false;
   }
@@ -184,12 +236,14 @@ onMounted(async () => {
 
 <div v-else-if="item" class="flex flex-wrap lg:flex-nowrap w-full max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
 <div class="item_detail_image p-4 lg:p-8 w-full lg:w-1/2">
+<!-- ★★★ srcは fullImageUrl を使用 ★★★ -->
 <img
-:src="item.item_image"
+:src="fullImageUrl"
 alt="商品写真"
 class="item_detail_image1 w-full h-auto object-cover rounded-lg shadow-md"
 onerror="this.onerror=null; this.src='https://placehold.co/450x450/D1D5DB/1F2937?text=No+Image';"
 />
+<!-- ★★★ 修正箇所 3 終わり ★★★ -->
 </div>
 
 <div class="information p-4 lg:p-8 w-full lg:w-1/2 space-y-4">

@@ -21,7 +21,7 @@ interface Item {
   explain: string;
   condition: string;
   category: string;
-  item_image: string; // 💡 修正後、ここは絶対URLが入ることを期待
+  item_image: string; // バックエンドから絶対URLが入る
   remain: number;
   user: User;
 }
@@ -102,41 +102,21 @@ export const useItemStore = defineStore("item", () => {
   }
 
   /**
-   * 💡 追加ヘルパー関数: 画像の相対パスを絶対URLに変換
-   * @param path APIから返された画像パス（例: /storage/item_images/image.jpg）
-   * @returns 完全なURL
+   * 💡 商品画像やユーザー画像はバックエンドのアクセサで絶対URLに変換されていることを期待し、
+   * ここでは**いかなる加工も行いません**。
    */
-  function getAbsoluteImageUrl(path: string): string {
-    // API_BASE_URL (例: https://laravel.test:4430/api) から /api を取り除く
-    const baseUrl = API_BASE_URL.replace("/api", "");
-
-    // パスがすでに絶対URLであればそのまま返す
-    if (path.startsWith("http://") || path.startsWith("https://")) {
-      return path;
-    }
-
-    // ベースURLとパスを結合する (余分なスラッシュを考慮)
-    const cleanedBaseUrl = baseUrl.endsWith("/")
-      ? baseUrl.slice(0, -1)
-      : baseUrl;
-    const cleanedPath = path.startsWith("/") ? path : `/${path}`;
-
-    return `${cleanedBaseUrl}${cleanedPath}`;
-  }
 
   // アクション (Actions: API通信)
 
   async function fetchItems(
-    token: string | null, // 💡 fetchItemsは非認証で叩くことが多いため、トークンはここでは使用しない
+    token: string | null,
     query: string = "",
     tab: "all" | "mylist" = "all"
   ) {
-    // ... (fetchItems ロジックは変更なし)
     isLoading.value = true;
     errors.value = [];
     items.value = [];
 
-    // tab:mylistは認証済みAPIコールに切り替える必要がある
     if (tab === "mylist") {
       errors.value = ["「マイリスト」タブの機能は未実装です。"];
       isLoading.value = false;
@@ -156,10 +136,15 @@ export const useItemStore = defineStore("item", () => {
 
       const responseData = data as { items: Item[] };
       if (responseData && Array.isArray(responseData.items)) {
-        // 💡 修正: item_imageを絶対URLに変換
+        // 💡 修正: item_imageはバックエンドから絶対URLとして返されるため、そのまま使用します。
         items.value = responseData.items.map((item) => ({
           ...item,
-          item_image: getAbsoluteImageUrl(item.item_image),
+          item_image: item.item_image, // 絶対URLをそのまま使用
+          // ユーザー画像もそのまま使用（バックエンドに任せる）
+          user: {
+            ...item.user,
+            user_image: item.user.user_image,
+          },
         }));
       } else {
         throw new Error("商品リストのデータ構造が不正です。");
@@ -191,7 +176,7 @@ export const useItemStore = defineStore("item", () => {
     isLoading.value = true;
     errors.value = [];
     item.value = null;
-    comments.value = [];
+    comments.value = null as unknown as Comment[];
     console.log(
       `[ItemStore:fetchItemDetail] Starting fetch for item ID: ${itemId}`
     );
@@ -201,30 +186,22 @@ export const useItemStore = defineStore("item", () => {
         method: "GET",
       })) as ItemDetailResponse;
 
-      // 💡 修正: item_imageを絶対URLに変換
-      const absoluteImageUrl = getAbsoluteImageUrl(
-        responseData.item.item_image
-      );
-
+      // 💡 修正: バックエンドから返された絶対URLをそのまま item_image に格納します。
       item.value = {
         ...responseData.item,
-        item_image: absoluteImageUrl, // 絶対URLに置き換え
+        item_image: responseData.item.item_image, // 絶対URLをそのまま使用
       };
 
-      // 💡 ユーザーの画像パスも絶対URLに変換
+      // 💡 ユーザーの画像パスもそのまま使用
       if (item.value.user && item.value.user.user_image) {
-        item.value.user.user_image = getAbsoluteImageUrl(
-          item.value.user.user_image
-        );
+        item.value.user.user_image = item.value.user.user_image;
       }
-      // 💡 コメントユーザーの画像パスも絶対URLに変換
+      // 💡 コメントユーザーの画像パスもそのまま使用
       comments.value = responseData.comments.map((comment) => ({
         ...comment,
         user: {
           ...comment.user,
-          user_image: comment.user.user_image
-            ? getAbsoluteImageUrl(comment.user.user_image)
-            : comment.user.user_image,
+          user_image: comment.user.user_image,
         },
       }));
 
@@ -233,7 +210,7 @@ export const useItemStore = defineStore("item", () => {
       currentUserId.value = responseData.userId;
       isLoggedIn.value = responseData.isLoggedIn;
 
-      // 💡 強化されたデバッグログ
+      // 💡 デバッグログ (Item Image URLが正しい絶対URLになっているかを確認)
       console.log("--- Debug Item Store (After authenticatedFetch) ---");
       console.log(
         `API is_favorited: ${responseData.is_favorited} -> Store isFavorited: ${isFavorited.value}`
@@ -243,6 +220,7 @@ export const useItemStore = defineStore("item", () => {
         `Current User ID: ${currentUserId.value}, Is Logged In: ${isLoggedIn.value}`
       );
       if (item.value) {
+        // !!! このログが 'https://laravel.test:4430/storage/item_images/...' と表示されれば成功です !!!
         console.log(`Item Image URL (Absolute): ${item.value.item_image}`);
       }
       console.log(`Number of comments loaded: ${comments.value.length}`);
@@ -327,16 +305,13 @@ export const useItemStore = defineStore("item", () => {
 
       const newCommentData = responseData as Comment;
       if (newCommentData && newCommentData.id) {
-        // 💡 新規コメントの画像パスも絶対URLに変換
+        // 新規コメントの画像パスもそのまま使用
         if (newCommentData.user && newCommentData.user.user_image) {
-          newCommentData.user.user_image = getAbsoluteImageUrl(
-            newCommentData.user.user_image
-          );
+          newCommentData.user.user_image = newCommentData.user.user_image;
         }
         comments.value.unshift(newCommentData);
       } else {
         // サーバーが新しいコメントを返さなかった場合は、手動でコメント一覧を再取得する
-        // 💡 再取得時には認証トークンが必要
         await fetchItemDetail(item.value.id, token);
       }
     } catch (e: any) {

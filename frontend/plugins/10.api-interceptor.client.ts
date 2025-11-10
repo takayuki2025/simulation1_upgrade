@@ -1,39 +1,49 @@
-import { useAuth } from "~/composables/useAuth"; // 💡 clearTokenのインポートを削除
-import { useRuntimeConfig, navigateTo, useCookie } from "#app";
-import type { NuxtApp } from "#app";
+import { useAuth } from "~/composables/useAuth";
+import {
+  useRuntimeConfig,
+  navigateTo,
+  useCookie,
+  defineNuxtPlugin,
+} from "#app";
 
 export default defineNuxtPlugin((nuxtApp) => {
-  // 💡 clearToken は useAuth() の実行結果から取得するため、ここではインポートしない
+  // 環境変数からAPIのベースURLを取得。
+  const apiBaseUrl = useRuntimeConfig().public.apiBaseUrl;
 
   const customFetch = $fetch.create({
-    baseURL: useRuntimeConfig().public.apiBase,
-    credentials: "include",
+    baseURL: apiBaseUrl,
+    credentials: "include", // 認証情報のCookieを確実に含める
 
-    // --- 1. リクエストインターセプター: X-XSRF-TOKENヘッダーの付与 ---
+    // --- 1. リクエストインターセプター: X-XSRF-TOKEN と Bearer Token の付与 ---
     onRequest({ options }) {
-      // headersがない場合に備えて初期化を確実に行う
       options.headers = options.headers || new Headers();
+      const headers = options.headers as Headers;
 
-      // Acceptヘッダーが指定されていない場合にデフォルトでJSONを設定
-      if (!(options.headers.Accept || options.headers.get("Accept"))) {
-        options.headers.set("Accept", "application/json");
+      // 1-1. Acceptヘッダーの設定
+      if (!headers.get("Accept")) {
+        headers.set("Accept", "application/json");
       }
 
-      // 💡 修正: CookieからXSRF-TOKENを読み取り、ヘッダーに設定する
+      // 1-2. CSRFトークンの付与 (Sanctum)
       if (process.client) {
-        // useCookie()はクライアント側でのみ動作
         const xsrfCookie = useCookie("XSRF-TOKEN");
         const tokenValue = xsrfCookie.value;
 
         if (tokenValue) {
           // XSRF-TOKEN Cookieの値を、X-XSRF-TOKEN ヘッダーとして送信
-          options.headers.set("X-XSRF-TOKEN", tokenValue);
-          console.log(
-            `[CSRF] X-XSRF-TOKEN set: ${tokenValue.substring(0, 10)}...`
-          );
+          headers.set("X-XSRF-TOKEN", tokenValue);
+          // console.log(`[CSRF] X-XSRF-TOKEN set: ${tokenValue.substring(0, 10)}...`);
         } else {
-          console.warn("[CSRF] XSRF-TOKEN cookie not found.");
+          // console.warn("[CSRF] XSRF-TOKEN cookie not found.");
         }
+      }
+
+      // 1-3. Bearerトークンの付与 (JWT/Token認証 - Piniaストア/useAuthに依存)
+      const { token: localToken } = useAuth();
+      if (localToken.value && !headers.get("Authorization")) {
+        // トークンが存在し、かつ Authorization ヘッダーが未設定の場合に付与
+        headers.set("Authorization", `Bearer ${localToken.value}`);
+        // console.log(`[Auth] Bearer Token set in $api: ${localToken.value.substring(0, 10)}...`);
       }
     },
 
@@ -42,17 +52,18 @@ export default defineNuxtPlugin((nuxtApp) => {
       if (response && response.status === 401) {
         const url = response.url;
 
-        // 認証エンドポイント (Firebase/Login/Register) はスキップ
-        const isAuthEndpoint = url.includes("/firebase/");
-
-        // Piniaのチェック用など、スキップフラグがある場合はスキップ
+        // 認証フロー内のリクエストはログアウトをスキップ
+        const isAuthRelated =
+          url.includes("/login") ||
+          url.includes("/register") ||
+          url.includes("/sanctum/csrf-cookie");
         const isSkipAutoLogoutFlag =
           options.context?.skipAutoLogout ||
           options.headers?.["X-Skip-Auto-Logout"] === "true";
 
-        if (isAuthEndpoint || isSkipAutoLogoutFlag) {
+        if (isAuthRelated || isSkipAutoLogoutFlag) {
           console.warn(
-            `⚠️ [GLOBAL 401 INTERCEPTOR] 401エラーを捕捉したが、自動ログアウトをスキップ (Auth Endpoint or Skip Flag): ${url}`
+            `⚠️ [GLOBAL 401 INTERCEPTOR] 401エラーを捕捉したが、自動ログアウトをスキップ (Auth Related or Skip Flag): ${url}`
           );
           return;
         }
@@ -61,7 +72,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           `🚨 [GLOBAL 401 INTERCEPTOR] 401エラーを捕捉: ${url}。強制ログアウト処理を実行します。`
         );
 
-        // 💡 修正: useAuth() を呼び出し、clearToken 関数を取得して実行
+        // useAuth() を呼び出し、clearToken 関数を取得して実行
         const { clearToken } = useAuth();
         clearToken();
 

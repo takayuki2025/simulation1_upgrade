@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo; 
-use Illuminate\Support\Facades\Storage; // ★ 追加: Storageファサードをインポート
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log; // Log::debugを削除したので、この行は不要だが残しておきます
+use Illuminate\Support\Facades\Config; 
 
 class Item extends Model
 {
@@ -42,26 +43,47 @@ class Item extends Model
         'category' => 'array',
     ];
 
+
     /**
-     * 商品画像パスを絶対URLとして取得するためのアクセサ
-     *
-     * JSONシリアライズ時や $item->item_image でアクセスされたときに実行され、
-     * パスを App URL に基づく絶対URLに変換してフロントエンドに渡します。
+     * 商品画像パスを絶対URLとして取得するためのアクセサ（最終確定版）
      *
      * @param string|null $value データベースに保存されているitem_imageの値
      * @return string
      */
     public function getItemImageAttribute($value): string
     {
-        if ($value) {
-            // パスが存在する場合、asset() ヘルパーを使って絶対URLを生成
-            // 例: 'storage/item_images/xxx.jpg' -> 'http://localhost/storage/item_images/xxx.jpg'
-            // ※ asset() は .env の APP_URL を使用します。
-            return asset($value); 
+        if (!$value) {
+            // 画像パスがない場合は空文字列を返す
+            return ''; 
         }
 
-        // 画像がない場合は空文字列を返す。
-        return ''; 
+        // 信頼できる唯一の情報源であるAPP_URLを直接取得
+        $baseUrl = Config::get('app.url'); 
+        
+        if (!$baseUrl) {
+            // APP_URLが設定されていない場合は、フォールバックとしてurl()を使用
+            return url($value);
+        }
+
+        // APP_URLをパースして、スキーム、ホスト、ポートを強制的に抽出します。
+        $parts = parse_url($baseUrl);
+
+        // ベースURLのパーツを再構築 (https://laravel.test:4430 のような形式)
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? '';
+        $port = $parts['port'] ?? null;
+
+        // 正しいホスト名とポート番号を含むベース部分を構築
+        $basePrefix = "{$scheme}://{$host}" . ($port ? ":{$port}" : '');
+
+        // 画像パスのスラッシュを削除（もしあれば）
+        $path = ltrim($value, '/');
+
+        // ベースとパスを結合して、完全で正しい絶対URLを手動で生成
+        $finalUrl = "{$basePrefix}/{$path}";
+
+        // !!! IMPORTANT: ここでデバッグコードや文字列を返さないこと !!!
+        return $finalUrl;
     }
 
 

@@ -32,7 +32,7 @@ class ItemController extends Controller
 
     // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
     // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。@
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         // URLのGETパラメータ'tab'を取得。デフォルトは'all'
         $tab = $request->query('tab', 'all');
@@ -40,8 +40,7 @@ class ItemController extends Controller
         // URLのGETパラメータ'all_item_search'を取得
         $searchQuery = $request->query('all_item_search');
 
-        // ★★★ 修正点: Sanctumガードを使ってユーザーを取得 ★★★
-        // ルートにミドルウェアがない場合でも、リクエストヘッダーにトークンがあればユーザーを特定できます。
+        // Sanctumガードを使ってユーザーを取得
         $user = Auth::guard('sanctum')->user();
         $authId = $user ? $user->id : null;
         
@@ -50,25 +49,25 @@ class ItemController extends Controller
 
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
-            // ここでは $user (sanctumガードで取得したもの) を使います。
             
             // 🚨 認証済みでなければマイリストは空のコレクション
             if (!$user) {
+                // ユーザーが認証されていなければ空のJSONレスポンスを返すための空のコレクション
                 $items = collect([]); 
             } else {
-                // Goodモデルを介して関連するItemを取得
-                $items = Good::where('user_id', $user->id)
-                    ->withCount(['comments', 'goods']) // mylist内のItemにもカウントを追加
-                    ->get()
-                    ->pluck('item')
-                    ->filter(); // nullをフィルタリング
-            }
-            
-            // 検索キーワードでフィルタリング
-            if (!empty($searchQuery)) {
-                $items = $items->filter(function ($item) use ($searchQuery) {
-                    return stripos($item->name, $searchQuery) !== false;
-                })->values(); // フィルタリング後にインデックスをリセット
+                // 1. ユーザーがいいねしたItemのIDを取得
+                $likedItemIds = Good::where('user_id', $user->id)->pluck('item_id');
+                
+                // 2. そのItem IDを持つ商品を取得し、コメント数といいね数をカウント
+                $query = Item::whereIn('id', $likedItemIds)
+                    ->withCount(['comments', 'goods']);
+                
+                // 検索キーワードでフィルタリング (クエリビルダに適用)
+                if (!empty($searchQuery)) {
+                    $query->where('name', 'like', '%' . $searchQuery . '%');
+                }
+                
+                $items = $query->get();
             }
 
         } else {
@@ -76,12 +75,11 @@ class ItemController extends Controller
             $query = Item::query();
             
             // 💡 認証済みユーザーの場合のみ、自身が出品した商品を除外する
-            if ($authId) { // ★ 修正後の $authId を使用
+            if ($authId) {
                 // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
                 $query->where('user_id', '!=', $authId);
                 Log::info("ItemController@index: Filter applied. Excluding items by user {$authId}.");
             }
-            // 🚨 Auth::id() が null の場合と同じく、where 句は実行されず全ての商品が取得される
 
             // 検索キーワードがあれば、クエリをフィルタリング
             if (!empty($searchQuery)) {
@@ -102,6 +100,11 @@ class ItemController extends Controller
                 if (!Str::startsWith($item->item_image, 'storage/')) {
                     $item->item_image = 'storage/' . $item->item_image; // 例: storage/images/item_xxx.jpg
                 }
+            }
+            
+            // 💡 商品に `remain` カラムがない場合を考慮して、強制的に追加
+            if (!isset($item->remain)) {
+                $item->remain = 1; // 暫定で1を設定、実際の在庫管理ロジックに従う必要があります
             }
         });
 
