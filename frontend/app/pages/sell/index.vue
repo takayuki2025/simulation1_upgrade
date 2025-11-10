@@ -158,8 +158,9 @@ const handleImageUpload = async (event: Event) => {
         const response: any = await authenticatedFetch('/upload', {
             method: 'POST',
             body: formData,
-            // FormDataを使うため、headersのContent-Typeは設定しない
-            headers: { 'Content-Type': undefined } as any, // TypeScriptを黙らせるハック
+            // 💡 修正箇所: headersを渡さないことで、ofetchがFormDataを正しく処理し、
+            // 💡 ブラウザが自動でContent-Type: multipart/form-dataを付与するようにする。
+            // headers: { 'Content-Type': undefined } as any, // ⬅︎ 削除しました
         });
 
         const uploadedPath = response.image_path; // サーバーからの保存パス
@@ -217,7 +218,7 @@ const submitNewData = async () => {
 
         // 成功時のリダイレクト
         setTimeout(() => {
-            router.push('/sell/thanks'); // 実際のサンクスページパスに修正
+            router.push('/thanks/sell'); // 実際のサンクスページパスに修正
         }, 1500);
 
     } catch (error: any) {
@@ -367,7 +368,7 @@ const triggerFileInput = () => {
 
                     <div class="mb-6">
                         <label class="block text-sm font-bold text-gray-700 mb-3">商品の説明 <span class="text-red-500 text-sm">(必須)</span></label>
-                        <textarea class="w-full border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2 min-h-[120px] resize-y" v-model="form.explain"></textarea>
+                        <textarea class="w-full border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity0 p-2 min-h-[120px] resize-y" v-model="form.explain"></textarea>
                         <div v-if="serverErrors.explain" class="text-red-500 text-sm mt-2">
                             {{ Array.isArray(serverErrors.explain) ? serverErrors.explain[0] : serverErrors.explain }}
                         </div>
@@ -436,4 +437,3 @@ const triggerFileInput = () => {
     border-color: #ef4444;
 }
 </style>
-

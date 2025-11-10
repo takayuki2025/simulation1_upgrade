@@ -58,6 +58,7 @@ const getAuthHeaders = (token: string | null): Record<string, string> => {
 
 export const useItemStore = defineStore("item", () => {
   // ★ 修正点: useRuntimeConfig() を defineStore コールバック内に移動
+  // Nuxt 3環境では、useRuntimeConfigはトップレベルではなく、関数内で呼び出す必要があります。
   const config = useRuntimeConfig();
   const API_BASE_URL = config.public.apiBaseUrl;
 
@@ -113,6 +114,68 @@ export const useItemStore = defineStore("item", () => {
   }
 
   // アクション (Actions: API通信)
+
+  /**
+   * 商品一覧データをAPIから取得する (検索とタブ切り替えに対応)
+   * @param token 認証トークン (オプション, 'mylist'タブ表示に必要)
+   * @param query 検索文字列 (オプション)
+   * @param tab 表示するタブ ('all' または 'mylist')
+   */
+  async function fetchItems(
+    token: string | null,
+    query: string = "",
+    tab: "all" | "mylist" = "all"
+  ) {
+    isLoading.value = true;
+    errors.value = [];
+    items.value = []; // データをフェッチする前に一覧をクリア
+
+    // 'mylist'タブを選択し、トークンがない場合はエラー
+    if (tab === "mylist" && !token) {
+      errors.value = ["「マイリスト」を表示するにはログインが必要です。"];
+      isLoading.value = false;
+      return;
+    }
+
+    try {
+      const headers = getAuthHeaders(token);
+
+      // URLとクエリパラメータを構築
+      const url = new URL(`${API_BASE_URL}/items`);
+
+      if (query && query.trim()) {
+        url.searchParams.append("q", query.trim());
+      }
+
+      if (tab === "mylist") {
+        url.searchParams.append("tab", "mylist");
+      }
+
+      const data = await $fetch(url.toString(), {
+        method: "GET",
+        headers: headers,
+      });
+
+      // レスポンスデータの型をチェックし、itemsを更新
+      const responseData = data as { items: Item[] };
+      if (responseData && Array.isArray(responseData.items)) {
+        items.value = responseData.items;
+      } else {
+        throw new Error("商品リストのデータ構造が不正です。");
+      }
+    } catch (e: any) {
+      console.error("商品リストの取得に失敗:", e);
+      let errorMessage = "商品リストの取得中にエラーが発生しました。";
+
+      if (e.message) {
+        errorMessage = e.message;
+      }
+      errors.value = [errorMessage];
+      items.value = []; // エラー時はリストを空に
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   /**
    * 商品詳細データ、コメント、お気に入り状態をAPIから取得する (トークン対応)
@@ -271,5 +334,6 @@ export const useItemStore = defineStore("item", () => {
     toggleFavorite,
     postComment,
     clearData, // ★★★ 外部からリセット可能にするためにエクスポート
+    fetchItems, // ★★★ 新しく追加した商品一覧取得アクション
   };
 });
