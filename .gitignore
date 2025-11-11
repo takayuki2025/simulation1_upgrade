@@ -2,3 +2,71 @@ backend/config/firebase-service-account.json
 
 takayuki-2025-ver-1-786d018a3e17.json
 node_modules/
+
+
+
+
+==================================
+
+1. 依存関係 & 自動生成されるディレクトリ (Dependencies & Generated)
+
+==================================
+
+/vendor                 # Composer (PHP) の依存ライブラリ全体
+/node_modules           # NPM/Yarn (JavaScript) の依存ライブラリ全体
+
+Laravel Vite / Nuxt / React のビルド結果
+
+/public/build
+/public/hot
+/.nuxt                  # Nuxt 3 の一時ビルドディレクトリ
+/.output                # Nuxt 3 の本番用出力ディレクトリ
+/dist                   # React (CRA) や一般的なビルドの出力ディレクトリ
+
+==================================
+
+2. 環境設定 & セキュリティ (Environment & Security)
+
+==================================
+
+.env                    # 環境変数ファイル (機密情報を含むため必須)
+.env.*.local            # ローカル環境用の一時的な設定
+.env.testing
+
+==================================
+
+3. ログ & キャッシュ (Logs & Cache)
+
+==================================
+
+/storage/.log          # Laravelのログファイル
+/bootstrap/cache/.php  # Laravelの最適化キャッシュ
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo           # TypeScriptのビルド情報
+
+==================================
+
+4. ローカル環境/IDE固有ファイル (Local Environment / IDE)
+
+==================================
+
+macOS
+
+.DS_Store
+
+Windows
+
+Thumbs.db
+
+JetBrains IDEs (PhpStorm, WebStorm, etc.)
+
+.idea/
+
+VS Code
+
+.vscode/
+
+Docker build context files
+
+.dockerignore           # .dockerignore自体はGitで追跡しますが、念のため
