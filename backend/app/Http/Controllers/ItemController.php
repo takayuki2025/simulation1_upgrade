@@ -23,6 +23,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log; // Logをインポート
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL; 
+
+use Stripe\StripeClient;
 
 
 
@@ -427,15 +430,22 @@ class ItemController extends Controller
             Log::info("Mypage (SELL) Item count: " . $items->count());
                 
         } else if ($pageType === 'buy') {
-            // ... (buyロジックは今回は省略)
-        } else {
-            return response()->json(['message' => 'Invalid page type.'], 400);
-        }
-        
-        return response()->json([
-            'items' => $items,
-            'user_id' => $user->id,
-        ]);
+            //  購入履歴を取得し、関連する商品データを含める
+        $items = OrderHistory::where('user_id', $user->id)
+            ->with('item') // OrderHistoryモデルに item() リレーションがあることが前提
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        Log::info("Mypage (BUY) OrderHistory count: " . $items->count());
+
+    } else {
+        return response()->json(['message' => 'Invalid page type.'], 400);
+    }
+    
+    return response()->json([
+        'items' => $items,
+        'user_id' => $user->id,
+    ]);
     }
 
                                      // ItemController.php 内の修正（例: メソッド名を getUserProfile に変更）
@@ -652,30 +662,83 @@ class ItemController extends Controller
 
 // 購入商品(コンビニ支払い、カード支払い)・出品商品の処理
         // コンビニ決済完了処理
-        public function thanks_buy_create(PurchaseRequest $request)
+        public function thanks_buy_create(Request $request)
     {
-            $item = Item::find($request->item_id);
+        // ★ 共通の認証チェックを先頭に移動
+        $user = Auth::user();
+            
+        if (!$user) { 
+            Log::error('!!!!!Purchase failed: User not authenticated.');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'ユーザー認証が必要です。リロードしてログインを確認してください。',
+            ], 401); 
+        }
+        
+        // 認証ユーザーIDを変数に格納
+        $currentUserId = $user->id; 
+
+        // ★★★ 暫定的なバリデーションを挿入 (PurchaseRequest が不明なため) ★★★
+        $request->validate([
+            'item_id' => 'required|exists:items,id',
+            'address' => 'required|string',
+            'payment' => 'required|string|in:コンビニ払い,カード支払い'
+        ]);
+        // ★★★ ここまで ★★★
+        
+        $item = Item::find($request->item_id);
 
         if ($request->input('payment') === 'コンビニ払い') {
 
-            $user = Auth::user();
+            // コンビニ払いのロジック (変更なし)
 
             $buyAddress = "{$user->name}\n{$user->post_number}\n{$user->address}\n{$user->building}";
 
             OrderHistory::create([
-                'user_id' => $user->id,
+                'user_id' => $currentUserId, // 認証ユーザーIDを使用
                 'item_id' => $item->id,
                 'status' => '購入済み',
                 'buy_address' => $buyAddress,
                 'payment' => 'コンビニ払い'
             ]);
 
+            Log::info("!!!!!!Purchase process started for item ID: {$item->id}");
+
             $item->decrement('remain');
 
-            return redirect()->route('thanks_buy')->with('success_conbini','コンビニ払込用紙の処理方法はただいま勉強中です。<br>実装完了までしばらくお待ちください。');
+            Log::info("!!!!!!!Purchase complete. Remaining stock: {$item->remain}");
+
+            return response()->json([
+            'status' => 'success',
+            'redirect_type' => 'conbini_thanks', // 遷移先のタイプを特定
+            'message' => 'コンビニ払込用紙の処理方法はただいま勉強中です。<br>実装完了までしばらくお待ちください。'
+        ], 200); // ステータスコード200 (OK)を返す
+
 
         } elseif ($request->input('payment') === 'カード支払い') {
 
+            // ★★★ URL設定の一時的な上書きロジック (ポート問題解決のために維持) ★★★
+            $appUrl = env('APP_URL');
+            if ($appUrl) {
+                $url = parse_url($appUrl);
+    
+                // 1. HTTPSを強制 (Docker環境でNginxがHTTPSを終端している場合など)
+                URL::forceScheme('https'); 
+    
+                // 2. ホストとポートを強制 (route()がポートを無視する問題を解決)
+                if (isset($url['host'])) {
+                    $host = $url['host'] . (isset($url['port']) ? ':' . $url['port'] : '');
+                    URL::forceRootUrl("{$url['scheme']}://{$host}");
+                }
+                
+                Log::info("URL configuration temporarily forced for Stripe success URL generation.");
+            }
+            // ★★★ URL設定の一時的な上書きロジックここまで ★★★
+
+            // ★★★ 修正された success_url の生成 ★★★
+            // APP_URLをベースに、Stripeのプレースホルダを文字列結合で厳密に渡す
+            $successUrl = $appUrl . '/api/stripe_success?session_id={CHECKOUT_SESSION_ID}';
+            
             Stripe::setApiKey(env('STRIPE_SECRET'));
             $session = Session::create([
                 'payment_method_types' => ['card'],
@@ -690,47 +753,123 @@ class ItemController extends Controller
                 'quantity' => 1,
                 ]],
                 'mode' => 'payment',
-                'success_url' => route('stripe_success', [
-                'item_id' => $item->id,
-                'address' => $request->address,
-                'payment' => 'カード支払い'
-                ]),
+                // ユーザーIDをStripeセッションに紐付ける
+                'client_reference_id' => (string) $currentUserId, 
+                
+                // ★★★ route()ヘルパーを使わず、直接URLを渡す ★★★
+                'success_url' => $successUrl,
+
                 'cancel_url' => route('item_buy', ['item_id' => $item->id]),
             ]);
+            
+            Log::info("Stripe session created with client_reference_id: {$currentUserId}");
 
-            return redirect($session->url, 303);
+            return response()->json([
+            'status' => 'success',
+            'redirect_type' => 'stripe_checkout', // 遷移先のタイプを特定
+            'stripe_url' => $session->url // StripeのチェックアウトURL
+        ], 200); // ステータスコード200 (OK)を返す
+    }
+    }
+    
+    /**
+     * Stripe決済成功時の処理
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function stripeSuccess(Request $request)
+    {
+        // 1. リクエストからセッションIDを取得
+        $sessionId = $request->get('session_id');
+
+        // 🚨 セッションIDがない場合は処理を中断
+        if (!$sessionId || $sessionId === '{CHECKOUT_SESSION_ID}') {
+            Log::error('Stripe Success failed: Missing or invalid session_id in request. Redirect from Stripe failed.', [
+                'received_session_id' => $sessionId,
+                'request_all' => $request->all()
+            ]);
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            return redirect("{$nuxtHost}/?error=invalid_stripe_session");
+        }
+
+        Stripe::setApiKey(env('STRIPE_SECRET'));
+        
+        try {
+            // StripeClientを初期化
+            $stripe = new StripeClient(env('STRIPE_SECRET'));
+
+            // 2. Stripe APIを使ってセッション情報を取得
+            $session = $stripe->checkout->sessions->retrieve($sessionId, [
+                'expand' => ['line_items']
+            ]);
+
+            // 3. client_reference_id（ユーザーID）とその他の情報を取得
+            $userId = (int) $session->client_reference_id;
+            
+            // 🚨 ユーザーIDがない、または不正な場合は処理を中断
+            if (!$userId) {
+                Log::error('Stripe Success failed: Missing client_reference_id.', ['session_id' => $sessionId]);
+                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+                return redirect("{$nuxtHost}/?error=no_user_reference");
+            }
+            
+            // 4. 認証の再確立 (Auth::user()が使えるようにする)
+            $user = \App\Models\User::find($userId); // ユーザーモデルをApp\Models\Userと仮定
+            if (!$user) {
+                Log::error('Stripe Success failed: User not found based on client_reference_id.', ['user_id' => $userId]);
+                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+                return redirect("{$nuxtHost}/?error=user_not_exist");
+            }
+            
+            // このリクエストのみで認証状態を復元
+            Auth::login($user); 
+
+            // 💡 ここから元の購入処理ロジック 💡
+            
+            // line_itemsから商品名を取得
+            $itemName = $session->line_items->data[0]->description ?? '';
+            $item = Item::where('name', $itemName)->first(); 
+            
+            // 暫定的に、ユーザーの登録情報を利用します。
+            $buyAddress = "{$user->name}\n{$user->post_number}\n{$user->address}\n{$user->building}";
+            
+            if (!$item) {
+                 Log::error('Stripe Success failed: Item not found based on Stripe session name.', ['item_name' => $itemName]);
+                 $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+                 return redirect("{$nuxtHost}/?error=item_not_found");
+            }
+
+            // OrderHistoryの作成
+            OrderHistory::create([
+                'user_id' => $userId, 
+                'item_id' => $item->id,
+                'buy_address' => $buyAddress,
+                'payment' => 'カード支払い'
+            ]);
+
+            // 在庫減少
+            $item->decrement('remain');
+            
+            Log::info('Stripe Success completed. Order saved to DB.', ['user_id' => $userId, 'item_id' => $item->id]);
+
+            // Nuxtのthanksページへリダイレクト
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            // return redirect("{$nuxtHost}/thanks?status=success&payment=card");
+            return redirect("{$nuxtHost}/thanks/buy-stripe");
+
+        } catch (\Exception $e) {
+            Log::error('Stripe Success API or Logic Error: ' . $e->getMessage(), ['session_id' => $sessionId]);
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            return redirect("{$nuxtHost}/?error=stripe_api_failed");
         }
     }
 
 
-        // stripe決済完了処理
-        public function stripeSuccess(Request $request)
-    {
-        Stripe::setApiKey(env('STRIPE_SECRET'));
-
-            $user = Auth::user();
-
-            $buyAddress = "{$user->name}\n{$user->post_number}\n{$user->address}\n{$user->building}";
-
-        OrderHistory::create([
-            'user_id' => Auth::id(),
-            'item_id' => $request->item_id,
-            'buy_address' => $buyAddress,
-            'payment' => 'カード支払い'
-        ]);
-
-        $item = Item::find($request->item_id);
-        $item->decrement('remain');
-
-        return redirect()->route('thanks_buy')->with('success', 'クレジットカード購入処理完了致しました。');
-    }
-
-
         // コンビニ・stripe決済完了後ページを表示する
-        public function thanks_buy_show()
-    {
-        return view('thanks_buy');
-    }
+    //     public function thanks_buy_show()
+    // {
+    //     return view('thanks_buy');
+    // }
 
 // 出品商品登録処理
 

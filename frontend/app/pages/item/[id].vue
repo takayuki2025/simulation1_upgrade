@@ -21,11 +21,11 @@ const error = ref('');
 
 // ストアから必要なリアクティブな状態を取得
 const {
-  item,
-  isFavorited,
-  favoritesCount,
-  errors: itemErrors,
-  comments
+item,
+isFavorited,
+favoritesCount,
+errors: itemErrors,
+comments
 } = storeToRefs(itemStore);
 const { user } = storeToRefs(authStore);
 
@@ -44,163 +44,173 @@ const canInteract = computed(() => isAuthenticated.value && user.value?.id !== i
 const isOwner = computed(() => isAuthenticated.value && user.value?.id === item.value?.user_id);
 const isSoldOut = computed(() => (item.value?.remain ?? 0) < 1);
 const itemCategories = computed(() => {
-  if (!item.value?.category) return [];
-  try {
-    // categoryプロパティはstoreでstring型に固定されているため、JSON.parseを試みる
-    const categories = JSON.parse(item.value.category);
-    return Array.isArray(categories) ? categories : [item.value.category];
-  } catch (e) {
-    // パースに失敗した場合、文字列のまま返す
-    return [item.value.category];
-  }
+if (!item.value?.category) return [];
+try {
+// categoryプロパティはstoreでstring型に固定されているため、JSON.parseを試みる
+const categories = JSON.parse(item.value.category);
+return Array.isArray(categories) ? categories : [item.value.category];
+} catch (e) {
+// パースに失敗した場合、文字列のまま返す
+return [item.value.category];
+}
 });
 
 
-// ★★★ 修正箇所 2: 完全な画像URLを生成するComputed Propertyを更新（二重結合と画像表示の失敗を同時に解消） ★★★
+// ★★★ 修正箇所 2: 完全な画像URLを生成するComputed Propertyを更新（商品画像用） ★★★
 const fullImageUrl = computed(() => {
-  if (!item.value || !item.value.item_image) {
-    // 商品情報がない、または画像パスがない場合は、プレースホルダーURLを返す
-    return 'https://placehold.co/450x450/D1D5DB/1F2937?text=No+Image';
-  }
-  let imagePath = item.value.item_image;
+if (!item.value || !item.value.item_image) {
+// 商品情報がない、または画像パスがない場合は、プレースホルダーURLを返す
+return 'https://placehold.co/450x450/D1D5DB/1F2937?text=No+Image';
+}
+let imagePath = item.value.item_image;
 
-  // 1. Pathが既に絶対URLならそのまま返す
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    
-    // 💡 念のため、二重結合の原因だった「フルURLの中にベースURLが再び現れる」パターンを検知し修正する
-    // これはAPIのデータが病的な場合にのみ必要
-    const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
-    
-    // パスの中にベースURLが2回以上含まれていないかチェック
-    if (imagePath.includes(base) && imagePath.indexOf(base) !== imagePath.lastIndexOf(base)) {
-        // 例: '.../storage/https://laravel.test:4430/storage/...' の場合、2回目のベースURLから切り出す
-        const correctedPathIndex = imagePath.lastIndexOf(base);
-        return imagePath.substring(correctedPathIndex);
-    }
-    
-    return imagePath;
-  }
+// 1. Pathが既に絶対URLならそのまま返す
+if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
+if (imagePath.includes(base) && imagePath.indexOf(base) !== imagePath.lastIndexOf(base)) {
+const correctedPathIndex = imagePath.lastIndexOf(base);
+return imagePath.substring(correctedPathIndex);
+}
+return imagePath;
+}
 
-  // 2. ベースURLを正規化（末尾のスラッシュを必ず持つ）
-  const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
-  
-  // 3. imagePathから先頭の `/` や `storage/` などのプレフィックスを全て除去し、クリーンな相対パスを得る
-  // 正規表現: パスの先頭にある `/` または `storage/` を全て削除する
-  let cleanPath = imagePath.replace(/^(\/|storage\/)+/, '');
+// 2. ベースURLを正規化（末尾のスラッシュを必ず持つ）
+const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
+// 3. imagePathから先頭の `/` や `storage/` などのプレフィックスを全て除去し、クリーンな相対パスを得る
+let cleanPath = imagePath.replace(/^(\/|storage\/)+/, '');
 
-  // 4. ベースURL + /storage/ + クリーンなパス を結合
-  // これがLaravelの静的ファイルアクセスに期待される最終的な形式
-  const finalUrl = `${base}storage/${cleanPath}`;
-  
-  // 💡 修正後のデバッグログ
-  console.log('Computed Full Image URL (Final Normalized V2):', finalUrl);
-  
-  return finalUrl;
+// 4. ベースURL + /storage/ + クリーンなパス を結合
+const finalUrl = `${base}storage/${cleanPath}`;
+console.log('Computed Full Image URL (Final Normalized V2):', finalUrl);
+return finalUrl;
 });
 // ★★★ 修正箇所 2 終わり ★★★
+
+
+// ★★★ 修正箇所 3: ユーザー画像URLを生成するヘルパー関数を追加 ★★★
+/**
+ * ユーザー画像パスを受け取り、完全なURLを生成する。
+ * @param path データベースに保存されている画像パス (例: storage/user_images/...)
+ * @returns 完全な画像URL
+ */
+const generateUserImageUrl = (path: string | null | undefined): string => {
+if (!path) {
+return 'https://placehold.co/40x40/D1D5DB/1F2937?text=U'; // プレースホルダー
+}
+// pathから先頭の `/` や `storage/` などのプレフィックスを全て除去し、クリーンな相対パスを得る
+let cleanPath = path.replace(/^(\/|storage\/)+/, '');
+
+// ベースURLを正規化（末尾のスラッシュを必ず持つ）
+const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL : `${IMAGE_BASE_URL}/`;
+
+// ベースURL + /storage/ + クリーンなパス を結合
+const finalUrl = `${base}storage/${cleanPath}`;
+return finalUrl;
+};
+// ★★★ 修正箇所 3 終わり ★★★
 
 
 // =======================================================
 // データ取得
 // =======================================================
 const fetchData = async (id: number) => {
-  try {
-    isLoading.value = true;
-    error.value = '';
-    // 1. 認証状態の解決を待つ (Authストアのロジックが完了するのを待つ)
-    await authStore.waitForAuthResolution();
-    // ★★★ 修正: トークンがセットされるまで待機するロジックをより確実に実装 ★★★
-    if (isAuthenticated.value) {
-      console.log('User is authenticated. Waiting for token...');
-      const maxWait = 2000; // 最大2秒待機
-      const interval = 100;
-      let waited = 0;
+try {
+isLoading.value = true;
+error.value = '';
+// 1. 認証状態の解決を待つ (Authストアのロジックが完了するのを待つ)
+await authStore.waitForAuthResolution();
+// ★★★ 修正: トークンがセットされるまで待機するロジックをより確実に実装 ★★★
+if (isAuthenticated.value) {
+console.log('User is authenticated. Waiting for token...');
+const maxWait = 2000; // 最大2秒待機
+const interval = 100;
+let waited = 0;
 
-      // localToken が null でなくなるまで、または最大待機時間までループ
-      while (!localToken.value && waited < maxWait) {
-        await new Promise(resolve => setTimeout(resolve, interval));
-        waited += interval;
-      }
+// localToken が null でなくなるまで、または最大待機時間までループ
+while (!localToken.value && waited < maxWait) {
+await new Promise(resolve => setTimeout(resolve, interval));
+waited += interval;
+}
 
-      if (!localToken.value) {
-        // トークンが取得できなかった場合はエラーログを出して続行 (Laravelが false を返す)
-        console.warn(`Authentication token could not be loaded within ${maxWait}ms.`);
-      }
-    }
-    // ★★★ 修正終わり ★★★
-    // 💡 トークン状態の最終確認ログ (デバッグ用)
-    console.log('Token check before API call:', localToken.value ? '✅ Token EXISTS' : '❌ Token MISSING');
+if (!localToken.value) {
+// トークンが取得できなかった場合はエラーログを出して続行 (Laravelが false を返す)
+console.warn(`Authentication token could not be loaded within ${maxWait}ms.`);
+}
+}
+// ★★★ 修正終わり ★★★
+// 💡 トークン状態の最終確認ログ (デバッグ用)
+console.log('Token check before API call:', localToken.value ? '✅ Token EXISTS' : '❌ Token MISSING');
 
-    // 2. 商品詳細情報をフェッチ (トークンが null の場合は null が渡される)
-    await itemStore.fetchItemDetail(id, localToken.value);
-    // itemStoreにエラーが残っていれば、それを表示
-    if (itemErrors.value.length > 0) {
-      error.value = itemErrors.value[0];
-    }
+// 2. 商品詳細情報をフェッチ (トークンが null の場合は null が渡される)
+await itemStore.fetchItemDetail(id, localToken.value);
+// itemStoreにエラーが残っていれば、それを表示
+if (itemErrors.value.length > 0) {
+error.value = itemErrors.value[0];
+}
 
-  } catch (e: any) {
-    error.value = 'データの取得中にエラーが発生しました。';
-  } finally {
-    // 💡 最終的な状態をデバッグログに出力
-    console.log('--- Final Component State (fetchData end) ---');
-    console.log('Is Favorited:', isFavorited.value);
-    // 💡 追加デバッグログ: 画像パスの最終確認
-    if (item.value) {
-        console.log('Original Item Image Path:', item.value.item_image);
-        // ★★★ 修正後のデバッグログ: 変換後の完全なURLを出力 ★★★
-        console.log('Computed Full Image URL:', fullImageUrl.value);
-    }
-    isLoading.value = false;
-  }
+} catch (e: any) {
+error.value = 'データの取得中にエラーが発生しました。';
+} finally {
+// 💡 最終的な状態をデバッグログに出力
+console.log('--- Final Component State (fetchData end) ---');
+console.log('Is Favorited:', isFavorited.value);
+// 💡 追加デバッグログ: 画像パスの最終確認
+if (item.value) {
+console.log('Original Item Image Path:', item.value.item_image);
+// ★★★ 修正後のデバッグログ: 変換後の完全なURLを出力 ★★★
+console.log('Computed Full Image URL:', fullImageUrl.value);
+}
+isLoading.value = false;
+}
 };
 
 // ... (機能ロジック 省略)
 
 const submitFavorite = async () => {
-  if (!item.value || !isAuthenticated.value) {
-    router.push('/login');
-    return;
-  }
-  await itemStore.toggleFavorite(localToken.value);
-  if (itemErrors.value.length > 0) {
-    // alertは使用禁止のため、メッセージを一時的に表示するUIなどに置き換えることが推奨されますが、
-    // 既存コードに合わせるため、ここでは暫定的に維持します。
-    // alert(itemErrors.value[0]);
-    console.error("お気に入りエラー:", itemErrors.value[0]);
-  }
+if (!item.value || !isAuthenticated.value) {
+router.push('/login');
+return;
+}
+await itemStore.toggleFavorite(localToken.value);
+if (itemErrors.value.length > 0) {
+// alertは使用禁止のため、メッセージを一時的に表示するUIなどに置き換えることが推奨されますが、
+// 既存コードに合わせるため、ここでは暫定的に維持します。
+// alert(itemErrors.value[0]);
+console.error("お気に入りエラー:", itemErrors.value[0]);
+}
 };
 
 const submitComment = async () => {
-  commentErrors.value = [];
-  if (!item.value || !isAuthenticated.value) {
-    router.push('/login');
-    return;
-  }
-  if (newComment.value.trim() === '') {
-    commentErrors.value.push('コメントを入力してください');
-    return;
-  }
-  try {
-    // トークンがnullでないことを保証
-    await itemStore.postComment(newComment.value, localToken.value!);
-    if (itemStore.errors.length > 0) {
-      commentErrors.value = itemStore.errors;
-    } else {
-      newComment.value = '';
-    }
-  } catch (e: any) {
-    commentErrors.value.push('コメント投稿中に予期せぬエラーが発生しました。');
-  }
+commentErrors.value = [];
+if (!item.value || !isAuthenticated.value) {
+router.push('/login');
+return;
+}
+if (newComment.value.trim() === '') {
+commentErrors.value.push('コメントを入力してください');
+return;
+}
+try {
+// トークンがnullでないことを保証
+await itemStore.postComment(newComment.value, localToken.value!);
+if (itemStore.errors.length > 0) {
+commentErrors.value = itemStore.errors;
+} else {
+newComment.value = '';
+}
+} catch (e: any) {
+commentErrors.value.push('コメント投稿中に予期せぬエラーが発生しました。');
+}
 };
 
 const navigateToPurchase = () => {
-  if (isOwner.value) {
-    router.push('/mypage');
-  } else if (isAuthenticated.value && item.value) {
-    router.push(`/purchase/${item.value.id}`);
-  } else {
-    router.push('/login');
-  }
+if (isOwner.value) {
+router.push('/mypage');
+} else if (isAuthenticated.value && item.value) {
+router.push(`/purchase/${item.value.id}`);
+} else {
+router.push('/login');
+}
 };
 
 
@@ -208,16 +218,16 @@ const navigateToPurchase = () => {
 // onMounted
 // =======================================================
 onMounted(async () => {
-  const idParam = route.params.id;
-  const id = Array.isArray(idParam) ? parseInt(idParam[0]) : parseInt(idParam as string);
+const idParam = route.params.id;
+const id = Array.isArray(idParam) ? parseInt(idParam[0]) : parseInt(idParam as string);
 
-  if (isNaN(id)) {
-    error.value = '無効な商品IDです。';
-    isLoading.value = false;
-    return;
-  }
-  itemId.value = id;
-  await fetchData(id);
+if (isNaN(id)) {
+error.value = '無効な商品IDです。';
+isLoading.value = false;
+return;
+}
+itemId.value = id;
+await fetchData(id);
 });
 </script>
 
@@ -314,9 +324,9 @@ class="text-gray-500"
 @click="navigateToPurchase"
 :disabled="isSoldOut && !isOwner"
 :class="{
-  'w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg': true,
-  'bg-red-600 text-white hover:bg-red-700 active:bg-red-800': !isSoldOut,
-  'bg-gray-400 text-gray-700 cursor-not-allowed': isSoldOut && !isOwner
+'w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg': true,
+'bg-red-600 text-white hover:bg-red-700 active:bg-red-800': !isSoldOut,
+'bg-gray-400 text-gray-700 cursor-not-allowed': isSoldOut && !isOwner
 }"
 >
 <span v-if="isOwner">マイページへ移動する</span>
@@ -335,22 +345,22 @@ class="text-gray-500"
 <div>
 <h2 class="text-xl font-bold text-gray-800 mb-2">商品情報</h2>
 <div class="flex flex-col space-y-2">
-  <div class="flex items-center space-x-4">
-    <p class="w-24 text-gray-600 font-medium">カテゴリー</p>
-    <ul v-if="itemCategories.length" class="flex flex-wrap gap-2">
-      <li v-for="(category, index) in itemCategories" :key="index" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-full">
-        {{ category }}
-      </li>
-    </ul>
-    <p v-else class="text-gray-500">カテゴリーは登録されていません。</p>
-  </div>
+<div class="flex items-center space-x-4">
+<p class="w-24 text-gray-600 font-medium">カテゴリー</p>
+<ul v-if="itemCategories.length" class="flex flex-wrap gap-2">
+<li v-for="(category, index) in itemCategories" :key="index" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-full">
+{{ category }}
+</li>
+</ul>
+<p v-else class="text-gray-500">カテゴリーは登録されていません。</p>
+</div>
 </div>
 </div>
 </div>
 <div class="item_detail_condition mt-4">
 <div class="flex items-center space-x-4">
-  <p class="w-24 text-gray-600 font-medium">商品の状態</p>
-  <p class="text-gray-700 font-semibold">{{ item.condition || '未登録' }}</p>
+<p class="w-24 text-gray-600 font-medium">商品の状態</p>
+<p class="text-gray-700 font-semibold">{{ item.condition || '未登録' }}</p>
 </div>
 </div>
 
@@ -362,11 +372,13 @@ class="text-gray-500"
 <div v-if="comments && comments.length > 0" class="max-h-80 overflow-y-auto pr-2 pt-2 space-y-4">
 <div v-for="comment in comments" :key="comment.id" class="comment border-b border-gray-100 pb-3">
 <div class="comment_name_image flex items-center space-x-3">
+<!-- ★★★ 修正箇所 4: generateUserImageUrl 関数を使用 ★★★ -->
 <img
-:src="comment.user.user_image || 'https://placehold.co/40x40/D1D5DB/1F2937?text=U'"
+:src="generateUserImageUrl(comment.user.user_image)"
 alt="プロフィール画像"
 class="user_image_css w-10 h-10 rounded-full object-cover"
 >
+<!-- ★★★ 修正箇所 4 終わり ★★★ -->
 <p class="comment_name font-semibold text-gray-800">{{ comment.user.name }}</p>
 </div>
 <p class="comment-text ml-10 mt-1 text-gray-700 whitespace-pre-wrap">{{ comment.comment }}</p>
@@ -400,83 +412,83 @@ class="user_image_css w-10 h-10 rounded-full object-cover"
 <style scoped>
 /* Tailwind CSSとの併用を考慮したBladeCSSの再現 */
 .item_detail_contents {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
+display: flex;
+justify-content: center;
+flex-wrap: wrap;
+max-width: 1400px;
+margin: 0 auto;
+padding: 20px;
 }
 
 .item_detail_image {
-    width: 50%;
-    max-width: 450px;
-    min-width: 300px;
-    padding: 50px;
+width: 50%;
+max-width: 450px;
+min-width: 300px;
+padding: 50px;
 }
 
 .item_detail_image1 {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    object-position: center;
+width: 100%;
+height: auto;
+aspect-ratio: 1 / 1;
+object-fit: cover;
+object-position: center;
 }
 
 .information {
-    width: 50%;
-    max-width: 450px;
-    min-width: 300px;
-    padding: 50px;
+width: 50%;
+max-width: 450px;
+min-width: 300px;
+padding: 50px;
 }
 
 .item_detail_name h2 {
-    max-width: 75%;
-    overflow: hidden;
-    font-size: 22px;
+max-width: 75%;
+overflow: hidden;
+font-size: 22px;
 }
 
 /* BladeのCSSで要素に設定されていたleftやpositionのオフセットをTailwindで上書きするため、ここではリセット/調整をしています。*/
 .information h2, .information h3, .information p {
-    margin-left: 0 !important; 
-    position: static; /* h3, pのleft: 20pxをリセット */
+margin-left: 0 !important;
+position: static; /* h3, pのleft: 20pxをリセット */
 }
 
-.information > div > h2, 
-.information > div > div > h2, 
-.item_detail_explain h2, 
-.item_detail_category h2, 
+.information > div > h2,
+.information > div > div > h2,
+.item_detail_explain h2,
+.item_detail_category h2,
 .item_detail_comment_history h2 {
-    font-size: 1.25rem; 
-    font-weight: bold; 
+font-size: 1.25rem;
+font-weight: bold;
 }
 
 .item_detail_brand {
-    display: flex;
-    align-items: center;
-    margin-top: 10px;
+display: flex;
+align-items: center;
+margin-top: 10px;
 }
 .item_detail_brand_1 {
-    font-weight: 700;
-    font-size: 14px;
+font-weight: 700;
+font-size: 14px;
 }
 .item_detail_brand_2 {
-    position: relative; 
-    left: 50px; /* Bladeのleft: 50pxを維持 */
-    font-weight: 600;
-    font-size: 14px;
+position: relative;
+left: 50px; /* Bladeのleft: 50pxを維持 */
+font-weight: 600;
+font-size: 14px;
 }
 
 .item_detail_price {
-    margin-top: 10px;
-    margin-bottom: 20px;
+margin-top: 10px;
+margin-bottom: 20px;
 }
 .item_detail_price h2 {
-    font-size: 26px;
+font-size: 26px;
 }
 .price_after {
-    font-size: 19px;
-    font-weight: 500;
+font-size: 19px;
+font-weight: 500;
 }
 
 /* 💡 修正後のアイコンコンテナ: Flexboxでシンプルに配置 */
@@ -484,178 +496,178 @@ class="user_image_css w-10 h-10 rounded-full object-cover"
 
 /* 💡 お気に入りボタンのカスタムCSSを修正 */
 .heart_icon {
-    /* ♥️ (黒ハート) は 'filled' の意味で赤色に、♡ (白ハート) は 'unfilled' の意味で灰色に */
-    /* text-red-500 クラスで色が変わるように、ここで基本の色を調整 */
-    color: currentColor; /* Tailwindクラスによる色指定を許可 */
+/* ♥️ (黒ハート) は 'filled' の意味で赤色に、♡ (白ハート) は 'unfilled' の意味で灰色に */
+/* text-red-500 クラスで色が変わるように、ここで基本の色を調整 */
+color: currentColor; /* Tailwindクラスによる色指定を許可 */
 }
 
 .item_detail_icon {
-    display: flex;
-    align-items: center;
-    margin-top: 10px;
-    margin-bottom: 20px;
+display: flex;
+align-items: center;
+margin-top: 10px;
+margin-bottom: 20px;
 }
 /* 旧CSSを削除/コメントアウト */
 /* .favorite_button, .star_text, .ster_icon_1, .ster_icon_2, .favorites_count, .comments_icon, .comments_count0 は削除または調整 */
 
 
 .explain_word {
-    word-break: break-all;
-    overflow-wrap: break-word;
-    font-weight: 600;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    line-height: 1.6;
-    margin-left: 20px; /* h3のleft: 20pxをmarginで代替 */
-    font-size: 14px;
+word-break: break-all;
+overflow-wrap: break-word;
+font-weight: 600;
+white-space: pre-wrap;
+word-wrap: break-word;
+line-height: 1.6;
+margin-left: 20px; /* h3のleft: 20pxをmarginで代替 */
+font-size: 14px;
 }
 
 .category_views {
-    display: flex;
-    flex-wrap: wrap;
-    padding-left: 0; 
-    margin-top: 10px;
+display: flex;
+flex-wrap: wrap;
+padding-left: 0;
+margin-top: 10px;
 }
 .category_mark01 {
-    position: relative;
-    right: 22px; /* category_mark01のright: 22pxを維持 */
-    font-weight: 700;
-    list-style: none;
+position: relative;
+right: 22px; /* category_mark01のright: 22pxを維持 */
+font-weight: 700;
+list-style: none;
 }
 .category_mark {
-    position: relative;
-    left: 20px; /* category_markのleft: 20pxを維持 */
-    margin-right: 10px;
-    list-style: none;
-    background-color: #d9d9d9;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 70px;
-    height: 20px;
-    padding: 2px 5px;
+position: relative;
+left: 20px; /* category_markのleft: 20pxを維持 */
+margin-right: 10px;
+list-style: none;
+background-color: #d9d9d9;
+border-radius: 10px;
+font-size: 11px;
+font-weight: 600;
+display: flex;
+align-items: center;
+justify-content: center;
+width: 70px;
+height: 20px;
+padding: 2px 5px;
 }
 
 .item_detail_condition {
-    display: flex;
-    align-items: center;
+display: flex;
+align-items: center;
 }
 .item_detail_condition_1 {
-    font-size: 16px;
-    font-weight: 700;
+font-size: 16px;
+font-weight: 700;
 }
 .item_detail_condition_2 {
-    position: relative;
-    left: 50px; /* item_detail_condition_2のleft: 50pxを維持 */
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
+position: relative;
+left: 50px; /* item_detail_condition_2のleft: 50pxを維持 */
+font-size: 12px;
+display: flex;
+align-items: center;
+justify-content: center;
+font-weight: 600;
 }
 
 .info_submit, .comment_submit {
-    width: 350px;
-    height: 30px;
-    font-weight: bold;
-    font-size: 17px;
-    display: block;
-    color: aliceblue;
-    border: #ff5555;
-    background-color: #ff5555;
-    text-decoration: none;
-    text-align: center;
-    line-height: 30px;
-    cursor: pointer;
-    border-radius: 0;
-    border-width: 0; /* Tailwindでborderが適用されるのを避ける */
+width: 350px;
+height: 30px;
+font-weight: bold;
+font-size: 17px;
+display: block;
+color: aliceblue;
+border: #ff5555;
+background-color: #ff5555;
+text-decoration: none;
+text-align: center;
+line-height: 30px;
+cursor: pointer;
+border-radius: 0;
+border-width: 0; /* Tailwindでborderが適用されるのを避ける */
 }
 .comment_submit {
-    margin-top: 15px;
-    font-weight: 800;
+margin-top: 15px;
+font-weight: 800;
 }
 
 .comment_count_flex {
-    display: flex;
-    align-items: center;
-    color: #5f5f5f;
+display: flex;
+align-items: center;
+color: #5f5f5f;
 }
 .comments_count {
-    position: relative;
-    top: 0;
-    margin-left: 10px;
-    font-size: 14px;
-    font-weight: normal;
+position: relative;
+top: 0;
+margin-left: 10px;
+font-size: 14px;
+font-weight: normal;
 }
 .comment {
-    max-width: 320px;
-    word-break: break-all;
-    overflow-wrap: break-word;
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px dashed #ccc;
+max-width: 320px;
+word-break: break-all;
+overflow-wrap: break-word;
+margin-top: 15px;
+padding-top: 10px;
+border-top: 1px dashed #ccc;
 }
 .comment-text {
-    font-weight: 600;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    line-height: 1.6;
-    margin-left: 50px;
-    font-size: 14px;
+font-weight: 600;
+white-space: pre-wrap;
+word-wrap: break-word;
+line-height: 1.6;
+margin-left: 50px;
+font-size: 14px;
 }
 .comment_name_image {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
+display: flex;
+align-items: center;
+margin-bottom: 5px;
 }
 .user_image_css {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    overflow: hidden;
-    object-fit: cover;
-    object-position: center;
-    position: relative;
-    left: 0px; 
+width: 40px;
+height: 40px;
+border-radius: 50%;
+overflow: hidden;
+object-fit: cover;
+object-position: center;
+position: relative;
+left: 0px;
 }
 .comment_name {
-    position: relative;
-    left: 10px; 
-    font-size: 17px;
-    font-weight: 700;
+position: relative;
+left: 10px;
+font-size: 17px;
+font-weight: 700;
 }
 .item_detail_comment_form h2 {
-    font-size: 18px;
-    position: relative;
-    top: 8px;
-    margin-bottom: 10px;
+font-size: 18px;
+position: relative;
+top: 8px;
+margin-bottom: 10px;
 }
 textarea {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .error_massage {
-    color: red;
-    list-style-type: none;
-    padding-left: 0;
-    margin-top: 10px;
+color: red;
+list-style-type: none;
+padding-left: 0;
+margin-top: 10px;
 }
 
 @media (max-width: 768px) {
-    .item_detail_image,
-    .information {
-        width: 100%;
-        max-width: 100%;
-        min-width: unset;
-        padding: 20px;
-    }
+.item_detail_image,
+.information {
+width: 100%;
+max-width: 100%;
+min-width: unset;
+padding: 20px;
+}
 
-    .info_submit, .comment_submit {
-        width: 100%;
-        max-width: 450px;
-    }
+.info_submit, .comment_submit {
+width: 100%;
+max-width: 450px;
+}
 }
 </style>

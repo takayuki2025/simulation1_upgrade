@@ -87,7 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/upload2', [ItemController::class, 'user_image_upload']);
 
     // 購入前情報画面表示
-    Route::get('/purchase/{item_id}', [ItemController::class, 'item_buy_show']);
+    Route::get('/purchase/{item_id}', [ItemController::class, 'item_buy_show'])->name('item_buy');
 
     // 出品画面表示
     Route::get('/sell', [ItemController::class, 'item_sell_show']);
@@ -100,8 +100,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 購入処理関連
     Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update']); 
+
     Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create'); 
-    Route::post('/stripe_success', [ItemController::class, 'stripeSuccess']); 
+    
 
     // コメント投稿
     Route::post('/comment', [ItemController::class, 'comment_create']); 
@@ -110,7 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/items/{item}/favorite', [ItemController::class, 'apiFavorite']);
 });
 
-
+Route::get('/stripe_success', [ItemController::class, 'stripeSuccess'])->name('stripe_success');
 // **********************************************
 // ★★★ 公開 (認証不要) API ルート ★★★
 // **********************************************

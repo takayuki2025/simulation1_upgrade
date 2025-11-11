@@ -1,4 +1,4 @@
-<!-- 💡 directory_name = 1pages -->
+<!-- 💡 directory_name = 0_pages -->
 <template>
   <div class="main_contents">
     <!-- ... (中略: タブ切り替え、検索フォーム) ... -->

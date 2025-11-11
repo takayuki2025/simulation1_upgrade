@@ -7,14 +7,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useAuth } from '~/composables/useAuth';
 
 // =======================================================
-// 💡 修正 1: NuxtのConfigとAPIベースURLの定義
-// =======================================================
-const config = useRuntimeConfig();
-// .env の NUXT_PUBLIC_API_BASE_URL が自動で camelCase の apiBaseUrl に変換されます
-const API_BASE_URL = config.public.apiBaseUrl as string;
-
-
-// =======================================================
 // ストア・ルータ初期化
 // ※ オリジナルのコードから変更なし
 // =======================================================
@@ -164,82 +156,19 @@ const navigateToAddressEdit = () => {
 };
 
 // 🔹 追加: 購入処理 (Bladeファイルの form action の代替)
-const submitPurchase = async () => {
-    if (!canPurchase.value || !item.value || !localToken.value) {
+const submitPurchase = () => {
+    if (!canPurchase.value) {
+        error.value = '支払い方法を選択するか、在庫があることを確認してください。';
         return;
     }
-    
-    error.value = '';
-    isLoading.value = true;
-    
-    const purchaseData = {
-        item_id: item.value.id,
+    // TODO: ここに実際の購入API連携ロジックを実装する
+    console.log('購入を確定:', {
+        item_id: item.value?.id,
         payment: selectedPayment.value,
-        address: user.value?.address || '住所未登録', 
-    };
-
-    try {
-        // 1. サーバーへPOSTリクエストを送信
-        // 🚨 修正点: API_BASE_URL (https://laravel.test:4430/api) を使って絶対URLを生成します。
-        const apiUrl = `${API_BASE_URL}/thanks_buy`;
-        
-        const response = await $fetch(apiUrl, { 
-            method: 'POST',
-            body: purchaseData,
-            headers: {
-                'Authorization': `Bearer ${localToken.value}`,
-                'Accept': 'application/json',
-            },
-            credentials: 'include', // Cookieを確実に送信
-        });
-      
-        console.log('デバッグA: API通信成功。レスポンス:', response);
-
-        // 2. 処理が成功した場合のみ、支払い方法に応じて画面遷移を分岐
-        
-        // 🔹 カード支払いの場合 (Stripeへのリダイレクト)
-        if (selectedPayment.value === 'カード支払い') {
-             // 💡 サーバーが303リダイレクトのURLをJSONで返したと仮定
-             if (response && response.stripe_url) { 
-                 // ブラウザ全体をStripeの決済画面へ移動
-                 window.location.href = response.stripe_url;
-                 return;
-             }
-             throw new Error("カード支払いリダイレクトURLの取得に失敗しました。");
-        } 
-        
-        // 🔹 コンビニ払いの場合 (API成功 -> thanksページへ遷移)
-        else if (selectedPayment.value === 'コンビニ払い') {
-          // 💡 thanks_buy_createの実行に成功したので、/thanksへ遷移
-          console.log('デバッグB: コンビニ払い、遷移を実行します。');
-            router.push('/thanks/buy-mypayment');
-            return;
-        }
-        
-        // 💡 どちらの支払い方法にも該当しない、または予期せぬレスポンス
-        throw new Error("支払い処理後の遷移に失敗しました。");
-
-    } catch (e: any) {
-        console.error('購入処理エラー:', e);
-
-        // 3. 失敗した場合：リダイレクトの特殊処理（主にStripe失敗時の戻り処理）
-        // Laravelの302リダイレクトがエラーとして捕捉された場合、そのURLに遷移させる
-        const redirectUrl = e.response?.headers?.get('Location') || e.response?.headers?.get('location');
-        if (redirectUrl && !redirectUrl.includes('/thanks')) { // thanksページへのリダイレクトは無視
-            window.location.href = redirectUrl;
-            return;
-        }
-
-        // 4. 失敗した場合：エラーメッセージの表示のみ行い、画面遷移はしない
-        if (e.response && e.response.status === 422) {
-             error.value = '入力内容または在庫に問題があります。';
-        } else {
-             error.value = e.message || '購入処理中に予期せぬエラーが発生しました。';
-        }
-
-    } finally {
-        isLoading.value = false;
-    }
+        address: user.value?.address,
+    });
+    // 仮で thanks_buy_create に相当するページに遷移
+    router.push('/thanks-buy-create');
 };
 </script>
 
