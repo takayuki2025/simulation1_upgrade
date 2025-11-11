@@ -660,9 +660,9 @@ class ItemController extends Controller
     
 
 
-// 購入商品(コンビニ支払い、カード支払い)・出品商品の処理
+// 購入商品(コンビニ支払い、カード支払い)
         // コンビニ決済完了処理
-        public function thanks_buy_create(Request $request)
+        public function thanks_buy_create(PurchaseRequest $request)
     {
         // ★ 共通の認証チェックを先頭に移動
         $user = Auth::user();
@@ -865,11 +865,6 @@ class ItemController extends Controller
     }
 
 
-        // コンビニ・stripe決済完了後ページを表示する
-    //     public function thanks_buy_show()
-    // {
-    //     return view('thanks_buy');
-    // }
 
 // 出品商品登録処理
 

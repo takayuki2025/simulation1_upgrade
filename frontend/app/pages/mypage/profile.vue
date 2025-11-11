@@ -402,13 +402,13 @@ const getProfileImageUrl = (path: string | undefined | null) => {
     
     <!-- 郵便番号 -->
     <div class="form-group">
-        <label class="label_form_2">郵便番号 (7桁、ハイフンなし)</label>
+        <label class="label_form_2">郵便番号 (8桁、ハイフンあり)</label>
         <input 
           type="text" 
           class="email_form" 
           name="post_number" 
           v-model="form.post_number" 
-          placeholder="例: 1000001" 
+          placeholder="例: 100-0001" 
           maxlength="8"
         />
         <div class="profile__error">

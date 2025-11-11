@@ -73,8 +73,8 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
 </script>
 
 <template>
-  <!-- Register Box: Loginページと同じスタイルを適用 -->
-  <div class="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl">
+  <!-- Register Box: Loginページと同じスタイルを適用し、mt-8とmb-8で上下のバランスを調整 -->
+  <div class="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl mx-auto z-10 mt-8 mb-8">
     
     <!-- Title -->
     <h2 class="text-center text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
@@ -159,7 +159,7 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
         <button 
           type="submit" 
           :disabled="isSubmitting"
-          class="w-full bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 transition duration-150 shadow-lg disabled:bg-gray-400"
+          class="w-full bg-red-600 text-white py-2 rounded-md font-semibold hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400"
         >
           {{ isSubmitting ? '登録中...' : '登録する' }}
         </button>

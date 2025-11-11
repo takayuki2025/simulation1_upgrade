@@ -62,8 +62,8 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
 </script>
 
 <template>
-  <!-- Login Box: 白い背景、角丸、シャドウ、最大幅設定 -->
-  <div class="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl">
+  <!-- 💡 修正: 上部のマージン mt-8 を追加し、ヘッダーからのバランスを調整します。 -->
+  <div class="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl mx-auto z-10 mt-20 mb-8">
     
     <!-- Title -->
     <h2 class="text-center text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
@@ -117,7 +117,7 @@ const handleSubmit = veeValidateHandleSubmit(async (values) => {
         <button 
           type="submit" 
           :disabled="isSubmitting"
-          class="w-full bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 transition duration-150 shadow-lg disabled:bg-gray-400"
+          class="w-full bg-red-600 text-white py-2 rounded-md font-semibold hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400"
         >
           {{ isSubmitting ? 'ログイン中...' : 'ログインする' }}
         </button>
