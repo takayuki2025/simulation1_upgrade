@@ -5,15 +5,19 @@ Dockerビルド
 <br>
 　1\. 　git cloneリンク（ターミナルコマンド） git clone https://github.com/takayuki2025/simulation1_upgrade.git  の実行
 <br>
-　2\. （ターミナルコマンド）cd simulation1　の実行。
+　2\. （ターミナルコマンド）cd simulation1_upgrade　の実行。
+                        git checkout feature/login-logout の実行
 <br>
  　3\.   　ダミーデーターの商品画像ファイルをstrageディレクトリーの中にitem_imagesディレクトリーを作成して商品画像ファイルをコピーする。<br>
-　　　（ターミナルコマンド）mkdir src/storage/app/public/item_images　の実行<br>
-　　　　　　　　　　　cp -r src/public/pictures/* src/storage/app/public/item_images　の実行<br>
+　　　（ターミナルコマンド）cd backend (実行後) mkdir storage/app/public/item_images　の実行<br>
+　　　　　　　　　　　cp -r public/pictures/* storage/app/public/item_images　の実行<br>
  　4\.　　ダミーデーターのユーザー初期画像ファイルをstrageディレクトリーの中にimagesディレクトリーを作成して初期画像ファイルをコピーする<br>
- 　　　（ターミナルコマンド）mkdir src/storage/app/public/images　の実行<br>
-　　　　　　　　　　　cp -r src/public/pictures_user/* src/storage/app/public/images　の実行<br>
-　5\. Docker Desktopを立ち上げて（ターミナルコマンド）docker-compose up -d --build　の実行
+ 　　　（ターミナルコマンド）mkdir storage/app/public/images　の実行<br>
+　　　　　　　　　　　cp -r public/pictures_user/* storage/app/public/images　の実行<br>
+  6\.    docker-compose.ymlのfrontend_devのcommandの　command: sh -c "VITE_FS_INOTIFY_LIMIT=524288 yarn dev --host 0.0.0.0 --port 3000 --https false"　を
+  　　　　　　　　　　　　　　　　　　　　　　　　　　　　　   command: sh -c "node /app/node_modules/@nuxt/cli/bin/nuxi.mjs dev --host 0.0.0.0 --port 3000 --https false"
+                                  に変更。
+　5\. Docker Desktopを立ち上げて（ターミナルコマンド）cd .. (実行後)　docker-compose up -d --build　の実行
 <br>
 　
   <br>
@@ -26,30 +30,24 @@ laravel環境構築
 <br>
 　3\. 　env.exampleファイルから.envを作成し、.envファイルの環境変数を変更<br>
 　(PHPコンテナー)  cp .env.example .env　の実行後.envの環境変数の変更<br>
+  その後　frontend_derに移動後、　cp .env.example .env　の実行後frontend.envの環境変数の追加<br>
 
-　stripeの公開キーは　STRIPE_KEY=""　　の""の中へ、シークレットキーは　STRIPE_SECRET=""　の""の中へ採点者様のキーを入力してstripe決済が機能しているかご確認よろしくお願い致します。<br>
-　ここからは全て追加です(env.ファイルの一番下に追加してください。)<br><br>
+　・stripeの公開キーなどは個人情報保護のためgitで追跡していません。必要でしたらコード伝えます。<br>
 
-STRIPE_KEY=""<br>
+  ・firebaseのAPIキーなど６項目（frontend .env　追記用）、firebaseのサービスアカウントキー（新規ファイル作成用）などは個人情報保護のためgitで追跡していません。（画面表示、新規登録もログインもできない状態です。）
+  必要でしたら　frontend .env　追記用　と　./backend/config/firebase-service-account.json　ファイルに必要なコード伝えます。<br>
 
-STRIPE_SECRET=""<br>
-
-CASHIER_CURRENCY=ja_JP<br>
-CASHIER_CURRENCY_LOCALE=ja_JP<br>
-CASHIER_LOGGER=daily<br>
+  (.env追加後　カレントディレクトリーに戻り)　docker compose restart （frontend_dev）or（frontend_dev）　の実行   <br>
 
 <br>
 <br>
 　4\. アプリケーションキーの作成<br>
 　　（PHPコンテナー）php artisan key:generate
 <br>
-　5\. マイグレーションの実行<br>
-　　php artisan migrate
+　5\. マイグレーションの実行・シーディング実行<br>
+　　php artisan migrate:fresh --seed
 <br>
-　6\. シーディングの実行<br>
-　　php artisan db:seed
-<br>
-　7\. テスト用のデーターベース作成からPHPUnitテスト実行まで。<br>
+　7\.(API ベース開発に変更したため全てのテストコードは使えない状態です。) テスト用のデーターベース作成からPHPUnitテスト実行まで。<br>
 　（exitでターミナルに戻ってから）docker-compose exec mysql bash　を実行<br>
 　（mysqlコンテナー）mysql -u root -p   の実行後パスワード　root　と入力して実行<br>
 　（mysql接続後）CREATE DATABASE coachtech1_test;　を実行 (実行後exitコマンドでターミナルまで戻る)<br>
@@ -116,7 +114,9 @@ WEBサイトにも良く反映されて景気の波にも負けないような�
   - PHP 8.4
   - Laravel 11
   - MySql 8.3
-  - nginx 1.21.1
+  - Nginx 1.21.1
+  - Caddy　2.7.5-alpine
+  - Nuxt 4.1.3(Node 22-bullseye)
 <br>
 
 # URL<br>
