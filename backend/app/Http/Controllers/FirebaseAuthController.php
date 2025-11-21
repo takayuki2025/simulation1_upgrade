@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller; 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -12,10 +12,10 @@ use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 use App\Models\User;
 use Throwable;
 // ★ メール認証に必要なクラスをインポート
-use Illuminate\Auth\Events\Verified; 
-use Illuminate\Auth\Notifications\VerifyEmail; 
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Auth\Notifications\VerifyEmail;
 
-class FirebaseAuthController extends Controller 
+class FirebaseAuthController extends Controller
 {
     /**
      * Firebase IDトークンを使用してユーザーを登録またはログインし、Sanctumトークンを返す

@@ -1,4 +1,4 @@
-# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋NUXT４＋firebase
+# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋React＋firebase
 # 環境構築
 Dockerビルド
 <br>
@@ -6,13 +6,14 @@ Dockerビルド
 　1\. 　git cloneリンク（ターミナルコマンド） git clone https://github.com/takayuki2025/simulation1_upgrade.git  の実行
 <br>
 　2\. （ターミナルコマンド）cd simulation1　の実行。
+                         git checkout feature/react-develop の実行
 <br>
  　3\.   　ダミーデーターの商品画像ファイルをstrageディレクトリーの中にitem_imagesディレクトリーを作成して商品画像ファイルをコピーする。<br>
-　　　（ターミナルコマンド）mkdir src/storage/app/public/item_images　の実行<br>
-　　　　　　　　　　　cp -r src/public/pictures/* src/storage/app/public/item_images　の実行<br>
+　　　（ターミナルコマンド）cd backend (実行後) mkdir storage/app/public/item_images　の実行<br>
+　　　　　　　　　　　cp -r public/pictures/* storage/app/public/item_images　の実行<br>
  　4\.　　ダミーデーターのユーザー初期画像ファイルをstrageディレクトリーの中にimagesディレクトリーを作成して初期画像ファイルをコピーする<br>
- 　　　（ターミナルコマンド）mkdir src/storage/app/public/images　の実行<br>
-　　　　　　　　　　　cp -r src/public/pictures_user/* src/storage/app/public/images　の実行<br>
+ 　　　（ターミナルコマンド）mkdir storage/app/public/images　の実行<br>
+　　　　　　　　　　　cp -r public/pictures_user/* storage/app/public/images　の実行<br>
 　5\. Docker Desktopを立ち上げて（ターミナルコマンド）docker-compose up -d --build　の実行
 <br>
 　
@@ -26,36 +27,39 @@ laravel環境構築
 <br>
 　3\. 　env.exampleファイルから.envを作成し、.envファイルの環境変数を変更<br>
 　(PHPコンテナー)  cp .env.example .env　の実行後.envの環境変数の変更<br>
+  その後　frontend_derに移動後、　cp .env.example .env　の実行後frontend.envの環境変数の追加<br>
 
-　stripeの公開キーは　STRIPE_KEY=""　　の""の中へ、シークレットキーは　STRIPE_SECRET=""　の""の中へ採点者様のキーを入力してstripe決済が機能しているかご確認よろしくお願い致します。<br>
-　ここからは全て追加です(env.ファイルの一番下に追加してください。)<br><br>
+　・stripeの公開キーなどは個人情報保護のためgitで追跡していません。必要でしたらコード伝えます。<br>
 
-STRIPE_KEY=""<br>
+  ・firebaseのAPIキーなど６項目（frontend .env　追記用）、firebaseのサービスアカウントキー（新規ファイル作成用）などは個人情報保護のためgitで追跡していません。（画面表示、新規登録もログインもできない状態です。）
+  必要でしたら　frontend .env　追記用　と　./backend/config/firebase-service-account.json　ファイルに必要なコード伝えます。<br>
 
-STRIPE_SECRET=""<br>
-
-CASHIER_CURRENCY=ja_JP<br>
-CASHIER_CURRENCY_LOCALE=ja_JP<br>
-CASHIER_LOGGER=daily<br>
+  (.env追加後　カレントディレクトリーに戻り)　docker compose restart （frontend_dev）or（frontend_dev）　の実行   <br>
 
 <br>
 <br>
 　4\. アプリケーションキーの作成<br>
 　　（PHPコンテナー）php artisan key:generate
 <br>
-　5\. マイグレーションの実行<br>
-　　php artisan migrate
+　5\. マイグレーションの実行・シーディング実行<br>
+　　php artisan migrate:fresh --seed
 <br>
-　6\. シーディングの実行<br>
-　　php artisan db:seed
-<br>
-　7\. テスト用のデーターベース作成からPHPUnitテスト実行まで。<br>
+　6\.(API ベース開発に変更したため全てのテストコードは使えない状態です。) テスト用のデーターベース作成からPHPUnitテスト実行まで。<br>
 　（exitでターミナルに戻ってから）docker-compose exec mysql bash　を実行<br>
 　（mysqlコンテナー）mysql -u root -p   の実行後パスワード　root　と入力して実行<br>
 　（mysql接続後）CREATE DATABASE coachtech1_test;　を実行 (実行後exitコマンドでターミナルまで戻る)<br>
 （ターミナルで　docker-compose exec php bash を実行した後のPHPコンテナーで）php artisan test　を実行してテストをしてください。<br>
-
 <br>
+
+# 次のステップ提案<br>
+ルーティング: react-router-dom を使って、ページ遷移を実装してみる。<br>
+
+API通信: Laravel に API を作り、React から fetch や axios でデータを取得してみる。<br>
+
+認証: Firebase Authentication を組み込んでみる（以前の 00.firebase-service.client.ts が役立ちます）。<br>
+
+
+
 
 # 伝えること<br>
 -  （応用）のstripe決済機能、メール認証機能、PHPUnitでのテストファイルの作成はできています。<br>stripe決済のクレジットカード番号は、4242 4242 4242 4242　で有効期限日は未来の日にち、セキュリティー番号とメールアドレス(メール形式で)、名前はなんでも大丈夫です。<br>
@@ -69,9 +73,9 @@ CASHIER_LOGGER=daily<br>
 -  ダミーのユーザーデーターと出品商品データーのシーダーファイルで作りましたので、PHPコンテナーで上記の通り　php artisan db:seed　を実行してください。<br>
    ダミーのユーザー情報です。'　'は削除してください。<br>
    １：名前:'テスト用のユーザ１'、アドレス:　'valid.email@example.com'　パスワード:　'testtest1'　出品数：'２品'<br>
-   ２：名前:'テスト用のユーザ2'、アドレス:　'test@22'　パスワード:　'testtest2'　出品数：'２品'<br>
-   ３：名前:'テスト用のユーザ3'、アドレス:　'test@33'　パスワード:　'testtest3'　出品数：'３品'<br>
-   ４：名前:'テスト用のユーザ4'、アドレス:　'test@44'　パスワード:　'testtest4'　出品数：'３品'　　です。メール認証は登録済みでログイン後トップページに移動します。<br><br>
+   ２：名前:'テスト用のユーザ2'、アドレス:　'taro.y@coachtech.com'　パスワード:　'testtest2'　出品数：'２品'<br>
+   ３：名前:'テスト用のユーザ3'、アドレス:　'reina.n@coachtech.com'　パスワード:　'testtest3'　出品数：'３品'<br>
+   ４：名前:'テスト用のユーザ4'、アドレス:　'tomomi.a@coachtech.com'　パスワード:　'testtest4'　出品数：'３品'　　です。メール認証は登録済みでログイン後トップページに移動します。<br><br>
 -  プロフィールのユーザー画像を登録していない場合は初期画面として、default-profile２.jpgファイルの画像を使っています。それからユーザー、商品画像を登録した際は同じファイル名にならないよう頭文字以外はランダムで生成するようにしました。<br><br>
 -  スプレットシートの機能要件一覧（US006 FN022.4）の商品を購入した後の還移先は商品一覧画面のところを一つ挟んで購入完了画面を追加しました。その後ページのトップページに戻るを押すと商品一覧画面に移動します。商品を出品した後は出品完了画面に移動してトップページに戻るを押すと商品一覧画面に移動します。<br><br>
 -  出品商品の商品名,ブランド名の文字数は２０文字以内、金額は２０億円以内（バリデーション、テスト含む）に設定しました。<br><br>
@@ -120,6 +124,7 @@ WEBサイトにも良く反映されて景気の波にも負けないような�
 <br>
 
 # URL<br>
+  - フロントエンド：https://laravel.test/
   - フリマアプリトップページ： https://laravel.test:4431/
   - ユーザー登録： https://laravel.test:4431/register
   - phpMyAdmin:http://localhost:8080/

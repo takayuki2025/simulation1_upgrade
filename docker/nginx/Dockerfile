@@ -28,8 +28,8 @@ RUN mkdir -p /var/www/backend /var/www/frontend/public && \
     chown -R www-data:www-data /var/www/backend /var/www/frontend/public && \
     chown -R www-data:www-data /var/cache/nginx /var/run /var/log/nginx
 
-# 🚨 実行ユーザーを www-data に変更 (変更なし)
-USER www-data
+# ベースイメージが何らかのユーザーに切り替えている場合に備えて、USER rootを明示。
+USER root
 
 # コマンドはそのまま (変更なし)
 ENTRYPOINT ["/usr/sbin/nginx", "-g", "daemon off;"]

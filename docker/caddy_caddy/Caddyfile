@@ -1,0 +1,31 @@
+{
+    auto_https disable_redirects
+    email your@email.com
+}
+
+# Laravel (Backend)
+https://laravel.test:4430 {
+    tls /etc/caddy/laravel.test.pem /etc/caddy/laravel.test-key.pem
+    reverse_proxy http://nginx:80 {
+
+        transport http {
+            read_timeout 10m
+            write_timeout 10m
+            dial_timeout 5s
+        }
+
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+}
+
+# Nuxt (Frontend)
+https://laravel.test:4431 {
+    tls /etc/caddy/laravel.test.pem /etc/caddy/laravel.test-key.pem
+    reverse_proxy http://frontend_dev:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+}

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tsbuildinfo",
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2022"]
+  },
+  // vite.config.jsやその他のNode環境で実行される設定ファイルを含める
+  "include": ["vite.config.js", "vite.config.ts"]
+}
