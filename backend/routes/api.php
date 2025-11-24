@@ -6,7 +6,11 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\FirebaseAuthController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ItemController;
+use Illuminate\Support\Facades\Log; // Logファサードをインポート
+use App\Http\Middleware\VerifyFirebaseToken; // ★ 追加：ミドルウェアクラスをインポート
 
+// ★★★ 強制ログ: ルーティングファイルが読み込まれているかを確認 ★★★
+Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 
 
 // **********************************************
@@ -14,21 +18,35 @@ use App\Http\Controllers\ItemController;
 // **********************************************
 
 
+// Nuxtがページを表示する際に必要なデータ取得エンドポイントを追加します。
+// 商品詳細情報取得
+    Route::get('/items/{item_id}', [ItemController::class, 'item_detail_show']);
+    
+// フロントページ（商品一覧）取得
+// 【修正点】認証情報が存在すればAuth::guard('sanctum')->user()にセットするため、ミドルウェアを適用
+// ★ 修正: ミドルウェアをAPIグループ全体に移動したため、ここでの個別指定は削除します。
+    Route::get('/items', [ItemController::class, 'index']); 
+
+// コメント取得 (GET)
+    Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);
 
 
+    Route::middleware('auth:sanctum')->get('/auth/check', function () {
+    return response()->json([
+        'authenticated' => true,
+        'user' => auth()->user(),
+    ]);
+});
 
+Route::get('/auth/check', function () {
+    return response()->json([
+        'authenticated' => auth()->check(),
+    ]);
+});
 
-
-
-
-
-
-
-
-
-
-
-
+// Sanctum認証が必要な他のAPIルートよりも前に定義することが推奨されます
+Route::post('/register_or_login', [FirebaseAuthController::class, 'handleTokenExchange'])
+    ->name('api.register_or_login');
 
 
 
@@ -65,7 +83,9 @@ use App\Http\Controllers\ItemController;
 // ★★★ Sanctum 認証 API ルート (auth:sanctum ミドルウェアを使用) ★★★
 // **********************************************
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // Route::middleware([VerifyFirebaseToken::class, 'auth:sanctum'])->group(function () {
+    Route::middleware([VerifyFirebaseToken::class])->group(function () {
+    
 
     // 現在のユーザー情報取得 (Pinia storeの fetchUser で使用)
     Route::get('/user', function (Request $request) {

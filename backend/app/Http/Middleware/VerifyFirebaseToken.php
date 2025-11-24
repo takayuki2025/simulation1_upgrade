@@ -4,77 +4,116 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Kreait\Firebase\Contract\Auth as FirebaseAuth;
-use Kreait\Firebase\Exception\Auth\InvalidToken;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth; // ★ Authファサードを追加
-use App\Models\User; // ★ ユーザーモデルのインポートを確認
 use Symfony\Component\HttpFoundation\Response;
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
+use Throwable;
 
 class VerifyFirebaseToken
 {
-    protected $auth;
+    protected $firebaseAuth;
 
-    public function __construct(FirebaseAuth $auth)
+    public function __construct(FirebaseAuth $firebaseAuth)
     {
-        $this->auth = $auth;
+        $this->firebaseAuth = $firebaseAuth;
     }
 
-    /**
-     * Firebase ID Tokenを検証し、Laravelユーザーを認証する。
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response)  $next
-     * @return \Illuminate\Http\Response|Response
-     */
     public function handle(Request $request, Closure $next): Response
     {
+        Log::info("VERIFY_MIDDLEWARE_EXECUTED_CHECK: Middleware started.");
+        
+        // 1. トークンの取得 (Authorizationヘッダー または カスタムヘッダー)
         $token = $request->bearerToken();
 
-        // 1. トークンが存在しない場合、直ちに401 JSONレスポンスを返す
+        // Bearerトークンが取れない場合、カスタムヘッダーをチェック
         if (!$token) {
-            return response()->json(['error' => 'Unauthorized.', 'message' => 'No Firebase ID token provided.'], 401);
+            $token = $request->header('X-Firebase-Token');
+            if ($token) {
+                // Log::info('VerifyFirebaseToken: Token retrieved from X-Firebase-Token header.'); // Log removed to prevent repetition
+            }
+        }
+        
+        // ログ出力 (デバッグ用)
+        Log::info('VERIFY_HEADER_DUMP: Authorization header: ' . ($token ? 'Bearer (token present)' : 'N/A'));
+        
+        // トークンがない場合はゲストとして続行
+        if (!$token) {
+            Log::info("VerifyFirebaseToken: Token Status: MISSING (Proceeding as guest)");
+            return $next($request);
         }
 
         try {
-            // 2. トークンを検証し、UIDを取得
-            $verifiedIdToken = $this->auth->verifyIdToken($token);
-            $uid = $verifiedIdToken->claims()->get('sub');
+            Log::info("VerifyFirebaseToken: Token Status: PRESENT (Verification started)");
             
-            // 3. (重要) Firebase UIDに対応するLaravelユーザーを検索
+            // トークン検証 (300秒の猶予)
+            $decodedToken = $this->firebaseAuth->verifyIdToken($token, false, 300);
+            
+            Log::info("VerifyFirebaseToken: TOKEN VERIFIED. Proceeding to DB lookup.");
+
+            // UIDとメタデータの取得
+            // Firebase ID Tokenでは 'sub' または 'user_id' がUIDとして使われます
+            $uid = $decodedToken->claims()->get('sub') ?? $decodedToken->claims()->get('user_id'); 
+            $email = $decodedToken->claims()->get('email');
+            $name = $decodedToken->claims()->get('name') ?? 'User-' . substr($uid, 0, 8);
+            
+            // サインインプロバイダーをチェック
+            $providerId = $decodedToken->claims()->get('firebase')['sign_in_provider'] ?? null;
+
+            // 匿名ユーザーの場合は、認証は行わず、ゲストとして続行
+            if ($providerId === 'anonymous') {
+                Log::info("VerifyFirebaseToken: Anonymous provider detected (UID: {$uid}). Proceeding as guest.");
+                return $next($request); 
+            }
+            
+            Log::info("VerifyFirebaseToken: Token successfully verified. UID: {$uid}");
+
+            // ローカルDBからユーザーを検索
             $user = User::where('firebase_uid', $uid)->first();
 
+            // Just-In-Time Provisioning
             if (!$user) {
-                // ユーザーがDBに存在しない場合 (登録されていないなど)
-                Log::warning("User not found in database.", ['firebase_uid' => $uid]);
-                return response()->json([
-                    'error' => 'Unauthorized.', 
-                    'message' => 'User not registered in the system.'
-                ], 401);
+                Log::warning("User not found in database for Firebase UID: {$uid}. Starting Just-In-Time Provisioning.");
+
+                // メールアドレスが必須だが匿名ではない場合は、プロビジョニングを試みる
+                if ($email) {
+                    $user = User::create([
+                        'firebase_uid' => $uid,
+                        'name' => $name,
+                        'email' => $email,
+                        'password' => Hash::make(base64_encode(random_bytes(10))), // ダミーパスワード
+                        'email_verified_at' => $decodedToken->claims()->get('email_verified') ? now() : null,
+                    ]);
+                    Log::info("VerifyFirebaseToken: New user provisioned. ID: {$user->id}");
+                } else {
+                    // Firebase AuthだがEmailがない場合（電話番号認証など）
+                    Log::error("VerifyFirebaseToken: Cannot provision user (UID: {$uid}) due to missing required 'email' field. Proceeding as guest.");
+                    return $next($request);
+                }
+            }
+            
+            // 認証の実行
+            if ($user) {
+                Auth::login($user);
+                Log::info("VerifyFirebaseToken: AUTH SUCCESS. User attached. {\"user_id\":{$user->id}}");
+            } else {
+                Log::error("VerifyFirebaseToken: User object not available after JIT. Proceeding as guest.");
             }
 
-            // 4. (重要) Laravelのセッション/ステートレス認証を通じてユーザーをログイン状態にする
-            Auth::login($user);
-            
-            // この時点で $request->user() や Auth::user() が使えるようになります。
-            Log::info("Firebase Token Verified and Laravel User Logged in.", ['user_id' => $user->id, 'firebase_uid' => $uid]);
-
-            return $next($request);
-
-        } catch (InvalidToken $e) {
-            // トークンが無効または期限切れの場合
-            Log::error("Firebase Token Invalid.", ['message' => $e->getMessage()]);
-            return response()->json([
-                'error' => 'Unauthorized.', 
-                'message' => 'Firebase token is invalid or expired.'
-            ], 401);
-        } catch (\Exception $e) {
-            // その他の予期せぬFirebase関連エラー
-            Log::error("Firebase Verification Error.", ['message' => $e->getMessage()]);
-            return response()->json([
-                'error' => 'Internal Server Error.', 
-                'message' => 'An unexpected error occurred during token verification.'
-            ], 500);
+        } catch (\Kreait\Firebase\Exception\Auth\InvalidToken $e) {
+            Log::error('VerifyFirebaseToken: Invalid Token. Proceeding as guest. ' . $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error('VerifyFirebaseToken: General Error. Proceeding as guest. ' . json_encode(['message' => $e->getMessage()]));
         }
+        
+        // ログによる最終チェック
+        $authCheck = Auth::check();
+        $requestUser = Auth::user() ? Auth::user()->id : 'N/A';
+        // SanctumCheckは不要なので削除
+        Log::info("VerifyFirebaseToken: FINAL CHECK: Auth::check()=" . ($authCheck ? 'TRUE' : 'FALSE') . ", RequestUser={$requestUser}");
+
+        return $next($request);
     }
 }

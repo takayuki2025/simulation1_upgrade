@@ -20,7 +20,7 @@ use App\Models\Good;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Log; // Logをインポート
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL; 
@@ -34,29 +34,46 @@ class ItemController extends Controller
 {
 
     // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
-    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。@
+    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
     public function index(Request $request): JsonResponse
     {
+        // リクエストヘッダーのフルダンプ
+        $allHeaders = $request->headers->all();
+        Log::info("ITEM_CONTROLLER_HEADER_DUMP: " . json_encode($allHeaders));
+        // 特にAuthorizationヘッダーの存在を確認
+        Log::info("ITEM_CONTROLLER_AUTH_HEADER_FINAL_CHECK: " . ($request->header('Authorization') ?? 'N/A'));
+
         // URLのGETパラメータ'tab'を取得。デフォルトは'all'
         $tab = $request->query('tab', 'all');
 
         // URLのGETパラメータ'all_item_search'を取得
         $searchQuery = $request->query('all_item_search');
 
-        // Sanctumガードを使ってユーザーを取得
-        $user = Auth::guard('sanctum')->user();
-        $authId = $user ? $user->id : null;
+        // ★★★ 認証状態のデバッグ強化 ★★★
+        // 1. Request::user()からユーザーを取得 (ミドルウェアがセットする場所)
+        $user = $request->user();
         
-        Log::info("ItemController@index called. AuthID (via sanctum guard): " . ($authId ?? 'N/A'));
+        // 2. Authファサードからもユーザーを取得
+        $authFacadeUser = Auth::user(); 
+
+        $authId = $user ? $user->id : ($authFacadeUser ? $authFacadeUser->id : null);
+        
+        // ログの出力（デバッグ情報として重要）
+        Log::info("ItemController@index called. Resolved AuthID: " . ($authId ?? 'N/A'));
+        
+        // 3. Sanctumガードの状態を確認
+        $authCheckSanctum = Auth::guard('sanctum')->check() ? 'TRUE' : 'FALSE';
+        Log::info("ItemController@index: Is Request User Present?: " . ($user ? 'TRUE (ID: ' . $user->id . ')' : 'FALSE') . ", Is Auth Facade User Present?: " . ($authFacadeUser ? 'TRUE (ID: ' . $authFacadeUser->id . ')' : 'FALSE') . ", SanctumCheck: {$authCheckSanctum}");
+        // ★★★ 認証状態のデバッグ強化ここまで ★★★
 
 
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
             
-            // 🚨 認証済みでなければマイリストは空のコレクション
+            // ★★★ 認証チェックは $user が必須 ★★★
             if (!$user) {
-                // ユーザーが認証されていなければ空のJSONレスポンスを返すための空のコレクション
                 $items = collect([]); 
+                Log::info("ItemController@index: Not authenticated. Returning empty mylist.");
             } else {
                 // 1. ユーザーがいいねしたItemのIDを取得
                 $likedItemIds = Good::where('user_id', $user->id)->pluck('item_id');
@@ -70,6 +87,10 @@ class ItemController extends Controller
                     $query->where('name', 'like', '%' . $searchQuery . '%');
                 }
                 
+                // ★追加: mylistのSQLもデバッグ
+                Log::info("ItemController@index: MYLIST QUERY SQL: " . $query->toSql());
+                Log::info("ItemController@index: MYLIST QUERY BINDINGS: " . json_encode($query->getBindings()));
+
                 $items = $query->get();
             }
 
@@ -88,6 +109,13 @@ class ItemController extends Controller
             if (!empty($searchQuery)) {
                 $query->where('name', 'like', '%' . $searchQuery . '%');
             }
+            
+            // ★★★ 修正箇所: SQLクエリのデバッグログを追加 ★★★
+            // get()を実行する前にtoSql()とgetBindings()を呼び出してログに出力する
+            // toSql()はバインドされる前のクエリ、getBindings()はバインドされる値を取得
+            Log::info("ItemController@index: ALL ITEMS QUERY SQL: " . $query->toSql());
+            Log::info("ItemController@index: ALL ITEMS QUERY BINDINGS: " . json_encode($query->getBindings()));
+            // ★★★ 修正箇所ここまで ★★★
             
             // リレーションをロード
             $items = $query->withCount(['comments', 'goods'])->get();
@@ -117,6 +145,9 @@ class ItemController extends Controller
             'current_tab' => $tab,
         ]);
     }
+
+
+
 
 
         public function item_detail_show($item_id)

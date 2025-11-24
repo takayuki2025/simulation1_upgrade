@@ -25,5 +25,5 @@ WORKDIR /var/www
 # コメントアウトされた COPY行の下に、新しい設定ファイルの上書きを追加します。
 # ----------------------------------------------------------------------------
 # 【新しい修正】競合のないシンプルな設定で www.conf を上書きします
-COPY ./conf.d/php-fpm-www.conf /usr/local/etc/php-fpm.d/www.conf
+#COPY ./conf.d/php-fpm-www.conf /usr/local/etc/php-fpm.d/www.conf
 # ----------------------------------------------------------------------------

@@ -1,26 +1,12 @@
-import type { Config } from "tailwindcss";
-
-export default <Partial<Config>>{
+// @type {import('tailwindcss').Config}
+export default {
   content: [
-    // Nuxtのコンポーネント、ページ、レイアウトなどすべてのVueファイルでTailwindクラスをスキャン
-    "./components/**/*.{js,vue,ts}",
-    "./layouts/**/*.vue",
-    "./pages/**/*.vue",
-    "./plugins/**/*.{js,ts}",
-    "./app.vue",
-    "./error.vue",
-    "./nuxt.config.{js,ts}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {
-      fontFamily: {
-        // 全体のフォントを 'Inter' に設定
-        sans: ["Inter", "sans-serif"],
-      },
-      colors: {
-        // カスタムカラーがあればここで定義
-      },
-    },
+    extend: {},
   },
   plugins: [],
 };

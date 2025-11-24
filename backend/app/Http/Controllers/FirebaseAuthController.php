@@ -2,32 +2,45 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Kreait\Firebase\Contract\Auth as FirebaseAuth;
-use App\Models\User;
-use Throwable;
-// ★ メール認証に必要なクラスをインポート
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Models\User;
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
+use Kreait\Firebase\Auth\IdToken;
+use Lcobucci\JWT\Token;
+use Throwable;
 
 class FirebaseAuthController extends Controller
 {
-    /**
-     * Firebase IDトークンを使用してユーザーを登録またはログインし、Sanctumトークンを返す
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
+    // ★修正: メール認証成功後のリダイレクト先を /mypage/profile に戻す
+    private const POST_VERIFY_REDIRECT_PATH = '/mypage/profile?verified=true';
+
+    private function getRegistrationName(Request $request, Token $verifiedIdToken, string $email): string
+    {
+        // 1. Request Input (クライアントから明示的に渡された名前)
+        if ($request->filled('name')) {
+            Log::info('Name source: Request input.');
+            return $request->input('name');
+        }
+        // 2. Firebase Token Claim
+        if ($verifiedIdToken->claims()->has('name')) {
+            Log::info('Name source: Firebase Token.');
+            return $verifiedIdToken->claims()->get('name');
+        }
+        // 3. Fallback to Email Local Part (これが上書きの原因となるため、新規登録時や名前が必須の場合のみ利用)
+        $parts = explode('@', $email);
+        $localPart = $parts[0];
+        Log::info('Name source: Fallback to Email Local Part.');
+        return $localPart;
+    }
+
     public function registerAndLogin(Request $request)
     {
-        Log::info('--- FirebaseAuthController reached. ---');
+        Log::info('--- FirebaseAuthController reached (registerAndLogin). ---');
 
-        // 1. バリデーション
         $request->validate([
             'id_token' => 'required|string',
             'name' => 'nullable|string|max:255',
@@ -35,256 +48,216 @@ class FirebaseAuthController extends Controller
         ]);
 
         $idToken = $request->input('id_token');
-        
-        // クライアントの時刻ずれを吸収するため、300秒（5分）を設定します。
         $leewayInSeconds = 300; 
+        
+        $user = null;
+        $registerEmail = null;
 
         try {
-            Log::info('DEBUG: Start Firebase Auth instance acquisition.');
-
             $auth = app(FirebaseAuth::class); 
-
-            Log::info('DEBUG: Firebase Auth instance acquired. Start ID Token verification.');
-
-            // IDトークンを検証
             $verifiedIdToken = $auth->verifyIdToken($idToken, false, $leewayInSeconds);
-            
-            Log::info('DEBUG: ID Token successfully verified.');
             
             $uid = $verifiedIdToken->claims()->get('sub');
             $isEmailVerified = $verifiedIdToken->claims()->get('email_verified', false); 
             $emailFromToken = $verifiedIdToken->claims()->get('email');
             
-            // 2. ユーザーの存在確認 (Firebase UIDで)
-            $user = User::where('firebase_uid', $uid)->first();
+            $emailFromRequest = $request->input('email'); 
+            $registerEmail = $emailFromToken ?? $emailFromRequest;
+            
+            if (empty($registerEmail)) {
+                Log::error("Registration failed: Email missing for UID {$uid}.");
+                return response()->json(['error' => 'Email is required for registration or login.'], 400);
+            }
+            
+            $registerName = $this->getRegistrationName($request, $verifiedIdToken, $registerEmail);
 
-            // 3. ユーザー処理
-            if (!$user) {
-                // ---------------------
-                // ★ 新規登録処理 / メール重複時の紐付け処理 ★
-                // ---------------------
-                $nameFromRequest = $request->input('name'); 
-                $emailFromRequest = $request->input('email'); 
-                $nameFromToken = $verifiedIdToken->claims()->get('name'); // ★ 追記: Firebaseトークンに含まれる名前を取得
+            // リクエストにnameが明示的に渡されたかどうかをチェック
+            $isNameProvidedInRequest = $request->filled('name'); 
 
-                $registerEmail = $emailFromToken ?? $emailFromRequest;
-                
-                // ★★★ 名前決定ロジック ★★★
-                $registerName = null;
+            // 3. ユーザーの存在確認と処理 (デッドロック自動リトライ付きトランザクション)
+            $maxRetries = 5; 
+            $retryCount = 0;
+            $user = null;
 
-                if (!empty($nameFromRequest)) {
-                    // 1. Requestで送られてきた名前を最優先
-                    $registerName = $nameFromRequest;
-                    Log::info('Name source: Request input.');
-                } elseif (!empty($nameFromToken)) {
-                    // 2. Requestの名前が空の場合、Firebaseトークンの表示名を使用
-                    $registerName = $nameFromToken;
-                    Log::info('Name source: Firebase Token.');
-                } elseif (!empty($registerEmail)) {
-                    // 3. どちらも空の場合、メールアドレスのローカルパートを最終手段として使用
-                    $localPart = explode('@', $registerEmail)[0];
-                    $registerName = $localPart;
-                    Log::warning('Name source: Fallback to Email Local Part.');
-                } else {
-                     // どのソースからも名前が取得できない場合
-                     $registerName = null;
-                }
-                // ★★★ 名前決定ロジックここまで ★★★
-                
-                // データベースの制約に合わせて name の長さを制限する (既存のロジックを維持)
-                $maxLength = 30; // usersテーブルのnameカラムの最大長に合わせて調整
-                if (!empty($registerName) && mb_strlen($registerName) > $maxLength) {
-                    $registerName = mb_substr($registerName, 0, $maxLength);
-                    Log::warning("Name was truncated to {$maxLength} characters to fit database schema.");
-                }
-                
-                // 登録に必要な最終チェック
-                if (empty($registerName) || empty($registerEmail)) {
-                    Log::error("Registration attempt failed: Name/Email missing from all sources for UID {$uid}.");
-                    return response()->json(['error' => 'User not found in database and name/email are required for registration.'], 400);
-                }
-
-                // メールアドレス重複チェック (1回目)
-                $user = User::where('email', $registerEmail)->first();
-
-                if ($user) {
-                    // ユーザーがメールアドレスで既に存在する場合 (1回目のチェックで検出)
-                    Log::warning("User already exists by email: {$registerEmail}. Associating new Firebase UID: {$uid}");
-                    
-                    // 既存ユーザーのFirebase UIDを更新してログインを続行
-                    $user->firebase_uid = $uid;
-                    // パスワードもFirebase UIDのハッシュに更新（ログインパスワードが不要な運用を想定）
-                    $user->password = Hash::make($uid); 
-                    $user->save();
-                    
-                } else {
-                    // ユーザーがDBに存在しない場合、新規登録を実行
-                    try {
-                        $user = DB::transaction(function () use ($uid, $registerName, $registerEmail, $isEmailVerified) {
-                            $newUser = User::create([
+            while ($retryCount < $maxRetries) {
+                try {
+                    $user = DB::transaction(function () use (
+                        $uid, 
+                        $registerEmail, 
+                        $registerName, 
+                        $isEmailVerified,
+                        $isNameProvidedInRequest // トランザクション内で使用
+                    ) {
+                        
+                        $user = User::where('firebase_uid', $uid)
+                                    ->orWhere('email', $registerEmail)
+                                    ->lockForUpdate()
+                                    ->first();
+                        
+                        if ($user) {
+                            // 既存ユーザーの更新処理
+                            if (is_null($user->firebase_uid)) {
+                                Log::warning("User found by email ({$registerEmail}) but not by UID. Associating new UID: {$uid}. ID: {$user->id}");
+                                $user->firebase_uid = $uid;
+                                $user->password = Hash::make($uid);
+                            }
+                            
+                            // ★修正2: 既存ユーザーの場合、リクエストにnameが明示的に渡された場合のみ上書きする
+                            if ($isNameProvidedInRequest) {
+                                $user->name = $registerName; 
+                            }
+                            
+                            if ($isEmailVerified && is_null($user->email_verified_at)) {
+                                $user->email_verified_at = now();
+                                Log::info("DB email_verified_at updated based on Firebase claim for UID: {$uid}. ID: {$user->id}");
+                            }
+                            $user->save();
+                            
+                            if (!$user->hasVerifiedEmail() && !$isEmailVerified) {
+                                $user->sendEmailVerificationNotification();
+                                Log::info("Verification email re-sent to unverified existing user: {$registerEmail}. ID: {$user->id}");
+                            }
+                            Log::info("Existing user logged in/updated. UID: {$uid}. ID: {$user->id}");
+                            
+                            return $user;
+                        }
+                        
+                        // 新規ユーザー作成の試行 (ここでは名前は必ずセット)
+                        try {
+                            $user = User::create([
                                 'name' => $registerName, 
                                 'email' => $registerEmail,
                                 'password' => Hash::make($uid),
                                 'firebase_uid' => $uid,
                                 'email_verified_at' => $isEmailVerified ? now() : null,
                             ]);
-        
-                            if (!$isEmailVerified) {
-                                $newUser->sendEmailVerificationNotification();
-                            }
-        
-                            return $newUser;
-                        });
-                        Log::info("New user registered successfully with UID: {$uid}. Name used: {$registerName}");
-                        
-                    } catch (\Illuminate\Database\QueryException $e) {
-                        // 新規登録失敗時のフォールバック処理 (既存のロジックを維持)
-                        if ($e->getCode() === '23000') {
-                            Log::warning("Attempted registration failed due to Duplicate Entry, falling back to association check: {$registerEmail}");
-                            
-                            // 2回目のメール検索で既存ユーザーを取得
-                            $user = User::where('email', $registerEmail)->first();
-                            
-                            if ($user) {
-                                // 紐付け処理を続行
-                                $user->firebase_uid = $uid;
-                                $user->password = Hash::make($uid); 
-                                $user->save();
-                                Log::info("Successfully associated existing user by email ({$registerEmail}) after failed insert.");
-                            } else {
-                                Log::error("Critical Error: Duplicate entry detected but user not found on second check.");
-                                throw $e;
-                            }
-                        } else {
-                            // その他のQueryExceptionはそのままスロー
-                            throw $e;
-                        }
-                    }
-                }
 
-            } else {
-                // ---------------------
-                // ★ 既存ユーザーのログイン処理 (UIDで発見) ★
-                // ---------------------
-                Log::info("Existing user logged in with UID: {$uid}");
-                
-                // Firebaseクレームを元にDBの検証ステータスを更新
-                if (($isEmailVerified && is_null($user->email_verified_at)) || (!$isEmailVerified && !is_null($user->email_verified_at))) {
-                    $user->email_verified_at = $isEmailVerified ? now() : null;
-                    $user->save();
-                    Log::info("User email verification status updated based on Firebase claims.");
+                        } catch (\Illuminate\Database\QueryException $e) {
+                             // 重複エラー (Code 23000) が発生した場合
+                             if ($e->getCode() === '23000') {
+                                 Log::warning("New user creation failed due to duplicate email/UID. Attempting to retrieve existing user.");
+                                 
+                                 // 別のリクエストが先に作成に成功した可能性を考慮し、ロック付きで再度検索
+                                 $existingUser = User::where('email', $registerEmail)
+                                                     ->orWhere('firebase_uid', $uid)
+                                                     ->lockForUpdate()
+                                                     ->first();
+                                 
+                                 if ($existingUser) {
+                                     Log::info("Successfully retrieved user {$existingUser->id} after duplicate creation attempt. Proceeding as existing.");
+                                     return $existingUser; 
+                                 }
+                             }
+                             throw $e;
+                        }
+
+                        if (!$isEmailVerified) {
+                            $user->sendEmailVerificationNotification();
+                            Log::info("Verification email sent to new user: {$registerEmail}");
+                        }
+                        Log::info("New user registered successfully with UID: {$uid}. ID: {$user->id}");
+                        
+                        return $user;
+                    });
+                    
+                    break; // トランザクション成功
+                    
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // デッドロックエラー (Code 40001) が発生した場合
+                    if ($e->getCode() === '40001' || str_contains($e->getMessage(), 'Deadlock')) {
+                        $retryCount++;
+                        Log::warning("Deadlock detected. Retrying transaction (Attempt {$retryCount}/{$maxRetries}).");
+                        usleep(rand(100000, 500000)); // 待機
+                        if ($retryCount >= $maxRetries) {
+                            Log::error("Failed to acquire lock after {$maxRetries} attempts. Final Error.");
+                            throw $e; 
+                        }
+                        continue; 
+                    }
+                    throw $e; // その他のエラーはそのままスロー
                 }
             }
             
-            Log::info('DEBUG: User check/registration completed successfully.');
-
+            if (!$user) {
+                 Log::error("Authentication failed: User object could not be resolved after all retries.");
+                 return response()->json(['error' => 'Authentication failed due to a server synchronization issue.'], 503);
+            }
 
             // 4. Sanctumトークンの生成
-            if (!$user) {
-                Log::error("Authentication failed: User object is null after all registration/login attempts.");
-                return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
-            }
-            
-            // ★ 削除推奨行 1: ユーザーモデルの再ロード（Auth::loginのため不要）
-            // $user = User::find($user->id); 
-            
-            if (!$user) {
-                Log::error("Authentication failed: User not found in database after successful Firebase verification.");
-                return response()->json(['error' => 'Authentication process failed unexpectedly.'], 500);
-            }
-            Log::info('DEBUG: User model reloaded from database (User::find) to ensure latest verification status.'); // ★ ログも削除対象
-            
-            // ★ 削除必須行 2: Laravelセッション（Cookie）への強制ログイン処理
-            // Auth::login($user); 
-            // Log::info('DEBUG: User successfully logged into web guard session using Auth::login.'); // ★ ログも削除対象
-
             $user->tokens()->delete();
-            Log::info('DEBUG: Old tokens deleted.');
-            
             $token = $user->createToken('authToken')->plainTextToken;
-            Log::info('DEBUG: New Sanctum token created.');
+            Log::info("Sanctum token issued for user ID: {$user->id}");
 
             // 5. JSONレスポンスを返す
-            // ★★★ 修正箇所: user配列にプロフィール関連のフィールドを追加 ★★★
             $userData = [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'uid' => $user->firebase_uid, 
                 'email_verified_at' => $user->email_verified_at,
-                // --- 追加したプロフィール関連フィールド ---
                 'post_number' => $user->post_number, 
                 'address' => $user->address,
                 'building' => $user->building,
                 'user_image' => $user->user_image,
-                // ----------------------------------------
             ];
             
-            Log::info('Returning user data (Sanctum/Firebase):', $userData);
-            
-            Log::info('DEBUG: Preparing final JSON response.');
-
             return response()->json([
                 'token' => $token,
                 'user' => $userData,
             ], 200);
 
         } catch (\Kreait\Firebase\Exception\Auth\InvalidToken $e) {
-            // "The token was issued in the future" のエラーはここで許容誤差によって吸収されます。
             Log::error("Firebase Invalid ID Token: " . $e->getMessage());
             return response()->json(['error' => 'Invalid Firebase ID Token.'], 401);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error("Final DB Critical Error: " . $e->getMessage() . " Code: {$e->getCode()}");
+            return response()->json(['error' => 'Authentication failed due to a critical server synchronization issue.'], 503);
         } catch (Throwable $e) {
-            Log::error("Auth/Register Error: " . $e->getMessage());
-            return response()->json(['error' => 'Server authentication failed.', 'details' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
+            Log::error("Auth/Register Critical Error: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            return response()->json(['error' => 'Server authentication failed.', 'details' => 'Internal Server Error.'], 500);
         }
     }
 
-    /**
-     * メール認証リンクをクリックした後の処理 (Laravel Fortify の動作を模倣)
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
+    public function handleTokenExchange(Request $request)
+    {
+        Log::info('--- FirebaseAuthController reached (handleTokenExchange). Forwarding to registerAndLogin. ---');
+        return $this->registerAndLogin($request);
+    }
+
     public function verifyEmail(Request $request, $id, $hash)
     {
-        Log::info('--- VERIFY EMAIL METHOD STARTED ---'); // ★これを入れてログに表示されるか確認
-        // フロントエンドURLを安全に取得（末尾のスラッシュを削除）
-        // $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
-        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://laravel.test:4430'), '/'); // ★ 修正: Nuxtのポート番号を明示的に4430に設定（またはenvから取得）
+        Log::info('--- VERIFY EMAIL METHOD STARTED ---'); 
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
 
-        // 1. IDを使ってユーザーを直接検索
+        if (! $request->hasValidSignature()) {
+            Log::error('Email verification failed: Invalid signature.');
+            return redirect("{$frontendUrl}/login?error=verification_failed&reason=invalid_signature");
+        }
+
         $user = User::find($id);
 
         if (is_null($user)) {
             Log::error('Email verification failed: User ID not found.', ['user_id' => $id, 'hash' => $hash]);
-            // フロントエンドのログインページにリダイレクトし、エラーを通知
             return redirect("{$frontendUrl}/login?error=verification_failed&reason=not_found");
         }
         
-        // 2. URLのハッシュが有効かチェック
-        // ハッシュチェックの前に、ユーザーがメールアドレスを持っているか確認 (getEmailForVerification()がnullを返す可能性に備える)
         if (empty($user->getEmailForVerification()) || ! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
             Log::warning('Email verification failed: Invalid hash or missing email.', ['user_id' => $id, 'provided_hash' => $hash]);
             return redirect("{$frontendUrl}/login?error=verification_failed&reason=invalid_hash");
         }
 
-        // 3. 認証済みかチェック
         if ($user->hasVerifiedEmail()) {
-            // 既に検証済みの場合、認証完了後のページにリダイレクト
-            return redirect("{$frontendUrl}/mypage/profile?verified=true&reason=already_verified");
+            Log::info('User already verified. Redirecting to success page.', ['user_id' => $user->id]);
+            // 既に認証済みの場合は、修正後のパスへリダイレクト
+            return redirect("{$frontendUrl}" . self::POST_VERIFY_REDIRECT_PATH);
         }
 
-        // 4. Laravelデータベース側でメールを検証済みとしてマーク
         if ($user->markEmailAsVerified()) {
-            // markEmailAsVerified() の後に、念のためユーザーインスタンスをリフレッシュ
             $user->refresh(); 
-
             event(new Verified($user));
             Log::info('Laravel DB email verified successfully (User Model Check).', ['user_id' => $user->id, 'verified_at' => $user->email_verified_at]); 
             
-            // 5. Firebaseのメール認証ステータスも更新
             try {
-                // FirebaseのUIDがない場合は更新をスキップ
                 if ($user->firebase_uid) {
                     $auth = app(FirebaseAuth::class); 
                     $auth->updateUser($user->firebase_uid, [ 
@@ -295,16 +268,16 @@ class FirebaseAuthController extends Controller
                     Log::warning('Firebase UID missing for user. Skipping Firebase status update.', ['user_id' => $user->id]);
                 }
             } catch (Throwable $e) {
-                // Firebaseの更新はオプションであり、致命的なエラーではない
                 Log::error('Failed to update Firebase email verification status for UID: ' . $user->firebase_uid . ' Error: ' . $e->getMessage());
             }
         } else {
-            // markEmailAsVerified()がfalseを返した場合（保存に失敗した場合）のログを追加
             Log::error('CRITICAL: markEmailAsVerified failed to save to database.', ['user_id' => $user->id]);
             return redirect("{$frontendUrl}/login?error=verification_failed&reason=save_error");
         }
         
-        // 6. 認証完了後のリダイレクト
-        return redirect("{$frontendUrl}/mypage/profile?verified=true");
+        // 認証成功後は、修正後のパスへリダイレクト
+        return redirect(
+            "{$frontendUrl}" . self::POST_VERIFY_REDIRECT_PATH
+        );
     }
 }

@@ -14,11 +14,13 @@ RUN apt-get update && \
 WORKDIR /app
 
 # 1. package.jsonとロックファイルをコンテナ内にコピー
-COPY package*.json ./ 
+# ★ 修正: ファイルを個別にコピーし、RUNコマンドの前に入れることで、
+# package.jsonが変更されたときのみ npm install が再実行されるようにします。
+COPY package.json ./
+
 
 # 2. 依存関係をクリーンインストール
-RUN rm -rf package-lock.json yarn.lock && \
-    rm -rf node_modules && \
+RUN rm -rf node_modules && \
     npm install
 
 # 3. 開発用の実行環境として使用

@@ -29,6 +29,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'App\Http\Middleware\AddQueuedCookiesToResponse' => \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             'App\Http\Middleware\StartSession' => \Illuminate\Session\Middleware\StartSession::class,
             'App\Http\Middleware\AuthenticateSession' => \Illuminate\Session\Middleware\AuthenticateSession::class,
+            
+            // ★★★ 修正箇所: ここに firebase.verify のエイリアスを移動/追加し、確実に認識させる ★★★
+            'firebase.verify' => VerifyFirebaseToken::class, 
+            'auth' => \Illuminate\Auth\Middleware\Authenticate::class, 
+            'sanctum.auth' => \Laravel\Sanctum\Http\Middleware\Authenticate::class, 
+            'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+            'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         ]);
         // ★★★ 修正箇所ここまで ★★★
 
@@ -40,21 +47,21 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // --- APIミドルウェアグループの定義 ---
         $middleware->api(
-            // ★★★ 修正箇所: ここでCorsMiddlewareを手動で追加すると重複するため削除する ★★★
             prepend: [
-                // \App\Http\Middleware\CorsMiddleware::class, // <-- これを削除！
                 \Illuminate\Http\Middleware\HandleCors::class,
-                // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             ],
             // 最後にルーティングバインディングを追加
             append: [
                 'throttle:api',
+                // ★★★ 修正箇所: VerifyFirebaseTokenをAPIグループ全体に適用 ★★★
+                VerifyFirebaseToken::class,
                 \Illuminate\Routing\Middleware\SubstituteBindings::class,
             ]
         );
-        // ★★★ 修正箇所ここまで ★★★
         
         // --- 2. ルートミドルウェアエイリアスの定義 (カスタムと認証のみ) ---
+        // 🚨【削除箇所】重複と混乱を避けるため、上記 alias に移設済みの定義を削除します。
+        /*
         $middleware->alias([
             'firebase.verify' => VerifyFirebaseToken::class, 
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class, 
@@ -62,6 +69,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         ]);
+        */
+        // 🚨【削除箇所ここまで】
+
+
     })
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

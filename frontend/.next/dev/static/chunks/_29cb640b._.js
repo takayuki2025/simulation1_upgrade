@@ -1,0 +1,1403 @@
+(globalThis.TURBOPACK || (globalThis.TURBOPACK = [])).push([typeof document === "object" ? document.currentScript : undefined,
+"[project]/hooks/useApi.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "useApi",
+    ()=>useApi
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+// axios の型を正しくインポート
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-client] (ecmascript)"); // useAuthフックのパスを調整してください
+var _s = __turbopack_context__.k.signature();
+"use client";
+;
+;
+;
+// Next.jsの環境変数を使用
+const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
+function useApi() {
+    _s();
+    // useAuth から logout と isLoggingOut を取得
+    const { user, logout, isLoggingOut } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    /**
+   * 認証済みのAPIリクエストを実行する汎用関数
+   * @param url リクエストURL（API BASE URLからの相対パス）
+   * @param config Axiosリクエスト設定
+   * @returns APIレスポンスデータ
+   */ const authenticatedFetch = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useApi.useCallback[authenticatedFetch]": async (url, config = {})=>{
+            if (isLoggingOut) {
+                throw new Error("Logging out, cannot perform API request.");
+            }
+            // ユーザーオブジェクトが存在しない場合は即座に認証エラー
+            if (!user) {
+                console.error("[useApi] User object missing. Forcing logout.");
+                await logout();
+                throw new Error("User not authenticated.");
+            }
+            // --- 最新のFirebase ID Tokenを強制的に取得 ---
+            let idToken;
+            try {
+                // getIdToken(true): キャッシュを無視して、Firebaseから強制的に最新のトークンを取得
+                idToken = await user.getIdToken(true);
+                console.log(`[useApi] Token acquired. Starts with: ${idToken.substring(0, 10)}...`);
+            } catch (e) {
+                console.error("[useApi] Failed to refresh/get ID Token. Forcing logout.", e);
+                await logout();
+                throw new Error("Failed to retrieve fresh authentication token.");
+            }
+            // ----------------------------------------
+            // --- URLプレフィックスのロジック (現状維持) ---
+            let apiPath = url.startsWith("/api/") ? url : `/api${url}`;
+            apiPath = apiPath.replace(/\/\/+/g, "/");
+            // ----------------------------------------
+            // ★★★ 修正箇所: ヘッダーマージロジックを修正し、Authorizationを最後に設定 ★★★
+            const baseHeaders = {
+                "Content-Type": "application/json",
+                Accept: "application/json"
+            };
+            // 1. デフォルトヘッダーと、configから渡されたヘッダーをマージ
+            const mergedHeaders = {
+                ...baseHeaders,
+                ...config.headers
+            };
+            // 2. 最後に、トークンを確実に設定（他のヘッダーで上書きされないようにする）
+            const finalHeaders = {
+                ...mergedHeaders,
+                Authorization: `Bearer ${idToken}`,
+                "X-Firebase-Token": idToken
+            };
+            // 💡 修正点 2: delete演算子のエラー (ts(2790)) を解消するためにキャストを使用
+            // 3. FormDataを使用する場合に Content-Type: undefined のエントリを削除する
+            if (finalHeaders["Content-Type"] === undefined) {
+                // 'as any' を使用して、型チェックを一時的に無効にする
+                delete finalHeaders["Content-Type"];
+            }
+            const headers = finalHeaders; // 最終的なヘッダー
+            // デバッグログ (★ここでAuthorizationヘッダーが正しく設定されているか確認)
+            console.log("[useApi] Request Headers being sent:", headers);
+            // ★★★ 修正箇所ここまで ★★★
+            try {
+                const response = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"])({
+                    method: config.method || "GET",
+                    url: `${API_BASE_URL}${apiPath}`,
+                    // AxiosConfigのdataとbodyの扱いを統一
+                    data: config.data || config.body,
+                    params: config.params,
+                    headers: headers,
+                    withCredentials: true
+                });
+                return response.data;
+            } catch (error) {
+                // AxiosError の型ガード
+                if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].isAxiosError(error)) {
+                    const status = error.response?.status;
+                    if (status === 401) {
+                        console.error("[useApi] 401 Unauthorized detected. Throwing error for page recovery (reloadAuthToken).");
+                        // ログアウトせず、エラーをスローして呼び出し元（ProfilePage.tsx）の catch に渡す
+                        const customError = new Error(`API Request Failed with status 401`);
+                        customError.status = 401;
+                        customError.response = error.response;
+                        throw customError;
+                    }
+                    // 401以外のエラーもカスタムエラーとしてスロー
+                    const customError = new Error(`API Request Failed with status ${status || "Unknown"}`);
+                    customError.status = status;
+                    customError.response = error.response;
+                    throw customError;
+                }
+                // ネットワークエラーなど (AxiosErrorではない場合)
+                console.error("[useApi] Network or other unexpected error:", error);
+                throw error;
+            }
+        }
+    }["useApi.useCallback[authenticatedFetch]"], [
+        user,
+        logout,
+        isLoggingOut
+    ] // 依存配列
+    );
+    const updateProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useApi.useCallback[updateProfile]": async (data)=>{
+            const response = await authenticatedFetch("/mypage/profile_update", {
+                method: "PATCH",
+                data: data
+            });
+            if (response && response.user) {
+                return response.user;
+            }
+            throw new Error("Profile update failed: Invalid response structure.");
+        }
+    }["useApi.useCallback[updateProfile]"], [
+        authenticatedFetch
+    ]);
+    const uploadImage = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "useApi.useCallback[uploadImage]": async (formData, url = "/upload2")=>{
+            // 画像アップロード時には、axiosのContent-Typeをundefinedに設定することで、
+            // 適切なBoundaryを持つ multipart/form-data ヘッダーが自動で設定されるようにする
+            const response = await authenticatedFetch(url, {
+                method: "POST",
+                data: formData,
+                headers: {
+                    "Content-Type": undefined
+                }
+            });
+            if (response && response.user) {
+                return response.user;
+            }
+            throw new Error("Image upload failed: Invalid response structure.");
+        }
+    }["useApi.useCallback[uploadImage]"], [
+        authenticatedFetch
+    ]);
+    return {
+        authenticatedFetch,
+        updateProfile,
+        uploadImage
+    };
+}
+_s(useApi, "wr7ZUEWX5x16jX4DZs9HUfru4eo=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]
+    ];
+});
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/app/(main)/mypage/profile/page.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
+
+__turbopack_context__.s([
+    "default",
+    ()=>ProfilePage
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/styled-jsx/style.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-client] (ecmascript)"); // Next.jsのカスタム認証フックのパスを調整してください
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useApi.tsx [app-client] (ecmascript)"); // 認証済みリクエスト用カスタムフックのパスを調整してください
+;
+var _s = __turbopack_context__.k.signature();
+"use client";
+;
+;
+;
+;
+;
+// =======================================================
+// Next.js クライアントコンポーネント
+// =======================================================
+// 環境変数からAPIベースURLを取得
+const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
+/**
+ * プロフィール画像のURLを生成するヘルパー関数
+ */ const getProfileImageUrl = (path)=>{
+    let base = API_BASE_URL;
+    const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
+    const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
+    if (!path) {
+        return DEFAULT_IMAGE_FULL_URL;
+    }
+    // pathがHTTPから始まっていればそのまま返す（フルURLの場合）
+    if (path.startsWith("http")) {
+        return path;
+    }
+    // 相対パスの場合はベースURLを付与
+    return `${base}/${path.replace(/^\//, "")}`;
+};
+function ProfilePage() {
+    _s();
+    const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"])();
+    const { user: authUser, isAuthenticated, isLoading: isAuthLoading, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    // useApiは通常、Firebase IDトークンをヘッダーに付けてAPIをコールする
+    const { authenticatedFetch, updateProfile, uploadImage } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useApi"])();
+    const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [form, setForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
+        name: "",
+        post_number: "",
+        address: "",
+        building: ""
+    });
+    const [profileErrors, setProfileErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({});
+    const [imageError, setImageError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
+    const [successMessage, setSuccessMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
+    const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true); // APIフェッチ中のローディング (全体)
+    const [isFetching, setIsFetching] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false); // データ取得中のローディング (フェッチ専用)
+    // 401エラーからのリカバリー中を示す状態
+    const [isRecovering, setIsRecovering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const fileInput = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    // URLクエリパラメータからメール認証状態を取得
+    const isVerificationRedirect = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "ProfilePage.useMemo[isVerificationRedirect]": ()=>{
+            return searchParams.get("verified") === "true";
+        }
+    }["ProfilePage.useMemo[isVerificationRedirect]"], [
+        searchParams
+    ]);
+    // ----------------------------------------------------------------
+    // 1. データ初期化ヘルパー
+    // ----------------------------------------------------------------
+    /**
+   * APIから取得したユーザーデータでフォームと状態を初期化する
+   */ const initializeUserData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "ProfilePage.useCallback[initializeUserData]": (apiData)=>{
+            let sourceData = null;
+            if (apiData && apiData.user) {
+                sourceData = apiData.user;
+            } else if (apiData && apiData.id && apiData.name) {
+                sourceData = apiData;
+            }
+            setUser({
+                "ProfilePage.useCallback[initializeUserData]": (current)=>{
+                    // 無限ループを防ぐため、データが実際に変更されているかチェック
+                    if (JSON.stringify(current) !== JSON.stringify(sourceData)) {
+                        console.log("✅ [InitData] user State を更新しました。", sourceData);
+                        return sourceData;
+                    }
+                    return current;
+                }
+            }["ProfilePage.useCallback[initializeUserData]"]);
+            if (sourceData) {
+                setForm({
+                    name: sourceData.name || "",
+                    post_number: sourceData.post_number || "",
+                    address: sourceData.address || "",
+                    building: sourceData.building || ""
+                });
+            }
+        }
+    }["ProfilePage.useCallback[initializeUserData]"], []);
+    // ----------------------------------------------------------------
+    // 2. データ取得ロジック (リカバリー処理を強化)
+    // ----------------------------------------------------------------
+    const fetchUserProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "ProfilePage.useCallback[fetchUserProfile]": async (isRetry = false)=>{
+            // 初回呼び出し時に、既にフェッチ中または認証解決待ちの場合はスキップ
+            if (!isRetry && isFetching) return;
+            if (isAuthLoading) return;
+            // フェッチ開始 (初回呼び出し時のみ isFetching を設定)
+            if (!isRetry) setIsFetching(true);
+            try {
+                // サーバーから最新のユーザーデータをフェッチ
+                const response = await authenticatedFetch("/mypage/profile");
+                // 最新のサーバーデータで更新
+                initializeUserData(response);
+                console.log("✅ [Fetch] プロフィールデータ取得に成功。ユーザーデータを初期化しました。");
+                // メール認証成功後のメッセージ表示
+                if (isVerificationRedirect) {
+                    setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
+                }
+                // 再試行が成功した場合は、リカバリー状態を解除
+                if (isRetry) {
+                    setIsRecovering(false);
+                }
+            } catch (err) {
+                console.error("プロフィールデータのロードに失敗しました:", err);
+                const status = err.status || err.response && err.response.status;
+                if (status === 401) {
+                    // 既に再試行して再度401なら、無限ループを防ぐためログアウト
+                    if (isRetry) {
+                        console.error("401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。");
+                        // ログアウト処理が完了したら、この処理は終了
+                        await logout();
+                        return;
+                    }
+                    console.log(`401エラーを検出。トークンリフレッシュを試行...`);
+                    setSuccessMessage("認証情報を更新中...");
+                    // リカバリー開始
+                    setIsRecovering(true);
+                    try {
+                        // 認証回復ロジック
+                        await reloadAuthToken(); // トークンを強制リフレッシュ
+                        setSuccessMessage("認証情報を更新しました。データを再取得します。");
+                        // 重要な修正: トークンリフレッシュ成功後、自身を再帰的に呼び出して再試行
+                        await fetchUserProfile(true); // isRetry=true で再試行
+                    } catch (reloadError) {
+                        console.error("トークンのリロードに失敗。ログアウトします。", reloadError);
+                        await logout();
+                        setSuccessMessage("セッションが切れました。再度ログインが必要です。");
+                    } finally{
+                    // 再帰呼び出しが完了しても、成功時は内部で isRecovering(false) になるため、
+                    // ここで設定するとリカバリー失敗時のみとなる。
+                    // ★重要な変更点: 成功時は tryブロック内部で isRecovering(false) を呼ぶため、
+                    // ここでは失敗時、または再帰後のクリーンアップは不要。
+                    }
+                } else {
+                    // 401以外のエラー
+                    setSuccessMessage(`データのロード中に予期せぬエラーが発生しました。(Status: ${status || "不明"})`);
+                }
+            } finally{
+                // 初回呼び出しが終了した時のみ isFetching をリセットする
+                // 再帰呼び出し (isRetry=true) が成功した場合、このブロックは実行されない
+                // (再帰呼び出しが成功し、親の try ブロックを抜けるため)
+                if (!isRetry) {
+                    setIsFetching(false);
+                // 2回目の API Callが401エラーで失敗し、ログアウトした場合、
+                // 初回呼び出しの finally が実行されるが、その時には既にログアウト処理がされているため問題なし。
+                }
+            }
+        }
+    }["ProfilePage.useCallback[fetchUserProfile]"], // useCallbackの依存配列
+    [
+        authenticatedFetch,
+        initializeUserData,
+        logout,
+        isVerificationRedirect,
+        reloadAuthToken,
+        isFetching,
+        isAuthLoading
+    ]);
+    // ----------------------------------------------------------------
+    // 3. 認証状態とデータフェッチの監視
+    // ----------------------------------------------------------------
+    // 認証状態に応じたデータフェッチとリダイレクト
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "ProfilePage.useEffect": ()=>{
+            // 1. 認証解決待ち、またはリカバリー中の場合はスキップ
+            if (isAuthLoading || isRecovering) return;
+            // 2. 未認証の場合はログインへリダイレクト
+            if (!isAuthenticated) {
+                // 認証リダイレクト中（?verified=true）は、セッション解決を待つ
+                if (isVerificationRedirect) {
+                    console.log("Verification redirect detected. Waiting for useLaravelSession to resolve session.");
+                    return;
+                }
+                console.log("Unauthenticated detected. Redirecting to /login.");
+                // ログアウト処理が完了していない場合は強制リダイレクト
+                if (authUser === null) {
+                    router.replace("/login");
+                }
+                return;
+            }
+            // 3. 認証済みだがユーザーデータがまだロードされていない場合、データフェッチを実行
+            // isFetching で現在ロード中かチェックし、重複実行を防ぐ
+            if (isAuthenticated && !user && !isFetching) {
+                console.log("Authenticated but user data is missing. Fetching profile.");
+                // setIsLoading(true) はレンダリングブロック時に設定されているため、ここでは省略
+                fetchUserProfile(false); // 初回フェッチ
+                return;
+            }
+            // 4. データがロード済みで認証済みであれば、ローディングを解除して終了
+            if (user && isAuthenticated) {
+                setIsLoading(false);
+                return;
+            }
+        }
+    }["ProfilePage.useEffect"], [
+        isAuthLoading,
+        isAuthenticated,
+        router,
+        fetchUserProfile,
+        user,
+        isFetching,
+        isVerificationRedirect,
+        isRecovering,
+        authUser
+    ]);
+    // ----------------------------------------------------------------
+    // 4. 画像アップロード処理
+    // ----------------------------------------------------------------
+    const handleImageUpload = async (event)=>{
+        const file = event.target.files?.[0];
+        if (!file || !user) return;
+        setImageError("");
+        setSuccessMessage("");
+        setIsLoading(true);
+        const formData = new FormData();
+        formData.append("user_image", file);
+        try {
+            const updatedUser = await uploadImage(formData, "/upload2");
+            setUser(updatedUser);
+            setSuccessMessage("画像をアップロードしました。");
+        } catch (error) {
+            console.error("【ERROR】画像アップロードに失敗しました:", error);
+            const status = error.status || error.response && error.response.status;
+            if (status === 401) {
+                // 画像アップロードの401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
+                // ここでのリカバリーロジックの実装は一旦見送り
+                await logout();
+                return;
+            }
+            if (error.response && error.response.status === 422) {
+                // エラーレスポンスの構造に応じて修正
+                setImageError(error.response.data?.errors?.user_image?.[0] || "無効なファイルです。");
+            } else {
+                setImageError(`アップロードに失敗しました (ステータス: ${status || "不明"})。`);
+            }
+        } finally{
+            setIsLoading(false);
+            if (fileInput.current) {
+                fileInput.current.value = "";
+            }
+        }
+    };
+    // ----------------------------------------------------------------
+    // 5. プロフィール情報更新処理
+    // --------------------------------------------------------------
+    const handleProfileUpdate = async (e)=>{
+        e.preventDefault();
+        setProfileErrors({});
+        setSuccessMessage("");
+        if (!user) return;
+        setIsLoading(true);
+        try {
+            const updatedUser = await updateProfile(form);
+            setSuccessMessage("プロフィール情報を更新しました！");
+            initializeUserData(updatedUser);
+        } catch (error) {
+            const statusCode = error.status || (error.response ? error.response.status : "不明");
+            console.error(`【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`, error);
+            if (statusCode === 401) {
+                // 更新時の401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
+                // ここでのリカバリーロジックの実装は一旦見送り
+                await logout();
+                return;
+            }
+            if (error.response && error.response.status === 422) {
+                // エラーレスポンスの構造に応じて修正
+                setProfileErrors(error.response.data.errors);
+            } else {
+                setSuccessMessage(`更新に失敗しました。(Status: ${statusCode}) 再度お試しください。`);
+            }
+        } finally{
+            setIsLoading(false);
+        }
+    };
+    // ----------------------------------------------------------------
+    // 6. ローディング・未認証時の表示
+    // ----------------------------------------------------------------
+    // 認証解決待ち、APIロード中、またはリカバリー中の全体ローディング
+    if (isAuthLoading || isLoading && !user || isRecovering) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "login_page max-w-[1400px] mx-auto pt-5 pb-10",
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                    className: "title",
+                    children: "プロフィール設定"
+                }, void 0, false, {
+                    fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                    lineNumber: 404,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "text-center p-8",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
+                        }, void 0, false, {
+                            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                            lineNumber: 406,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-lg text-gray-500 mt-3",
+                            children: isAuthLoading ? "認証状態を確認中 / セッションを再確立中..." : isRecovering ? "認証情報を回復中です..." // リカバリー中のメッセージ
+                             : "データをロード中です..."
+                        }, void 0, false, {
+                            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                            lineNumber: 407,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                    lineNumber: 405,
+                    columnNumber: 9
+                }, this)
+            ]
+        }, void 0, true, {
+            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+            lineNumber: 403,
+            columnNumber: 7
+        }, this);
+    }
+    // 認証が完了したがユーザーデータがない場合 (fetchで失敗した場合など)
+    if (!isAuthenticated || !user) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "login_page max-w-[1400px] mx-auto pt-5 pb-10",
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                    className: "title",
+                    children: "プロフィール設定"
+                }, void 0, false, {
+                    fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                    lineNumber: 423,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "text-center p-8",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-xl text-red-500",
+                            children: "認証エラー、またはユーザー情報がロードできませんでした。"
+                        }, void 0, false, {
+                            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                            lineNumber: 425,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-md text-gray-500 mt-2",
+                            children: "ログインページへ移動しています..."
+                        }, void 0, false, {
+                            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                            lineNumber: 428,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                    lineNumber: 424,
+                    columnNumber: 9
+                }, this)
+            ]
+        }, void 0, true, {
+            fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+            lineNumber: 422,
+            columnNumber: 7
+        }, this);
+    }
+    // ----------------------------------------------------------------
+    // 7. レンダリング
+    // ----------------------------------------------------------------
+    return(// authUser?.uid をキーに使用し、ユーザーが変わった場合に強制再描画
+    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "jsx-ba5c1f40791bc779" + " " + "login_page max-w-[1400px] mx-auto pt-5 pb-10",
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                className: "jsx-ba5c1f40791bc779" + " " + "title",
+                children: "プロフィール設定"
+            }, void 0, false, {
+                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                lineNumber: 446,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "jsx-ba5c1f40791bc779" + " " + "form-wrapper",
+                children: [
+                    successMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "jsx-ba5c1f40791bc779" + " " + "alert-success2",
+                        children: successMessage
+                    }, void 0, false, {
+                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                        lineNumber: 451,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                        onSubmit: (e)=>e.preventDefault(),
+                        className: "jsx-ba5c1f40791bc779" + " " + "item_sell_contents_box_line",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "image_name",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-ba5c1f40791bc779" + " " + "image_button_row",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                src: getProfileImageUrl(user.user_image),
+                                                alt: "プロフィール画像",
+                                                className: "jsx-ba5c1f40791bc779" + " " + "user_image_css"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                                lineNumber: 462,
+                                                columnNumber: 15
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>fileInput.current?.click(),
+                                                disabled: isLoading,
+                                                className: "jsx-ba5c1f40791bc779" + " " + "upload_submit",
+                                                children: "画像を選択する"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                                lineNumber: 467,
+                                                columnNumber: 15
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 461,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        type: "file",
+                                        name: "user_image",
+                                        ref: fileInput,
+                                        style: {
+                                            display: "none"
+                                        },
+                                        onChange: handleImageUpload,
+                                        accept: "image/*",
+                                        className: "jsx-ba5c1f40791bc779"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 476,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 459,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "user_image_error_message",
+                                children: imageError
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 485,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                        lineNumber: 455,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                        onSubmit: handleProfileUpdate,
+                        className: "jsx-ba5c1f40791bc779",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                        htmlFor: "name",
+                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_1",
+                                        children: "ユーザー名"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 492,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        id: "name",
+                                        type: "text",
+                                        name: "name",
+                                        value: form.name,
+                                        onChange: (e)=>setForm((prev)=>({
+                                                    ...prev,
+                                                    name: e.target.value
+                                                })),
+                                        className: "jsx-ba5c1f40791bc779" + " " + "name_form"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 495,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        children: profileErrors.name ? profileErrors.name[0] : ""
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 505,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 491,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                        htmlFor: "post_number",
+                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_2",
+                                        children: "郵便番号 (8桁、ハイフンあり)"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 512,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        id: "post_number",
+                                        type: "text",
+                                        name: "post_number",
+                                        value: form.post_number,
+                                        onChange: (e)=>setForm((prev)=>({
+                                                    ...prev,
+                                                    post_number: e.target.value
+                                                })),
+                                        placeholder: "例: 100-0001",
+                                        maxLength: 8,
+                                        className: "jsx-ba5c1f40791bc779" + " " + "email_form"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 515,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        children: profileErrors.post_number ? profileErrors.post_number[0] : ""
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 527,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 511,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                        htmlFor: "address",
+                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_3",
+                                        children: "住所"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 534,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        id: "address",
+                                        type: "text",
+                                        name: "address",
+                                        value: form.address,
+                                        onChange: (e)=>setForm((prev)=>({
+                                                    ...prev,
+                                                    address: e.target.value
+                                                })),
+                                        placeholder: "手動で入力してください",
+                                        className: "jsx-ba5c1f40791bc779" + " " + "password_form"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 537,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        children: profileErrors.address ? profileErrors.address[0] : ""
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 548,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 533,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                        htmlFor: "building",
+                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_4",
+                                        children: "建物名"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 555,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                        id: "building",
+                                        type: "text",
+                                        name: "building",
+                                        value: form.building,
+                                        onChange: (e)=>setForm((prev)=>({
+                                                    ...prev,
+                                                    building: e.target.value
+                                                })),
+                                        className: "jsx-ba5c1f40791bc779" + " " + "password_form"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 558,
+                                        columnNumber: 13
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        children: profileErrors.building ? profileErrors.building[0] : ""
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                        lineNumber: 568,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 554,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-ba5c1f40791bc779" + " " + "submit",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    type: "submit",
+                                    value: "更新する",
+                                    disabled: isLoading,
+                                    className: "jsx-ba5c1f40791bc779" + " " + "submit_form"
+                                }, void 0, false, {
+                                    fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                    lineNumber: 574,
+                                    columnNumber: 13
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                                lineNumber: 573,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                        lineNumber: 489,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+                lineNumber: 448,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                id: "ba5c1f40791bc779",
+                children: ".login_page.jsx-ba5c1f40791bc779{text-align:center}.title.jsx-ba5c1f40791bc779{color:#4f46e5;margin-bottom:2rem;font-size:2rem;font-weight:700}.form-wrapper.jsx-ba5c1f40791bc779{text-align:center;display:inline-block}.alert-success2.jsx-ba5c1f40791bc779{color:#065f46;background-color:#d1fae5;border:1px solid #34d399;border-radius:.5rem;margin-bottom:1.5rem;padding:1rem}.profile__error.jsx-ba5c1f40791bc779,.user_image_error_message.jsx-ba5c1f40791bc779{color:#f55;text-align:left;width:400px;margin:-5px auto 5px;padding-left:5px;font-size:15px}.user_image_error_message.jsx-ba5c1f40791bc779{text-align:center;position:relative;bottom:20px}.item_sell_contents_box_line.jsx-ba5c1f40791bc779{margin-bottom:0;padding-bottom:0;display:block}.image_name.jsx-ba5c1f40791bc779{justify-content:center;align-items:center;padding-top:35px;padding-bottom:60px;display:flex;position:relative}.image_button_row.jsx-ba5c1f40791bc779{align-items:center;gap:30px;display:flex;position:relative;right:50px}.user_image_css.jsx-ba5c1f40791bc779{object-fit:cover;object-position:center;border-radius:50%;width:100px;height:100px;position:static;overflow:hidden}.upload_submit.jsx-ba5c1f40791bc779{color:#f55;cursor:pointer;white-space:nowrap;background-color:#fff;border:1px solid #f55;border-radius:5px;margin:0;padding:5px 10px;font-weight:700;position:static}.form-group.jsx-ba5c1f40791bc779{text-align:center;width:400px;margin:0 auto}.label_form_1.jsx-ba5c1f40791bc779,.label_form_2.jsx-ba5c1f40791bc779,.label_form_3.jsx-ba5c1f40791bc779,.label_form_4.jsx-ba5c1f40791bc779{text-align:left;font-weight:700;display:block;position:relative;left:0}.label_form_2.jsx-ba5c1f40791bc779,.label_form_3.jsx-ba5c1f40791bc779,.label_form_4.jsx-ba5c1f40791bc779{margin-top:30px}.name_form.jsx-ba5c1f40791bc779,.email_form.jsx-ba5c1f40791bc779,.password_form.jsx-ba5c1f40791bc779{box-sizing:border-box;border:1px solid #d1d5db;border-radius:3px;width:400px;height:30px;margin-bottom:10px;padding:0 10px}.submit.jsx-ba5c1f40791bc779{margin-top:10px}.submit_form.jsx-ba5c1f40791bc779{color:#fff;cursor:pointer;background-color:#f55;border:#f55;border-radius:5px;width:400px;height:40px;margin:30px auto;font-weight:700;transition:background-color .1s;position:relative;top:20px}.submit_form.jsx-ba5c1f40791bc779:hover{background-color:#e54c4c}.submit_form.jsx-ba5c1f40791bc779:disabled{cursor:not-allowed;background-color:#9ca3af}"
+            }, void 0, false, void 0, this)
+        ]
+    }, authUser?.uid || "unauthenticated", true, {
+        fileName: "[project]/app/(main)/mypage/profile/page.tsx",
+        lineNumber: 442,
+        columnNumber: 5
+    }, this));
+}
+_s(ProfilePage, "DPXaUHyjZLs+5y1kcbiCqJWdQ8A=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useApi"]
+    ];
+});
+_c = ProfilePage;
+var _c;
+__turbopack_context__.k.register(_c, "ProfilePage");
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
+}),
+"[project]/node_modules/next/dist/compiled/client-only/index.js [app-client] (ecmascript)", ((__turbopack_context__, module, exports) => {
+
+}),
+"[project]/node_modules/styled-jsx/dist/index/index.js [app-client] (ecmascript)", ((__turbopack_context__, module, exports) => {
+
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
+__turbopack_context__.r("[project]/node_modules/next/dist/compiled/client-only/index.js [app-client] (ecmascript)");
+var React = __turbopack_context__.r("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+function _interopDefaultLegacy(e) {
+    return e && typeof e === 'object' && 'default' in e ? e : {
+        'default': e
+    };
+}
+var React__default = /*#__PURE__*/ _interopDefaultLegacy(React);
+/*
+Based on Glamor's sheet
+https://github.com/threepointone/glamor/blob/667b480d31b3721a905021b26e1290ce92ca2879/src/sheet.js
+*/ function _defineProperties(target, props) {
+    for(var i = 0; i < props.length; i++){
+        var descriptor = props[i];
+        descriptor.enumerable = descriptor.enumerable || false;
+        descriptor.configurable = true;
+        if ("value" in descriptor) descriptor.writable = true;
+        Object.defineProperty(target, descriptor.key, descriptor);
+    }
+}
+function _createClass(Constructor, protoProps, staticProps) {
+    if (protoProps) _defineProperties(Constructor.prototype, protoProps);
+    if (staticProps) _defineProperties(Constructor, staticProps);
+    return Constructor;
+}
+var isProd = typeof __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"] !== "undefined" && __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env && ("TURBOPACK compile-time value", "development") === "production";
+var isString = function(o) {
+    return Object.prototype.toString.call(o) === "[object String]";
+};
+var StyleSheet = /*#__PURE__*/ function() {
+    function StyleSheet(param) {
+        var ref = param === void 0 ? {} : param, _name = ref.name, name = _name === void 0 ? "stylesheet" : _name, _optimizeForSpeed = ref.optimizeForSpeed, optimizeForSpeed = _optimizeForSpeed === void 0 ? isProd : _optimizeForSpeed;
+        invariant$1(isString(name), "`name` must be a string");
+        this._name = name;
+        this._deletedRulePlaceholder = "#" + name + "-deleted-rule____{}";
+        invariant$1(typeof optimizeForSpeed === "boolean", "`optimizeForSpeed` must be a boolean");
+        this._optimizeForSpeed = optimizeForSpeed;
+        this._serverSheet = undefined;
+        this._tags = [];
+        this._injected = false;
+        this._rulesCount = 0;
+        var node = typeof window !== "undefined" && document.querySelector('meta[property="csp-nonce"]');
+        this._nonce = node ? node.getAttribute("content") : null;
+    }
+    var _proto = StyleSheet.prototype;
+    _proto.setOptimizeForSpeed = function setOptimizeForSpeed(bool) {
+        invariant$1(typeof bool === "boolean", "`setOptimizeForSpeed` accepts a boolean");
+        invariant$1(this._rulesCount === 0, "optimizeForSpeed cannot be when rules have already been inserted");
+        this.flush();
+        this._optimizeForSpeed = bool;
+        this.inject();
+    };
+    _proto.isOptimizeForSpeed = function isOptimizeForSpeed() {
+        return this._optimizeForSpeed;
+    };
+    _proto.inject = function inject() {
+        var _this = this;
+        invariant$1(!this._injected, "sheet already injected");
+        this._injected = true;
+        if (typeof window !== "undefined" && this._optimizeForSpeed) {
+            this._tags[0] = this.makeStyleTag(this._name);
+            this._optimizeForSpeed = "insertRule" in this.getSheet();
+            if (!this._optimizeForSpeed) {
+                if ("TURBOPACK compile-time truthy", 1) {
+                    console.warn("StyleSheet: optimizeForSpeed mode not supported falling back to standard mode.");
+                }
+                this.flush();
+                this._injected = true;
+            }
+            return;
+        }
+        this._serverSheet = {
+            cssRules: [],
+            insertRule: function(rule, index) {
+                if (typeof index === "number") {
+                    _this._serverSheet.cssRules[index] = {
+                        cssText: rule
+                    };
+                } else {
+                    _this._serverSheet.cssRules.push({
+                        cssText: rule
+                    });
+                }
+                return index;
+            },
+            deleteRule: function(index) {
+                _this._serverSheet.cssRules[index] = null;
+            }
+        };
+    };
+    _proto.getSheetForTag = function getSheetForTag(tag) {
+        if (tag.sheet) {
+            return tag.sheet;
+        }
+        // this weirdness brought to you by firefox
+        for(var i = 0; i < document.styleSheets.length; i++){
+            if (document.styleSheets[i].ownerNode === tag) {
+                return document.styleSheets[i];
+            }
+        }
+    };
+    _proto.getSheet = function getSheet() {
+        return this.getSheetForTag(this._tags[this._tags.length - 1]);
+    };
+    _proto.insertRule = function insertRule(rule, index) {
+        invariant$1(isString(rule), "`insertRule` accepts only strings");
+        if (typeof window === "undefined") {
+            if (typeof index !== "number") {
+                index = this._serverSheet.cssRules.length;
+            }
+            this._serverSheet.insertRule(rule, index);
+            return this._rulesCount++;
+        }
+        if (this._optimizeForSpeed) {
+            var sheet = this.getSheet();
+            if (typeof index !== "number") {
+                index = sheet.cssRules.length;
+            }
+            // this weirdness for perf, and chrome's weird bug
+            // https://stackoverflow.com/questions/20007992/chrome-suddenly-stopped-accepting-insertrule
+            try {
+                sheet.insertRule(rule, index);
+            } catch (error) {
+                if ("TURBOPACK compile-time truthy", 1) {
+                    console.warn("StyleSheet: illegal rule: \n\n" + rule + "\n\nSee https://stackoverflow.com/q/20007992 for more info");
+                }
+                return -1;
+            }
+        } else {
+            var insertionPoint = this._tags[index];
+            this._tags.push(this.makeStyleTag(this._name, rule, insertionPoint));
+        }
+        return this._rulesCount++;
+    };
+    _proto.replaceRule = function replaceRule(index, rule) {
+        if (this._optimizeForSpeed || typeof window === "undefined") {
+            var sheet = typeof window !== "undefined" ? this.getSheet() : this._serverSheet;
+            if (!rule.trim()) {
+                rule = this._deletedRulePlaceholder;
+            }
+            if (!sheet.cssRules[index]) {
+                // @TBD Should we throw an error?
+                return index;
+            }
+            sheet.deleteRule(index);
+            try {
+                sheet.insertRule(rule, index);
+            } catch (error) {
+                if ("TURBOPACK compile-time truthy", 1) {
+                    console.warn("StyleSheet: illegal rule: \n\n" + rule + "\n\nSee https://stackoverflow.com/q/20007992 for more info");
+                }
+                // In order to preserve the indices we insert a deleteRulePlaceholder
+                sheet.insertRule(this._deletedRulePlaceholder, index);
+            }
+        } else {
+            var tag = this._tags[index];
+            invariant$1(tag, "old rule at index `" + index + "` not found");
+            tag.textContent = rule;
+        }
+        return index;
+    };
+    _proto.deleteRule = function deleteRule(index) {
+        if (typeof window === "undefined") {
+            this._serverSheet.deleteRule(index);
+            return;
+        }
+        if (this._optimizeForSpeed) {
+            this.replaceRule(index, "");
+        } else {
+            var tag = this._tags[index];
+            invariant$1(tag, "rule at index `" + index + "` not found");
+            tag.parentNode.removeChild(tag);
+            this._tags[index] = null;
+        }
+    };
+    _proto.flush = function flush() {
+        this._injected = false;
+        this._rulesCount = 0;
+        if (typeof window !== "undefined") {
+            this._tags.forEach(function(tag) {
+                return tag && tag.parentNode.removeChild(tag);
+            });
+            this._tags = [];
+        } else {
+            // simpler on server
+            this._serverSheet.cssRules = [];
+        }
+    };
+    _proto.cssRules = function cssRules() {
+        var _this = this;
+        if (typeof window === "undefined") {
+            return this._serverSheet.cssRules;
+        }
+        return this._tags.reduce(function(rules, tag) {
+            if (tag) {
+                rules = rules.concat(Array.prototype.map.call(_this.getSheetForTag(tag).cssRules, function(rule) {
+                    return rule.cssText === _this._deletedRulePlaceholder ? null : rule;
+                }));
+            } else {
+                rules.push(null);
+            }
+            return rules;
+        }, []);
+    };
+    _proto.makeStyleTag = function makeStyleTag(name, cssString, relativeToTag) {
+        if (cssString) {
+            invariant$1(isString(cssString), "makeStyleTag accepts only strings as second parameter");
+        }
+        var tag = document.createElement("style");
+        if (this._nonce) tag.setAttribute("nonce", this._nonce);
+        tag.type = "text/css";
+        tag.setAttribute("data-" + name, "");
+        if (cssString) {
+            tag.appendChild(document.createTextNode(cssString));
+        }
+        var head = document.head || document.getElementsByTagName("head")[0];
+        if (relativeToTag) {
+            head.insertBefore(tag, relativeToTag);
+        } else {
+            head.appendChild(tag);
+        }
+        return tag;
+    };
+    _createClass(StyleSheet, [
+        {
+            key: "length",
+            get: function get() {
+                return this._rulesCount;
+            }
+        }
+    ]);
+    return StyleSheet;
+}();
+function invariant$1(condition, message) {
+    if (!condition) {
+        throw new Error("StyleSheet: " + message + ".");
+    }
+}
+function hash(str) {
+    var _$hash = 5381, i = str.length;
+    while(i){
+        _$hash = _$hash * 33 ^ str.charCodeAt(--i);
+    }
+    /* JavaScript does bitwise operations (like XOR, above) on 32-bit signed
+   * integers. Since we want the results to be always positive, convert the
+   * signed int to an unsigned by doing an unsigned bitshift. */ return _$hash >>> 0;
+}
+var stringHash = hash;
+var sanitize = function(rule) {
+    return rule.replace(/\/style/gi, "\\/style");
+};
+var cache = {};
+/**
+ * computeId
+ *
+ * Compute and memoize a jsx id from a basedId and optionally props.
+ */ function computeId(baseId, props) {
+    if (!props) {
+        return "jsx-" + baseId;
+    }
+    var propsToString = String(props);
+    var key = baseId + propsToString;
+    if (!cache[key]) {
+        cache[key] = "jsx-" + stringHash(baseId + "-" + propsToString);
+    }
+    return cache[key];
+}
+/**
+ * computeSelector
+ *
+ * Compute and memoize dynamic selectors.
+ */ function computeSelector(id, css) {
+    var selectoPlaceholderRegexp = /__jsx-style-dynamic-selector/g;
+    // Sanitize SSR-ed CSS.
+    // Client side code doesn't need to be sanitized since we use
+    // document.createTextNode (dev) and the CSSOM api sheet.insertRule (prod).
+    if (typeof window === "undefined") {
+        css = sanitize(css);
+    }
+    var idcss = id + css;
+    if (!cache[idcss]) {
+        cache[idcss] = css.replace(selectoPlaceholderRegexp, id);
+    }
+    return cache[idcss];
+}
+function mapRulesToStyle(cssRules, options) {
+    if (options === void 0) options = {};
+    return cssRules.map(function(args) {
+        var id = args[0];
+        var css = args[1];
+        return /*#__PURE__*/ React__default["default"].createElement("style", {
+            id: "__" + id,
+            // Avoid warnings upon render with a key
+            key: "__" + id,
+            nonce: options.nonce ? options.nonce : undefined,
+            dangerouslySetInnerHTML: {
+                __html: css
+            }
+        });
+    });
+}
+var StyleSheetRegistry = /*#__PURE__*/ function() {
+    function StyleSheetRegistry(param) {
+        var ref = param === void 0 ? {} : param, _styleSheet = ref.styleSheet, styleSheet = _styleSheet === void 0 ? null : _styleSheet, _optimizeForSpeed = ref.optimizeForSpeed, optimizeForSpeed = _optimizeForSpeed === void 0 ? false : _optimizeForSpeed;
+        this._sheet = styleSheet || new StyleSheet({
+            name: "styled-jsx",
+            optimizeForSpeed: optimizeForSpeed
+        });
+        this._sheet.inject();
+        if (styleSheet && typeof optimizeForSpeed === "boolean") {
+            this._sheet.setOptimizeForSpeed(optimizeForSpeed);
+            this._optimizeForSpeed = this._sheet.isOptimizeForSpeed();
+        }
+        this._fromServer = undefined;
+        this._indices = {};
+        this._instancesCounts = {};
+    }
+    var _proto = StyleSheetRegistry.prototype;
+    _proto.add = function add(props) {
+        var _this = this;
+        if (undefined === this._optimizeForSpeed) {
+            this._optimizeForSpeed = Array.isArray(props.children);
+            this._sheet.setOptimizeForSpeed(this._optimizeForSpeed);
+            this._optimizeForSpeed = this._sheet.isOptimizeForSpeed();
+        }
+        if (typeof window !== "undefined" && !this._fromServer) {
+            this._fromServer = this.selectFromServer();
+            this._instancesCounts = Object.keys(this._fromServer).reduce(function(acc, tagName) {
+                acc[tagName] = 0;
+                return acc;
+            }, {});
+        }
+        var ref = this.getIdAndRules(props), styleId = ref.styleId, rules = ref.rules;
+        // Deduping: just increase the instances count.
+        if (styleId in this._instancesCounts) {
+            this._instancesCounts[styleId] += 1;
+            return;
+        }
+        var indices = rules.map(function(rule) {
+            return _this._sheet.insertRule(rule);
+        }) // Filter out invalid rules
+        .filter(function(index) {
+            return index !== -1;
+        });
+        this._indices[styleId] = indices;
+        this._instancesCounts[styleId] = 1;
+    };
+    _proto.remove = function remove(props) {
+        var _this = this;
+        var styleId = this.getIdAndRules(props).styleId;
+        invariant(styleId in this._instancesCounts, "styleId: `" + styleId + "` not found");
+        this._instancesCounts[styleId] -= 1;
+        if (this._instancesCounts[styleId] < 1) {
+            var tagFromServer = this._fromServer && this._fromServer[styleId];
+            if (tagFromServer) {
+                tagFromServer.parentNode.removeChild(tagFromServer);
+                delete this._fromServer[styleId];
+            } else {
+                this._indices[styleId].forEach(function(index) {
+                    return _this._sheet.deleteRule(index);
+                });
+                delete this._indices[styleId];
+            }
+            delete this._instancesCounts[styleId];
+        }
+    };
+    _proto.update = function update(props, nextProps) {
+        this.add(nextProps);
+        this.remove(props);
+    };
+    _proto.flush = function flush() {
+        this._sheet.flush();
+        this._sheet.inject();
+        this._fromServer = undefined;
+        this._indices = {};
+        this._instancesCounts = {};
+    };
+    _proto.cssRules = function cssRules() {
+        var _this = this;
+        var fromServer = this._fromServer ? Object.keys(this._fromServer).map(function(styleId) {
+            return [
+                styleId,
+                _this._fromServer[styleId]
+            ];
+        }) : [];
+        var cssRules = this._sheet.cssRules();
+        return fromServer.concat(Object.keys(this._indices).map(function(styleId) {
+            return [
+                styleId,
+                _this._indices[styleId].map(function(index) {
+                    return cssRules[index].cssText;
+                }).join(_this._optimizeForSpeed ? "" : "\n")
+            ];
+        }) // filter out empty rules
+        .filter(function(rule) {
+            return Boolean(rule[1]);
+        }));
+    };
+    _proto.styles = function styles(options) {
+        return mapRulesToStyle(this.cssRules(), options);
+    };
+    _proto.getIdAndRules = function getIdAndRules(props) {
+        var css = props.children, dynamic = props.dynamic, id = props.id;
+        if (dynamic) {
+            var styleId = computeId(id, dynamic);
+            return {
+                styleId: styleId,
+                rules: Array.isArray(css) ? css.map(function(rule) {
+                    return computeSelector(styleId, rule);
+                }) : [
+                    computeSelector(styleId, css)
+                ]
+            };
+        }
+        return {
+            styleId: computeId(id),
+            rules: Array.isArray(css) ? css : [
+                css
+            ]
+        };
+    };
+    /**
+   * selectFromServer
+   *
+   * Collects style tags from the document with id __jsx-XXX
+   */ _proto.selectFromServer = function selectFromServer() {
+        var elements = Array.prototype.slice.call(document.querySelectorAll('[id^="__jsx-"]'));
+        return elements.reduce(function(acc, element) {
+            var id = element.id.slice(2);
+            acc[id] = element;
+            return acc;
+        }, {});
+    };
+    return StyleSheetRegistry;
+}();
+function invariant(condition, message) {
+    if (!condition) {
+        throw new Error("StyleSheetRegistry: " + message + ".");
+    }
+}
+var StyleSheetContext = /*#__PURE__*/ React.createContext(null);
+StyleSheetContext.displayName = "StyleSheetContext";
+function createStyleRegistry() {
+    return new StyleSheetRegistry();
+}
+function StyleRegistry(param) {
+    var configuredRegistry = param.registry, children = param.children;
+    var rootRegistry = React.useContext(StyleSheetContext);
+    var ref = React.useState({
+        "StyleRegistry.useState[ref]": function() {
+            return rootRegistry || configuredRegistry || createStyleRegistry();
+        }
+    }["StyleRegistry.useState[ref]"]), registry = ref[0];
+    return /*#__PURE__*/ React__default["default"].createElement(StyleSheetContext.Provider, {
+        value: registry
+    }, children);
+}
+function useStyleRegistry() {
+    return React.useContext(StyleSheetContext);
+}
+// Opt-into the new `useInsertionEffect` API in React 18, fallback to `useLayoutEffect`.
+// https://github.com/reactwg/react-18/discussions/110
+var useInsertionEffect = React__default["default"].useInsertionEffect || React__default["default"].useLayoutEffect;
+var defaultRegistry = typeof window !== "undefined" ? createStyleRegistry() : undefined;
+function JSXStyle(props) {
+    var registry = defaultRegistry ? defaultRegistry : useStyleRegistry();
+    // If `registry` does not exist, we do nothing here.
+    if (!registry) {
+        return null;
+    }
+    if (typeof window === "undefined") {
+        registry.add(props);
+        return null;
+    }
+    useInsertionEffect({
+        "JSXStyle.useInsertionEffect": function() {
+            registry.add(props);
+            return ({
+                "JSXStyle.useInsertionEffect": function() {
+                    registry.remove(props);
+                }
+            })["JSXStyle.useInsertionEffect"];
+        // props.children can be string[], will be striped since id is identical
+        }
+    }["JSXStyle.useInsertionEffect"], [
+        props.id,
+        String(props.dynamic)
+    ]);
+    return null;
+}
+JSXStyle.dynamic = function(info) {
+    return info.map(function(tagInfo) {
+        var baseId = tagInfo[0];
+        var props = tagInfo[1];
+        return computeId(baseId, props);
+    }).join(" ");
+};
+exports.StyleRegistry = StyleRegistry;
+exports.createStyleRegistry = createStyleRegistry;
+exports.style = JSXStyle;
+exports.useStyleRegistry = useStyleRegistry;
+}),
+"[project]/node_modules/styled-jsx/style.js [app-client] (ecmascript)", ((__turbopack_context__, module, exports) => {
+
+module.exports = __turbopack_context__.r("[project]/node_modules/styled-jsx/dist/index/index.js [app-client] (ecmascript)").style;
+}),
+]);
+
+//# sourceMappingURL=_29cb640b._.js.map

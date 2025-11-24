@@ -36,6 +36,7 @@ services:
       # ★★★ 修正: ./public ではなく ./backend/public をマウント ★★★
       - ./backend/public:/var/www/backend/public
       - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
+      - ./docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf
     # ★★★ CRITICAL FIX: Laravel実行に必要な権限をPHPコンテナ起動時に付与 ★★★
     entrypoint: /bin/sh -c
     command: >
@@ -100,17 +101,17 @@ services:
       dockerfile: Dockerfile
     container_name: frontend_dev
     ports:
-      - "5173:5173" # ★ 修正: ホスト側のポートを5173に統一
+      - "3000:3000" # ★ Next.js 標準ポート
+    
     volumes:
       - ./frontend:/app
-      - /app/node_modules # 匿名ボリューム
-      - ./docker/nginx/ssl:/certs # ★ 修正: SSLディレクトリを /certs にマウント
-      # ★★★ 修正: Laravelのpublicディレクトリを正しく指す ★★★
-      - ./backend/public:/app/public
+      - /app/node_modules
+      #- ./docker/nginx/ssl:/certs # ★ 修正: SSLディレクトリを /certs にマウント
     working_dir: /app
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - APP_URL=https://laravel.test # ★ 追加: APP_URLを設定
+      # 🚨 修正: ここで NEXT_PUBLIC_API_BASE_URL を明示的に設定
+      - NEXT_PUBLIC_API_BASE_URL=https://laravel.test # ← ルートの.envの内容をコピー
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.7
