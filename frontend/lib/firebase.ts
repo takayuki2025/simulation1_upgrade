@@ -9,12 +9,12 @@ import { getAuth, Auth } from "firebase/auth";
 // Next.jsの環境変数を参照する場合、process.env.NEXT_PUBLIC_xxx を使用します。
 // ! は non-null assertion operator で、値が必ず存在する前提で進めます。
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
 // ---------------------------------------------------------
@@ -27,12 +27,12 @@ let app: FirebaseApp | null = null;
  */
 export const getFirebaseApp = (): FirebaseApp | null => {
   // サーバーサイドレンダリング (SSR) の実行を防ぎます
-  if (typeof window === "undefined") return null;
+    if (typeof window === "undefined") return null;
 
-  if (!app) {
+    if (!app) {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  }
-  return app;
+    }
+    return app;
 };
 
 // ---------------------------------------------------------
@@ -44,14 +44,14 @@ let authInstance: Auth | null = null;
  * @returns Authインスタンス
  */
 export const getFirebaseAuth = (): Auth | null => {
-  if (typeof window === "undefined") return null;
+    if (typeof window === "undefined") return null;
 
-  if (!authInstance) {
+    if (!authInstance) {
     const _app = getFirebaseApp();
     if (!_app) return null;
 
     authInstance = getAuth(_app);
-  }
+    }
 
-  return authInstance;
+    return authInstance;
 };

@@ -1,4 +1,4 @@
-# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋React＋firebase
+# アプリケーション名： 模擬案件初級_フリマアプリ_Laravel１１＋React19(Next.js16)＋firebase
 # 環境構築
 Dockerビルド
 <br>
@@ -6,7 +6,7 @@ Dockerビルド
 　1\. 　git cloneリンク（ターミナルコマンド） git clone https://github.com/takayuki2025/simulation1_upgrade.git  の実行
 <br>
 　2\. （ターミナルコマンド）cd simulation1　の実行。
-                         git checkout feature/react-develop の実行
+                         git checkout feature/react+next.js-develop の実行
 <br>
  　3\.   　ダミーデーターの商品画像ファイルをstrageディレクトリーの中にitem_imagesディレクトリーを作成して商品画像ファイルをコピーする。<br>
 　　　（ターミナルコマンド）cd backend (実行後) mkdir storage/app/public/item_images　の実行<br>
@@ -52,11 +52,7 @@ laravel環境構築
 <br>
 
 # 次のステップ提案<br>
-ルーティング: react-router-dom を使って、ページ遷移を実装してみる。<br>
 
-API通信: Laravel に API を作り、React から fetch や axios でデータを取得してみる。<br>
-
-認証: Firebase Authentication を組み込んでみる（以前の 00.firebase-service.client.ts が役立ちます）。<br>
 
 
 
@@ -117,15 +113,18 @@ WEBサイトにも良く反映されて景気の波にも負けないような�
 <img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/77cc71be-eb73-4a46-9a28-6dada2c46e4b" />
 
 # 使用技術<br>
-  - PHP 8.4
-  - Laravel 11
-  - MySql 8.3
-  - nginx 1.21.1
+  - PHP: 8.4
+  - Laravel: 11.31
+  - MySql: 8.3
+  - nginx: 1.21.1
+  - firebase: 10.12.2
+  - React: 19.0.0
+  - Next.js: 16.0.0
+  - node: 22-bullseye
 <br>
 
 # URL<br>
-  - フロントエンド：https://laravel.test/
-  - フリマアプリトップページ： https://laravel.test:4431/
-  - ユーザー登録： https://laravel.test:4431/register
+  - フリマアプリトップページ： https://localhost:3000/
+  - ユーザー登録： https://localhost:3000/register
   - phpMyAdmin:http://localhost:8080/
   - meilhog： http://localhost:8025/

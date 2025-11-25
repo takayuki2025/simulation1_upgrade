@@ -3,21 +3,21 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth"; // .tsxを削除 (推奨)
 
 export const metadata = {
-  title: "Next.js + Laravel",
-  description: "Frontend by Next.js, Backend by Laravel",
+    title: "Next.js + Laravel",
+    description: "Frontend by Next.js, Backend by Laravel",
 };
 
 export default function RootLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }) {
-  return (
+    return (
     <html lang="ja">
-      <body>
+        <body>
         {/* ★★★ AuthProviderでアプリケーション全体をラップ ★★★ */}
         <AuthProvider>{children}</AuthProvider>
-      </body>
+        </body>
     </html>
-  );
+    );
 }

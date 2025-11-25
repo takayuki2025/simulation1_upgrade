@@ -364,10 +364,12 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/firebase/node_modules/@firebase/auth/dist/node-esm/index.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
+"use client";
 ;
 ;
 ;
 ;
+// --- 設定 ---
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 const completeLaravelLogin = async (idToken, name)=>{
     if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
@@ -378,7 +380,10 @@ const completeLaravelLogin = async (idToken, name)=>{
             name: name
         }
     };
-    const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/register_or_login`, payload);
+    // SanctumはCookieベースの認証であり、このPOSTリクエストはセッション確立を担う
+    const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/register_or_login`, payload, {
+        withCredentials: true
+    });
     const { token, user: backendUser } = res.data;
     if (token && backendUser) {
         console.log("[Sanctum] Successful token exchange and session established.");
@@ -408,7 +413,9 @@ const useLaravelSession = (user, auth, checkLaravelSession)=>{
         console.log("[Firebase] Forced ID Token refresh successful during sync.");
         return idToken;
     }, []);
-    const syncAndRedirect = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
+    /**
+   * 認証状態の同期を試行し、必要に応じてリダイレクト処理を行う
+   */ const syncAndRedirect = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         if (!user || !auth) {
             // ログアウト状態の場合、Laravelセッションチェックのみ実行
             const sessionData = await checkLaravelSession();
@@ -416,8 +423,6 @@ const useLaravelSession = (user, auth, checkLaravelSession)=>{
             setInitialCheckComplete(true);
             return;
         }
-        // ★修正: getIdToken(false) を使用し、トークンが古ければ強制リロードする
-        let idToken = await forceTokenRefresh(user);
         let sessionData = await checkLaravelSession();
         // 匿名ユーザーまたはLaravelセッションが既に確立されている場合はスキップ
         if (user.isAnonymous) {
@@ -433,10 +438,10 @@ const useLaravelSession = (user, auth, checkLaravelSession)=>{
             console.log("[Sanctum] Non-anonymous user present but session missing. Attempting auto-login...");
             try {
                 // nameはauto-loginの際は省略
-                const { user: backendUser } = await completeLaravelLogin(idToken);
+                const { user: backendUser } = await completeLaravelLogin(await forceTokenRefresh(user) // 最新のトークンで自動ログイン
+                );
                 setLaravelAuthenticated(true);
-                // ★★★ 修正点 1: Sanctumセッション確立後、Firebaseトークンを再度強制リロード ★★★
-                // useApiが最新トークンを使うことを保証するため、二重に実行します
+                // Sanctumセッション確立後、useApiなどが最新トークンを使うことを保証するため再度強制リロード
                 await forceTokenRefresh(user);
                 // リダイレクト処理
                 if (!backendUser.email_verified_at) {
@@ -454,14 +459,16 @@ const useLaravelSession = (user, auth, checkLaravelSession)=>{
                 await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signOut"])(auth);
             }
         } else {
-            // セッション確立済みの場合のリダイレクトチェック
-            // ★★★ 修正点 2: セッション確立済みの場合もトークンを強制リロード ★★★
+            // セッション確立済みの場合
+            // ✅ 修正済み箇所: セッション確立済みの場合も true に設定する
+            setLaravelAuthenticated(true);
+            // セッション確立済みの場合も、useApiが最新のトークンを使用することを保証するため強制リロード
             await forceTokenRefresh(user);
             const backendUser = sessionData.user;
             if (backendUser && !backendUser.email_verified_at) {
                 router.push("/email/verify");
             } else {
-                // ★★★ 修正点 3: 認証完了済みの場合、URLクエリパラメータをクリーンアップ ★★★
+                // 認証完了済みの場合、URLクエリパラメータをクリーンアップ
                 if (isVerificationRedirect()) {
                     console.log("Session verified, cleaning up URL parameter.");
                     // verified=true を URL から削除し、ループを止める
@@ -492,8 +499,7 @@ const useLaravelSession = (user, auth, checkLaravelSession)=>{
     ]);
     return {
         laravelAuthenticated,
-        initialCheckComplete,
-        completeLaravelLogin
+        initialCheckComplete
     };
 };
 }),
@@ -510,10 +516,10 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/index.mjs [app-ssr] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/firebase/node_modules/@firebase/auth/dist/node-esm/index.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)"); // API通信に必要
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useFirebaseInit$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useFirebaseInit.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useLaravelSession.tsx [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useLaravelSession.tsx [app-ssr] (ecmascript)"); // Laravelセッション管理の外部フック
 "use client";
 ;
 ;
@@ -523,8 +529,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2
 ;
 ;
 // --- 設定 ---
+// API_BASE_URL の取得はここで維持
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
-__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
 const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"])(null);
 function AuthProvider({ children }) {
     const { auth, userId, isReady } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useFirebaseInit$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useFirebaseInit"])();
@@ -532,13 +538,17 @@ function AuthProvider({ children }) {
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoggingOut, setIsLoggingOut] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
-    // Sanctum CSRF Cookieの取得
+    // --- Laravel/Sanctum 関連のヘルパー関数 ---
+    // CSRF Cookieの取得
     const fetchCsrfCookie = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
         ;
         try {
-            await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`);
-            console.log("[Sanctum] CSRF cookie fetched");
+            // 修正: withCredentialsを明示的に指定
+            await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
+                withCredentials: true
+            });
+            console.log("[Sanctum] CSRF cookie fetched.");
         } catch (error) {
             console.error("[Sanctum] Failed to fetch CSRF cookie:", error);
         }
@@ -546,6 +556,7 @@ function AuthProvider({ children }) {
     // Laravel セッションチェック API
     const checkLaravelSession = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         try {
+            // 修正: withCredentialsを明示的に指定
             const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/api/auth/check`, {
                 withCredentials: true
             });
@@ -556,15 +567,18 @@ function AuthProvider({ children }) {
             };
         }
     }, []);
-    // ★★★ 外部フックの利用 ★★★
+    // ★★★ 外部フックの利用 (変更なし) ★★★
+    // user, auth の変化を監視し、Laravel側の認証状態を管理
     const { laravelAuthenticated, initialCheckComplete, completeLaravelLogin } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useLaravelSession"])(user, auth, checkLaravelSession);
-    // Firebase user 変化 → token 更新 のみ
+    // --- 状態監視 useEffect ---
+    // 1. Firebase user 変化 → token 更新
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!auth || !isReady) return;
         const unsub = auth.onAuthStateChanged(async (currentUser)=>{
             setUser(currentUser);
             if (currentUser) {
                 try {
+                    // トークンを取得し、状態を更新
                     const idToken = await currentUser.getIdToken();
                     setToken(idToken);
                 } catch  {
@@ -579,34 +593,39 @@ function AuthProvider({ children }) {
         auth,
         isReady
     ]);
-    // 初回 CSRF
+    // 2. 初回 CSRF Cookie 取得
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         fetchCsrfCookie();
     }, [
         fetchCsrfCookie
     ]);
-    // isAuthenticated の正しい条件
+    // --- useMemo で状態を集約 ---
+    // isAuthenticated の正しい条件 (変更なし)
     const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
+        // Firebaseユーザーが存在し、匿名ユーザーでなく、かつLaravel側でのセッションチェックも完了し認証済みである
         return initialCheckComplete && !!user && !user.isAnonymous && laravelAuthenticated === true;
     }, [
         initialCheckComplete,
         user,
         laravelAuthenticated
     ]);
-    // isLoading の定義をシンプルに
+    // isLoading の定義をシンプルに (変更なし)
     const isLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>!isReady || !initialCheckComplete, [
         isReady,
         initialCheckComplete
     ]);
+    // --- 認証アクション ---
     // Login
     const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ email, password, name })=>{
         if (!auth) throw new Error("Auth service unavailable.");
+        // 1. CSRF Cookie を取得 (ログイン前に必ず)
         await fetchCsrfCookie();
+        // 2. Firebase ログイン
         const userCredential = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
-        // Firebaseログイン成功後、IDトークンを使ってLaravel側にセッションを確立
+        // 3. IDトークンを取得し、Laravel側にセッションを確立 (completeLaravelLoginはuseLaravelSession由来)
         const idToken = await userCredential.user.getIdToken();
         const { user: backendUser } = await completeLaravelLogin(idToken, name);
-        // ログイン成功時にリダイレクト
+        // 4. ログイン後のリダイレクト
         if (!backendUser.email_verified_at) {
             router.push("/email/verify");
         } else {
@@ -623,8 +642,8 @@ function AuthProvider({ children }) {
         if (!auth) return;
         setIsLoggingOut(true);
         try {
-            // Laravelセッションを無効化するAPIを叩く処理を追加しても良いが、
-            // 今回はFirebaseのsignOutとSanctum Cookieの期限切れに頼る
+            // 修正: Laravel側でのログアウトAPIを叩く処理を追加しても良い (Sanctumセッションの即時破棄)
+            // ここでは実装せず、FirebaseログアウトとCookie期限切れに依存する既存のロジックを維持
             await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signOut"])(auth);
             router.push(redirectPath);
         } catch (e) {
@@ -637,14 +656,14 @@ function AuthProvider({ children }) {
         router
     ]);
     /**
-   * 認証トークンを強制的にリロードする関数
+   * 認証トークンを強制的にリロードする関数 (変更なし)
    */ const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         if (user) {
             console.log("[Firebase] Forcing ID Token refresh...");
             try {
                 const idToken = await user.getIdToken(true);
                 setToken(idToken);
-                // リフレッシュされたトークンでLaravelセッションを再確立
+                // リフレッシュされたトークンでLaravelセッションを再確立 (completeLaravelLoginはuseLaravelSession由来)
                 await completeLaravelLogin(idToken);
             } catch (error) {
                 console.error("[Firebase] Failed to refresh ID Token:", error);
@@ -673,7 +692,7 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useAuth.tsx",
-        lineNumber: 196,
+        lineNumber: 216,
         columnNumber: 5
     }, this);
 }

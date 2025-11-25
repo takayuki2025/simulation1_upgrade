@@ -17,7 +17,7 @@ services:
       # Nginxがビルド成果物を内部でコピーするため、ソースコードのマウントは不要（削除）
       # - ./frontend:/var/www/frontend # <-- この行を削除
       - ./backend:/var/www/backend  # Laravelのソースコードは引き続きマウント
-      # ★ 追加: オレオレ証明書をマウント
+      # ★ 追加: mkcert証明書をマウント
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
       # ★★★ 修正: ./public ではなく ./backend/public をマウント ★★★
       - ./backend/public:/var/www/backend/public
@@ -102,11 +102,13 @@ services:
     container_name: frontend_dev
     ports:
       - "3000:3000" # ★ Next.js 標準ポート
-    
+
     volumes:
       - ./frontend:/app
       - /app/node_modules
       #- ./docker/nginx/ssl:/certs # ★ 修正: SSLディレクトリを /certs にマウント
+      # ★★★ 修正: ファイルではなく、ディレクトリ全体をマウントする ★★★
+      - ./ssl_certs:/app/ssl_certs  # /app/ssl_certs にディレクトリごとマウント
     working_dir: /app
     environment:
       - CHOKIDAR_USEPOLLING=true

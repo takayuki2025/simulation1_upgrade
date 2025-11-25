@@ -46,9 +46,7 @@ yarn-error.log*
 *.tsbuildinfo           # TypeScriptのビルド情報
 
 ==================================
-
 4. ローカル環境/IDE固有ファイル (Local Environment / IDE)
-
 ==================================
 
 macOS

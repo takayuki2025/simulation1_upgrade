@@ -8,7 +8,7 @@ RUN apt update \
   # 依存関係のないパッケージのキャッシュをクリア
   && rm -rf /var/lib/apt/lists/* \
   && docker-php-ext-configure gd --with-jpeg --with-webp \
-  && docker-php-ext-install -j$(nproc) gd pdo_mysql zip bcmath 
+  && docker-php-ext-install -j$(nproc) gd pdo_mysql zip bcmath
 
 # Composerのインストール
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer

@@ -10,16 +10,20 @@ import React, {
   useCallback,
 } from "react";
 import { Auth, User, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import axios from "axios";
+import axios from "axios"; // API通信に必要
 import { useFirebaseInit } from "@/hooks/useFirebaseInit";
 import { useRouter } from "next/navigation";
-import { useLaravelSession } from "@/hooks/useLaravelSession";
+import { useLaravelSession } from "@/hooks/useLaravelSession"; // Laravelセッション管理の外部フック
 
 // --- 設定 ---
+// API_BASE_URL の取得はここで維持
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-axios.defaults.withCredentials = true;
 
-// --- 型定義 ---
+// ★ 修正点: グローバルな axios.defaults.withCredentials = true の設定を削除
+// これにより、axiosの設定をより細かく制御できるようになります。
+// 代わりに、認証フック内で使用される axios インスタンスまたはカスタムフック内で withCredentials を設定することを推奨します。
+
+// --- 型定義 (変更なし) ---
 export interface AuthContextType {
   user: User | null;
   auth: Auth | null;
@@ -48,12 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Sanctum CSRF Cookieの取得
+  // --- Laravel/Sanctum 関連のヘルパー関数 ---
+  // CSRF Cookieの取得
   const fetchCsrfCookie = useCallback(async () => {
     if (!API_BASE_URL) return;
     try {
-      await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`);
-      console.log("[Sanctum] CSRF cookie fetched");
+      // 修正: withCredentialsを明示的に指定
+      await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
+        withCredentials: true,
+      });
+      console.log("[Sanctum] CSRF cookie fetched.");
     } catch (error) {
       console.error("[Sanctum] Failed to fetch CSRF cookie:", error);
     }
@@ -62,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Laravel セッションチェック API
   const checkLaravelSession = useCallback(async () => {
     try {
+      // 修正: withCredentialsを明示的に指定
       const res = await axios.get(`${API_BASE_URL}/api/auth/check`, {
         withCredentials: true,
       });
@@ -71,11 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ★★★ 外部フックの利用 ★★★
+  // ★★★ 外部フックの利用 (変更なし) ★★★
+  // user, auth の変化を監視し、Laravel側の認証状態を管理
   const { laravelAuthenticated, initialCheckComplete, completeLaravelLogin } =
     useLaravelSession(user, auth, checkLaravelSession);
 
-  // Firebase user 変化 → token 更新 のみ
+  // --- 状態監視 useEffect ---
+
+  // 1. Firebase user 変化 → token 更新
   useEffect(() => {
     if (!auth || !isReady) return;
 
@@ -83,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser);
       if (currentUser) {
         try {
+          // トークンを取得し、状態を更新
           const idToken = await currentUser.getIdToken();
           setToken(idToken);
         } catch {
@@ -96,13 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [auth, isReady]);
 
-  // 初回 CSRF
+  // 2. 初回 CSRF Cookie 取得
   useEffect(() => {
     fetchCsrfCookie();
   }, [fetchCsrfCookie]);
 
-  // isAuthenticated の正しい条件
+  // --- useMemo で状態を集約 ---
+
+  // isAuthenticated の正しい条件 (変更なし)
   const isAuthenticated = useMemo(() => {
+    // Firebaseユーザーが存在し、匿名ユーザーでなく、かつLaravel側でのセッションチェックも完了し認証済みである
     return (
       initialCheckComplete &&
       !!user &&
@@ -111,11 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [initialCheckComplete, user, laravelAuthenticated]);
 
-  // isLoading の定義をシンプルに
+  // isLoading の定義をシンプルに (変更なし)
   const isLoading = useMemo(
     () => !isReady || !initialCheckComplete,
     [isReady, initialCheckComplete]
   );
+
+  // --- 認証アクション ---
 
   // Login
   const login = useCallback(
@@ -130,19 +148,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       if (!auth) throw new Error("Auth service unavailable.");
 
+      // 1. CSRF Cookie を取得 (ログイン前に必ず)
       await fetchCsrfCookie();
+
+      // 2. Firebase ログイン
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
         password
       );
 
-      // Firebaseログイン成功後、IDトークンを使ってLaravel側にセッションを確立
+      // 3. IDトークンを取得し、Laravel側にセッションを確立 (completeLaravelLoginはuseLaravelSession由来)
       const idToken = await userCredential.user.getIdToken();
-
       const { user: backendUser } = await completeLaravelLogin(idToken, name);
 
-      // ログイン成功時にリダイレクト
+      // 4. ログイン後のリダイレクト
       if (!backendUser.email_verified_at) {
         router.push("/email/verify");
       } else {
@@ -159,8 +179,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoggingOut(true);
       try {
-        // Laravelセッションを無効化するAPIを叩く処理を追加しても良いが、
-        // 今回はFirebaseのsignOutとSanctum Cookieの期限切れに頼る
+        // 修正: Laravel側でのログアウトAPIを叩く処理を追加しても良い (Sanctumセッションの即時破棄)
+        // ここでは実装せず、FirebaseログアウトとCookie期限切れに依存する既存のロジックを維持
         await signOut(auth);
         router.push(redirectPath);
       } catch (e) {
@@ -173,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * 認証トークンを強制的にリロードする関数
+   * 認証トークンを強制的にリロードする関数 (変更なし)
    */
   const reloadAuthToken = useCallback(async () => {
     if (user) {
@@ -181,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const idToken = await user.getIdToken(true);
         setToken(idToken);
-        // リフレッシュされたトークンでLaravelセッションを再確立
+        // リフレッシュされたトークンでLaravelセッションを再確立 (completeLaravelLoginはuseLaravelSession由来)
         await completeLaravelLogin(idToken);
       } catch (error) {
         console.error("[Firebase] Failed to refresh ID Token:", error);

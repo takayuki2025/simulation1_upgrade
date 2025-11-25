@@ -130,7 +130,7 @@ function VerifyEmailPage() {
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
             lineNumber: 102,
-            columnNumber: 7
+            columnNumber: 9
         }, this);
     }
     // 認証済みだと useEffect で移動するので return null
@@ -177,7 +177,7 @@ function VerifyEmailPage() {
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
                             lineNumber: 146,
-                            columnNumber: 11
+                            columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                             className: "text-base",
@@ -200,7 +200,7 @@ function VerifyEmailPage() {
                         }, void 0, true, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
                             lineNumber: 148,
-                            columnNumber: 11
+                            columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "p-4 bg-yellow-50 border border-yellow-300 rounded-md shadow-sm",
@@ -225,7 +225,7 @@ function VerifyEmailPage() {
                         }, void 0, true, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
                             lineNumber: 156,
-                            columnNumber: 11
+                            columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
@@ -239,7 +239,7 @@ function VerifyEmailPage() {
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
                     lineNumber: 167,
-                    columnNumber: 11
+                    columnNumber: 13
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     className: "mt-8 text-center",
@@ -252,7 +252,7 @@ function VerifyEmailPage() {
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
                         lineNumber: 174,
-                        columnNumber: 11
+                        columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
@@ -273,7 +273,7 @@ function VerifyEmailPage() {
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
                         lineNumber: 192,
-                        columnNumber: 11
+                        columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
@@ -284,7 +284,7 @@ function VerifyEmailPage() {
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
             lineNumber: 140,
-            columnNumber: 7
+            columnNumber: 9
         }, this)
     }, void 0, false, {
         fileName: "[project]/app/(auth)/email/verify/page.tsx",

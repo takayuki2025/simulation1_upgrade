@@ -48,5 +48,4 @@ async function deleteAllUsers() {
 deleteAllUsers().catch((error) => {
   console.error("致命的なエラーが発生しました:", error);
 });
-
 // 実行方法 simulation1_upgradeで: node delete_users.js

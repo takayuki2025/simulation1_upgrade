@@ -1,20 +1,28 @@
+"use client";
+
 import { useCallback, useEffect, useState } from "react";
 import { User, signOut } from "firebase/auth";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { Auth } from "firebase/auth";
 
+// --- 設定 ---
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+// --- 型定義 ---
 interface BackendUser {
   id: number;
   email_verified_at: string | null;
   // 他のユーザー情報...
 }
 
+// -----------------------------------------------------------------
+// 1. ヘルパー関数: Laravelセッション確立 (completeLaravelLogin)
+// -----------------------------------------------------------------
+
 /**
  * Firebase ID TokenをLaravelに送り、Sanctumセッションを確立する
- * (useAuthフックに移動し、useAuthとuseLaravelSessionの両方から参照できるようにします)
+ * (useAuthとuseLaravelSessionの両方から参照できるように、ファイル内でexportしています)
  */
 export const completeLaravelLogin = async (
   idToken: string,
@@ -27,9 +35,13 @@ export const completeLaravelLogin = async (
     ...(name && { name: name }),
   };
 
+  // SanctumはCookieベースの認証であり、このPOSTリクエストはセッション確立を担う
   const res = await axios.post(
     `${API_BASE_URL}/api/register_or_login`,
-    payload
+    payload,
+    {
+      withCredentials: true, // Sanctum Cookieの送受信に必須
+    }
   );
 
   const { token, user: backendUser } = res.data;
@@ -44,13 +56,17 @@ export const completeLaravelLogin = async (
   }
 };
 
+// -----------------------------------------------------------------
+// 2. メインフック: Laravelセッション同期 (useLaravelSession)
+// -----------------------------------------------------------------
+
 /**
  * Laravelとの認証状態の同期とリダイレクトを処理するカスタムフック
  */
 export const useLaravelSession = (
   user: User | null,
   auth: Auth | null,
-  checkLaravelSession: () => Promise<any>
+  checkLaravelSession: () => Promise<any> // AuthProviderから渡されるセッションチェック関数
 ) => {
   const router = useRouter();
   const [laravelAuthenticated, setLaravelAuthenticated] = useState(false);
@@ -71,6 +87,9 @@ export const useLaravelSession = (
     return idToken;
   }, []);
 
+  /**
+   * 認証状態の同期を試行し、必要に応じてリダイレクト処理を行う
+   */
   const syncAndRedirect = useCallback(async () => {
     if (!user || !auth) {
       // ログアウト状態の場合、Laravelセッションチェックのみ実行
@@ -80,8 +99,6 @@ export const useLaravelSession = (
       return;
     }
 
-    // ★修正: getIdToken(false) を使用し、トークンが古ければ強制リロードする
-    let idToken = await forceTokenRefresh(user);
     let sessionData = await checkLaravelSession();
 
     // 匿名ユーザーまたはLaravelセッションが既に確立されている場合はスキップ
@@ -103,11 +120,12 @@ export const useLaravelSession = (
       );
       try {
         // nameはauto-loginの際は省略
-        const { user: backendUser } = await completeLaravelLogin(idToken);
+        const { user: backendUser } = await completeLaravelLogin(
+          await forceTokenRefresh(user) // 最新のトークンで自動ログイン
+        );
         setLaravelAuthenticated(true);
 
-        // ★★★ 修正点 1: Sanctumセッション確立後、Firebaseトークンを再度強制リロード ★★★
-        // useApiが最新トークンを使うことを保証するため、二重に実行します
+        // Sanctumセッション確立後、useApiなどが最新トークンを使うことを保証するため再度強制リロード
         await forceTokenRefresh(user);
 
         // リダイレクト処理
@@ -134,9 +152,12 @@ export const useLaravelSession = (
         await signOut(auth);
       }
     } else {
-      // セッション確立済みの場合のリダイレクトチェック
+      // セッション確立済みの場合
 
-      // ★★★ 修正点 2: セッション確立済みの場合もトークンを強制リロード ★★★
+      // ✅ 修正済み箇所: セッション確立済みの場合も true に設定する
+      setLaravelAuthenticated(true);
+
+      // セッション確立済みの場合も、useApiが最新のトークンを使用することを保証するため強制リロード
       await forceTokenRefresh(user);
 
       const backendUser = sessionData.user;
@@ -144,7 +165,7 @@ export const useLaravelSession = (
       if (backendUser && !backendUser.email_verified_at) {
         router.push("/email/verify");
       } else {
-        // ★★★ 修正点 3: 認証完了済みの場合、URLクエリパラメータをクリーンアップ ★★★
+        // 認証完了済みの場合、URLクエリパラメータをクリーンアップ
         if (isVerificationRedirect()) {
           console.log("Session verified, cleaning up URL parameter.");
           // verified=true を URL から削除し、ループを止める
@@ -174,6 +195,6 @@ export const useLaravelSession = (
   return {
     laravelAuthenticated,
     initialCheckComplete,
-    completeLaravelLogin,
+    // completeLaravelLogin はこのファイルで export されているため、フックの戻り値からは削除
   };
 };

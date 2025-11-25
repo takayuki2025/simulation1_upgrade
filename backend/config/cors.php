@@ -15,7 +15,7 @@ return [
     // ★★★ 【重要修正】フロントエンドのホスト名とポートを明示的に許可 ★★★
     'allowed_origins' => [
         // 環境変数から取得（ここで FRONTEND_URL=http://localhost:3000 とするのが理想）
-        env('FRONTEND_URL', 'http://localhost:3000'),
+        env('FRONTEND_URL', 'https://localhost:3000'),
         // 念のため明示的に追記
         'http://127.0.0.1:3000',
         'https://laravel.test',
