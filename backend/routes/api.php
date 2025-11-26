@@ -7,7 +7,6 @@ use App\Http\Controllers\FirebaseAuthController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ItemController;
 use Illuminate\Support\Facades\Log; // Logファサードをインポート
-use App\Http\Middleware\VerifyFirebaseToken; // ★ 追加：ミドルウェアクラスをインポート
 
 // ★★★ 強制ログ: ルーティングファイルが読み込まれているかを確認 ★★★
 Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
@@ -21,11 +20,14 @@ Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 // Nuxtがページを表示する際に必要なデータ取得エンドポイントを追加します。
 // 商品詳細情報取得
     Route::get('/items/{item_id}', [ItemController::class, 'item_detail_show']);
-    
+
 // フロントページ（商品一覧）取得
 // 【修正点】認証情報が存在すればAuth::guard('sanctum')->user()にセットするため、ミドルウェアを適用
 // ★ 修正: ミドルウェアをAPIグループ全体に移動したため、ここでの個別指定は削除します。
-    Route::get('/items', [ItemController::class, 'index']); 
+    // Route::get('/items', [ItemController::class, 'index']);
+
+    // カスタムミドルウェアのみを適用。トークンがあれば認証し、なければそのまま通過させる。
+Route::get('/items', [ItemController::class, 'index']);
 
 // コメント取得 (GET)
     Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);
@@ -47,10 +49,6 @@ Route::get('/auth/check', function () {
 // Sanctum認証が必要な他のAPIルートよりも前に定義することが推奨されます
 Route::post('/register_or_login', [FirebaseAuthController::class, 'handleTokenExchange'])
     ->name('api.register_or_login');
-
-
-
-
 
 
 
@@ -80,16 +78,14 @@ Route::post('/register_or_login', [FirebaseAuthController::class, 'handleTokenEx
 
 
 // **********************************************
-// ★★★ Sanctum 認証 API ルート (auth:sanctum ミドルウェアを使用) ★★★
+// ★★★ firebase(JWT) 認証 API ルート (auth:firebase + VerifyFirebaseToken ミドルウェアを使用) ★★★
 // **********************************************
 
-    // Route::middleware([VerifyFirebaseToken::class, 'auth:sanctum'])->group(function () {
-    Route::middleware([VerifyFirebaseToken::class])->group(function () {
-    
-
-    // 現在のユーザー情報取得 (Pinia storeの fetchUser で使用)
+Route::middleware(['auth:firebase'])->group(function () {
+    // 認証済みユーザーのみがアクセスできるAPIエンドポイント
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        // Auth::user() はVerifyFirebaseTokenが成功していれば設定されている
+        return $request->user(); // Auth::user() も使用可能
     });
 
 
@@ -127,12 +123,12 @@ Route::post('/register_or_login', [FirebaseAuthController::class, 'handleTokenEx
     Route::get('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'item_purchase_edit']);
 
     // 購入処理関連
-    Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update']); 
+    Route::patch('/purchase/address/{item_id}/{user_id?}', [ItemController::class, 'update']);
 
-    Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create'); 
+    Route::post('/thanks_buy', [ItemController::class, 'thanks_buy_create'])->name('thanks_buy_create');
 
     // コメント投稿
-    Route::post('/comment', [ItemController::class, 'comment_create']); 
+    Route::post('/comment', [ItemController::class, 'comment_create']);
 
     // いいね機能
     Route::post('/items/{item}/favorite', [ItemController::class, 'apiFavorite']);
@@ -143,10 +139,11 @@ Route::post('/register_or_login', [FirebaseAuthController::class, 'handleTokenEx
 // ★★★ 公開 (認証不要) API ルート ★★★
 // **********************************************
 
+
 // Nuxtがページを表示する際に必要なデータ取得エンドポイントを追加します。
 // 商品詳細情報取得
     Route::get('/items/{item_id}', [ItemController::class, 'item_detail_show']);
 // フロントページ（商品一覧）取得
     Route::get('/items', [ItemController::class, 'index']);
 // コメント取得 (GET)
-    Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']); 
+    Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);

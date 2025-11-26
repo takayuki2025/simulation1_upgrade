@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth"; // useApiClientは不要になったため削除
 import { getImageUrl, onImageError } from "@/utils/utils";
 
 // 環境変数ではなく、Next.jsのクライアント側の定数として扱います
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// 💡 グローバルなaxiosは認証チェックやCSRF取得時など、特定の非認証リクエストでのみ使用します。
 axios.defaults.withCredentials = true;
 
 // =======================================================
@@ -30,12 +31,15 @@ interface Item {
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // useAuth から必要なステートを取得
   const {
     user,
-    token,
-    isLoading: isAuthLoading, // useFirebaseInitのisReadyがfalseの時、trueになる
+    // tokenの取得を削除し、代わりにapiClientを取得
+    isLoading: isAuthLoading,
     isLoggingOut,
     isAuthenticated,
+    apiClient: rawApiClient, // 認証状態によってはnullになる元の apiClient を取得
   } = useAuth();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -77,10 +81,13 @@ export default function Home() {
   // =======================================================
 
   const fetchItems = useCallback(
-    async (tab: string, search: string, currentToken: string | null) => {
-      const isAuthenticatedByHook = !!user && !user.isAnonymous; // 匿名ユーザーを除く認証済みチェック
+    // currentToken引数を削除
+    async (tab: string, search: string) => {
+      // 認証済みAxiosインスタンスの参照
+      const apiClient = rawApiClient;
 
-      console.log(`[DEBUG] Received Token: ${currentToken}`);
+      // マイリストタブ、またはユーザーが認証済みの場合に認証済みクライアントを使用する
+      const useAuthClient = tab === "mylist" || isAuthenticated;
 
       if (isLoggingOut) {
         console.log("[Skip Fetch] Logging out, skipping fetch.");
@@ -89,8 +96,8 @@ export default function Home() {
         return;
       }
 
-      // マイリストタブかつ未ログインの場合、フェッチをスキップ
-      if (tab === "mylist" && !isAuthenticatedByHook) {
+      // マイリストタブかつ未ログインの場合（ isAuthenticated=false ）、フェッチをスキップ
+      if (tab === "mylist" && !isAuthenticated) {
         console.log("[Skip Fetch] Not logged in and accessing mylist.");
         setItems([]);
         setLoading(false);
@@ -98,38 +105,39 @@ export default function Home() {
         return;
       }
 
-      setLoading(true);
-      console.log(
-        `[Fetch] Auth Check: ${isAuthenticatedByHook}. Token Present: ${!!currentToken}. Fetching items: tab=${tab}, search=${search}`
-      );
-
-      const apiUrl = `${API_BASE_URL}/api/items`;
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      // 重要な修正: currentTokenが確実に存在する（認証が完了している）場合にのみヘッダーを設定
-      if (currentToken) {
-        headers["Authorization"] = `Bearer ${currentToken}`;
+      // 認証が必要なリクエストだが、apiClient（トークン付きAxios）がまだ準備できていない場合はスキップ
+      if (useAuthClient && !apiClient) {
         console.log(
-          "[Fetch] Including 'Authorization: Bearer' header with Firebase ID Token."
+          "[Skip Fetch] Auth client needed (Mylist or Authenticated view) but apiClient is null. Waiting for token."
         );
-      } else if (isAuthenticatedByHook && user) {
-        // トークンが存在しないが、userが存在する場合（念のためトークンを再取得）
-        console.warn(
-          "[Fetch] User exists but token is null. Fetching new token."
-        );
-        const freshToken = await user.getIdToken();
-        headers["Authorization"] = `Bearer ${freshToken}`;
+        setItems([]);
+        setLoading(false);
+        setImageRefreshKey((prev) => prev + 1);
+        return;
       }
 
+      setLoading(true);
+
+      // グローバルAxiosか認証済みAxiosのどちらを使うかを選択
+      // useAuthClientがtrueでapiClientが利用可能ならapiClientを使用
+      const client = apiClient && useAuthClient ? apiClient : axios;
+      const apiUrl = `${API_BASE_URL}/api/items`;
+
+      console.log(
+        `[Fetch] Using client: ${
+          useAuthClient ? "Authenticated" : "Global/Unauthenticated"
+        }. Fetching items: tab=${tab}, search=${search}`
+      );
+
+      // 以前の手動でヘッダーを設定するロジックは全て削除されました
+
       try {
-        const response = await axios.get(apiUrl, {
+        const response = await client.get(apiUrl, {
           params: {
             tab: tab,
             all_item_search: search,
           },
-          headers: headers,
+          // 認証ヘッダーはclient (apiClientの場合) に既に含まれています
         });
 
         const responseData = response.data;
@@ -147,7 +155,8 @@ export default function Home() {
         setLoading(false);
       }
     },
-    [user, isLoggingOut, API_BASE_URL]
+    // 依存配列を更新: rawApiClient, isAuthenticated を追加
+    [rawApiClient, isAuthenticated, isLoggingOut, API_BASE_URL]
   );
 
   // =======================================================
@@ -157,8 +166,7 @@ export default function Home() {
   useEffect(() => {
     console.group("Home.tsx useEffect Re-run Check");
     console.log(`[STATE] isAuthLoading: ${isAuthLoading}`); // 認証待機中は true
-    console.log(`[STATE] user (exists): ${!!user}`);
-    console.log(`[STATE] token (exists): ${!!token}`);
+    console.log(`[STATE] isAuthenticated: ${isAuthenticated}`);
     console.groupEnd();
 
     // ★★★ 認証状態が解決するまで、フェッチを厳密にブロックする ★★★
@@ -172,12 +180,13 @@ export default function Home() {
     console.log(
       `[Fetch Triggered] Auth Resolved/Query Changed. Re-fetching items.`
     );
-    fetchItems(currentTab, currentSearchQuery, token);
+    // fetchItemsを引数なしで呼び出す
+    fetchItems(currentTab, currentSearchQuery);
   }, [
     currentTab,
     currentSearchQuery,
     isAuthLoading, // 認証完了を監視
-    token, // トークン変更を監視
+    rawApiClient, // apiClientが再生成された時（トークンが変更された時）に再フェッチ
     fetchItems,
     user,
   ]);

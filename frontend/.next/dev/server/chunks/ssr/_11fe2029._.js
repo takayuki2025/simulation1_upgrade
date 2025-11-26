@@ -53,7 +53,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)"); // useApiClientは不要になったため削除
 var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/utils/utils.ts [app-ssr] (ecmascript)");
 "use client";
 ;
@@ -66,11 +66,14 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$ap
 ;
 // 環境変数ではなく、Next.jsのクライアント側の定数として扱います
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
+// 💡 グローバルなaxiosは認証チェックやCSRF取得時など、特定の非認証リクエストでのみ使用します。
 __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
 function Home() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSearchParams"])();
-    const { user, token, isLoading: isAuthLoading, isLoggingOut, isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    // useAuth から必要なステートを取得
+    const { user, // tokenの取得を削除し、代わりにapiClientを取得
+    isLoading: isAuthLoading, isLoggingOut, isAuthenticated, apiClient: rawApiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const [items, setItems] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])([]);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // APIフェッチ中のローディング
     const [imageRefreshKey, setImageRefreshKey] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
@@ -112,46 +115,47 @@ function Home() {
     // =======================================================
     // データフェッチロジック
     // =======================================================
-    const fetchItems = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (tab, search, currentToken)=>{
-        const isAuthenticatedByHook = !!user && !user.isAnonymous; // 匿名ユーザーを除く認証済みチェック
-        console.log(`[DEBUG] Received Token: ${currentToken}`);
+    const fetchItems = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(// currentToken引数を削除
+    async (tab, search)=>{
+        // 認証済みAxiosインスタンスの参照
+        const apiClient = rawApiClient;
+        // マイリストタブ、またはユーザーが認証済みの場合に認証済みクライアントを使用する
+        const useAuthClient = tab === "mylist" || isAuthenticated;
         if (isLoggingOut) {
             console.log("[Skip Fetch] Logging out, skipping fetch.");
             setItems([]);
             setLoading(false);
             return;
         }
-        // マイリストタブかつ未ログインの場合、フェッチをスキップ
-        if (tab === "mylist" && !isAuthenticatedByHook) {
+        // マイリストタブかつ未ログインの場合（ isAuthenticated=false ）、フェッチをスキップ
+        if (tab === "mylist" && !isAuthenticated) {
             console.log("[Skip Fetch] Not logged in and accessing mylist.");
             setItems([]);
             setLoading(false);
             setImageRefreshKey((prev)=>prev + 1);
             return;
         }
-        setLoading(true);
-        console.log(`[Fetch] Auth Check: ${isAuthenticatedByHook}. Token Present: ${!!currentToken}. Fetching items: tab=${tab}, search=${search}`);
-        const apiUrl = `${API_BASE_URL}/api/items`;
-        const headers = {
-            "Content-Type": "application/json"
-        };
-        // 重要な修正: currentTokenが確実に存在する（認証が完了している）場合にのみヘッダーを設定
-        if (currentToken) {
-            headers["Authorization"] = `Bearer ${currentToken}`;
-            console.log("[Fetch] Including 'Authorization: Bearer' header with Firebase ID Token.");
-        } else if (isAuthenticatedByHook && user) {
-            // トークンが存在しないが、userが存在する場合（念のためトークンを再取得）
-            console.warn("[Fetch] User exists but token is null. Fetching new token.");
-            const freshToken = await user.getIdToken();
-            headers["Authorization"] = `Bearer ${freshToken}`;
+        // 認証が必要なリクエストだが、apiClient（トークン付きAxios）がまだ準備できていない場合はスキップ
+        if (useAuthClient && !apiClient) {
+            console.log("[Skip Fetch] Auth client needed (Mylist or Authenticated view) but apiClient is null. Waiting for token.");
+            setItems([]);
+            setLoading(false);
+            setImageRefreshKey((prev)=>prev + 1);
+            return;
         }
+        setLoading(true);
+        // グローバルAxiosか認証済みAxiosのどちらを使うかを選択
+        // useAuthClientがtrueでapiClientが利用可能ならapiClientを使用
+        const client = apiClient && useAuthClient ? apiClient : __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"];
+        const apiUrl = `${API_BASE_URL}/api/items`;
+        console.log(`[Fetch] Using client: ${useAuthClient ? "Authenticated" : "Global/Unauthenticated"}. Fetching items: tab=${tab}, search=${search}`);
+        // 以前の手動でヘッダーを設定するロジックは全て削除されました
         try {
-            const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(apiUrl, {
+            const response = await client.get(apiUrl, {
                 params: {
                     tab: tab,
                     all_item_search: search
-                },
-                headers: headers
+                }
             });
             const responseData = response.data;
             if (responseData && Array.isArray(responseData.items)) {
@@ -167,8 +171,10 @@ function Home() {
         } finally{
             setLoading(false);
         }
-    }, [
-        user,
+    }, // 依存配列を更新: rawApiClient, isAuthenticated を追加
+    [
+        rawApiClient,
+        isAuthenticated,
         isLoggingOut,
         API_BASE_URL
     ]);
@@ -178,8 +184,7 @@ function Home() {
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         console.group("Home.tsx useEffect Re-run Check");
         console.log(`[STATE] isAuthLoading: ${isAuthLoading}`); // 認証待機中は true
-        console.log(`[STATE] user (exists): ${!!user}`);
-        console.log(`[STATE] token (exists): ${!!token}`);
+        console.log(`[STATE] isAuthenticated: ${isAuthenticated}`);
         console.groupEnd();
         // ★★★ 認証状態が解決するまで、フェッチを厳密にブロックする ★★★
         if (isAuthLoading) {
@@ -189,12 +194,13 @@ function Home() {
         }
         // 認証状態の解決後 (isAuthLoading=false) または、解決後のトークン/クエリ変更時にフェッチを実行
         console.log(`[Fetch Triggered] Auth Resolved/Query Changed. Re-fetching items.`);
-        fetchItems(currentTab, currentSearchQuery, token);
+        // fetchItemsを引数なしで呼び出す
+        fetchItems(currentTab, currentSearchQuery);
     }, [
         currentTab,
         currentSearchQuery,
         isAuthLoading,
-        token,
+        rawApiClient,
         fetchItems,
         user
     ]);
@@ -211,7 +217,7 @@ function Home() {
                         className: "jsx-4703cd38c22867c" + " " + "animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 194,
+                        lineNumber: 203,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -221,13 +227,13 @@ function Home() {
                          : "商品を読み込み中..."
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 195,
+                        lineNumber: 204,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/page.tsx",
-                lineNumber: 193,
+                lineNumber: 202,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -253,7 +259,7 @@ function Home() {
                                 children: "すべて"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 208,
+                                lineNumber: 217,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -273,13 +279,13 @@ function Home() {
                                 children: "マイリスト"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 223,
+                                lineNumber: 232,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 207,
+                        lineNumber: 216,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -299,7 +305,7 @@ function Home() {
                                                     className: "jsx-4703cd38c22867c" + " " + "w-full aspect-square object-cover block rounded-lg shadow-md"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 247,
+                                                    lineNumber: 256,
                                                     columnNumber: 21
                                                 }, this),
                                                 item.remain === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -307,13 +313,13 @@ function Home() {
                                                     children: "SOLD"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 254,
+                                                    lineNumber: 263,
                                                     columnNumber: 43
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 246,
+                                            lineNumber: 255,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -324,7 +330,7 @@ function Home() {
                                                     children: item.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 257,
+                                                    lineNumber: 266,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -335,24 +341,24 @@ function Home() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 258,
+                                                    lineNumber: 267,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 256,
+                                            lineNumber: 265,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/page.tsx",
-                                    lineNumber: 245,
+                                    lineNumber: 254,
                                     columnNumber: 17
                                 }, this)
                             }, item.id, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 244,
+                                lineNumber: 253,
                                 columnNumber: 15
                             }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "jsx-4703cd38c22867c" + " " + "text-center w-full py-10 text-gray-500",
@@ -361,23 +367,23 @@ function Home() {
                                 children: currentTab === "mylist" && isUserLoggedOutComputed ? "マイリストを見るにはログインしてください。" : currentTab === "all" && isAuthLoading ? "認証状態を確認中..." : "該当する商品が見つかりませんでした。"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 267,
+                                lineNumber: 276,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/page.tsx",
-                            lineNumber: 266,
+                            lineNumber: 275,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 240,
+                        lineNumber: 249,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/page.tsx",
-                lineNumber: 205,
+                lineNumber: 214,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -387,7 +393,7 @@ function Home() {
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/page.tsx",
-        lineNumber: 190,
+        lineNumber: 199,
         columnNumber: 5
     }, this);
 }

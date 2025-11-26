@@ -37,6 +37,7 @@ class ItemController extends Controller
     // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
     public function index(Request $request): JsonResponse
     {
+        Log::info('FINAL_AUTHORIZATION_HEADER_CHECK: ' . $request->header('Authorization'));
         // リクエストヘッダーのフルダンプ
         $allHeaders = $request->headers->all();
         Log::info("ITEM_CONTROLLER_HEADER_DUMP: " . json_encode($allHeaders));
@@ -405,6 +406,7 @@ class ItemController extends Controller
      */
     public function profile_show(Request $request)
     {
+        Log::info('profile_page_FINAL_AUTHORIZATION_HEADER_CHECK: ' . $request->header('Authorization'));
         // 認証チェック
         if (!Auth::check()) {
             // 認証されていない場合は 401 Unauthorized を返す

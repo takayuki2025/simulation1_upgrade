@@ -10,7 +10,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)"); // 実際の useAuth を利用
 "use client";
 ;
 ;
@@ -19,17 +19,20 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b
 ;
 function LoginPage() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
-    const { login, isAuthenticated, isLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { login, isAuthenticated, isLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])(); // 👈 実際の login を使用
     const [email, setEmail] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const [password, setPassword] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const [apiError, setApiError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const [isSubmitting, setIsSubmitting] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     // -------------------------
-    // 副作用: 認証済みならトップへリダイレクト
+    // 副作用: 認証済みならトップへリダイレクト（ページ読み込み時の安全策として維持）
     // -------------------------
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        console.log("PAGE_EFFECT: Auth Status Check. Loading:", isLoading, "Authenticated:", isAuthenticated);
+        // isAuthLoadingが解決し、かつisAuthenticatedがtrueであればリダイレクト
         if (!isLoading && isAuthenticated) {
-            router.push("/");
+            console.log("PAGE_EFFECT: Redirecting to / (via useEffect)");
+            router.replace("/"); // replaceを使って履歴を残さないようにする
         }
     }, [
         isLoading,
@@ -43,34 +46,47 @@ function LoginPage() {
                 children: "認証状態を確認中..."
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/login/page.tsx",
-                lineNumber: 29,
+                lineNumber: 37,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/app/(auth)/login/page.tsx",
-            lineNumber: 28,
+            lineNumber: 36,
             columnNumber: 7
         }, this);
     }
-    if (isAuthenticated) return null; // リダイレクト済み
+    // 既に認証済みの場合、useEffectでリダイレクトされるのを待つ
+    if (isAuthenticated) return null;
     const handleSubmit = async (e)=>{
         e.preventDefault();
         setApiError("");
         setIsSubmitting(true);
+        console.log("PAGE_HANDLE: Submission started.");
         if (!email || !password) {
             setApiError("メールアドレスとパスワードを入力してください。");
             setIsSubmitting(false);
             return;
         }
         try {
+            console.log("PAGE_HANDLE: Calling actual login function from useAuth...");
+            // 1. ログイン処理の実行
             await login({
                 email,
                 password
             });
-        // 成功後は副作用でリダイレクト
+            // 2. 成功後の処理: useAuth内部でメール認証へのリダイレクトが行われなかった場合
+            //    (つまり、認証済みとしてトップページへ移動する場合) はここで明示的にリダイレクトする
+            console.log("PAGE_HANDLE: Login successful. Immediately redirecting to /");
+            // 🔥 修正: ログイン成功後、router.push("/") を実行
+            router.push("/");
         } catch (error) {
+            console.error("PAGE_HANDLE: Login failed in catch block.", error);
             let errorMessage = "ログインに失敗しました。再試行してください。";
-            if (error.code) {
+            // Axios エラー (Laravel API 失敗) の処理を追加
+            if (error.response && error.response.data && error.response.data.message) {
+                errorMessage = `APIエラー: ${error.response.data.message}`;
+            } else if (error.code) {
+                console.log(`PAGE_HANDLE: Detected Firebase Auth error code: ${error.code}`);
                 switch(error.code){
                     case "auth/user-not-found":
                     case "auth/wrong-password":
@@ -86,9 +102,15 @@ function LoginPage() {
                         errorMessage = `ログインに失敗しました: ${error.message}`;
                 }
             }
+            console.log(`PAGE_HANDLE: Displaying API Error message: ${errorMessage}`);
             setApiError(errorMessage);
         } finally{
-            setIsSubmitting(false);
+            // ログイン成功時にリダイレクト処理が行われるため、
+            // 成功時は setIsSubmitting(false) が実行される前にページ遷移する
+            if (apiError) {
+                setIsSubmitting(false);
+            }
+            console.log("PAGE_HANDLE: Submission process finished.");
         }
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -99,7 +121,7 @@ function LoginPage() {
                 children: "ログイン"
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/login/page.tsx",
-                lineNumber: 76,
+                lineNumber: 116,
                 columnNumber: 7
             }, this),
             apiError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -107,7 +129,7 @@ function LoginPage() {
                 children: apiError
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/login/page.tsx",
-                lineNumber: 81,
+                lineNumber: 121,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -122,7 +144,7 @@ function LoginPage() {
                                 children: "メールアドレス"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/login/page.tsx",
-                                lineNumber: 88,
+                                lineNumber: 128,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -135,13 +157,13 @@ function LoginPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/login/page.tsx",
-                                lineNumber: 94,
+                                lineNumber: 134,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/login/page.tsx",
-                        lineNumber: 87,
+                        lineNumber: 127,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -152,7 +174,7 @@ function LoginPage() {
                                 children: "パスワード"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/login/page.tsx",
-                                lineNumber: 106,
+                                lineNumber: 146,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -165,13 +187,13 @@ function LoginPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/login/page.tsx",
-                                lineNumber: 112,
+                                lineNumber: 152,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/login/page.tsx",
-                        lineNumber: 105,
+                        lineNumber: 145,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -183,18 +205,18 @@ function LoginPage() {
                             children: isSubmitting ? "ログイン中..." : "ログインする"
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/login/page.tsx",
-                            lineNumber: 124,
+                            lineNumber: 164,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/login/page.tsx",
-                        lineNumber: 123,
+                        lineNumber: 163,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(auth)/login/page.tsx",
-                lineNumber: 86,
+                lineNumber: 126,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -205,18 +227,18 @@ function LoginPage() {
                     children: "会員登録はこちら"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/login/page.tsx",
-                    lineNumber: 135,
+                    lineNumber: 175,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/login/page.tsx",
-                lineNumber: 134,
+                lineNumber: 174,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(auth)/login/page.tsx",
-        lineNumber: 75,
+        lineNumber: 115,
         columnNumber: 5
     }, this);
 }

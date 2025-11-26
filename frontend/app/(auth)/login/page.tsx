@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth"; // 実際の useAuth を利用
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth(); // 👈 実際の login を使用
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,11 +15,19 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // -------------------------
-  // 副作用: 認証済みならトップへリダイレクト
+  // 副作用: 認証済みならトップへリダイレクト（ページ読み込み時の安全策として維持）
   // -------------------------
   useEffect(() => {
+    console.log(
+      "PAGE_EFFECT: Auth Status Check. Loading:",
+      isLoading,
+      "Authenticated:",
+      isAuthenticated
+    );
+    // isAuthLoadingが解決し、かつisAuthenticatedがtrueであればリダイレクト
     if (!isLoading && isAuthenticated) {
-      router.push("/");
+      console.log("PAGE_EFFECT: Redirecting to / (via useEffect)");
+      router.replace("/"); // replaceを使って履歴を残さないようにする
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -31,12 +39,14 @@ export default function LoginPage() {
     );
   }
 
-  if (isAuthenticated) return null; // リダイレクト済み
+  // 既に認証済みの場合、useEffectでリダイレクトされるのを待つ
+  if (isAuthenticated) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError("");
     setIsSubmitting(true);
+    console.log("PAGE_HANDLE: Submission started.");
 
     if (!email || !password) {
       setApiError("メールアドレスとパスワードを入力してください。");
@@ -45,11 +55,34 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("PAGE_HANDLE: Calling actual login function from useAuth...");
+
+      // 1. ログイン処理の実行
       await login({ email, password });
-      // 成功後は副作用でリダイレクト
+
+      // 2. 成功後の処理: useAuth内部でメール認証へのリダイレクトが行われなかった場合
+      //    (つまり、認証済みとしてトップページへ移動する場合) はここで明示的にリダイレクトする
+      console.log(
+        "PAGE_HANDLE: Login successful. Immediately redirecting to /"
+      );
+      // 🔥 修正: ログイン成功後、router.push("/") を実行
+      router.push("/");
     } catch (error: any) {
+      console.error("PAGE_HANDLE: Login failed in catch block.", error);
+
       let errorMessage = "ログインに失敗しました。再試行してください。";
-      if (error.code) {
+
+      // Axios エラー (Laravel API 失敗) の処理を追加
+      if (
+        error.response &&
+        error.response.data &&
+        error.response.data.message
+      ) {
+        errorMessage = `APIエラー: ${error.response.data.message}`;
+      } else if (error.code) {
+        console.log(
+          `PAGE_HANDLE: Detected Firebase Auth error code: ${error.code}`
+        );
         switch (error.code) {
           case "auth/user-not-found":
           case "auth/wrong-password":
@@ -65,9 +98,16 @@ export default function LoginPage() {
             errorMessage = `ログインに失敗しました: ${error.message}`;
         }
       }
+
+      console.log(`PAGE_HANDLE: Displaying API Error message: ${errorMessage}`);
       setApiError(errorMessage);
     } finally {
-      setIsSubmitting(false);
+      // ログイン成功時にリダイレクト処理が行われるため、
+      // 成功時は setIsSubmitting(false) が実行される前にページ遷移する
+      if (apiError) {
+        setIsSubmitting(false);
+      }
+      console.log("PAGE_HANDLE: Submission process finished.");
     }
   };
 

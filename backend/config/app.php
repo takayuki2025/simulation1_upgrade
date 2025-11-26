@@ -137,6 +137,7 @@ return [
 
     'providers' => [
 
+        \Kreait\Laravel\Firebase\ServiceProvider::class, // ★★★ この行を追加 ★★★
         /*
          * Laravel Framework Service Providers...
          */
@@ -162,7 +163,6 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
-        
 
         /*
          * Package Service Providers...

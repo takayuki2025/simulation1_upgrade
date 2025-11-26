@@ -1,6 +1,6 @@
 import "./globals.css";
-// ★ 修正: ファイル拡張子を明確にするためインポートパスを更新
-import { AuthProvider } from "@/hooks/useAuth"; // .tsxを削除 (推奨)
+// ★ 修正: AuthProviderを直接インポートする代わりに、クライアントラッパーをインポート
+import { Providers } from "@/components/Providers";
 
 export const metadata = {
     title: "Next.js + Laravel",
@@ -15,8 +15,8 @@ export default function RootLayout({
     return (
     <html lang="ja">
         <body>
-        {/* ★★★ AuthProviderでアプリケーション全体をラップ ★★★ */}
-        <AuthProvider>{children}</AuthProvider>
+        {/* ★★★ 修正: クライアントコンポーネントであるProvidersでラップ ★★★ */}
+        <Providers>{children}</Providers>
         </body>
     </html>
     );

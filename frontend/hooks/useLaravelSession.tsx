@@ -22,7 +22,6 @@ interface BackendUser {
 
 /**
  * Firebase ID TokenをLaravelに送り、Sanctumセッションを確立する
- * (useAuthとuseLaravelSessionの両方から参照できるように、ファイル内でexportしています)
  */
 export const completeLaravelLogin = async (
   idToken: string,
@@ -35,24 +34,41 @@ export const completeLaravelLogin = async (
     ...(name && { name: name }),
   };
 
-  // SanctumはCookieベースの認証であり、このPOSTリクエストはセッション確立を担う
-  const res = await axios.post(
-    `${API_BASE_URL}/api/register_or_login`,
-    payload,
-    {
-      withCredentials: true, // Sanctum Cookieの送受信に必須
-    }
-  );
-
-  const { token, user: backendUser } = res.data;
-
-  if (token && backendUser) {
-    console.log("[Sanctum] Successful token exchange and session established.");
-    return { token, user: backendUser };
-  } else {
-    throw new Error(
-      "Sanctum token exchange failed: Missing token or user data."
+  try {
+    const res = await axios.post(
+      `${API_BASE_URL}/api/register_or_login`,
+      payload,
+      {
+        withCredentials: true,
+      }
     );
+
+    const { token, user: backendUser } = res.data;
+
+    if (token && backendUser) {
+      console.log(
+        "[Sanctum] Successful token exchange and session established."
+      );
+      return { token, user: backendUser };
+    } else {
+      throw new Error(
+        "Sanctum token exchange failed: Missing token or user data."
+      );
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      console.error(
+        `[Sanctum ERROR] completeLaravelLogin API failed. Status: ${error.response.status}`,
+        "Data:",
+        error.response.data
+      );
+      const status = error.response.status;
+      const detail = JSON.stringify(error.response.data);
+      throw new Error(`Laravel API Error (${status}): ${detail}`);
+    } else {
+      console.error("[Sanctum ERROR] completeLaravelLogin failed:", error);
+      throw error;
+    }
   }
 };
 
@@ -72,7 +88,6 @@ export const useLaravelSession = (
   const [laravelAuthenticated, setLaravelAuthenticated] = useState(false);
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
-  // URLクエリパラメータからメール認証状態を取得
   const isVerificationRedirect = useCallback(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(window.location.search);
@@ -81,7 +96,6 @@ export const useLaravelSession = (
 
   // トークンを強制的にリロードするヘルパー
   const forceTokenRefresh = useCallback(async (currentUser: User) => {
-    // キャッシュを無視して、Firebaseから最新のトークンを強制的に取得
     const idToken = await currentUser.getIdToken(true);
     console.log("[Firebase] Forced ID Token refresh successful during sync.");
     return idToken;
@@ -91,90 +105,102 @@ export const useLaravelSession = (
    * 認証状態の同期を試行し、必要に応じてリダイレクト処理を行う
    */
   const syncAndRedirect = useCallback(async () => {
-    if (!user || !auth) {
-      // ログアウト状態の場合、Laravelセッションチェックのみ実行
-      const sessionData = await checkLaravelSession();
-      setLaravelAuthenticated(sessionData.authenticated);
-      setInitialCheckComplete(true);
-      return;
-    }
+    console.log("[Sanctum Sync] Starting sync check...");
+    let finalAuthStatus = false;
 
-    let sessionData = await checkLaravelSession();
-
-    // 匿名ユーザーまたはLaravelセッションが既に確立されている場合はスキップ
-    if (user.isAnonymous) {
-      if (sessionData.authenticated) {
-        console.warn(
-          "[Sanctum] Anonymous user found with active Laravel session. Forcing logout."
+    try {
+      // ログアウト状態
+      if (!user || !auth) {
+        const sessionData = await checkLaravelSession();
+        finalAuthStatus = sessionData.authenticated;
+        console.log(
+          `[Sanctum Sync] FINAL CHECK COMPLETE (Logged Out). laravelAuthenticated: ${finalAuthStatus}`
         );
-        await signOut(auth);
+        return; // ここで return しても finally は実行される
       }
-      setInitialCheckComplete(true);
-      return;
-    }
 
-    // 既存のセッションがない場合、自動ログインを試行
-    if (!sessionData.authenticated) {
-      console.log(
-        "[Sanctum] Non-anonymous user present but session missing. Attempting auto-login..."
-      );
-      try {
-        // nameはauto-loginの際は省略
-        const { user: backendUser } = await completeLaravelLogin(
-          await forceTokenRefresh(user) // 最新のトークンで自動ログイン
+      let sessionData = await checkLaravelSession();
+      finalAuthStatus = sessionData.authenticated; // 最終的な認証ステータスを格納する変数
+
+      // 匿名ユーザー
+      if (user.isAnonymous) {
+        if (sessionData.authenticated) {
+          console.warn(
+            "[Sanctum] Anonymous user found with active Laravel session. Forcing Firebase logout."
+          );
+          await signOut(auth);
+          finalAuthStatus = false;
+        } else {
+          finalAuthStatus = false; // 匿名ユーザーは未認証扱い
+        }
+      }
+      // 既存のセッションがない場合、自動ログインを試行
+      else if (!sessionData.authenticated) {
+        console.log(
+          "[Sanctum] Non-anonymous user present but session missing. Attempting auto-login..."
         );
-        setLaravelAuthenticated(true);
+        try {
+          // ログイン成功時にIDトークンを強制リフレッシュし、Laravelに送信
+          const { user: backendUser } = await completeLaravelLogin(
+            await forceTokenRefresh(user)
+          );
+          finalAuthStatus = true; // ログイン成功
 
-        // Sanctumセッション確立後、useApiなどが最新トークンを使うことを保証するため再度強制リロード
+          // リダイレクト処理
+          if (!backendUser.email_verified_at) {
+            router.push("/email/verify");
+          } else {
+            const currentPath = window.location.pathname;
+            if (
+              currentPath === "/login" ||
+              currentPath === "/register" ||
+              currentPath === "/email/verify" ||
+              isVerificationRedirect()
+            ) {
+              router.replace("/mypage/profile");
+            }
+          }
+        } catch (error) {
+          console.error(
+            "[Sanctum] Auto-login attempt failed. Forcing Firebase logout."
+          );
+          await signOut(auth);
+          finalAuthStatus = false; // ログイン失敗
+        }
+      }
+      // セッション確立済みの場合
+      else {
+        finalAuthStatus = true; // 既に認証済み
+        // IDトークンを強制リフレッシュして、有効性を確保
         await forceTokenRefresh(user);
+        const backendUser = sessionData.user;
 
-        // リダイレクト処理
-        if (!backendUser.email_verified_at) {
+        if (backendUser && !backendUser.email_verified_at) {
           router.push("/email/verify");
         } else {
-          // 自動ログイン成功時は、認証が必要なページへリダイレクト
-          const currentPath = window.location.pathname;
-
-          if (
-            currentPath === "/login" ||
-            currentPath === "/register" ||
-            currentPath === "/email/verify" ||
-            isVerificationRedirect()
-          ) {
-            // replaceを使用して履歴を整理し、無限ループを防ぐ
-            router.replace("/mypage/profile");
+          if (isVerificationRedirect()) {
+            console.log("Session verified, cleaning up URL parameter.");
+            router.replace(window.location.pathname);
           }
         }
-      } catch (error) {
-        console.error(
-          "[Sanctum] Auto-login attempt failed. Forcing Firebase logout."
-        );
-        await signOut(auth);
       }
-    } else {
-      // セッション確立済みの場合
+    } catch (error) {
+      console.error("[Sanctum Sync] An error occurred during sync:", error);
+      // エラー発生時は安全策として認証を解除
+      finalAuthStatus = false;
+    } finally {
+      // 🔥 修正の核心: 全てのロジックが完了した後、最終的な状態を同時に更新する
+      // 1. 最終的な認証ステータスを設定
+      setLaravelAuthenticated(finalAuthStatus);
 
-      // ✅ 修正済み箇所: セッション確立済みの場合も true に設定する
-      setLaravelAuthenticated(true);
+      // 2. 認証ステータスを設定した直後に完了フラグを設定
+      //    (成功/失敗/エラーに関わらず、必ずロード状態を解除)
+      setInitialCheckComplete(true);
 
-      // セッション確立済みの場合も、useApiが最新のトークンを使用することを保証するため強制リロード
-      await forceTokenRefresh(user);
-
-      const backendUser = sessionData.user;
-
-      if (backendUser && !backendUser.email_verified_at) {
-        router.push("/email/verify");
-      } else {
-        // 認証完了済みの場合、URLクエリパラメータをクリーンアップ
-        if (isVerificationRedirect()) {
-          console.log("Session verified, cleaning up URL parameter.");
-          // verified=true を URL から削除し、ループを止める
-          router.replace(window.location.pathname);
-        }
-      }
+      console.log(
+        `[Sanctum Sync] FINAL CHECK COMPLETE. laravelAuthenticated: ${finalAuthStatus}`
+      );
     }
-
-    setInitialCheckComplete(true);
   }, [
     user,
     auth,
@@ -183,10 +209,12 @@ export const useLaravelSession = (
     forceTokenRefresh,
     isVerificationRedirect,
   ]);
+  // 依存配列から laravelAuthenticated を削除。このフックは認証状態の決定者であり、自身を依存すべきではない。
 
   // Firebase user/auth/ready の状態変化時に同期を実行
   useEffect(() => {
-    // initialCheckCompleteがtrueになれば、以降は実行されない
+    // user が null/User オブジェクトのどちらかに定まり、auth が存在し、
+    // まだ初回チェックが完了していない場合のみ実行
     if (user !== undefined && auth && initialCheckComplete === false) {
       syncAndRedirect();
     }
@@ -195,6 +223,5 @@ export const useLaravelSession = (
   return {
     laravelAuthenticated,
     initialCheckComplete,
-    // completeLaravelLogin はこのファイルで export されているため、フックの戻り値からは削除
   };
 };

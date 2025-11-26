@@ -44,7 +44,7 @@ export const useFirebaseInit = (): FirebaseState => {
 
         setState((s) => ({ ...s, app, auth }));
 
-        // 2. 認証状態の監視 (Firebaseがローカルストレージからセッションを復元するまで待つ)
+        // 2. 認証状態の監視
         unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
           // 初回発火時、またはセッション復元時に isReady を true に設定
             if (!authStateResolved) {
