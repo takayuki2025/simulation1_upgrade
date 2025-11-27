@@ -44,7 +44,7 @@ class VerifyFirebaseToken
             // "Bearer " (スペースあり) の標準形式
             if (Str::startsWith($authorizationHeader, 'Bearer ')) {
                 $idToken = Str::substr($authorizationHeader, 7);
-            } 
+            }
             // cURLテストで確認された "BearereyJ..." の形式 (スペースなし)
             elseif (Str::startsWith($authorizationHeader, 'Bearer')) {
                 $idToken = Str::substr($authorizationHeader, 6);
@@ -84,7 +84,7 @@ class VerifyFirebaseToken
             // 匿名ユーザーの場合は、401を返す (API保護のため)
             if ($providerId === 'anonymous') {
                 Log::warning("VerifyFirebaseToken: Anonymous provider detected (UID: {$uid}). Unauthorized.");
-                return response()->json(['message' => 'Unauthenticated: Anonymous users cannot access this resource.'], 401); 
+                return response()->json(['message' => 'Unauthenticated: Anonymous users cannot access this resource.'], 401);
             }
 
             // ローカルDBからユーザーを検索

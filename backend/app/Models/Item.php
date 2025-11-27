@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Config; 
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str; // Strクラスを追加で使用
 
 class Item extends Model
@@ -28,14 +28,14 @@ class Item extends Model
         'user_id',
         'name',
         'price',
-        'explain',      
-        'condition',    
-        'category',     
-        'item_image',   
-        'brand',        
-        'remain',       
+        'explain',
+        'condition',
+        'category',
+        'item_image',
+        'brand',
+        'remain',
     ];
-    
+
     /**
      * ネイティブタイプへキャストする属性
      * @var array

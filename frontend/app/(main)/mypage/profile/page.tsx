@@ -138,6 +138,7 @@ export default function ProfilePage() {
 
   /**
    * サーバーからプロフィールデータを取得する関数。401エラー時にトークンリフレッシュを試みる。
+   * (認証リダイレクト時のポーリングロジックはuseEffectに分離)
    */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
@@ -149,38 +150,32 @@ export default function ProfilePage() {
         const response = await apiClient.get("/api/mypage/profile");
         const responseData = response.data;
 
-        // ★★★ デバッグログ追加: APIレスポンスの確認 ★★★
         console.log("API Response Data:", responseData);
-        // ★★★ ログ終わり ★★★
 
         initializeUserData(responseData);
         console.log("✅ [Fetch] プロフィールデータ取得に成功。");
 
-        if (isVerificationRedirect) {
-          setSuccessMessage(
-            "メール認証が完了しました！引き続きサービスをご利用いただけます。"
-          );
-        }
+        // ★修正: 認証成功メッセージ表示ロジックはポーリング側に移譲するか、削除する
+        // if (isVerificationRedirect) {
+        //   setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
+        // }
 
         if (isRetry) {
           setIsRecovering(false);
           setSuccessMessage("認証情報を回復し、データを再取得しました。");
         }
 
-        // ★★★ 修正: 成功時にローディングを解除する ★★★
         setIsLoading(false);
       } catch (err: any) {
         console.error("プロフィールデータのロードに失敗しました:", err);
-        // ★★★ デバッグログ追加: エラー詳細ログ ★★★
         console.error("Fetch Error Details:", err);
-        // ★★★ ログ終わり ★★★
 
         const status = err.response ? err.response.status : null;
 
         if (status === 401) {
           if (isRetry) {
             console.error(
-              "401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。"
+              "401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。",
             );
             await logout();
             return;
@@ -197,11 +192,11 @@ export default function ProfilePage() {
           } catch (reloadError) {
             console.error(
               "トークンのリロードに失敗。ログアウトします。",
-              reloadError
+              reloadError,
             );
             await logout();
             setSuccessMessage(
-              "セッションが切れました。再度ログインが必要です。"
+              "セッションが切れました。再度ログインが必要です。",
             );
           }
           return;
@@ -211,10 +206,8 @@ export default function ProfilePage() {
         setSuccessMessage(
           `データのロード中に予期せぬエラーが発生しました。(Status: ${
             status || "不明"
-          })`
+          })`,
         );
-
-        // ★★★ 修正: エラーが発生した場合も、ロード状態を解除してエラーメッセージを表示できるようにする ★★★
         setIsLoading(false);
       } finally {
         if (!isRetry) {
@@ -222,17 +215,11 @@ export default function ProfilePage() {
         }
       }
     },
-    [
-      apiClient,
-      initializeUserData,
-      logout,
-      isVerificationRedirect,
-      reloadAuthToken,
-    ]
+    [apiClient, initializeUserData, logout, reloadAuthToken],
   );
 
   // ----------------------------------------------------------------
-  // 3. 認証状態とデータフェッチの監視 (useEffect)
+  // 3. 認証状態とデータフェッチの監視 (useEffect) - ★ポーリングロジックを実装★
   // ----------------------------------------------------------------
 
   useEffect(() => {
@@ -253,49 +240,135 @@ export default function ProfilePage() {
     }
 
     // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
-    if (isAuthenticated && apiClient && !user && !isFetching) {
-      console.log("Authenticated and client ready. Fetching profile.");
-      // ★★★ デバッグログ追加 ★★★
-      console.log(
-        `[DEBUG] Step 3: isAuthenticated: ${isAuthenticated}, user: ${!!user}, isFetching: ${isFetching}, isLoading: ${isLoading}`
-      );
-      // ★★★ ログ終わり ★★★
-      fetchUserProfile(false); // 初回フェッチ
+    // または、認証済みリダイレクト中で、まだメールが未認証と表示されている場合
+    const needsInitialFetch =
+      isAuthenticated && apiClient && !user && !isFetching;
+    const needsPolling =
+      isAuthenticated &&
+      apiClient &&
+      isVerificationRedirect &&
+      user &&
+      !user.email_verified_at &&
+      !isFetching;
+
+    // 初回フェッチ
+    if (needsInitialFetch) {
+      console.log("[DEBUG] Initial Fetch Triggered.");
+      fetchUserProfile(false);
       return;
     }
 
-    // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
-    if (user && isAuthenticated) {
-      // ★★★ デバッグログ追加 ★★★
-      console.log(
-        `[DEBUG] Step 4: User loaded. isAuthenticated: ${isAuthenticated}, user: ${!!user}, isLoading: ${isLoading}`
-      );
-      // ★★★ ログ終わり ★★★
+    // ★★★ メール認証後のポーリング処理 ★★★
+    if (needsPolling) {
+      console.log("[DEBUG] Verification Polling Started.");
 
-      // メール認証リダイレクトのクエリパラメータをクリーンアップ
-      if (isVerificationRedirect) {
-        router.replace("/mypage/profile");
-      }
+      let attempt = 0;
+      const MAX_ATTEMPTS = 5;
+      const POLLING_INTERVAL = 1000; // 1秒間隔
+
+      const startPolling = async () => {
+        setIsFetching(true); // ポーリング中はフェッチ中とする
+        setIsLoading(true); // UIをローディング状態に保つ
+
+        try {
+          let currentData: User | null = user;
+
+          while (
+            isVerificationRedirect &&
+            currentData &&
+            !currentData.email_verified_at &&
+            attempt < MAX_ATTEMPTS
+          ) {
+            attempt++;
+            console.log(
+              `[Polling] Attempt ${attempt}/${MAX_ATTEMPTS}. Checking verification status...`,
+            );
+
+            if (attempt > 1) {
+              // 2回目以降はインターバルを待つ
+              await new Promise((resolve) =>
+                setTimeout(resolve, POLLING_INTERVAL),
+              );
+            }
+
+            // APIから最新データを取得
+            const response = await apiClient.get("/api/mypage/profile");
+            const responseData = response.data;
+            currentData = responseData.user || responseData;
+
+            if (currentData && currentData.email_verified_at) {
+              console.log("✅ [Polling] Verification success. Updating state.");
+              initializeUserData(responseData);
+              setSuccessMessage(
+                "メール認証が完了しました！引き続きサービスをご利用いただけます。",
+              );
+
+              // クエリをクリーンアップ
+              router.replace("/mypage/profile");
+              break; // 認証が確認されたらループを抜ける
+            }
+          }
+
+          // ポーリング終了時の処理
+          if (
+            isVerificationRedirect &&
+            attempt >= MAX_ATTEMPTS &&
+            !currentData?.email_verified_at
+          ) {
+            console.warn(
+              "⚠️ [Polling] Max attempts reached. Verification data not synchronized yet.",
+            );
+            setSuccessMessage(
+              "⚠️ メール認証データの反映に時間がかかっています。しばらくしてから再度アクセスするか、リロードしてください。",
+            );
+            // クエリをクリーンアップ
+            router.replace("/mypage/profile");
+          }
+
+          setIsLoading(false);
+        } catch (error) {
+          console.error("[Polling Error]", error);
+          // ポーリング中のエラーは一旦ローディングを解除
+          setIsLoading(false);
+          // 401の場合は既存のfetchUserProfileに任せる
+          fetchUserProfile(false);
+        } finally {
+          setIsFetching(false);
+        }
+      };
+
+      // ポーリング開始
+      startPolling();
       return;
+    }
+    // ★★★ ポーリング処理 終わり ★★★
+
+    // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
+    // ポーリング中でない、かつユーザーデータがあれば、ローディングを解除
+    if (user && isAuthenticated && !isFetching && isLoading) {
+      console.log("[DEBUG] Guard: User loaded, setting isLoading=false.");
+      setIsLoading(false);
     }
   }, [
     isAuthLoading,
     isAuthenticated,
     router,
     fetchUserProfile,
-    user,
+    user, // 認証情報が変わったら再評価される
     isVerificationRedirect,
     isRecovering,
     authUser,
     apiClient,
-    // isLoading, // ★★★ 再発防止のため削除済み ★★★
+    isFetching, // isFetchingが変わった時も再評価
+    isLoading, // isLoadingが変わった時も再評価
+    initializeUserData,
   ]);
 
   // ----------------------------------------------------------------
   // 4. 画像アップロード処理
   // ----------------------------------------------------------------
   const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file || !user || !apiClient) return;
@@ -330,11 +403,12 @@ export default function ProfilePage() {
 
       if (status === 422) {
         setImageError(
-          error.response.data?.errors?.user_image?.[0] || "無効なファイルです。"
+          error.response.data?.errors?.user_image?.[0] ||
+            "無効なファイルです。",
         );
       } else {
         setImageError(
-          `アップロードに失敗しました (ステータス: ${status || "不明"})。`
+          `アップロードに失敗しました (ステータス: ${status || "不明"})。`,
         );
       }
     } finally {
@@ -367,7 +441,7 @@ export default function ProfilePage() {
       const statusCode = error.response ? error.response.status : "不明";
       console.error(
         `【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`,
-        error
+        error,
       );
 
       if (statusCode === 401) {
@@ -379,7 +453,7 @@ export default function ProfilePage() {
         setProfileErrors(error.response.data.errors);
       } else {
         setSuccessMessage(
-          `更新に失敗しました。(Status: ${statusCode}) 再度お試しください。`
+          `更新に失敗しました。(Status: ${statusCode}) 再度お試しください。`,
         );
       }
     } finally {
@@ -402,9 +476,14 @@ export default function ProfilePage() {
             {isAuthLoading
               ? "認証状態を確認中 / セッションを再確立中..."
               : isRecovering
-              ? "⚠️ 認証情報を回復中です..."
-              : "データをロード中です..."}
+                ? "⚠️ 認証情報を回復中です..."
+                : "データをロード中です..."}
           </p>
+          {isVerificationRedirect && isFetching && (
+            <p className="text-sm text-blue-500 mt-2">
+              メール認証の状態を確認中です。しばらくお待ちください。
+            </p>
+          )}
         </div>
       </div>
     );

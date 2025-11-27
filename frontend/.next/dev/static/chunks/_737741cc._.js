@@ -634,7 +634,7 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useAuth.tsx",
-        lineNumber: 307,
+        lineNumber: 309,
         columnNumber: 5
     }, this);
 }

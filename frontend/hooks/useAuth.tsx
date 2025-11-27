@@ -35,8 +35,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  */
 interface BackendUser {
   id: number;
-  name: string;      
-  email: string;     
+  name: string;
+  email: string;
   email_verified_at: string | null;
   // ... その他のユーザープロパティ ...
 }
@@ -56,13 +56,13 @@ export interface AuthContextType {
     password: string;
     name?: string;
   }) => Promise<void>;
-  
+
   // 💡 修正: 戻り値を Promise<void> から Promise<BackendUser> に変更
   logout: (redirectPath?: string) => Promise<void>;
-  reloadAuthToken: () => Promise<BackendUser>; 
-  
+  reloadAuthToken: () => Promise<BackendUser>;
+
   // ★追加: 外部から backendUser を更新するための関数
-  setBackendUserStatus: (user: BackendUser | null) => void; 
+  setBackendUserStatus: (user: BackendUser | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { laravelAuthenticated, initialCheckComplete } = useLaravelSession(
     user,
     auth,
-    checkLaravelSession
+    checkLaravelSession,
   );
 
   // --- B. 状態監視と同期 (useEffect) ---
@@ -119,26 +119,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsub = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
-      
+
       if (currentUser) {
         setIsBackendUserLoading(true); // ★ロード開始
         try {
           const idToken = await currentUser.getIdToken();
           setToken(idToken);
-          
+
           // IDトークンがあれば、Laravelからプロフィールをロード
           if (idToken) {
             try {
-                // LaravelのプロフィールAPIを叩き、最新のユーザー情報を取得
-                const profileRes = await axios.get(
-                    `${API_BASE_URL}/api/mypage/profile`,
-                    { headers: { Authorization: `Bearer ${idToken}` } }
-                );
-                // 型アサーションは、useLaravelSession.ts の BackendUser 型と一致しているため安全
-                setBackendUser(profileRes.data.user as BackendUser); 
+              // LaravelのプロフィールAPIを叩き、最新のユーザー情報を取得
+              const profileRes = await axios.get(
+                `${API_BASE_URL}/api/mypage/profile`,
+                { headers: { Authorization: `Bearer ${idToken}` } },
+              );
+              // 型アサーションは、useLaravelSession.ts の BackendUser 型と一致しているため安全
+              setBackendUser(profileRes.data.user as BackendUser);
             } catch (profileError) {
-                console.warn("[Profile] Failed to load backend user profile:", profileError);
-                setBackendUser(null); 
+              console.warn(
+                "[Profile] Failed to load backend user profile:",
+                profileError,
+              );
+              setBackendUser(null);
             }
           }
         } catch (error) {
@@ -146,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(null);
           setBackendUser(null);
         } finally {
-            setIsBackendUserLoading(false); // ★ロード完了
+          setIsBackendUserLoading(false); // ★ロード完了
         }
       } else {
         setToken(null);
@@ -179,10 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return instance;
   }, [token]);
-  
+
   // ★外部公開用の setBackendUser ラッパー関数 (メール認証後の即時更新用)
   const setBackendUserStatus = useCallback((user: BackendUser | null) => {
-      setBackendUser(user);
+    setBackendUser(user);
   }, []);
 
   // --- C. 状態の計算 (useMemo) ---
@@ -192,10 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const isAuthenticated = useMemo(() => {
     const isAuth =
-      initialCheckComplete && 
-      !!user && 
-      !user.isAnonymous && 
-      laravelAuthenticated === true; 
+      initialCheckComplete &&
+      !!user &&
+      !user.isAnonymous &&
+      laravelAuthenticated === true;
     return isAuth;
   }, [initialCheckComplete, user, laravelAuthenticated]);
 
@@ -228,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
       const idToken = await userCredential.user.getIdToken();
 
@@ -237,7 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Laravel側で認証セッションを確立し、ユーザー情報を取得
       const { user: newBackendUser } = await completeLaravelLogin(
         idToken,
-        name
+        name,
       );
 
       setBackendUser(newBackendUser);
@@ -246,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push("/email/verify");
       }
     },
-    [auth, fetchCsrfCookie, router]
+    [auth, fetchCsrfCookie, router],
   );
 
   /**
@@ -262,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setToken(null);
         setUser(null);
-        setBackendUser(null); 
+        setBackendUser(null);
 
         router.push(redirectPath);
       } catch (e) {
@@ -271,7 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoggingOut(false);
       }
     },
-    [auth, router]
+    [auth, router],
   );
 
   /**
@@ -285,13 +288,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(idToken);
 
         // Laravelセッションも更新し、ユーザー情報を取得
-        const { user: refreshedBackendUser } = await completeLaravelLogin(
-          idToken
-        );
+        const { user: refreshedBackendUser } =
+          await completeLaravelLogin(idToken);
 
         setBackendUser(refreshedBackendUser);
         // 💡 修正点: BackendUser型の値を返す
-        return refreshedBackendUser as BackendUser; 
+        return refreshedBackendUser as BackendUser;
       } catch (error) {
         console.error("[Firebase] Failed to refresh ID Token:", error);
         throw error;
@@ -318,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         reloadAuthToken,
-        setBackendUserStatus, 
+        setBackendUserStatus,
       }}
     >
       {children}
@@ -344,7 +346,7 @@ export const useApiClient = () => {
 
   if (!ctx.apiClient) {
     throw new Error(
-      "Authenticated API client is not available. Check if the user is authenticated and loading is complete."
+      "Authenticated API client is not available. Check if the user is authenticated and loading is complete.",
     );
   }
   return ctx.apiClient;

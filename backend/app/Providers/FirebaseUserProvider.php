@@ -48,7 +48,7 @@ class FirebaseUserProvider implements UserProvider
             if (!$user) {
                 // 5. ユーザーがLaravel DBに存在しない場合は新規作成
                 $firebaseUser = $this->firebaseAuth->getUser($uid);
-                
+
                 $user = User::create([
                     'name' => $firebaseUser->displayName ?? 'Firebase User',
                     'email' => $firebaseUser->email,
@@ -57,7 +57,7 @@ class FirebaseUserProvider implements UserProvider
                     'email_verified_at' => $firebaseUser->emailVerified ? now() : null,
                 ]);
             }
-            
+
             return $user;
 
         } catch (\Exception $e) {
@@ -68,8 +68,19 @@ class FirebaseUserProvider implements UserProvider
     }
 
     // 以下のメソッドは、IDトークン認証フローでは使用しないため、デフォルト実装を維持します。
-    public function retrieveById($identifier) { return null; }
-    public function retrieveByToken($identifier, $token) { return null; }
-    public function updateRememberToken(Authenticatable $user, $token) {}
-    public function validateCredentials(Authenticatable $user, array $credentials) { return false; }
+    public function retrieveById($identifier)
+    {
+        return null;
+    }
+    public function retrieveByToken($identifier, $token)
+    {
+        return null;
+    }
+    public function updateRememberToken(Authenticatable $user, $token)
+    {
+    }
+    public function validateCredentials(Authenticatable $user, array $credentials)
+    {
+        return false;
+    }
 }

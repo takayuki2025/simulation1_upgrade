@@ -82,9 +82,9 @@ class UsersTableSeeder extends Seeder
                 try {
                     $userRecord = $this->firebaseAuth->getUserByEmail($email);
                     $this->firebaseAuth->deleteUser($userRecord->uid);
-                    
+
                     // 削除時は email ではなく firebase_uid で検索
-                    // User::where('firebase_uid', $userRecord->uid)->delete(); 
+                    // User::where('firebase_uid', $userRecord->uid)->delete();
                     // ↑ 既に run() の冒頭でメールアドレスをキーに削除済みのためこの行は不要
                 } catch (\Exception $e) {
                     // ユーザーが存在しなかった場合は無視
@@ -105,7 +105,7 @@ class UsersTableSeeder extends Seeder
                         'name' => $userData['name'],
                         'email' => $email,
                         // Laravel DBのパスワードはNOT NULL制約回避のためランダム文字列を設定
-                        'password' => Hash::make(\Illuminate\Support\Str::random(16)), 
+                        'password' => Hash::make(\Illuminate\Support\Str::random(16)),
                         'post_number' => $userData['post_number'],
                         'address' => $userData['address'],
                         'building' => $userData['building'],

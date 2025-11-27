@@ -1,0 +1,39 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    // 常に最後に配置し、Prettierと競合するルールを無効化します
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "plugins": ["react", "react-hooks", "@typescript-eslint"],
+  "rules": {
+    "react/react-in-jsx-scope": "off", // Next.jsでは不要なルール
+    "no-unused-vars": "off", // 組み込みJSの未使用変数ルールは無効化
+
+    // ★★★ シンプルに文字列リテラルでレベルを指定 ★★★
+    "@typescript-eslint/no-unused-vars": "warn"
+
+    // もしオプションが必要な場合は、以下のように記述します
+    /*
+    "@typescript-eslint/explicit-function-return-type": ["error", {
+      "allowExpressions": true
+    }]
+    */
+  }
+}

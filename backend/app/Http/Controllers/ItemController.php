@@ -23,16 +23,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL; 
-
+use Illuminate\Support\Facades\URL;
 use Stripe\StripeClient;
 
-
-
-
-class ItemController extends Controller 
+class ItemController extends Controller
 {
-
     // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
     // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
     public function index(Request $request): JsonResponse
@@ -53,15 +48,15 @@ class ItemController extends Controller
         // ★★★ 認証状態のデバッグ強化 ★★★
         // 1. Request::user()からユーザーを取得 (ミドルウェアがセットする場所)
         $user = $request->user();
-        
+
         // 2. Authファサードからもユーザーを取得
-        $authFacadeUser = Auth::user(); 
+        $authFacadeUser = Auth::user();
 
         $authId = $user ? $user->id : ($authFacadeUser ? $authFacadeUser->id : null);
-        
+
         // ログの出力（デバッグ情報として重要）
         Log::info("ItemController@index called. Resolved AuthID: " . ($authId ?? 'N/A'));
-        
+
         // 3. Sanctumガードの状態を確認
         $authCheckSanctum = Auth::guard('sanctum')->check() ? 'TRUE' : 'FALSE';
         Log::info("ItemController@index: Is Request User Present?: " . ($user ? 'TRUE (ID: ' . $user->id . ')' : 'FALSE') . ", Is Auth Facade User Present?: " . ($authFacadeUser ? 'TRUE (ID: ' . $authFacadeUser->id . ')' : 'FALSE') . ", SanctumCheck: {$authCheckSanctum}");
@@ -70,19 +65,19 @@ class ItemController extends Controller
 
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
-            
+
             // ★★★ 認証チェックは $user が必須 ★★★
             if (!$user) {
-                $items = collect([]); 
+                $items = collect([]);
                 Log::info("ItemController@index: Not authenticated. Returning empty mylist.");
             } else {
                 // 1. ユーザーがいいねしたItemのIDを取得
                 $likedItemIds = Good::where('user_id', $user->id)->pluck('item_id');
-                
+
                 // 2. そのItem IDを持つ商品を取得し、コメント数といいね数をカウント
                 $query = Item::whereIn('id', $likedItemIds)
                     ->withCount(['comments', 'goods']);
-                
+
                 // 検索キーワードでフィルタリング (クエリビルダに適用)
                 if (!empty($searchQuery)) {
                     $query->where('name', 'like', '%' . $searchQuery . '%');
@@ -110,21 +105,21 @@ class ItemController extends Controller
             if (!empty($searchQuery)) {
                 $query->where('name', 'like', '%' . $searchQuery . '%');
             }
-            
+
             // ★★★ 修正箇所: SQLクエリのデバッグログを追加 ★★★
             // get()を実行する前にtoSql()とgetBindings()を呼び出してログに出力する
             // toSql()はバインドされる前のクエリ、getBindings()はバインドされる値を取得
             Log::info("ItemController@index: ALL ITEMS QUERY SQL: " . $query->toSql());
             Log::info("ItemController@index: ALL ITEMS QUERY BINDINGS: " . json_encode($query->getBindings()));
             // ★★★ 修正箇所ここまで ★★★
-            
+
             // リレーションをロード
             $items = $query->withCount(['comments', 'goods'])->get();
         }
 
         // 取得した商品コレクションをループ処理し、表示用のデータを整形
         $items->each(function ($item) {
-            
+
             // 画像パスが相対パス（storage/images/...）であると仮定し、そのまま返す
             // Nuxt側でASSET_BASE_URLと結合してフルURLにする
             if ($item->item_image && !Str::startsWith($item->item_image, ['http://', 'https://'])) {
@@ -133,7 +128,7 @@ class ItemController extends Controller
                     $item->item_image = 'storage/' . $item->item_image; // 例: storage/images/item_xxx.jpg
                 }
             }
-            
+
             // 💡 商品に `remain` カラムがない場合を考慮して、強制的に追加
             if (!isset($item->remain)) {
                 $item->remain = 1; // 暫定で1を設定、実際の在庫管理ロジックに従う必要があります
@@ -170,10 +165,10 @@ class ItemController extends Controller
 
         $user = auth('sanctum')->user();
         $isFavorited = false;
-        
+
         // 商品IDに関連するコメントを取得 (ユーザー情報もロード)
         $comments = Comment::with('user')->where('item_id', $item->id)->get();
-        
+
         // お気に入り数のカウント
         $favoritesCount = Good::where('item_id', $item->id)->count();
 
@@ -236,8 +231,8 @@ class ItemController extends Controller
         }
 
         // 4. 売り切れチェック (itemモデルに is_sold というアクセサまたはカラムがあると仮定)
-        if ($item->is_sold ?? false) { 
-             return response()->json([
+        if ($item->is_sold ?? false) {
+            return response()->json([
                 'message' => 'This item is already sold.',
                 'code' => 'ITEM_SOLD'
             ], 400); // 400 Bad Request
@@ -268,7 +263,7 @@ class ItemController extends Controller
     }
 
 
-        public function item_purchase_edit($item_id, $user_id): JsonResponse
+    public function item_purchase_edit($item_id, $user_id): JsonResponse
     {
         // 1. 認証チェック（ミドルウェアで行うのが理想的だが、ここでは明示的に確認）
         if (!Auth::check()) {
@@ -356,7 +351,7 @@ class ItemController extends Controller
     public function profile_revise(Request $request)
     {
         Log::info('*** [HIT] profile_revise (GET: プロフィール取得) Controller ***');
-        
+
         // 認証チェック
         if (!Auth::check()) {
             Log::warning('PROFILE_REVISE_FETCH: Auth Check FAILED');
@@ -364,7 +359,7 @@ class ItemController extends Controller
         }
 
         $user = Auth::user();
-        
+
         if (!$user) {
             return response()->json(['message' => 'User not found despite successful authentication.'], 401);
         }
@@ -373,17 +368,17 @@ class ItemController extends Controller
 
         // 取得したユーザーデータをJSON形式で返す
         return response()->json([
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'email_verified_at' => $user->email_verified_at, // ← hasVerifiedEmail は、/api/mypage/profile の応答である localBackendUser に含まれる email_verified_at が存在するかで判定されるこれを追加
-            // ★★★ ここに他のフィールドを追加！ ★★★
-            'post_number' => $user->post_number, 
-            'address' => $user->address,
-            'building' => $user->building,
-            'user_image' => $user->user_image,
-        ],
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at, // ← hasVerifiedEmail は、/api/mypage/profile の応答である localBackendUser に含まれる email_verified_at が存在するかで判定されるこれを追加
+                // ★★★ ここに他のフィールドを追加！ ★★★
+                'post_number' => $user->post_number,
+                'address' => $user->address,
+                'building' => $user->building,
+                'user_image' => $user->user_image,
+            ],
             'message' => '現在のプロフィール情報を取得しました。'
         ]);
     }
@@ -437,12 +432,12 @@ class ItemController extends Controller
             Log::warning('Mypage fetch FAILED: User not authenticated.');
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-        
+
         // ★デバッグポイント 3: 認証成功とユーザーIDを記録
         $user = Auth::user();
         Log::info("Mypage fetch SUCCESS: Authenticated User ID: {$user->id}");
 
-        $pageType = $request->query('page', 'sell'); 
+        $pageType = $request->query('page', 'sell');
 
         $items = [];
 
@@ -450,64 +445,64 @@ class ItemController extends Controller
             $items = Item::where('user_id', $user->id)
                 ->orderBy('created_at', 'desc')
                 ->get();
-            
+
             // ★デバッグポイント 4: 取得件数を確認
             Log::info("Mypage (SELL) Item count: " . $items->count());
-                
-        } else if ($pageType === 'buy') {
+
+        } elseif ($pageType === 'buy') {
             //  購入履歴を取得し、関連する商品データを含める
-        $items = OrderHistory::where('user_id', $user->id)
-            ->with('item') // OrderHistoryモデルに item() リレーションがあることが前提
-            ->orderBy('created_at', 'desc')
-            ->get();
-            
-        Log::info("Mypage (BUY) OrderHistory count: " . $items->count());
+            $items = OrderHistory::where('user_id', $user->id)
+                ->with('item') // OrderHistoryモデルに item() リレーションがあることが前提
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-    } else {
-        return response()->json(['message' => 'Invalid page type.'], 400);
-    }
-    
-    return response()->json([
-        'items' => $items,
-        'user_id' => $user->id,
-    ]);
+            Log::info("Mypage (BUY) OrderHistory count: " . $items->count());
+
+        } else {
+            return response()->json(['message' => 'Invalid page type.'], 400);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'user_id' => $user->id,
+        ]);
     }
 
-                                     // ItemController.php 内の修正（例: メソッド名を getUserProfile に変更）
+    // ItemController.php 内の修正（例: メソッド名を getUserProfile に変更）
     public function getUserProfile(Request $request)
     {
-    // ★ 修正: Auth::user() の代わりに、Firebaseミドルウェアが挿入したユーザー情報を取得
-    // ここでは、ミドルウェアが 'user' または 'firebaseUser' をリクエストにセットしていると仮定
+        // ★ 修正: Auth::user() の代わりに、Firebaseミドルウェアが挿入したユーザー情報を取得
+        // ここでは、ミドルウェアが 'user' または 'firebaseUser' をリクエストにセットしていると仮定
         $user = $request->user(); // Laravelの標準的なミドルウェアの動作に従い、user() を使用する場合
 
         if (!$user) {
-        // IDトークン検証失敗や、ユーザーがDBに存在しない場合の応答
-        return response()->json(['message' => 'User not authenticated or not found in database.'], 404);
+            // IDトークン検証失敗や、ユーザーがDBに存在しない場合の応答
+            return response()->json(['message' => 'User not authenticated or not found in database.'], 404);
         }
 
-    // Nuxt.jsが利用するユーザー情報をJSONで返す
+        // Nuxt.jsが利用するユーザー情報をJSONで返す
         return response()->json([
-        'user' => $user
+            'user' => $user
         ]);
     }
 
 
-//onetime'へのアクセスを処理し、認証状態に応じてリダイレクトする
+    //onetime'へのアクセスを処理し、認証状態に応じてリダイレクトする
 
-        public function handleOnetimeRedirect(): RedirectResponse
+    public function handleOnetimeRedirect(): RedirectResponse
     {
         if (Auth::check()) {
             $user = Auth::user();
 
-        // メール認証が完了しているか確認
-        if ($user->hasVerifiedEmail()) {
-            // メール認証済みの場合、'front_page'ルートへリダイレクト
-            return redirect()->route('front_page');
+            // メール認証が完了しているか確認
+            if ($user->hasVerifiedEmail()) {
+                // メール認証済みの場合、'front_page'ルートへリダイレクト
+                return redirect()->route('front_page');
             }
 
-        // ユーザーは認証済みだが、メールが未認証の場合
-        // Fortifyの認証メール再送信ページへリダイレクト
-        return redirect()->route('verification.notice');
+            // ユーザーは認証済みだが、メールが未認証の場合
+            // Fortifyの認証メール再送信ページへリダイレクト
+            return redirect()->route('verification.notice');
         }
 
         // ユーザーが未認証の場合、Fortifyのログインページへリダイレクト
@@ -516,9 +511,9 @@ class ItemController extends Controller
 
 
 
-// ユーザー情報の更新。画像アップロードの処理
+    // ユーザー情報の更新。画像アップロードの処理
 
-                                       // ItemController.php 内の修正＠＠
+    // ItemController.php 内の修正＠＠
     public function profile_update(ProfileRequest $request)
     {
         Log::info('*** [HIT] profile_update (PATCH: プロフィール更新) Controller ***');
@@ -533,13 +528,13 @@ class ItemController extends Controller
 
         // name, post_number, address, building のみを取得
         $updateData = $request->only('name', 'post_number', 'address', 'building');
-        
+
         // データベースを更新
         $user->update($updateData);
 
         // ★★★ 修正点1: 更新後の最新ユーザー情報を取得して返す ★★★
         // フロントエンドの Pinia Store の user オブジェクトを直接更新できるようにするため
-        $latestUser = User::find($user->id); 
+        $latestUser = User::find($user->id);
 
         Log::info('PROFILE_UPDATE: Profile updated successfully', ['user_id' => $user->id]);
 
@@ -553,7 +548,7 @@ class ItemController extends Controller
                 'email' => $latestUser->email,
                 'uid' => $latestUser->uid, // Firebase UIDも返却
                 'email_verified_at' => $latestUser->email_verified_at,
-                'post_number' => $latestUser->post_number, 
+                'post_number' => $latestUser->post_number,
                 'address' => $latestUser->address,
                 'building' => $latestUser->building,
                 'user_image' => $latestUser->user_image,
@@ -587,7 +582,7 @@ class ItemController extends Controller
             Log::error("ADDRESS_UPDATE: Unauthorized attempt to update user ID $userId by Auth user " . Auth::id());
             return response()->json(['message' => '更新権限がありません。'], 403);
         }
-        
+
         // リクエストから新しい住所情報を取得してユーザーを更新します。
         $user->update([
             'post_number' => $request->post_number,
@@ -598,7 +593,7 @@ class ItemController extends Controller
         // ★★★ 修正点2: リダイレクトを削除し、JSONで成功レスポンスを返す ★★★
         // フロントエンドはこれを受け取った後、自身で遷移する
         Log::info('ADDRESS_UPDATE: Address updated successfully', ['user_id' => $user->id, 'item_id' => $itemId]);
-        
+
         // 更新後の最新ユーザー情報を返すことで、Pinia Store を最新の状態に保つ
         return response()->json([
             'success' => true,
@@ -608,16 +603,16 @@ class ItemController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'uid' => $user->uid, 
+                'uid' => $user->uid,
                 'email_verified_at' => $user->email_verified_at,
-                'post_number' => $user->post_number, 
+                'post_number' => $user->post_number,
                 'address' => $user->address,
                 'building' => $user->building,
                 'user_image' => $user->user_image,
             ]
         ], 200);
     }
-    
+
     /**
      * ユーザー画像（アバター）をアップロードする＠＠
      *
@@ -627,7 +622,7 @@ class ItemController extends Controller
     public function user_image_upload(ProfileImageRequest $request)
     {
         Log::info('*** [HIT] user_image_upload (画像アップロード) Controller ***');
-        
+
         // 認証済みユーザーを取得
         $user = $request->user();
 
@@ -637,7 +632,7 @@ class ItemController extends Controller
         }
 
         if ($request->hasFile('user_image') && $request->file('user_image')->isValid()) {
-            
+
             // ファイル名生成と保存のロジック
             $extension = $request->user_image->getClientOriginalExtension();
             $randomName = 'user_image_' . Str::random(30) . '.' . $extension;
@@ -645,15 +640,15 @@ class ItemController extends Controller
             $path = $request->user_image->storeAs('public/user_images', $randomName);
             $dbPath = str_replace('public/', '', $path);
             // storage/user_images/filename.ext の形式でDBに保存
-            $storagePath = 'storage/' . $dbPath; 
+            $storagePath = 'storage/' . $dbPath;
 
             // DBアップデート処理
             $user->update([
-                'user_image' => $storagePath 
+                'user_image' => $storagePath
             ]);
 
             // ★★★ 修正点3: 最新のユーザー情報と画像パスをJSONで返す ★★★
-            $latestUser = User::find($user->id); 
+            $latestUser = User::find($user->id);
 
             Log::info('IMAGE_UPLOAD: Image uploaded and profile updated successfully', ['user_id' => $user->id, 'path' => $storagePath]);
 
@@ -664,16 +659,16 @@ class ItemController extends Controller
                     'id' => $latestUser->id,
                     'name' => $latestUser->name,
                     'email' => $latestUser->email,
-                    'uid' => $latestUser->uid, 
+                    'uid' => $latestUser->uid,
                     'email_verified_at' => $latestUser->email_verified_at,
-                    'post_number' => $latestUser->post_number, 
+                    'post_number' => $latestUser->post_number,
                     'address' => $latestUser->address,
                     'building' => $latestUser->building,
                     'user_image' => $latestUser->user_image,
                 ]
             ], 200);
         }
-    
+
         // 画像ファイルがない場合のエラー処理
         Log::error('IMAGE_UPLOAD: No valid image file provided.');
         return response()->json([
@@ -682,26 +677,26 @@ class ItemController extends Controller
         ], 400);
     }
 
-    
 
 
-// 購入商品(コンビニ支払い、カード支払い)
-        // コンビニ決済完了処理
-        public function thanks_buy_create(PurchaseRequest $request)
+
+    // 購入商品(コンビニ支払い、カード支払い)
+    // コンビニ決済完了処理
+    public function thanks_buy_create(PurchaseRequest $request)
     {
         // ★ 共通の認証チェックを先頭に移動
         $user = Auth::user();
-            
-        if (!$user) { 
+
+        if (!$user) {
             Log::error('!!!!!Purchase failed: User not authenticated.');
             return response()->json([
                 'status' => 'error',
                 'message' => 'ユーザー認証が必要です。リロードしてログインを確認してください。',
-            ], 401); 
+            ], 401);
         }
-        
+
         // 認証ユーザーIDを変数に格納
-        $currentUserId = $user->id; 
+        $currentUserId = $user->id;
 
         // ★★★ 暫定的なバリデーションを挿入 (PurchaseRequest が不明なため) ★★★
         $request->validate([
@@ -710,7 +705,7 @@ class ItemController extends Controller
             'payment' => 'required|string|in:コンビニ払い,カード支払い'
         ]);
         // ★★★ ここまで ★★★
-        
+
         $item = Item::find($request->item_id);
 
         if ($request->input('payment') === 'コンビニ払い') {
@@ -734,10 +729,10 @@ class ItemController extends Controller
             Log::info("!!!!!!!Purchase complete. Remaining stock: {$item->remain}");
 
             return response()->json([
-            'status' => 'success',
-            'redirect_type' => 'conbini_thanks', // 遷移先のタイプを特定
-            'message' => 'コンビニ払込用紙の処理方法はただいま勉強中です。<br>実装完了までしばらくお待ちください。'
-        ], 200); // ステータスコード200 (OK)を返す
+                'status' => 'success',
+                'redirect_type' => 'conbini_thanks', // 遷移先のタイプを特定
+                'message' => 'コンビニ払込用紙の処理方法はただいま勉強中です。<br>実装完了までしばらくお待ちください。'
+            ], 200); // ステータスコード200 (OK)を返す
 
 
         } elseif ($request->input('payment') === 'カード支払い') {
@@ -746,16 +741,16 @@ class ItemController extends Controller
             $appUrl = env('APP_URL');
             if ($appUrl) {
                 $url = parse_url($appUrl);
-    
+
                 // 1. HTTPSを強制 (Docker環境でNginxがHTTPSを終端している場合など)
-                URL::forceScheme('https'); 
-    
+                URL::forceScheme('https');
+
                 // 2. ホストとポートを強制 (route()がポートを無視する問題を解決)
                 if (isset($url['host'])) {
                     $host = $url['host'] . (isset($url['port']) ? ':' . $url['port'] : '');
                     URL::forceRootUrl("{$url['scheme']}://{$host}");
                 }
-                
+
                 Log::info("URL configuration temporarily forced for Stripe success URL generation.");
             }
             // ★★★ URL設定の一時的な上書きロジックここまで ★★★
@@ -763,40 +758,40 @@ class ItemController extends Controller
             // ★★★ 修正された success_url の生成 ★★★
             // APP_URLをベースに、Stripeのプレースホルダを文字列結合で厳密に渡す
             $successUrl = $appUrl . '/api/stripe_success?session_id={CHECKOUT_SESSION_ID}';
-            
+
             Stripe::setApiKey(env('STRIPE_SECRET'));
             $session = Session::create([
                 'payment_method_types' => ['card'],
                 'line_items' => [[
-                'price_data' => [
-                'currency' => 'jpy',
-                'product_data' => [
-                'name' => $item->name,
-                ],
-                'unit_amount' => $item->price,
-                ],
-                'quantity' => 1,
+                    'price_data' => [
+                        'currency' => 'jpy',
+                        'product_data' => [
+                            'name' => $item->name,
+                        ],
+                        'unit_amount' => $item->price,
+                    ],
+                    'quantity' => 1,
                 ]],
                 'mode' => 'payment',
                 // ユーザーIDをStripeセッションに紐付ける
-                'client_reference_id' => (string) $currentUserId, 
-                
+                'client_reference_id' => (string) $currentUserId,
+
                 // ★★★ route()ヘルパーを使わず、直接URLを渡す ★★★
                 'success_url' => $successUrl,
 
                 'cancel_url' => route('item_buy', ['item_id' => $item->id]),
             ]);
-            
+
             Log::info("Stripe session created with client_reference_id: {$currentUserId}");
 
             return response()->json([
-            'status' => 'success',
-            'redirect_type' => 'stripe_checkout', // 遷移先のタイプを特定
-            'stripe_url' => $session->url // StripeのチェックアウトURL
-        ], 200); // ステータスコード200 (OK)を返す
+                'status' => 'success',
+                'redirect_type' => 'stripe_checkout', // 遷移先のタイプを特定
+                'stripe_url' => $session->url // StripeのチェックアウトURL
+            ], 200); // ステータスコード200 (OK)を返す
+        }
     }
-    }
-    
+
     /**
      * Stripe決済成功時の処理
      * @param \Illuminate\Http\Request $request
@@ -813,12 +808,12 @@ class ItemController extends Controller
                 'received_session_id' => $sessionId,
                 'request_all' => $request->all()
             ]);
-            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
             return redirect("{$nuxtHost}/?error=invalid_stripe_session");
         }
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
-        
+
         try {
             // StripeClientを初期化
             $stripe = new StripeClient(env('STRIPE_SECRET'));
@@ -830,43 +825,43 @@ class ItemController extends Controller
 
             // 3. client_reference_id（ユーザーID）とその他の情報を取得
             $userId = (int) $session->client_reference_id;
-            
+
             // 🚨 ユーザーIDがない、または不正な場合は処理を中断
             if (!$userId) {
                 Log::error('Stripe Success failed: Missing client_reference_id.', ['session_id' => $sessionId]);
-                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
                 return redirect("{$nuxtHost}/?error=no_user_reference");
             }
-            
+
             // 4. 認証の再確立 (Auth::user()が使えるようにする)
             $user = \App\Models\User::find($userId); // ユーザーモデルをApp\Models\Userと仮定
             if (!$user) {
                 Log::error('Stripe Success failed: User not found based on client_reference_id.', ['user_id' => $userId]);
-                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
                 return redirect("{$nuxtHost}/?error=user_not_exist");
             }
-            
+
             // このリクエストのみで認証状態を復元
-            Auth::login($user); 
+            Auth::login($user);
 
             // 💡 ここから元の購入処理ロジック 💡
-            
+
             // line_itemsから商品名を取得
             $itemName = $session->line_items->data[0]->description ?? '';
-            $item = Item::where('name', $itemName)->first(); 
-            
+            $item = Item::where('name', $itemName)->first();
+
             // 暫定的に、ユーザーの登録情報を利用します。
             $buyAddress = "{$user->name}\n{$user->post_number}\n{$user->address}\n{$user->building}";
-            
+
             if (!$item) {
-                 Log::error('Stripe Success failed: Item not found based on Stripe session name.', ['item_name' => $itemName]);
-                 $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
-                 return redirect("{$nuxtHost}/?error=item_not_found");
+                Log::error('Stripe Success failed: Item not found based on Stripe session name.', ['item_name' => $itemName]);
+                $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
+                return redirect("{$nuxtHost}/?error=item_not_found");
             }
 
             // OrderHistoryの作成
             OrderHistory::create([
-                'user_id' => $userId, 
+                'user_id' => $userId,
                 'item_id' => $item->id,
                 'buy_address' => $buyAddress,
                 'payment' => 'カード支払い'
@@ -874,26 +869,26 @@ class ItemController extends Controller
 
             // 在庫減少
             $item->decrement('remain');
-            
+
             Log::info('Stripe Success completed. Order saved to DB.', ['user_id' => $userId, 'item_id' => $item->id]);
 
             // Nuxtのthanksページへリダイレクト
-            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
             // return redirect("{$nuxtHost}/thanks?status=success&payment=card");
             return redirect("{$nuxtHost}/thanks/buy-stripe");
 
         } catch (\Exception $e) {
             Log::error('Stripe Success API or Logic Error: ' . $e->getMessage(), ['session_id' => $sessionId]);
-            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431'); 
+            $nuxtHost = env('NUXT_HOST', 'https://laravel.test:4431');
             return redirect("{$nuxtHost}/?error=stripe_api_failed");
         }
     }
 
 
 
-// 出品商品登録処理
+    // 出品商品登録処理
 
-        public function thanks_sell_create(ExhibitionRequest $request)
+    public function thanks_sell_create(ExhibitionRequest $request)
     {
         // ExhibitionRequestで基本的なバリデーションと認証は処理されているはず
         if (!Auth::check()) {
@@ -936,20 +931,20 @@ class ItemController extends Controller
         ], 201); // 201 Created
     }
 
-        // 出品商品画像アップロード処理
-        public function item_image_upload(Request $request)
+    // 出品商品画像アップロード処理
+    public function item_image_upload(Request $request)
     {
         // リクエストの全データをログに出力 (必ず配列を渡す)
-    \Log::info('画像アップロードリクエスト受信', $request->all()); 
-    
-    // ファイルの存在を確認しながらログに出力
-    $file = $request->file('item_image');
-    if ($file) {
-        \Log::info('ファイル受信成功', ['filename' => $file->getClientOriginalName(), 'size' => $file->getSize()]);
-    } else {
-        // null の場合は、メッセージとしてログに出力
-        \Log::warning('ファイルが見つかりません (null)', $request->all()); 
-    }
+        \Log::info('画像アップロードリクエスト受信', $request->all());
+
+        // ファイルの存在を確認しながらログに出力
+        $file = $request->file('item_image');
+        if ($file) {
+            \Log::info('ファイル受信成功', ['filename' => $file->getClientOriginalName(), 'size' => $file->getSize()]);
+        } else {
+            // null の場合は、メッセージとしてログに出力
+            \Log::warning('ファイルが見つかりません (null)', $request->all());
+        }
 
 
         // 認証チェック (Middlewareで処理することを推奨しますが、明示的に記述)
@@ -985,8 +980,8 @@ class ItemController extends Controller
 
         // --- 💡 ここにデバッグログを追加 ---
         if (!$file) {
-        \Log::error('❌ ファイルが Null です。致命的なリクエスト失敗。');
-        return response()->json(['message' => 'ファイルがリクエストに含まれていません。'], 400);
+            \Log::error('❌ ファイルが Null です。致命的なリクエスト失敗。');
+            return response()->json(['message' => 'ファイルがリクエストに含まれていません。'], 400);
         }
         \Log::info('✅ ファイルオブジェクトの存在を確認。');
 
@@ -1011,18 +1006,18 @@ class ItemController extends Controller
     }
 
 
-// いいね・コメント機能関係
+    // いいね・コメント機能関係
 
-        public function apiFavorite(Request $request, Item $item)
+    public function apiFavorite(Request $request, Item $item)
     {
         // 💡 auth:sanctumミドルウェアにより、認証済みユーザーが取得できている
-        $user = $request->user(); 
+        $user = $request->user();
 
         if (!$user) {
             // auth:sanctumが失敗した場合に備えておくが、通常はミドルウェアで401が返る
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-            
+
         $isFavorited = false;
         $existingGood = Good::where('item_id', $item->id)->where('user_id', $user->id)->first();
 
@@ -1035,7 +1030,7 @@ class ItemController extends Controller
             Good::create(['item_id' => $item->id, 'user_id' => $user->id]);
             $isFavorited = true;
         }
-        
+
         // 💡 成功したJSONレスポンスを返す
         $favoritesCount = Good::where('item_id', $item->id)->count();
 
@@ -1047,7 +1042,7 @@ class ItemController extends Controller
     }
 
 
-        public function comment_create(CommentRequest $request)
+    public function comment_create(CommentRequest $request)
     {
         // auth()ヘルパーはAPIトークン認証（Sanctumガード）の場合、
         // ユーザーが認証されていればそのユーザーを返します。
@@ -1069,7 +1064,7 @@ class ItemController extends Controller
 
         // データベースにコメントを作成
         $newComment = Comment::create($word);
-        
+
         // 💡 修正: APIリクエストなので、リダイレクトではなくJSONレスポンスを返す
         // ステータスコード201 (Created) と作成されたコメントのデータを返すと、
         // Nuxt側でコメントリストを更新しやすくなります。
