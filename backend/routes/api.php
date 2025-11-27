@@ -19,13 +19,9 @@ Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 
 // Nuxtがページを表示する際に必要なデータ取得エンドポイントを追加します。
 // 商品詳細情報取得
-    Route::get('/items/{item_id}', [ItemController::class, 'item_detail_show']);
+    Route::get('/items/{items_id}', [ItemController::class, 'item_detail_show']);
 
 // フロントページ（商品一覧）取得
-// 【修正点】認証情報が存在すればAuth::guard('sanctum')->user()にセットするため、ミドルウェアを適用
-// ★ 修正: ミドルウェアをAPIグループ全体に移動したため、ここでの個別指定は削除します。
-    // Route::get('/items', [ItemController::class, 'index']);
-
     // カスタムミドルウェアのみを適用。トークンがあれば認証し、なければそのまま通過させる。
 Route::get('/items', [ItemController::class, 'index']);
 
@@ -142,8 +138,8 @@ Route::middleware(['auth:firebase'])->group(function () {
 
 // Nuxtがページを表示する際に必要なデータ取得エンドポイントを追加します。
 // 商品詳細情報取得
-    Route::get('/items/{item_id}', [ItemController::class, 'item_detail_show']);
+    // Route::get('/item/{item_id}', [ItemController::class, 'item_detail_show']);
 // フロントページ（商品一覧）取得
-    Route::get('/items', [ItemController::class, 'index']);
+    // Route::get('/items', [ItemController::class, 'index']);
 // コメント取得 (GET)
-    Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);
+    // Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);

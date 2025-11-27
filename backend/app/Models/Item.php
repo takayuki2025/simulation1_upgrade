@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Log; // Log::debugを削除したので、この行は不要だが残しておきます
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config; 
+use Illuminate\Support\Str; // Strクラスを追加で使用
 
 class Item extends Model
 {
@@ -54,12 +55,18 @@ class Item extends Model
     {
         if (!$value) {
             // 画像パスがない場合は空文字列を返す
-            return ''; 
+            return '';
+        }
+
+        // ★★★ 根本解決ロジック：既にフルURLであれば、そのまま加工せずに返す ★★★
+        if (Str::startsWith(strtolower($value), ['http://', 'https://'])) {
+            // DBにフルURLが保存されている場合、このアクセサによる二重結合を防ぐ
+            return $value;
         }
 
         // 信頼できる唯一の情報源であるAPP_URLを直接取得
-        $baseUrl = Config::get('app.url'); 
-        
+        $baseUrl = Config::get('app.url');
+
         if (!$baseUrl) {
             // APP_URLが設定されていない場合は、フォールバックとしてurl()を使用
             return url($value);

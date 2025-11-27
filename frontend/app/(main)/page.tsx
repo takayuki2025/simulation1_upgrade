@@ -1,15 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import axios from "axios";
+import axios, { AxiosError, AxiosResponse } from "axios"; // AxiosError, AxiosResponse を追加
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // useApiClientは不要になったため削除
+
+// 💡 useAuth のみを使用 (useApi は削除)
+import { useAuth, AuthContextType } from "@/hooks/useAuth";
+
+// 💡 getImageUrl, onImageError はプロジェクト内の実際のパスに修正してください
 import { getImageUrl, onImageError } from "@/utils/utils";
 
-// 環境変数ではなく、Next.jsのクライアント側の定数として扱います
+// 環境変数
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-// 💡 グローバルなaxiosは認証チェックやCSRF取得時など、特定の非認証リクエストでのみ使用します。
+
+// グローバルなaxiosは、認証が不要なリクエストで使用（ただし、今回は apiClient を優先）
 axios.defaults.withCredentials = true;
 
 // =======================================================
@@ -32,22 +37,24 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // useAuth から必要なステートを取得
+  // 1. 認証フックから必要な状態とアクションを取得
   const {
     user,
-    // tokenの取得を削除し、代わりにapiClientを取得
     isLoading: isAuthLoading,
     isLoggingOut,
     isAuthenticated,
-    apiClient: rawApiClient, // 認証状態によってはnullになる元の apiClient を取得
-  } = useAuth();
+    apiClient, // ★ 認証済みクライアント
+    logout, // ★ ログアウト関数
+    reloadAuthToken, // ★ トークンリフレッシュ関数
+  } = useAuth(); // useAuthから全ての必要な機能を取得
 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false); // APIフェッチ中のローディング
+  // 画像URLのキャッシュ打破用キー
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   // =======================================================
-  // Computed (useMemoで代替)
+  // Computed State
   // =======================================================
 
   const currentTab = useMemo(() => {
@@ -58,58 +65,104 @@ export default function Home() {
     return searchParams.get("all_item_search") || "";
   }, [searchParams]);
 
-  // ページ全体のローディング状態
+  // ページ全体のローディング状態の判定
   const isPageLoading = useMemo(() => {
-    // ログアウト処理中が最優先
-    if (isLoggingOut) return true;
-    // 認証状態の解決が完了していない場合（useFirebaseInit.isReady=false）
-    if (isAuthLoading) return true;
-    // 商品データロード中
-    if (loading) return true;
-
-    return false;
+    return isLoggingOut || isAuthLoading || loading;
   }, [isLoggingOut, isAuthLoading, loading]);
 
   // テンプレートのログインメッセージ表示に使用
   const isUserLoggedOutComputed = useMemo(() => {
-    // 認証が解決済み(isAuthLoading=false)で、かつユーザーが存在しない場合に「ログアウト状態」と判断
     return !isAuthLoading && !user;
   }, [isAuthLoading, user]);
 
   // =======================================================
-  // データフェッチロジック
+  // データフェッチロジック (useAuthの apiClient を使用)
   // =======================================================
 
-  const fetchItems = useCallback(
-    // currentToken引数を削除
-    async (tab: string, search: string) => {
-      // 認証済みAxiosインスタンスの参照
-      const apiClient = rawApiClient;
-
-      // マイリストタブ、またはユーザーが認証済みの場合に認証済みクライアントを使用する
-      const useAuthClient = tab === "mylist" || isAuthenticated;
-
+  /**
+   * 💡 活用ポイント: 認証済みリクエストを実行する汎用ヘルパー関数
+   * useApiが担っていたロジック（特に401エラー時のリトライ）をここに統合します。
+   * 他のページでも同様の認証済み通信が必要な場合は、このロジックを再利用可能なカスタムフックとして切り出してください。
+   */
+  const authenticatedFetchWithRetry = useCallback(
+    async (url: string, params: any): Promise<AxiosResponse> => {
+      // ログアウト中であればすぐにエラーを投げる
       if (isLoggingOut) {
-        console.log("[Skip Fetch] Logging out, skipping fetch.");
+        throw new Error("Logging out, skipping request.");
+      }
+
+      // 認証済みクライアントがなければエラー
+      if (!apiClient) {
+        // apiClient が null の場合、isAuthenticated も false のはずだが、念のためチェック
+        if (!isAuthenticated) {
+          throw new Error("Not authenticated, API client unavailable.");
+        }
+        // ロード中などで一時的に apiClient が null の場合は、待機するかエラーとする
+        throw new Error("API client not initialized.");
+      }
+
+      const requestConfig = {
+        method: "GET",
+        url: url,
+        params: params,
+      };
+
+      try {
+        // 1. 通常のリクエスト実行
+        return await apiClient.request(requestConfig);
+      } catch (e) {
+        const error = e as AxiosError;
+        const status = error.response?.status;
+
+        // 2. 401 Unauthorized エラーの場合
+        if (status === 401) {
+          console.warn(
+            "401 Unauthorized detected. Attempting token refresh..."
+          );
+
+          try {
+            // トークンを強制リフレッシュ
+            await reloadAuthToken();
+
+            // 3. 再度リクエストを実行（apiClientは useMemo により新しいトークンで再生成されているはず）
+            // 💡 注意: Next.js/Reactの非同期環境では、apiClientの再生成を待つ必要がありますが、
+            // ここでは再レンダリングを挟まずにリトライするため、即時実行で試みます。
+            // 理想的には、Axiosインターセプターを apiClient に設定することで、この処理を自動化すべきです。
+            const secondResponse = await apiClient.request(requestConfig);
+            console.log("Token refresh and retry successful.");
+            return secondResponse;
+          } catch (refreshError) {
+            // 4. リフレッシュ失敗またはリトライ後のエラー
+            console.error(
+              "Token refresh or retry failed. Logging out.",
+              refreshError
+            );
+            await logout(); // 致命的な認証エラーとしてログアウト
+            throw new Error("Authentication failed after retry.");
+          }
+        }
+
+        // 401 以外のエラーはそのままスロー
+        throw error;
+      }
+    },
+    [isAuthenticated, isLoggingOut, apiClient, logout, reloadAuthToken]
+  );
+
+  /**
+   * 商品データをAPIから取得する関数
+   */
+  const fetchItems = useCallback(
+    async (tab: string, search: string) => {
+      // ログアウト処理中はフェッチをスキップ
+      if (isLoggingOut) {
         setItems([]);
         setLoading(false);
         return;
       }
 
-      // マイリストタブかつ未ログインの場合（ isAuthenticated=false ）、フェッチをスキップ
+      // マイリストタブかつ未ログインの場合、フェッチをスキップ
       if (tab === "mylist" && !isAuthenticated) {
-        console.log("[Skip Fetch] Not logged in and accessing mylist.");
-        setItems([]);
-        setLoading(false);
-        setImageRefreshKey((prev) => prev + 1);
-        return;
-      }
-
-      // 認証が必要なリクエストだが、apiClient（トークン付きAxios）がまだ準備できていない場合はスキップ
-      if (useAuthClient && !apiClient) {
-        console.log(
-          "[Skip Fetch] Auth client needed (Mylist or Authenticated view) but apiClient is null. Waiting for token."
-        );
         setItems([]);
         setLoading(false);
         setImageRefreshKey((prev) => prev + 1);
@@ -118,78 +171,63 @@ export default function Home() {
 
       setLoading(true);
 
-      // グローバルAxiosか認証済みAxiosのどちらを使うかを選択
-      // useAuthClientがtrueでapiClientが利用可能ならapiClientを使用
-      const client = apiClient && useAuthClient ? apiClient : axios;
-      const apiUrl = `${API_BASE_URL}/api/items`;
+      const apiUrl = `/api/items`;
+      const params = { tab: tab, all_item_search: search };
 
-      console.log(
-        `[Fetch] Using client: ${
-          useAuthClient ? "Authenticated" : "Global/Unauthenticated"
-        }. Fetching items: tab=${tab}, search=${search}`
-      );
-
-      // 以前の手動でヘッダーを設定するロジックは全て削除されました
+      // 認証クライアントとグローバルAxiosの選択ロジック
+      const useAuthClient = tab === "mylist" || isAuthenticated;
 
       try {
-        const response = await client.get(apiUrl, {
-          params: {
-            tab: tab,
-            all_item_search: search,
-          },
-          // 認証ヘッダーはclient (apiClientの場合) に既に含まれています
-        });
+        let responseData;
 
-        const responseData = response.data;
+        if (useAuthClient) {
+          // ★★★ 認証済みリクエスト (apiClient/retryロジックを使用) ★★★
+          const response = await authenticatedFetchWithRetry(apiUrl, params);
+          responseData = response.data;
+        } else {
+          // ★★★ 未認証リクエスト (グローバル axios を使用) ★★★
+          const response = await axios.get(`${API_BASE_URL}${apiUrl}`, {
+            params: params,
+          });
+          responseData = response.data;
+        }
+
         if (responseData && Array.isArray(responseData.items)) {
           setItems(responseData.items as Item[]);
           setImageRefreshKey((prev) => prev + 1);
         } else {
-          console.warn("APIレスポンスの構造が不正です:", responseData);
           setItems([]);
         }
       } catch (e: any) {
-        console.error("商品の取得中に予期せぬエラーが発生しました:", e);
+        // ログアウト処理は authenticatedFetchWithRetry で行われるため、ここではエラーをハンドルするのみ
+        console.error("商品の取得中にエラーが発生しました:", e);
         setItems([]);
       } finally {
         setLoading(false);
       }
     },
-    // 依存配列を更新: rawApiClient, isAuthenticated を追加
-    [rawApiClient, isAuthenticated, isLoggingOut, API_BASE_URL]
+    // 依存配列: 認証状態とカスタムフェッチャーに依存
+    [
+      isAuthenticated,
+      isLoggingOut,
+      authenticatedFetchWithRetry, // 認証クライアントとリトライロジックを内包
+    ]
   );
 
   // =======================================================
-  // Effect / Watcher (認証状態とURLクエリの統合監視)
+  // Effect / Watcher
   // =======================================================
 
   useEffect(() => {
-    console.group("Home.tsx useEffect Re-run Check");
-    console.log(`[STATE] isAuthLoading: ${isAuthLoading}`); // 認証待機中は true
-    console.log(`[STATE] isAuthenticated: ${isAuthenticated}`);
-    console.groupEnd();
-
-    // ★★★ 認証状態が解決するまで、フェッチを厳密にブロックする ★★★
+    // 認証状態の解決を待つ
     if (isAuthLoading) {
-      console.log("[Skip] Waiting for authentication to resolve.");
-      setItems([]); // データが表示されないようクリア
+      setItems([]);
       return;
     }
 
-    // 認証状態の解決後 (isAuthLoading=false) または、解決後のトークン/クエリ変更時にフェッチを実行
-    console.log(
-      `[Fetch Triggered] Auth Resolved/Query Changed. Re-fetching items.`
-    );
-    // fetchItemsを引数なしで呼び出す
+    // 認証が解決した後、またはクエリ/認証状態が変わったときにフェッチを実行
     fetchItems(currentTab, currentSearchQuery);
-  }, [
-    currentTab,
-    currentSearchQuery,
-    isAuthLoading, // 認証完了を監視
-    rawApiClient, // apiClientが再生成された時（トークンが変更された時）に再フェッチ
-    fetchItems,
-    user,
-  ]);
+  }, [currentTab, currentSearchQuery, isAuthLoading, fetchItems]);
 
   // =======================================================
   // レンダリング
@@ -197,23 +235,25 @@ export default function Home() {
 
   return (
     <div className="main_contents">
-      {/* ローディング状態 */}
+      {/* ローディング状態表示エリア */}
       {isPageLoading && (
         <div className="flex justify-center items-center h-48">
           <div className="animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"></div>
           <p className="ml-4 text-lg text-gray-400">
             {isLoggingOut
               ? "ログアウト処理中..."
-              : isAuthLoading // 認証解決待ちのとき
-              ? "認証状態を確認中..." // ← isAuthLoading が false になるまでデータフェッチはブロックされる
+              : isAuthLoading
+              ? "認証状態を確認中..."
               : "商品を読み込み中..."}
           </p>
         </div>
       )}
 
+      {/* メインコンテンツエリア (ローディング中は非表示) */}
       <div className={isPageLoading ? "hidden" : ""}>
-        {/* タブ切り替えと検索フォーム（簡易版） */}
+        {/* タブ切り替えコンポーネント */}
         <div className="main_select">
+          {/* すべてタブ */}
           <Link
             href={{
               pathname: "/",
@@ -229,6 +269,7 @@ export default function Home() {
           >
             すべて
           </Link>
+          {/* マイリストタブ */}
           <Link
             href={{
               pathname: "/",
@@ -251,7 +292,8 @@ export default function Home() {
           {items.length > 0 ? (
             items.map((item) => (
               <div key={item.id} className="items_select_all">
-                <Link href={`/item/${item.id}`}>
+                {/* 💡 商品詳細ページへのリンク */}
+                <Link href={`/items/${item.id}`}>
                   <div className="relative">
                     <img
                       src={getImageUrl(item.item_image, imageRefreshKey)}
@@ -277,7 +319,7 @@ export default function Home() {
                 {currentTab === "mylist" && isUserLoggedOutComputed
                   ? "マイリストを見るにはログインしてください。"
                   : currentTab === "all" && isAuthLoading
-                  ? "認証状態を確認中..."
+                  ? "認証状態を確認中..." // 認証ロード中は認証状態を確認中を表示
                   : "該当する商品が見つかりませんでした。"}
               </p>
             </div>
@@ -285,7 +327,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Vueの <style scoped> を Tailwind CSSと組み合わせて再現 */}
+      {/* スタイル定義 (変更なし) */}
       <style jsx>{`
         .main_contents {
           margin: 0 auto;
@@ -295,7 +337,7 @@ export default function Home() {
 
         .main_select {
           height: 80px;
-          border-bottom: 3px solid #4b5563; /* Tailwind gray-600 */
+          border-bottom: 3px solid #4b5563;
           position: relative;
           display: flex;
           align-items: center;
@@ -307,7 +349,7 @@ export default function Home() {
         .recs,
         .mylists {
           text-decoration: none;
-          color: #9ca3af; /* Tailwind gray-400 */
+          color: #9ca3af;
           font-size: 1.2rem;
           font-weight: bold;
           padding-bottom: 15px;
@@ -318,12 +360,12 @@ export default function Home() {
 
         .recs:hover,
         .mylists:hover {
-          color: #d1d5db; /* Tailwind gray-300 */
+          color: #d1d5db;
         }
 
         .recs.active,
         .mylists.active {
-          color: #ef4444; /* Tailwind red-500 */
+          color: #ef4444;
           border-bottom: 3px solid #ef4444;
         }
 
@@ -366,7 +408,7 @@ export default function Home() {
           min-height: 40px;
         }
         .item-name {
-          color: #000000ff; /* Tailwind gray-200 */
+          color: #000000ff;
         }
 
         /* soldタグのスタイル */
@@ -377,15 +419,10 @@ export default function Home() {
           transform: translate(-50%, -50%) rotate(-10deg);
           z-index: 10;
           font-size: 1.5rem;
-          color: #f87171; /* Tailwind red-400 */
+          color: #f87171;
           font-weight: 900;
           padding: 8px 16px;
-          background-color: rgba(
-            31,
-            41,
-            55,
-            0.9
-          ); /* Tailwind gray-800 semi-transparent */
+          background-color: rgba(31, 41, 55, 0.9);
           border: 4px solid #f87171;
           border-radius: 8px;
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);

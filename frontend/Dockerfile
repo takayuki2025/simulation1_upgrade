@@ -14,14 +14,16 @@ RUN apt-get update && \
 WORKDIR /app
 
 # 1. package.jsonとロックファイルをコンテナ内にコピー
-# ★ 修正: ファイルを個別にコピーし、RUNコマンドの前に入れることで、
-# package.jsonが変更されたときのみ npm install が再実行されるようにします。
+# ★ 修正: ロックファイルもコピーし、npm installのキャッシュを最大限に活用
 COPY package.json ./
+COPY package-lock.json ./
 
 
 # 2. 依存関係をクリーンインストール
-RUN rm -rf node_modules && \
-    npm install
+#RUN rm -rf node_modules && \ <- 初回ビルド時はnode_modulesがないため rm は不要
+#    npm install
+RUN npm install
+
 
 # 3. 開発用の実行環境として使用
 # `npm run dev` コマンドを正確に実行し、`npm`にパス解決を任せる

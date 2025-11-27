@@ -87,7 +87,7 @@ class ItemController extends Controller
                 if (!empty($searchQuery)) {
                     $query->where('name', 'like', '%' . $searchQuery . '%');
                 }
-                
+
                 // ★追加: mylistのSQLもデバッグ
                 Log::info("ItemController@index: MYLIST QUERY SQL: " . $query->toSql());
                 Log::info("ItemController@index: MYLIST QUERY BINDINGS: " . json_encode($query->getBindings()));
@@ -98,7 +98,7 @@ class ItemController extends Controller
         } else {
             // 'all'タブ（またはデフォルト）の場合、全商品を取得
             $query = Item::query();
-            
+
             // 💡 認証済みユーザーの場合のみ、自身が出品した商品を除外する
             if ($authId) {
                 // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
@@ -151,36 +151,23 @@ class ItemController extends Controller
 
 
 
-        public function item_detail_show($item_id)
+    public function item_detail_show($item_id)
     {
-        // 商品が存在しない場合は404エラーを返す
+
+        // アクセサ(Itemモデム)がフルURLの生成を保証するため、複雑な処理は不要 商品が存在しない場合は404エラーを返す (findOrFailを使用)
         $item = Item::with('user')->findOrFail($item_id);
 
-        // 💡 修正: item_image の値を Storage::url() を使ってフルURLに変換する
-        if ($item->item_image) {
-            $imagePath = $item->item_image;
-            
-            // データベースに保存されているパスから 'storage/' プレフィックスを削除する
-            // Storage::url() は 'storage/app/public' からの相対パス（例: 'item_images/HDD+Hard+Disk.jpg'）を期待するため。
-            $cleanPath = Str::startsWith($imagePath, 'storage/') 
-                ? substr($imagePath, 8) // 'storage/' (8文字) を削除
-                : $imagePath;
+        // ★★★ 修正: 配列変換と手動URL処理のロジックを全て削除 ★★★
 
-            // Storage::url() を使用してフルURLを生成
-            // これにより、Nuxt側でベースURLの結合が不要になり、特殊文字のエンコードも適切に行われる
-            $item->item_image = Storage::url($cleanPath);
-            
-            // ★★★ デバッグログ: Nuxtに返されるフルURLを確認 ★★★
-            Log::info("ItemController@item_detail_show: Full URL for Nuxt: " . $item->item_image);
-            
-        } else {
-            // item_image が null の場合に対応
-            $item->item_image = null;
+        // デバッグログ: アクセサ経由で取得した最終URLを確認
+        if ($item->item_image) {
+            Log::info("ItemController@item_detail_show: Final URL (via Accessor): " . $item->item_image);
         }
 
-        // 商品詳細とコメント、お気に入り状態などを取得するロジックをここに追加
-        // 以下のロジックは以前のバージョンと、ユーザーが提供した「Laravel ItemController show method」の内容を統合して再現します。
-        
+        // ----------------------------------------------------
+        // お気に入り・コメントデータの取得
+        // ----------------------------------------------------
+
         $user = auth('sanctum')->user();
         $isFavorited = false;
         
@@ -189,24 +176,28 @@ class ItemController extends Controller
         
         // お気に入り数のカウント
         $favoritesCount = Good::where('item_id', $item->id)->count();
-    
+
+        // ログインユーザーのお気に入り状態をチェック
         if ($user) {
-            // ログインユーザーがこの商品を気に入っているかチェック
             $isFavorited = Good::where('item_id', $item->id)
                 ->where('user_id', $user->id)
                 ->exists();
         }
 
+        // ----------------------------------------------------
+        // レスポンス
+        // ----------------------------------------------------
+
         return response()->json([
-            'item' => $item,
+            'item' => $item, // ★ モデルオブジェクトをそのまま返し、アクセサにURL処理を任せる ★
             'comments' => $comments,
             'is_favorited' => $isFavorited,
             'favorites_count' => $favoritesCount,
             'userId' => $user ? $user->id : null,
             'isLoggedIn' => $user !== null,
         ]);
-
     }
+
 
 
     public function item_buy_show($item_id): JsonResponse
@@ -386,6 +377,7 @@ class ItemController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at, // ← hasVerifiedEmail は、/api/mypage/profile の応答である localBackendUser に含まれる email_verified_at が存在するかで判定されるこれを追加
             // ★★★ ここに他のフィールドを追加！ ★★★
             'post_number' => $user->post_number, 
             'address' => $user->address,

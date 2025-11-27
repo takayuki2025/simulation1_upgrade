@@ -12,6 +12,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 // --- 型定義 ---
 interface BackendUser {
   id: number;
+  name: string; // ★追加
+  email: string;
   email_verified_at: string | null;
   // 他のユーザー情報...
 }

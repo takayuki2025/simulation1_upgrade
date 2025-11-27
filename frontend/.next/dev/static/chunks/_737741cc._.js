@@ -167,7 +167,7 @@ const useFirebaseInit = ()=>{
     }["useFirebaseInit.useEffect"], []);
     return state;
 };
-_s(useFirebaseInit, "ZHpEEPtqm0F4c05fAQ0WAV1PfdY=");
+_s(useFirebaseInit, "1hP2lAxALG/GLfd/s6rsfTKsQuU=");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }
@@ -376,11 +376,16 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+// 認証ロジックのコア: Firebase Authentication SDK
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/esm/index.esm.js [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/firebase/node_modules/@firebase/auth/dist/esm2017/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)"); // AxiosInstanceをインポート
+// ネットワーク通信ライブラリ: Axios
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
+// 外部の依存フック (Firebase初期化と設定)
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useFirebaseInit$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useFirebaseInit.tsx [app-client] (ecmascript)");
+// Next.jsのルーター (リダイレクト処理に利用)
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
+// 外部の依存フック (Laravelセッション管理ロジック)
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useLaravelSession.tsx [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature();
@@ -398,19 +403,21 @@ function AuthProvider({ children }) {
     _s();
     const { auth, userId, isReady } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useFirebaseInit$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useFirebaseInit"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    // 内部状態
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoggingOut, setIsLoggingOut] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
-    // --- Laravel/Sanctum 関連のヘルパー関数 ---
+    const [backendUser, setBackendUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    // Laravelユーザーのロード状態をトラッキング
+    const [isBackendUserLoading, setIsBackendUserLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    // --- A. Laravel/Sanctum 連携ヘルパー (変更なし) ---
     const fetchCsrfCookie = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[fetchCsrfCookie]": async ()=>{
             if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
             ;
             try {
-                // Axiosのグローバル設定が withCredentials=true であることを保証
                 __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
                 await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`);
-                console.log("[Sanctum] CSRF cookie fetched.");
             } catch (error) {
                 console.error("[Sanctum] Failed to fetch CSRF cookie:", error);
             }
@@ -419,7 +426,6 @@ function AuthProvider({ children }) {
     const checkLaravelSession = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[checkLaravelSession]": async ()=>{
             try {
-                // グローバルAxiosを使用してセッションチェック（Authorizationヘッダーは不要）
                 const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/api/auth/check`);
                 return res.data;
             } catch  {
@@ -429,29 +435,47 @@ function AuthProvider({ children }) {
             }
         }
     }["AuthProvider.useCallback[checkLaravelSession]"], []);
-    // --------------------------------------------------
-    // 外部フックの利用
     const { laravelAuthenticated, initialCheckComplete } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useLaravelSession"])(user, auth, checkLaravelSession);
-    // --- 状態監視 useEffect ---
-    // 1. Firebase user 変化 → token 更新
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+    // --- B. 状態監視と同期 (useEffect) ---
+    /**
+   * 責務 1: Firebaseの認証状態変更の監視とBackendUserのロード
+   */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthProvider.useEffect": ()=>{
             if (!auth || !isReady) return;
-            // onAuthStateChangedはコンポーネントがマウントされている限りアクティブ
             const unsub = auth.onAuthStateChanged({
                 "AuthProvider.useEffect.unsub": async (currentUser)=>{
                     setUser(currentUser);
                     if (currentUser) {
+                        setIsBackendUserLoading(true); // ★ロード開始
                         try {
-                            // トークン取得を試行
                             const idToken = await currentUser.getIdToken();
                             setToken(idToken);
+                            // IDトークンがあれば、Laravelからプロフィールをロード
+                            if (idToken) {
+                                try {
+                                    // LaravelのプロフィールAPIを叩き、最新のユーザー情報を取得
+                                    const profileRes = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/api/mypage/profile`, {
+                                        headers: {
+                                            Authorization: `Bearer ${idToken}`
+                                        }
+                                    });
+                                    // 型アサーションは、useLaravelSession.ts の BackendUser 型と一致しているため安全
+                                    setBackendUser(profileRes.data.user);
+                                } catch (profileError) {
+                                    console.warn("[Profile] Failed to load backend user profile:", profileError);
+                                    setBackendUser(null);
+                                }
+                            }
                         } catch (error) {
                             console.error("[Firebase] Failed to get ID Token:", error);
                             setToken(null);
+                            setBackendUser(null);
+                        } finally{
+                            setIsBackendUserLoading(false); // ★ロード完了
                         }
                     } else {
                         setToken(null);
+                        setBackendUser(null);
                     }
                 }
             }["AuthProvider.useEffect.unsub"]);
@@ -463,42 +487,20 @@ function AuthProvider({ children }) {
         auth,
         isReady
     ]);
-    // 2. 初回 CSRF Cookie 取得 (リロード時にセッション確立のために必要)
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+    /**
+   * 責務 2 & 3: CSRF Cookieの初回取得と apiClient の生成 (変更なし)
+   */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthProvider.useEffect": ()=>{
-            // 💡 リロード時にすぐ実行されるように、このフックは残します。
             fetchCsrfCookie();
         }
     }["AuthProvider.useEffect"], [
         fetchCsrfCookie
     ]);
-    // 3. 🚨 削除: グローバルな axios.defaults の設定は削除し、カスタムインスタンスに移行します。
-    // 以前のロジック:
-    /*
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      console.log("[Axios Config] Set Authorization header with new token.");
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-      console.log("[Axios Config] Cleared Authorization header.");
-    }
-  }, [token]);
-  */ // 4. グローバルな withCredentials 設定は CSRF 取得時に移し、ここでは削除
-    // 以前のロジック:
-    /*
-  useEffect(() => {
-     axios.defaults.withCredentials = true;
-  }, []);
-  */ // --- カスタム Axios インスタンスの生成 ---
     const apiClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AuthProvider.useMemo[apiClient]": ()=>{
             if (!token) {
-                console.log("[API Client] Token is missing. Returning null client.");
                 return null;
             }
-            console.log("[API Client] Creating new Axios instance with Authorization header.");
-            // ★ トークンが存在するときのみカスタムインスタンスを生成
             const instance = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].create({
                 baseURL: API_BASE_URL,
                 withCredentials: true,
@@ -512,11 +514,18 @@ function AuthProvider({ children }) {
     }["AuthProvider.useMemo[apiClient]"], [
         token
     ]);
-    // --- useMemo で状態を集約 (省略) ---
-    const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+    // ★外部公開用の setBackendUser ラッパー関数 (メール認証後の即時更新用)
+    const setBackendUserStatus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "AuthProvider.useCallback[setBackendUserStatus]": (user)=>{
+            setBackendUser(user);
+        }
+    }["AuthProvider.useCallback[setBackendUserStatus]"], []);
+    // --- C. 状態の計算 (useMemo) ---
+    /**
+   * 💡 最終的な認証状態の計算 (二重認証チェック)
+   */ const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AuthProvider.useMemo[isAuthenticated]": ()=>{
             const isAuth = initialCheckComplete && !!user && !user.isAnonymous && laravelAuthenticated === true;
-            console.log(`[AUTH STATE] isAuthenticated computed: ${isAuth}. (initialCheckComplete: ${initialCheckComplete}, laravelAuthenticated: ${laravelAuthenticated}, user present: ${!!user})`);
             return isAuth;
         }
     }["AuthProvider.useMemo[isAuthenticated]"], [
@@ -524,54 +533,51 @@ function AuthProvider({ children }) {
         user,
         laravelAuthenticated
     ]);
-    const isLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+    /**
+   * 💡 ローディング状態の計算 (BackendUserのロードまで待つ)
+   */ const isLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AuthProvider.useMemo[isLoading]": ()=>{
-            const loading = !isReady || !initialCheckComplete;
-            console.log(`[AUTH STATE] isLoading computed: ${loading}. (isReady: ${isReady}, initialCheckComplete: ${initialCheckComplete})`);
+            const loading = !isReady || !initialCheckComplete || isBackendUserLoading;
             return loading;
         }
     }["AuthProvider.useMemo[isLoading]"], [
         isReady,
-        initialCheckComplete
+        initialCheckComplete,
+        isBackendUserLoading
     ]);
-    // --- 認証アクション (省略) ---
-    // Login (省略)
-    const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    // --- D. 認証アクション ---
+    /**
+   * 💡 ログイン処理のオーケストレーション
+   */ const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[login]": async ({ email, password, name })=>{
             if (!auth) throw new Error("Auth service unavailable.");
-            // 1. CSRF Cookie を取得 (ログイン前に必ず)
             await fetchCsrfCookie();
-            // 2. Firebase ログイン
             const userCredential = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
-            console.log("[Firebase] Sign-in successful. Proceeding to Sanctum...");
-            // 3. IDトークンを取得し、Laravel側にセッションを確立
             const idToken = await userCredential.user.getIdToken();
-            // ★ トークンを即座にステートに設定
             setToken(idToken);
-            // ログインリクエストはトークンを設定した後に行う
-            const { user: backendUser } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["completeLaravelLogin"])(idToken, name);
-            // 4. メール認証が必要な場合のみリダイレクト
-            if (!backendUser.email_verified_at) {
+            // Laravel側で認証セッションを確立し、ユーザー情報を取得
+            const { user: newBackendUser } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["completeLaravelLogin"])(idToken, name);
+            setBackendUser(newBackendUser);
+            if (!newBackendUser.email_verified_at) {
                 router.push("/email/verify");
             }
-        // 成功時 (メール認証不要) は、LoginPage.tsxがリダイレクトを制御する
         }
     }["AuthProvider.useCallback[login]"], [
         auth,
         fetchCsrfCookie,
         router
     ]);
-    // Logout (省略)
-    const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    /**
+   * 💡 ログアウト処理
+   */ const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[logout]": async (redirectPath = "/")=>{
             if (!auth) return;
             setIsLoggingOut(true);
             try {
-                // Laravel側セッションの破棄（明示的なAPIコールが最善だが、ここではFirebase側のみ）
-                // Firebaseからのサインアウト
                 await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["signOut"])(auth);
-                // トークンをクリア
                 setToken(null);
+                setUser(null);
+                setBackendUser(null);
                 router.push(redirectPath);
             } catch (e) {
                 console.error("Logout failed:", e);
@@ -583,16 +589,20 @@ function AuthProvider({ children }) {
         auth,
         router
     ]);
-    // reloadAuthToken (省略)
-    const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    /**
+   * 💡 トークン失効時のリカバリー
+   * BackendUserの最新情報を返す
+   */ const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[reloadAuthToken]": async ()=>{
             if (user) {
-                console.log("[Firebase] Forcing ID Token refresh...");
                 try {
                     const idToken = await user.getIdToken(true);
-                    setToken(idToken); // ステート更新により、apiClientが再生成される
-                    // リフレッシュされたトークンでLaravelセッションを再確立
-                    await (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["completeLaravelLogin"])(idToken);
+                    setToken(idToken);
+                    // Laravelセッションも更新し、ユーザー情報を取得
+                    const { user: refreshedBackendUser } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useLaravelSession$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["completeLaravelLogin"])(idToken);
+                    setBackendUser(refreshedBackendUser);
+                    // 💡 修正点: BackendUser型の値を返す
+                    return refreshedBackendUser;
                 } catch (error) {
                     console.error("[Firebase] Failed to refresh ID Token:", error);
                     throw error;
@@ -604,11 +614,13 @@ function AuthProvider({ children }) {
     }["AuthProvider.useCallback[reloadAuthToken]"], [
         user
     ]);
+    // --- E. Context Provider ---
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
         value: {
             user,
             auth,
             userId,
+            backendUser,
             isAuthenticated,
             isLoading,
             isLoggingOut,
@@ -616,16 +628,17 @@ function AuthProvider({ children }) {
             apiClient,
             login,
             logout,
-            reloadAuthToken
+            reloadAuthToken,
+            setBackendUserStatus
         },
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useAuth.tsx",
-        lineNumber: 273,
+        lineNumber: 307,
         columnNumber: 5
     }, this);
 }
-_s(AuthProvider, "CNF9Y8byVfgiOE/lBNFbVxTM2Gw=", false, function() {
+_s(AuthProvider, "/8lRm+lw0ta3SYuTbPpx7m+v5Wk=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useFirebaseInit$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useFirebaseInit"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
@@ -633,28 +646,25 @@ _s(AuthProvider, "CNF9Y8byVfgiOE/lBNFbVxTM2Gw=", false, function() {
     ];
 });
 _c = AuthProvider;
-const useApiClient = ()=>{
+const useAuth = ()=>{
     _s1();
     const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
-    if (!ctx || !ctx.apiClient) {
-        // 認証情報がないか、認証済みクライアントがまだ準備できていない（トークンがない）
-        // このエラーは、認証が必要なページで api が null の場合に発生します。
-        // その場合、ページ側で isLoading や isAuthenticated をチェックする必要があります。
-        // ★ 認証なしでもアクセスできるAPIにはグローバルAxiosを使用し、
-        // 認証が必要なAPIには apiClient を使用するようにフロントエンドのコードを修正する必要があります。
-        throw new Error("Authenticated API client is not available. Ensure you are within AuthProvider and the user is authenticated.");
+    if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+    return ctx;
+};
+_s1(useAuth, "/dMy7t63NXD4eYACoT93CePwGrg=");
+const useApiClient = ()=>{
+    _s2();
+    const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
+    if (!ctx) {
+        throw new Error("useApiClient must be used within AuthProvider");
+    }
+    if (!ctx.apiClient) {
+        throw new Error("Authenticated API client is not available. Check if the user is authenticated and loading is complete.");
     }
     return ctx.apiClient;
 };
-_s1(useApiClient, "/dMy7t63NXD4eYACoT93CePwGrg=");
-const useAuth = ()=>{
-    _s2();
-    const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
-    if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-    // apiClient を提供する useAuth フック（既存のものを保持）
-    return ctx;
-};
-_s2(useAuth, "/dMy7t63NXD4eYACoT93CePwGrg=");
+_s2(useApiClient, "/dMy7t63NXD4eYACoT93CePwGrg=");
 var _c;
 __turbopack_context__.k.register(_c, "AuthProvider");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
@@ -680,7 +690,7 @@ function Providers({ children }) {
     }, void 0, false, {
         fileName: "[project]/components/Providers.tsx",
         lineNumber: 13,
-        columnNumber: 10
+        columnNumber: 12
     }, this);
 }
 _c = Providers;

@@ -8,14 +8,12 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // Next.jsのカスタム認証フックのパスを調整してください
-import { useApi } from "@/hooks/useApi"; // 認証済みリクエスト用カスタムフックのパスを調整してください
+import { useAuth } from "@/hooks/useAuth"; // 認証と認証済みAxiosクライアントの提供元
 
 // =======================================================
-// 型定義
+// 型定義 (TypeScript の整合性を高める)
 // =======================================================
 
-// User interface, assuming it matches the backend model
 interface User {
   id: number;
   name: string;
@@ -28,11 +26,10 @@ interface User {
   user_image?: string | null;
 }
 
-// useApiのupdateProfile/uploadImageが返す応答型（Userと同じ構造を想定）
 interface UpdatedUserResponse extends User {}
 
 // =======================================================
-// Next.js クライアントコンポーネント
+// グローバル変数・ヘルパー関数
 // =======================================================
 
 // 環境変数からAPIベースURLを取得
@@ -42,38 +39,38 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * プロフィール画像のURLを生成するヘルパー関数
  */
 const getProfileImageUrl = (path: string | undefined | null): string => {
-  let base = API_BASE_URL;
+  const base = API_BASE_URL;
   const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
   const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
 
   if (!path) {
     return DEFAULT_IMAGE_FULL_URL;
   }
-
-  // pathがHTTPから始まっていればそのまま返す（フルURLの場合）
   if (path.startsWith("http")) {
     return path;
   }
-
-  // 相対パスの場合はベースURLを付与
   return `${base}/${path.replace(/^\//, "")}`;
 };
+
+// =======================================================
+// メインコンポーネント: ProfilePage
+// =======================================================
 
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 1. 認証フック: ユーザー状態とAPIクライアントを取得
   const {
     user: authUser,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
-    reloadAuthToken, // トークン強制リフレッシュ関数
+    reloadAuthToken, // 401リカバリー用
+    apiClient, // 認証済み Axios インスタンス
   } = useAuth();
 
-  // useApiは通常、Firebase IDトークンをヘッダーに付けてAPIをコールする
-  const { authenticatedFetch, updateProfile, uploadImage } = useApi();
-
+  // -------------------- State --------------------
   const [user, setUser] = useState<User | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -85,13 +82,14 @@ export default function ProfilePage() {
   const [profileErrors, setProfileErrors] = useState<any>({});
   const [imageError, setImageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true); // APIフェッチ中のローディング (全体)
-  const [isFetching, setIsFetching] = useState(false); // データ取得中のローディング (フェッチ専用)
 
-  // 401エラーからのリカバリー中を示す状態
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // UI全体のローディング
+  const [isFetching, setIsFetching] = useState(false); // データ取得中の状態
+  const [isRecovering, setIsRecovering] = useState(false); // 401リカバリー中
 
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // -------------------- Computed Value (useMemo) --------------------
 
   // URLクエリパラメータからメール認証状態を取得
   const isVerificationRedirect = useMemo(() => {
@@ -103,11 +101,12 @@ export default function ProfilePage() {
   // ----------------------------------------------------------------
 
   /**
-   * APIから取得したユーザーデータでフォームと状態を初期化する
+   * APIから取得したユーザーデータでフォームと状態を初期化する。
    */
   const initializeUserData = useCallback((apiData: any) => {
     let sourceData: User | null = null;
 
+    // APIレスポンスの構造をチェック
     if (apiData && apiData.user) {
       sourceData = apiData.user as User;
     } else if (apiData && apiData.id && apiData.name) {
@@ -115,9 +114,9 @@ export default function ProfilePage() {
     }
 
     setUser((current) => {
-      // 無限ループを防ぐため、データが実際に変更されているかチェック
+      // データの変更がなければステート更新をスキップ
       if (JSON.stringify(current) !== JSON.stringify(sourceData)) {
-        console.log("✅ [InitData] user State を更新しました。", sourceData);
+        console.log("✅ [InitData] user State を更新しました。");
         return sourceData;
       }
       return current;
@@ -134,68 +133,67 @@ export default function ProfilePage() {
   }, []);
 
   // ----------------------------------------------------------------
-  // 2. データ取得ロジック (リカバリー処理を強化)
+  // 2. データ取得ロジック (401リカバリー処理を含む)
   // ----------------------------------------------------------------
 
+  /**
+   * サーバーからプロフィールデータを取得する関数。401エラー時にトークンリフレッシュを試みる。
+   */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
-      // 初回呼び出し時に、既にフェッチ中または認証解決待ちの場合はスキップ
-      if (!isRetry && isFetching) return;
-      if (isAuthLoading) return;
+      if (!apiClient) return;
 
-      // フェッチ開始 (初回呼び出し時のみ isFetching を設定)
-      if (!isRetry) setIsFetching(true);
+      if (!isRetry) setIsFetching(true); // 初回試行時のみフェッチ中フラグを立てる
 
       try {
-        // サーバーから最新のユーザーデータをフェッチ
-        const response: any = await authenticatedFetch("/mypage/profile");
+        const response = await apiClient.get("/api/mypage/profile");
+        const responseData = response.data;
 
-        // 最新のサーバーデータで更新
-        initializeUserData(response);
+        // ★★★ デバッグログ追加: APIレスポンスの確認 ★★★
+        console.log("API Response Data:", responseData);
+        // ★★★ ログ終わり ★★★
 
-        console.log(
-          "✅ [Fetch] プロフィールデータ取得に成功。ユーザーデータを初期化しました。"
-        );
+        initializeUserData(responseData);
+        console.log("✅ [Fetch] プロフィールデータ取得に成功。");
 
-        // メール認証成功後のメッセージ表示
         if (isVerificationRedirect) {
           setSuccessMessage(
             "メール認証が完了しました！引き続きサービスをご利用いただけます。"
           );
         }
 
-        // 再試行が成功した場合は、リカバリー状態を解除
         if (isRetry) {
           setIsRecovering(false);
+          setSuccessMessage("認証情報を回復し、データを再取得しました。");
         }
+
+        // ★★★ 修正: 成功時にローディングを解除する ★★★
+        setIsLoading(false);
       } catch (err: any) {
         console.error("プロフィールデータのロードに失敗しました:", err);
-        const status = err.status || (err.response && err.response.status);
+        // ★★★ デバッグログ追加: エラー詳細ログ ★★★
+        console.error("Fetch Error Details:", err);
+        // ★★★ ログ終わり ★★★
+
+        const status = err.response ? err.response.status : null;
 
         if (status === 401) {
-          // 既に再試行して再度401なら、無限ループを防ぐためログアウト
           if (isRetry) {
             console.error(
               "401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。"
             );
-            // ログアウト処理が完了したら、この処理は終了
             await logout();
             return;
           }
 
           console.log(`401エラーを検出。トークンリフレッシュを試行...`);
           setSuccessMessage("認証情報を更新中...");
-
-          // リカバリー開始
           setIsRecovering(true);
 
           try {
-            // 認証回復ロジック
-            await reloadAuthToken(); // トークンを強制リフレッシュ
+            await reloadAuthToken();
             setSuccessMessage("認証情報を更新しました。データを再取得します。");
-
-            // 重要な修正: トークンリフレッシュ成功後、自身を再帰的に呼び出して再試行
-            await fetchUserProfile(true); // isRetry=true で再試行
+            await fetchUserProfile(true);
           } catch (reloadError) {
             console.error(
               "トークンのリロードに失敗。ログアウトします。",
@@ -205,82 +203,79 @@ export default function ProfilePage() {
             setSuccessMessage(
               "セッションが切れました。再度ログインが必要です。"
             );
-          } finally {
-            // 再帰呼び出しが完了しても、成功時は内部で isRecovering(false) になるため、
-            // ここで設定するとリカバリー失敗時のみとなる。
-            // ★重要な変更点: 成功時は tryブロック内部で isRecovering(false) を呼ぶため、
-            // ここでは失敗時、または再帰後のクリーンアップは不要。
           }
-        } else {
-          // 401以外のエラー
-          setSuccessMessage(
-            `データのロード中に予期せぬエラーが発生しました。(Status: ${
-              status || "不明"
-            })`
-          );
+          return;
         }
+
+        // 401以外のエラー
+        setSuccessMessage(
+          `データのロード中に予期せぬエラーが発生しました。(Status: ${
+            status || "不明"
+          })`
+        );
+
+        // ★★★ 修正: エラーが発生した場合も、ロード状態を解除してエラーメッセージを表示できるようにする ★★★
+        setIsLoading(false);
       } finally {
-        // 初回呼び出しが終了した時のみ isFetching をリセットする
-        // 再帰呼び出し (isRetry=true) が成功した場合、このブロックは実行されない
-        // (再帰呼び出しが成功し、親の try ブロックを抜けるため)
         if (!isRetry) {
           setIsFetching(false);
-          // 2回目の API Callが401エラーで失敗し、ログアウトした場合、
-          // 初回呼び出しの finally が実行されるが、その時には既にログアウト処理がされているため問題なし。
         }
       }
     },
-    // useCallbackの依存配列
     [
-      authenticatedFetch,
+      apiClient,
       initializeUserData,
       logout,
       isVerificationRedirect,
       reloadAuthToken,
-      isFetching, // 初回呼び出し時のガード
-      isAuthLoading,
     ]
   );
 
   // ----------------------------------------------------------------
-  // 3. 認証状態とデータフェッチの監視
+  // 3. 認証状態とデータフェッチの監視 (useEffect)
   // ----------------------------------------------------------------
 
-  // 認証状態に応じたデータフェッチとリダイレクト
   useEffect(() => {
     // 1. 認証解決待ち、またはリカバリー中の場合はスキップ
     if (isAuthLoading || isRecovering) return;
 
     // 2. 未認証の場合はログインへリダイレクト
     if (!isAuthenticated) {
-      // 認証リダイレクト中（?verified=true）は、セッション解決を待つ
       if (isVerificationRedirect) {
-        console.log(
-          "Verification redirect detected. Waiting for useLaravelSession to resolve session."
-        );
+        console.log("Waiting for session resolve.");
         return;
       }
-
       console.log("Unauthenticated detected. Redirecting to /login.");
-      // ログアウト処理が完了していない場合は強制リダイレクト
       if (authUser === null) {
         router.replace("/login");
       }
       return;
     }
 
-    // 3. 認証済みだがユーザーデータがまだロードされていない場合、データフェッチを実行
-    // isFetching で現在ロード中かチェックし、重複実行を防ぐ
-    if (isAuthenticated && !user && !isFetching) {
-      console.log("Authenticated but user data is missing. Fetching profile.");
-      // setIsLoading(true) はレンダリングブロック時に設定されているため、ここでは省略
+    // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
+    if (isAuthenticated && apiClient && !user && !isFetching) {
+      console.log("Authenticated and client ready. Fetching profile.");
+      // ★★★ デバッグログ追加 ★★★
+      console.log(
+        `[DEBUG] Step 3: isAuthenticated: ${isAuthenticated}, user: ${!!user}, isFetching: ${isFetching}, isLoading: ${isLoading}`
+      );
+      // ★★★ ログ終わり ★★★
       fetchUserProfile(false); // 初回フェッチ
       return;
     }
 
-    // 4. データがロード済みで認証済みであれば、ローディングを解除して終了
+    // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
     if (user && isAuthenticated) {
-      setIsLoading(false);
+      // ★★★ デバッグログ追加 ★★★
+      console.log(
+        `[DEBUG] Step 4: User loaded. isAuthenticated: ${isAuthenticated}, user: ${!!user}, isLoading: ${isLoading}`
+      );
+      // ★★★ ログ終わり ★★★
+
+      // メール認証リダイレクトのクエリパラメータをクリーンアップ
+      if (isVerificationRedirect) {
+        router.replace("/mypage/profile");
+      }
       return;
     }
   }, [
@@ -289,10 +284,11 @@ export default function ProfilePage() {
     router,
     fetchUserProfile,
     user,
-    isFetching,
     isVerificationRedirect,
-    isRecovering, // リカバリー状態の変化を監視
+    isRecovering,
     authUser,
+    apiClient,
+    // isLoading, // ★★★ 再発防止のため削除済み ★★★
   ]);
 
   // ----------------------------------------------------------------
@@ -302,7 +298,7 @@ export default function ProfilePage() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user || !apiClient) return;
 
     setImageError("");
     setSuccessMessage("");
@@ -312,27 +308,27 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      const updatedUser: UpdatedUserResponse = await uploadImage(
-        formData,
-        "/upload2"
-      );
+      // apiClient.post で画像アップロード
+      const response = await apiClient.post("/upload2", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const updatedUser: UpdatedUserResponse = response.data;
 
       setUser(updatedUser as User);
-
       setSuccessMessage("画像をアップロードしました。");
     } catch (error: any) {
       console.error("【ERROR】画像アップロードに失敗しました:", error);
-      const status = error.status || (error.response && error.response.status);
+      const status = error.response ? error.response.status : null;
 
       if (status === 401) {
-        // 画像アップロードの401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
-        // ここでのリカバリーロジックの実装は一旦見送り
         await logout();
         return;
       }
 
-      if (error.response && error.response.status === 422) {
-        // エラーレスポンスの構造に応じて修正
+      if (status === 422) {
         setImageError(
           error.response.data?.errors?.user_image?.[0] || "無効なファイルです。"
         );
@@ -356,32 +352,30 @@ export default function ProfilePage() {
     e.preventDefault();
     setProfileErrors({});
     setSuccessMessage("");
-    if (!user) return;
+    if (!user || !apiClient) return;
     setIsLoading(true);
 
     try {
-      const updatedUser: UpdatedUserResponse = await updateProfile(form);
+      // apiClient.put でプロフィール情報更新
+      const response = await apiClient.put("/mypage/profile", form);
+
+      const updatedUser: UpdatedUserResponse = response.data;
 
       setSuccessMessage("プロフィール情報を更新しました！");
-
       initializeUserData(updatedUser);
     } catch (error: any) {
-      const statusCode =
-        error.status || (error.response ? error.response.status : "不明");
+      const statusCode = error.response ? error.response.status : "不明";
       console.error(
         `【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`,
         error
       );
 
       if (statusCode === 401) {
-        // 更新時の401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
-        // ここでのリカバリーロジックの実装は一旦見送り
         await logout();
         return;
       }
 
-      if (error.response && error.response.status === 422) {
-        // エラーレスポンスの構造に応じて修正
+      if (statusCode === 422) {
         setProfileErrors(error.response.data.errors);
       } else {
         setSuccessMessage(
@@ -394,7 +388,7 @@ export default function ProfilePage() {
   };
 
   // ----------------------------------------------------------------
-  // 6. ローディング・未認証時の表示
+  // 6. ローディング・未認証時の表示 (レンダリングブロック)
   // ----------------------------------------------------------------
 
   // 認証解決待ち、APIロード中、またはリカバリー中の全体ローディング
@@ -408,7 +402,7 @@ export default function ProfilePage() {
             {isAuthLoading
               ? "認証状態を確認中 / セッションを再確立中..."
               : isRecovering
-              ? "認証情報を回復中です..." // リカバリー中のメッセージ
+              ? "⚠️ 認証情報を回復中です..."
               : "データをロード中です..."}
           </p>
         </div>
@@ -416,7 +410,7 @@ export default function ProfilePage() {
     );
   }
 
-  // 認証が完了したがユーザーデータがない場合 (fetchで失敗した場合など)
+  // 認証が完了したがユーザーデータがない場合
   if (!isAuthenticated || !user) {
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
@@ -434,11 +428,10 @@ export default function ProfilePage() {
   }
 
   // ----------------------------------------------------------------
-  // 7. レンダリング
+  // 7. メインレンダリング (UI)
   // ----------------------------------------------------------------
 
   return (
-    // authUser?.uid をキーに使用し、ユーザーが変わった場合に強制再描画
     <div
       className="login_page max-w-[1400px] mx-auto pt-5 pb-10"
       key={authUser?.uid || "unauthenticated"}
@@ -446,18 +439,16 @@ export default function ProfilePage() {
       <h2 className="title">プロフィール設定</h2>
 
       <div className="form-wrapper">
-        {/* 成功メッセージの表示 (元のCSSでは .alert-success2) */}
         {successMessage && (
           <div className="alert-success2">{successMessage}</div>
         )}
 
-        {/* 画像アップロードフォーム */}
+        {/* --- 画像アップロードフォーム --- */}
         <form
           onSubmit={(e) => e.preventDefault()}
           className="item_sell_contents_box_line"
         >
           <div className="image_name">
-            {/* 画像とボタンを横並びにするラッパー */}
             <div className="image_button_row">
               <img
                 src={getProfileImageUrl(user.user_image)}
@@ -485,7 +476,7 @@ export default function ProfilePage() {
           <div className="user_image_error_message">{imageError}</div>
         </form>
 
-        {/* プロフィール情報更新フォーム */}
+        {/* --- プロフィール情報更新フォーム --- */}
         <form onSubmit={handleProfileUpdate}>
           {/* ユーザー名 */}
           <div className="form-group">
@@ -581,32 +572,21 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      {/* Vueの <style scoped> を Tailwind CSSと組み合わせて再現 */}
+      {/* --- スタイル定義 (変更なし) --- */}
       <style jsx>{`
-        /*
-        |--------------------------------------------------------------------------
-        | スコープ付きCSS (元のCSSの99%再現を目指す)
-        |--------------------------------------------------------------------------
-        */
-
-        /* -------------------- 共通コンテナ -------------------- */
         .login_page {
           text-align: center;
         }
-
         .title {
           font-size: 2rem;
           font-weight: bold;
           margin-bottom: 2rem;
           color: #4f46e5;
         }
-
         .form-wrapper {
           display: inline-block;
           text-align: center;
         }
-
-        /* -------------------- メッセージ・エラー -------------------- */
         .alert-success2 {
           background-color: #d1fae5;
           color: #065f46;
@@ -615,7 +595,6 @@ export default function ProfilePage() {
           margin-bottom: 1.5rem;
           border: 1px solid #34d399;
         }
-
         .profile__error,
         .user_image_error_message {
           color: #ff5555;
@@ -628,21 +607,16 @@ export default function ProfilePage() {
           margin-left: auto;
           margin-right: auto;
         }
-
         .user_image_error_message {
           text-align: center;
           position: relative;
           bottom: 20px;
         }
-
-        /* -------------------- 画像アップロード (横並び調整) -------------------- */
-
         .item_sell_contents_box_line {
           display: block;
           padding-bottom: 0;
           margin-bottom: 0;
         }
-
         .image_name {
           display: flex;
           justify-content: center;
@@ -651,17 +625,13 @@ export default function ProfilePage() {
           padding-bottom: 60px;
           position: relative;
         }
-
-        /* 横並びを実現する新しいラッパー */
         .image_button_row {
           display: flex;
           align-items: center;
           gap: 30px;
-
           position: relative;
           right: 50px;
         }
-
         .user_image_css {
           width: 100px;
           height: 100px;
@@ -671,11 +641,9 @@ export default function ProfilePage() {
           object-position: center;
           position: static;
         }
-
         .upload_submit {
           position: static;
           margin: 0;
-
           color: #ff5555;
           font-weight: 700;
           background-color: white;
@@ -685,15 +653,11 @@ export default function ProfilePage() {
           cursor: pointer;
           white-space: nowrap;
         }
-
-        /* -------------------- フォーム要素 -------------------- */
-
         .form-group {
           width: 400px;
           margin: 0 auto;
           text-align: center;
         }
-
         .label_form_1,
         .label_form_2,
         .label_form_3,
@@ -704,7 +668,6 @@ export default function ProfilePage() {
           position: relative;
           left: 0;
         }
-
         .label_form_2 {
           margin-top: 30px;
         }
@@ -714,7 +677,6 @@ export default function ProfilePage() {
         .label_form_4 {
           margin-top: 30px;
         }
-
         .name_form,
         .email_form,
         .password_form {
@@ -722,21 +684,18 @@ export default function ProfilePage() {
           height: 30px;
           box-sizing: border-box;
           padding: 0 10px;
-          margin-bottom: 10px; /* profile__errorとのスペースを確保するため調整 */
+          margin-bottom: 10px;
           border: 1px solid #d1d5db;
           border-radius: 3px;
         }
-
-        /* -------------------- 送信ボタン -------------------- */
         .submit {
           margin-top: 10px;
         }
-
         .submit_form {
           position: relative;
           top: 20px;
           width: 400px;
-          height: 40px; /* 高さを少し大きくして押しやすく */
+          height: 40px;
           margin: 30px auto;
           background-color: #ff5555;
           border: #ff5555;
@@ -746,7 +705,6 @@ export default function ProfilePage() {
           border-radius: 5px;
           transition: background-color 0.1s;
         }
-
         .submit_form:hover {
           background-color: #e54c4c;
         }

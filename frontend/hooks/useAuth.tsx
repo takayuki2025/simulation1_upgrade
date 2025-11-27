@@ -9,10 +9,15 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+// 認証ロジックのコア: Firebase Authentication SDK
 import { Auth, User, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import axios, { AxiosInstance } from "axios"; // AxiosInstanceをインポート
+// ネットワーク通信ライブラリ: Axios
+import axios, { AxiosInstance } from "axios";
+// 外部の依存フック (Firebase初期化と設定)
 import { useFirebaseInit } from "@/hooks/useFirebaseInit";
+// Next.jsのルーター (リダイレクト処理に利用)
 import { useRouter } from "next/navigation";
+// 外部の依存フック (Laravelセッション管理ロジック)
 import {
   useLaravelSession,
   completeLaravelLogin,
@@ -21,44 +26,69 @@ import {
 // --- 設定 ---
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-// --- 型定義 ---
+// =======================================================
+// I. 型定義とContextの初期化
+// =======================================================
+
+/**
+ * ★重要: useLaravelSession.ts の BackendUser と同一である必要があります
+ */
+interface BackendUser {
+  id: number;
+  name: string;      
+  email: string;     
+  email_verified_at: string | null;
+  // ... その他のユーザープロパティ ...
+}
+
 export interface AuthContextType {
   user: User | null;
   auth: Auth | null;
   userId: string | null;
+  backendUser: BackendUser | null; // Laravelから取得した完全なユーザーデータ
   isAuthenticated: boolean;
-  isLoading: boolean;
+  isLoading: boolean; // Firebase, Laravelセッション, BackendUserロードの全てを含む
   isLoggingOut: boolean;
   token: string | null;
-  apiClient: AxiosInstance | null; // ★ 追加: 認証済みAxiosインスタンス
+  apiClient: AxiosInstance | null;
   login: (credentials: {
     email: string;
     password: string;
     name?: string;
   }) => Promise<void>;
+  
+  // 💡 修正: 戻り値を Promise<void> から Promise<BackendUser> に変更
   logout: (redirectPath?: string) => Promise<void>;
-  reloadAuthToken: () => Promise<void>;
+  reloadAuthToken: () => Promise<BackendUser>; 
+  
+  // ★追加: 外部から backendUser を更新するための関数
+  setBackendUserStatus: (user: BackendUser | null) => void; 
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// --- Auth Provider コンポーネント ---
+// =======================================================
+// II. Auth Provider コンポーネント (状態管理のコア)
+// =======================================================
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { auth, userId, isReady } = useFirebaseInit();
   const router = useRouter();
 
+  // 内部状態
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
+  // Laravelユーザーのロード状態をトラッキング
+  const [isBackendUserLoading, setIsBackendUserLoading] = useState(false);
 
-  // --- Laravel/Sanctum 関連のヘルパー関数 ---
+  // --- A. Laravel/Sanctum 連携ヘルパー (変更なし) ---
   const fetchCsrfCookie = useCallback(async () => {
     if (!API_BASE_URL) return;
     try {
-      // Axiosのグローバル設定が withCredentials=true であることを保証
       axios.defaults.withCredentials = true;
       await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`);
-      console.log("[Sanctum] CSRF cookie fetched.");
     } catch (error) {
       console.error("[Sanctum] Failed to fetch CSRF cookie:", error);
     }
@@ -66,88 +96,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkLaravelSession = useCallback(async () => {
     try {
-      // グローバルAxiosを使用してセッションチェック（Authorizationヘッダーは不要）
       const res = await axios.get(`${API_BASE_URL}/api/auth/check`);
       return res.data;
     } catch {
       return { authenticated: false };
     }
   }, []);
-  // --------------------------------------------------
 
-  // 外部フックの利用
   const { laravelAuthenticated, initialCheckComplete } = useLaravelSession(
     user,
     auth,
     checkLaravelSession
   );
 
-  // --- 状態監視 useEffect ---
+  // --- B. 状態監視と同期 (useEffect) ---
 
-  // 1. Firebase user 変化 → token 更新
+  /**
+   * 責務 1: Firebaseの認証状態変更の監視とBackendUserのロード
+   */
   useEffect(() => {
     if (!auth || !isReady) return;
 
-    // onAuthStateChangedはコンポーネントがマウントされている限りアクティブ
     const unsub = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
+      
       if (currentUser) {
+        setIsBackendUserLoading(true); // ★ロード開始
         try {
-          // トークン取得を試行
           const idToken = await currentUser.getIdToken();
           setToken(idToken);
+          
+          // IDトークンがあれば、Laravelからプロフィールをロード
+          if (idToken) {
+            try {
+                // LaravelのプロフィールAPIを叩き、最新のユーザー情報を取得
+                const profileRes = await axios.get(
+                    `${API_BASE_URL}/api/mypage/profile`,
+                    { headers: { Authorization: `Bearer ${idToken}` } }
+                );
+                // 型アサーションは、useLaravelSession.ts の BackendUser 型と一致しているため安全
+                setBackendUser(profileRes.data.user as BackendUser); 
+            } catch (profileError) {
+                console.warn("[Profile] Failed to load backend user profile:", profileError);
+                setBackendUser(null); 
+            }
+          }
         } catch (error) {
           console.error("[Firebase] Failed to get ID Token:", error);
           setToken(null);
+          setBackendUser(null);
+        } finally {
+            setIsBackendUserLoading(false); // ★ロード完了
         }
       } else {
         setToken(null);
+        setBackendUser(null);
       }
     });
 
     return () => unsub();
   }, [auth, isReady]);
 
-  // 2. 初回 CSRF Cookie 取得 (リロード時にセッション確立のために必要)
+  /**
+   * 責務 2 & 3: CSRF Cookieの初回取得と apiClient の生成 (変更なし)
+   */
   useEffect(() => {
-    // 💡 リロード時にすぐ実行されるように、このフックは残します。
     fetchCsrfCookie();
   }, [fetchCsrfCookie]);
 
-  // 3. 🚨 削除: グローバルな axios.defaults の設定は削除し、カスタムインスタンスに移行します。
-  // 以前のロジック:
-  /*
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      console.log("[Axios Config] Set Authorization header with new token.");
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-      console.log("[Axios Config] Cleared Authorization header.");
-    }
-  }, [token]);
-  */
-
-  // 4. グローバルな withCredentials 設定は CSRF 取得時に移し、ここでは削除
-  // 以前のロジック:
-  /*
-  useEffect(() => {
-      axios.defaults.withCredentials = true;
-  }, []);
-  */
-
-  // --- カスタム Axios インスタンスの生成 ---
   const apiClient = useMemo(() => {
     if (!token) {
-      console.log("[API Client] Token is missing. Returning null client.");
       return null;
     }
-
-    console.log(
-      "[API Client] Creating new Axios instance with Authorization header."
-    );
-
-    // ★ トークンが存在するときのみカスタムインスタンスを生成
     const instance = axios.create({
       baseURL: API_BASE_URL,
       withCredentials: true,
@@ -159,32 +179,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return instance;
   }, [token]);
+  
+  // ★外部公開用の setBackendUser ラッパー関数 (メール認証後の即時更新用)
+  const setBackendUserStatus = useCallback((user: BackendUser | null) => {
+      setBackendUser(user);
+  }, []);
 
-  // --- useMemo で状態を集約 (省略) ---
+  // --- C. 状態の計算 (useMemo) ---
 
+  /**
+   * 💡 最終的な認証状態の計算 (二重認証チェック)
+   */
   const isAuthenticated = useMemo(() => {
     const isAuth =
-      initialCheckComplete &&
-      !!user &&
-      !user.isAnonymous &&
-      laravelAuthenticated === true;
-    console.log(
-      `[AUTH STATE] isAuthenticated computed: ${isAuth}. (initialCheckComplete: ${initialCheckComplete}, laravelAuthenticated: ${laravelAuthenticated}, user present: ${!!user})`
-    );
+      initialCheckComplete && 
+      !!user && 
+      !user.isAnonymous && 
+      laravelAuthenticated === true; 
     return isAuth;
   }, [initialCheckComplete, user, laravelAuthenticated]);
 
+  /**
+   * 💡 ローディング状態の計算 (BackendUserのロードまで待つ)
+   */
   const isLoading = useMemo(() => {
-    const loading = !isReady || !initialCheckComplete;
-    console.log(
-      `[AUTH STATE] isLoading computed: ${loading}. (isReady: ${isReady}, initialCheckComplete: ${initialCheckComplete})`
-    );
+    const loading = !isReady || !initialCheckComplete || isBackendUserLoading;
     return loading;
-  }, [isReady, initialCheckComplete]);
+  }, [isReady, initialCheckComplete, isBackendUserLoading]);
 
-  // --- 認証アクション (省略) ---
+  // --- D. 認証アクション ---
 
-  // Login (省略)
+  /**
+   * 💡 ログイン処理のオーケストレーション
+   */
   const login = useCallback(
     async ({
       email,
@@ -197,49 +224,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       if (!auth) throw new Error("Auth service unavailable.");
 
-      // 1. CSRF Cookie を取得 (ログイン前に必ず)
       await fetchCsrfCookie();
-
-      // 2. Firebase ログイン
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
         password
       );
-
-      console.log("[Firebase] Sign-in successful. Proceeding to Sanctum...");
-
-      // 3. IDトークンを取得し、Laravel側にセッションを確立
       const idToken = await userCredential.user.getIdToken();
 
-      // ★ トークンを即座にステートに設定
       setToken(idToken);
 
-      // ログインリクエストはトークンを設定した後に行う
-      const { user: backendUser } = await completeLaravelLogin(idToken, name);
+      // Laravel側で認証セッションを確立し、ユーザー情報を取得
+      const { user: newBackendUser } = await completeLaravelLogin(
+        idToken,
+        name
+      );
 
-      // 4. メール認証が必要な場合のみリダイレクト
-      if (!backendUser.email_verified_at) {
+      setBackendUser(newBackendUser);
+
+      if (!newBackendUser.email_verified_at) {
         router.push("/email/verify");
       }
-      // 成功時 (メール認証不要) は、LoginPage.tsxがリダイレクトを制御する
     },
     [auth, fetchCsrfCookie, router]
   );
 
-  // Logout (省略)
+  /**
+   * 💡 ログアウト処理
+   */
   const logout = useCallback(
     async (redirectPath = "/") => {
       if (!auth) return;
 
       setIsLoggingOut(true);
       try {
-        // Laravel側セッションの破棄（明示的なAPIコールが最善だが、ここではFirebase側のみ）
-        // Firebaseからのサインアウト
         await signOut(auth);
 
-        // トークンをクリア
         setToken(null);
+        setUser(null);
+        setBackendUser(null); 
 
         router.push(redirectPath);
       } catch (e) {
@@ -251,15 +274,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [auth, router]
   );
 
-  // reloadAuthToken (省略)
+  /**
+   * 💡 トークン失効時のリカバリー
+   * BackendUserの最新情報を返す
+   */
   const reloadAuthToken = useCallback(async () => {
     if (user) {
-      console.log("[Firebase] Forcing ID Token refresh...");
       try {
         const idToken = await user.getIdToken(true);
-        setToken(idToken); // ステート更新により、apiClientが再生成される
-        // リフレッシュされたトークンでLaravelセッションを再確立
-        await completeLaravelLogin(idToken);
+        setToken(idToken);
+
+        // Laravelセッションも更新し、ユーザー情報を取得
+        const { user: refreshedBackendUser } = await completeLaravelLogin(
+          idToken
+        );
+
+        setBackendUser(refreshedBackendUser);
+        // 💡 修正点: BackendUser型の値を返す
+        return refreshedBackendUser as BackendUser; 
       } catch (error) {
         console.error("[Firebase] Failed to refresh ID Token:", error);
         throw error;
@@ -269,20 +301,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  // --- E. Context Provider ---
+
   return (
     <AuthContext.Provider
       value={{
         user,
         auth,
         userId,
+        backendUser,
         isAuthenticated,
         isLoading,
         isLoggingOut,
         token,
-        apiClient, // ★ カスタムインスタンスを提供
+        apiClient,
         login,
         logout,
         reloadAuthToken,
+        setBackendUserStatus, 
       }}
     >
       {children}
@@ -290,25 +326,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// アプリケーション内の他の場所で認証済みAxiosクライアントを使用するためのカスタムフック
-export const useApiClient = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx || !ctx.apiClient) {
-    // 認証情報がないか、認証済みクライアントがまだ準備できていない（トークンがない）
-    // このエラーは、認証が必要なページで api が null の場合に発生します。
-    // その場合、ページ側で isLoading や isAuthenticated をチェックする必要があります。
-    // ★ 認証なしでもアクセスできるAPIにはグローバルAxiosを使用し、
-    // 認証が必要なAPIには apiClient を使用するようにフロントエンドのコードを修正する必要があります。
-    throw new Error(
-      "Authenticated API client is not available. Ensure you are within AuthProvider and the user is authenticated."
-    );
-  }
-  return ctx.apiClient;
-};
+// =======================================================
+// III. カスタムフック (Consumer)
+// =======================================================
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  // apiClient を提供する useAuth フック（既存のものを保持）
   return ctx;
+};
+
+export const useApiClient = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useApiClient must be used within AuthProvider");
+  }
+
+  if (!ctx.apiClient) {
+    throw new Error(
+      "Authenticated API client is not available. Check if the user is authenticated and loading is complete."
+    );
+  }
+  return ctx.apiClient;
 };

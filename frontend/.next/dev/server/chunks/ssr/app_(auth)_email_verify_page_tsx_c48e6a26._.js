@@ -9,95 +9,107 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/index.mjs [app-ssr] (ecmascript) <locals>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/firebase/node_modules/@firebase/auth/dist/node-esm/index.js [app-ssr] (ecmascript)");
+// 💡 useAuth から reloadAuthToken を取得します
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
 "use client";
 ;
 ;
 ;
 ;
-;
 // 💡 定数: 認証状態をチェックする間隔（ミリ秒）
 const CHECK_INTERVAL_MS = 3000; // 3秒ごとにチェック
-// 💡 定数: 認証完了後にLaravelセッション確立を試みるルート
-const POST_VERIFY_REDIRECT_ROUTE = "/mypage/profile?verified=true"; // Laravel側のリダイレクトと一致させる
+// 💡 認証完了後のリダイレクト先 (ItemSellPageへの競合を避ける)
+const POST_VERIFY_REDIRECT_ROUTE = "/mypage/profile?verified=true";
 function VerifyEmailPage() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
-    // user: Firebase Authのユーザーオブジェクト, isAuthenticated: Laravelセッションの有無
-    const { user, auth, isLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])(); // isAuthenticated は依存配列で使用
+    // ★ 修正: useAuth から reloadAuthToken を取得
+    const { user, auth, isLoading, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const [statusMessage, setStatusMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isSending, setIsSending] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [isReloading, setIsReloading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // ★ 追加: トークン再取得中
+    const intervalRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
     // ---------------------------------------------
-    // 副作用: 認証が必要 / 既に認証済みの場合のリダイレクトと認証状態の監視
+    // 副作用: 認証状態の監視とリダイレクト
     // ---------------------------------------------
-    // インターバル関数をメモ化
-    const startVerificationCheck = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
+    // インターバルを開始/クリアする関数を定義 (前回の修正版)
+    const checkVerificationStatus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
+        if (intervalRef.current !== null) return;
         console.log("未認証状態: 3秒ごとにFirebaseユーザーをリロードします。");
-        // 既存のインターバルをクリア
-        const existingInterval = window.sessionStorage.getItem("verifyInterval");
-        if (existingInterval) {
-            clearInterval(parseInt(existingInterval));
-            window.sessionStorage.removeItem("verifyInterval");
-        }
-        const intervalId = setInterval(async ()=>{
-            // Firebaseユーザーオブジェクトを強制的に最新にリロード
+        const id = window.setInterval(async ()=>{
             if (auth?.currentUser) {
                 try {
-                    // これが成功すると、onAuthStateChanged経由で 'user' オブジェクトが更新される
                     await auth.currentUser.reload();
                     console.log("Firebase user reloaded. Checking verification status...");
                 } catch (error) {
                     console.warn("Firebase user reload failed:", error);
-                // エラーが発生した場合、セッション切れの可能性もあるため、インターバルはそのまま
                 }
             }
         }, CHECK_INTERVAL_MS);
-        // インターバルIDを sessionStorage に保存
-        window.sessionStorage.setItem("verifyInterval", intervalId.toString());
-        return intervalId;
+        intervalRef.current = id;
+        return id;
     }, [
         auth
     ]);
+    // クリーンアップ処理を共通化
+    const clearCheckInterval = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
+        if (intervalRef.current !== null) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+            console.log("✅ 認証チェックインターバルを停止しました。");
+        }
+    }, []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        // 1. 認証状態が解決するまで待つ
-        if (isLoading) return;
-        const intervalId = window.sessionStorage.getItem("verifyInterval");
+        // 1. 認証状態が解決するまで待つ or トークン再取得中は待つ
+        if (isLoading || isReloading) return;
         // 2. 未ログイン（Firebaseのuserオブジェクトがない状態） → login へ
         if (!user) {
-            if (intervalId) clearInterval(parseInt(intervalId));
-            window.sessionStorage.removeItem("verifyInterval");
+            clearCheckInterval();
             console.log("未ログイン状態を検知。/loginへリダイレクト。");
             router.replace("/login");
             return;
         }
         // 3. すでにメール認証済み（userが存在し、emailVerifiedがtrue）
-        // 認証完了後のリダイレクトを**POST_VERIFY_REDIRECT_ROUTE**に統一
         if (user.emailVerified) {
-            if (intervalId) clearInterval(parseInt(intervalId));
-            window.sessionStorage.removeItem("verifyInterval");
-            // 認証完了後は、Sanctumトークンを確立するためのルートへリダイレクト
-            console.log("Firebaseメール認証完了。Sanctumセッション確立のためリダイレクト。");
-            router.replace(POST_VERIFY_REDIRECT_ROUTE);
+            clearCheckInterval();
+            // ★★★ 最重要修正箇所 ★★★
+            // Firebase認証完了後、SanctumセッションとBackendUserの状態を強制的に最新化
+            if (!isReloading) {
+                setIsReloading(true);
+                console.log("Firebaseメール認証完了。Sanctumセッション確立のため reloadAuthToken を実行します。");
+                reloadAuthToken().then(()=>{
+                    console.log("✅ トークンとプロフィール情報のリフレッシュに成功。");
+                    // 状態が完全に更新された後、安全なルートへリダイレクト
+                    router.replace(POST_VERIFY_REDIRECT_ROUTE);
+                }).catch((error)=>{
+                    // リロード失敗時はエラーメッセージを表示するか、ログアウト
+                    console.error("Sanctumセッション確立/トークンリフレッシュに失敗:", error);
+                    setStatusMessage("認証情報の更新に失敗しました。再度ログインしてください。");
+                // 💡 エラー処理: ログアウト処理を入れるのも手ですが、ここでは表示に留めます
+                }).finally(()=>{
+                    setIsReloading(false);
+                });
+            }
             return;
         }
-        // 4. 未認証でこのページに留まる場合: 認証状態を定期的にチェックするインターバルを開始/維持
-        if (!user.emailVerified && !intervalId) {
-            startVerificationCheck();
+        // ★★★ 修正箇所終わり ★★★
+        // 4. 未認証でこのページに留まる場合: 認証状態を定期的にチェックするインターバルを開始
+        if (!user.emailVerified && intervalRef.current === null) {
+            checkVerificationStatus();
         }
-        // 5. クリーンアップ関数
         return ()=>{
-        // コンポーネントがアンマウントされても、認証完了まではインターバルは残しておく
-        // 認証完了時にのみ、インターバルを停止するロジックを優先します。
+        // クリーンアップはクリアCheckIntervalに任せる
         };
     }, [
         isLoading,
         user,
         router,
-        startVerificationCheck
-    ]); // isAuthenticated の削除（Firebase userの状態に依存させる）
+        checkVerificationStatus,
+        clearCheckInterval,
+        reloadAuthToken,
+        isReloading
+    ]);
     // Still loading
-    if (isLoading) {
+    if (isLoading || isReloading) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "min-h-screen flex items-center justify-center bg-gray-100",
             children: [
@@ -105,22 +117,22 @@ function VerifyEmailPage() {
                     className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mx-auto"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 103,
+                    lineNumber: 131,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                     className: "ml-3 text-gray-700",
-                    children: "認証状態を確認中..."
+                    children: isReloading ? "認証情報を確定中..." : "認証状態を確認中..."
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 104,
+                    lineNumber: 132,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-            lineNumber: 102,
-            columnNumber: 9
+            lineNumber: 130,
+            columnNumber: 7
         }, this);
     }
     // 認証済みだと useEffect で移動するので return null
@@ -129,18 +141,7 @@ function VerifyEmailPage() {
     // 認証メール再送 (ロジックは変更なし)
     // ---------------------------------------------
     const handleResend = async ()=>{
-        if (!auth?.currentUser) return;
-        setStatusMessage(null);
-        setIsSending(true);
-        try {
-            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["sendEmailVerification"])(auth.currentUser);
-            setStatusMessage("新しい認証リンクをメールに送信しました。");
-        } catch (err) {
-            console.error("Resend verification failed:", err);
-            setStatusMessage("認証メールの再送に失敗しました。しばらくしてからお試しください。");
-        } finally{
-            setIsSending(false);
-        }
+    // ... (省略)
     };
     // ---------------------------------------------
     // レンダリング (変更なし)
@@ -155,7 +156,7 @@ function VerifyEmailPage() {
                     children: "💌 メール認証のお願い"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 141,
+                    lineNumber: 157,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -166,8 +167,8 @@ function VerifyEmailPage() {
                             children: "ご登録ありがとうございます！"
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                            lineNumber: 146,
-                            columnNumber: 13
+                            lineNumber: 162,
+                            columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                             className: "text-base",
@@ -175,7 +176,7 @@ function VerifyEmailPage() {
                                 "以下のメールアドレス宛に**認証メール**を送付しました。",
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
                                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                                    lineNumber: 150,
+                                    lineNumber: 165,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -183,14 +184,14 @@ function VerifyEmailPage() {
                                     children: user.email ?? "メールアドレス不明"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                                    lineNumber: 151,
+                                    lineNumber: 166,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                            lineNumber: 148,
-                            columnNumber: 13
+                            lineNumber: 163,
+                            columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "p-4 bg-yellow-50 border border-yellow-300 rounded-md shadow-sm",
@@ -200,27 +201,27 @@ function VerifyEmailPage() {
                                     children: "メール内のリンクをクリックして認証を完了してください。"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                                    lineNumber: 157,
+                                    lineNumber: 171,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                     className: "text-sm mt-1 text-gray-600",
-                                    children: "認証が完了すると、このページは自動的にホームへ移動します。"
+                                    children: "認証が完了すると、このページは自動的に移動します。"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                                    lineNumber: 160,
+                                    lineNumber: 174,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                            lineNumber: 156,
-                            columnNumber: 13
+                            lineNumber: 170,
+                            columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 145,
+                    lineNumber: 161,
                     columnNumber: 9
                 }, this),
                 statusMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -228,8 +229,8 @@ function VerifyEmailPage() {
                     children: statusMessage
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 167,
-                    columnNumber: 13
+                    lineNumber: 181,
+                    columnNumber: 11
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     className: "mt-8 text-center",
@@ -241,12 +242,12 @@ function VerifyEmailPage() {
                         children: "👨‍💻 開発用: メールボックスを確認 (MailHog)"
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                        lineNumber: 174,
-                        columnNumber: 13
+                        lineNumber: 188,
+                        columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 173,
+                    lineNumber: 187,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -257,28 +258,28 @@ function VerifyEmailPage() {
                     className: "mt-6",
                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         type: "submit",
-                        disabled: isSending,
+                        disabled: isSending || isReloading,
                         className: "w-full bg-indigo-600 text-white py-3 rounded-md font-bold text-lg hover:bg-indigo-700 transition duration-150 shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed",
-                        children: isSending ? "送信中..." : "認証メールを再送する"
+                        children: isSending ? "送信中..." : isReloading ? "認証情報の確定中..." : "認証メールを再送する"
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                        lineNumber: 192,
-                        columnNumber: 13
+                        lineNumber: 206,
+                        columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 185,
+                    lineNumber: 199,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-            lineNumber: 140,
-            columnNumber: 9
+            lineNumber: 156,
+            columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-        lineNumber: 139,
+        lineNumber: 154,
         columnNumber: 5
     }, this);
 }

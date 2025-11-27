@@ -17,40 +17,40 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b
 // Next.jsの環境変数を使用
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 function useApi() {
-    // useAuth から logout と isLoggingOut を取得
+    // useAuth からユーザー情報、ログアウト関数、ログアウト状態を取得
     const { user, logout, isLoggingOut } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     /**
-   * 認証済みのAPIリクエストを実行する汎用関数
-   * @param url リクエストURL（API BASE URLからの相対パス）
+   * 認証済みのAPIリクエストを実行する汎用関数 (Firebase ID Tokenを自動付与)
+   * @param url リクエストURL（/api/ から始まる相対パスを推奨）
    * @param config Axiosリクエスト設定
    * @returns APIレスポンスデータ
    */ const authenticatedFetch = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (url, config = {})=>{
         if (isLoggingOut) {
             throw new Error("Logging out, cannot perform API request.");
         }
-        // ユーザーオブジェクトが存在しない場合は即座に認証エラー
+        // ユーザーオブジェクトが存在しない場合は、認証セッションがないためログアウト処理へ
         if (!user) {
             console.error("[useApi] User object missing. Forcing logout.");
-            await logout();
+            // await logout(); // Home.tsx側で認証状態を見てスキップするため、ここではログアウトを強制しない場合もある
             throw new Error("User not authenticated.");
         }
-        // --- 最新のFirebase ID Tokenを強制的に取得 ---
+        // --- 最新のFirebase ID Tokenを強制的に取得 (トークン失効対策) ---
         let idToken;
         try {
             // getIdToken(true): キャッシュを無視して、Firebaseから強制的に最新のトークンを取得
             idToken = await user.getIdToken(true);
-            console.log(`[useApi] Token acquired. Starts with: ${idToken.substring(0, 10)}...`);
         } catch (e) {
             console.error("[useApi] Failed to refresh/get ID Token. Forcing logout.", e);
-            await logout();
+            await logout(); // トークン取得失敗は致命的エラーのためログアウト
             throw new Error("Failed to retrieve fresh authentication token.");
         }
         // ----------------------------------------
-        // --- URLプレフィックスのロジック (現状維持) ---
+        // --- APIパスの整形 ---
+        // /api/ プレフィックスを保証し、重複するスラッシュを削除
         let apiPath = url.startsWith("/api/") ? url : `/api${url}`;
         apiPath = apiPath.replace(/\/\/+/g, "/");
         // ----------------------------------------
-        // ★★★ 修正箇所: ヘッダーマージロジックを修正し、Authorizationを最後に設定 ★★★
+        // --- ヘッダーの構築 ---
         const baseHeaders = {
             "Content-Type": "application/json",
             Accept: "application/json"
@@ -60,27 +60,25 @@ function useApi() {
             ...baseHeaders,
             ...config.headers
         };
-        // 2. 最後に、トークンを確実に設定（他のヘッダーで上書きされないようにする）
+        // 2. 最後に、認証トークンを確実に設定 (上書きされないように最後に配置)
         const finalHeaders = {
             ...mergedHeaders,
             Authorization: `Bearer ${idToken}`,
             "X-Firebase-Token": idToken
         };
-        // 💡 修正点 2: delete演算子のエラー (ts(2790)) を解消するためにキャストを使用
-        // 3. FormDataを使用する場合に Content-Type: undefined のエントリを削除する
+        // 💡 修正点 2: FormDataを使用する場合の 'Content-Type' 削除ロジック
+        // Content-Type: undefined のエントリを削除し、Axios/ブラウザに自動で multipart/form-data の設定をさせる
         if (finalHeaders["Content-Type"] === undefined) {
-            // 'as any' を使用して、型チェックを一時的に無効にする
+            // TypeScriptエラー回避のため 'as any' で一時的に型チェックを無効にする
             delete finalHeaders["Content-Type"];
         }
-        const headers = finalHeaders; // 最終的なヘッダー
-        // デバッグログ (★ここでAuthorizationヘッダーが正しく設定されているか確認)
-        console.log("[useApi] Request Headers being sent:", headers);
-        // ★★★ 修正箇所ここまで ★★★
+        const headers = finalHeaders;
+        // --- Axiosリクエストの実行 ---
         try {
             const response = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"])({
                 method: config.method || "GET",
                 url: `${API_BASE_URL}${apiPath}`,
-                // AxiosConfigのdataとbodyの扱いを統一
+                // config.data または config.body のいずれかをリクエストボディとして使用
                 data: config.data || config.body,
                 params: config.params,
                 headers: headers,
@@ -88,12 +86,12 @@ function useApi() {
             });
             return response.data;
         } catch (error) {
-            // AxiosError の型ガード
+            // --- エラーハンドリング ---
             if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].isAxiosError(error)) {
                 const status = error.response?.status;
                 if (status === 401) {
-                    console.error("[useApi] 401 Unauthorized detected. Throwing error for page recovery (reloadAuthToken).");
-                    // ログアウトせず、エラーをスローして呼び出し元（ProfilePage.tsx）の catch に渡す
+                    console.error("[useApi] 401 Unauthorized detected. Token likely expired on backend.");
+                    // ログアウトせず、エラーをスローして呼び出し元でリカバリ（必要に応じてリロードやリトライ）させる
                     const customError = new Error(`API Request Failed with status 401`);
                     customError.status = 401;
                     customError.response = error.response;
@@ -105,7 +103,7 @@ function useApi() {
                 customError.response = error.response;
                 throw customError;
             }
-            // ネットワークエラーなど (AxiosErrorではない場合)
+            // ネットワークエラーなど
             console.error("[useApi] Network or other unexpected error:", error);
             throw error;
         }
@@ -113,8 +111,9 @@ function useApi() {
         user,
         logout,
         isLoggingOut
-    ] // 依存配列
+    ] // 依存配列: user/logout/isLoggingOut が変わったら関数を再生成
     );
+    // --- プロファイル更新専用ラッパー ---
     const updateProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (data)=>{
         const response = await authenticatedFetch("/mypage/profile_update", {
             method: "PATCH",
@@ -126,10 +125,12 @@ function useApi() {
         throw new Error("Profile update failed: Invalid response structure.");
     }, [
         authenticatedFetch
-    ]);
+    ] // 依存配列
+    );
+    // --- 画像アップロード専用ラッパー ---
     const uploadImage = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (formData, url = "/upload2")=>{
-        // 画像アップロード時には、axiosのContent-Typeをundefinedに設定することで、
-        // 適切なBoundaryを持つ multipart/form-data ヘッダーが自動で設定されるようにする
+        // FormDataを送信する際、Content-Type: undefined とすることで、
+        // Axiosが自動的に適切な 'multipart/form-data' ヘッダーを生成する
         const response = await authenticatedFetch(url, {
             method: "POST",
             data: formData,
@@ -143,7 +144,8 @@ function useApi() {
         throw new Error("Image upload failed: Invalid response structure.");
     }, [
         authenticatedFetch
-    ]);
+    ] // 依存配列
+    );
     return {
         authenticatedFetch,
         updateProfile,
@@ -162,8 +164,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/styled-jsx/style.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)"); // Next.jsのカスタム認証フックのパスを調整してください
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useApi.tsx [app-ssr] (ecmascript)"); // 認証済みリクエスト用カスタムフックのパスを調整してください
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useApi.tsx [app-ssr] (ecmascript)");
 "use client";
 ;
 ;
@@ -172,32 +174,36 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$
 ;
 ;
 // =======================================================
-// Next.js クライアントコンポーネント
+// グローバル変数・ヘルパー関数
 // =======================================================
 // 環境変数からAPIベースURLを取得
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 /**
  * プロフィール画像のURLを生成するヘルパー関数
+ * Vue.jsの画像処理やLaravelのStorageパス解決を模倣
  */ const getProfileImageUrl = (path)=>{
-    let base = API_BASE_URL;
+    const base = API_BASE_URL;
     const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
     const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
     if (!path) {
         return DEFAULT_IMAGE_FULL_URL;
     }
-    // pathがHTTPから始まっていればそのまま返す（フルURLの場合）
+    // 既にフルURLの場合はそのまま返す (S3など外部URL対応)
     if (path.startsWith("http")) {
         return path;
     }
     // 相対パスの場合はベースURLを付与
+    // 先頭のスラッシュを削除して二重スラッシュを防ぐ
     return `${base}/${path.replace(/^\//, "")}`;
 };
 function ProfilePage() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSearchParams"])();
+    // 1. 認証フック: ユーザー状態と認証アクションを提供
     const { user: authUser, isAuthenticated, isLoading: isAuthLoading, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
-    // useApiは通常、Firebase IDトークンをヘッダーに付けてAPIをコールする
+    // 2. APIフック: 認証ヘッダー付きのAPI通信を提供
     const { authenticatedFetch, updateProfile, uploadImage } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useApi$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useApi"])();
+    // -------------------- State --------------------
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [form, setForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])({
         name: "",
@@ -208,11 +214,14 @@ function ProfilePage() {
     const [profileErrors, setProfileErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])({});
     const [imageError, setImageError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const [successMessage, setSuccessMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
-    const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true); // APIフェッチ中のローディング (全体)
-    const [isFetching, setIsFetching] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // データ取得中のローディング (フェッチ専用)
+    // UI全体のローディング (trueの間はUIをブロック)
+    const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
+    // APIデータ取得中の状態 (重複フェッチを防ぐための内部状態)
+    const [isFetching, setIsFetching] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     // 401エラーからのリカバリー中を示す状態
     const [isRecovering, setIsRecovering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     const fileInput = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
+    // -------------------- Computed Value (useMemo) --------------------
     // URLクエリパラメータからメール認証状態を取得
     const isVerificationRedirect = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         return searchParams.get("verified") === "true";
@@ -226,19 +235,21 @@ function ProfilePage() {
    * APIから取得したユーザーデータでフォームと状態を初期化する
    */ const initializeUserData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((apiData)=>{
         let sourceData = null;
+        // APIレスポンスの構造を考慮 ('user'キーの下にあるか、トップレベルか)
         if (apiData && apiData.user) {
             sourceData = apiData.user;
         } else if (apiData && apiData.id && apiData.name) {
             sourceData = apiData;
         }
+        // ユーザーStateの更新 (無限ループを防ぐため、データが実際に変更されているかチェック)
         setUser((current)=>{
-            // 無限ループを防ぐため、データが実際に変更されているかチェック
             if (JSON.stringify(current) !== JSON.stringify(sourceData)) {
-                console.log("✅ [InitData] user State を更新しました。", sourceData);
+                console.log("✅ [InitData] user State を更新しました。");
                 return sourceData;
             }
             return current;
         });
+        // フォームStateの更新
         if (sourceData) {
             setForm({
                 name: sourceData.name || "",
@@ -247,29 +258,31 @@ function ProfilePage() {
                 building: sourceData.building || ""
             });
         }
-    }, []);
+    }, []); // 依存配列は空でOK
     // ----------------------------------------------------------------
-    // 2. データ取得ロジック (リカバリー処理を強化)
+    // 2. データ取得ロジック (401リカバリー処理を含む)
     // ----------------------------------------------------------------
-    const fetchUserProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (isRetry = false)=>{
-        // 初回呼び出し時に、既にフェッチ中または認証解決待ちの場合はスキップ
-        if (!isRetry && isFetching) return;
-        if (isAuthLoading) return;
-        // フェッチ開始 (初回呼び出し時のみ isFetching を設定)
+    /**
+   * サーバーからプロフィールデータを取得する関数。401エラー時にトークンリフレッシュを試みる。
+   * @param isRetry 再試行 (トークンリフレッシュ後) の呼び出しであるか
+   */ const fetchUserProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (isRetry = false)=>{
+        // 外部の状態 (isFetching や isAuthLoading) のチェックは useEffect に任せ、
+        // ここではロジックの純粋性を保つ方が望ましいが、既存のロジックを踏襲し、
+        // isRetryフラグで親の try/finally ブロックの動作を制御する設計を維持する。
+        // 初回呼び出し時のみ isFetching を設定
         if (!isRetry) setIsFetching(true);
         try {
             // サーバーから最新のユーザーデータをフェッチ
             const response = await authenticatedFetch("/mypage/profile");
-            // 最新のサーバーデータで更新
             initializeUserData(response);
-            console.log("✅ [Fetch] プロフィールデータ取得に成功。ユーザーデータを初期化しました。");
-            // メール認証成功後のメッセージ表示
+            console.log("✅ [Fetch] プロフィールデータ取得に成功。");
             if (isVerificationRedirect) {
                 setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
             }
-            // 再試行が成功した場合は、リカバリー状態を解除
+            // 再試行が成功した場合は、リカバリー状態を解除し、成功メッセージをリセット
             if (isRetry) {
                 setIsRecovering(false);
+                setSuccessMessage("認証情報を回復し、データを再取得しました。");
             }
         } catch (err) {
             console.error("プロフィールデータのロードに失敗しました:", err);
@@ -278,88 +291,90 @@ function ProfilePage() {
                 // 既に再試行して再度401なら、無限ループを防ぐためログアウト
                 if (isRetry) {
                     console.error("401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。");
-                    // ログアウト処理が完了したら、この処理は終了
                     await logout();
                     return;
                 }
+                // ★ 401初回検出時のリカバリー処理 ★
                 console.log(`401エラーを検出。トークンリフレッシュを試行...`);
                 setSuccessMessage("認証情報を更新中...");
-                // リカバリー開始
-                setIsRecovering(true);
+                setIsRecovering(true); // リカバリー開始
                 try {
-                    // 認証回復ロジック
                     await reloadAuthToken(); // トークンを強制リフレッシュ
                     setSuccessMessage("認証情報を更新しました。データを再取得します。");
-                    // 重要な修正: トークンリフレッシュ成功後、自身を再帰的に呼び出して再試行
-                    await fetchUserProfile(true); // isRetry=true で再試行
+                    // 重要な修正ポイント: トークンリフレッシュ成功後、自身を再帰的に呼び出して再試行
+                    // 再試行が成功すれば、tryブロックが実行され、setIsRecovering(false)となる。
+                    await fetchUserProfile(true);
                 } catch (reloadError) {
                     console.error("トークンのリロードに失敗。ログアウトします。", reloadError);
                     await logout();
                     setSuccessMessage("セッションが切れました。再度ログインが必要です。");
-                } finally{
-                // 再帰呼び出しが完了しても、成功時は内部で isRecovering(false) になるため、
-                // ここで設定するとリカバリー失敗時のみとなる。
-                // ★重要な変更点: 成功時は tryブロック内部で isRecovering(false) を呼ぶため、
-                // ここでは失敗時、または再帰後のクリーンアップは不要。
                 }
-            } else {
-                // 401以外のエラー
-                setSuccessMessage(`データのロード中に予期せぬエラーが発生しました。(Status: ${status || "不明"})`);
+                // リカバリーロジックが完了したら、この catch ブロックの実行を終了
+                return;
             }
+            // 401以外のエラー
+            setSuccessMessage(`データのロード中に予期せぬエラーが発生しました。(Status: ${status || "不明"})`);
         } finally{
             // 初回呼び出しが終了した時のみ isFetching をリセットする
-            // 再帰呼び出し (isRetry=true) が成功した場合、このブロックは実行されない
-            // (再帰呼び出しが成功し、親の try ブロックを抜けるため)
+            // isRetry=true の再帰呼び出しが成功した場合、親の finally は実行されるが、
+            // その時は isRetry=false のブロックしか実行されないため、isFetching のリセットは親で実行される。
             if (!isRetry) {
                 setIsFetching(false);
-            // 2回目の API Callが401エラーで失敗し、ログアウトした場合、
-            // 初回呼び出しの finally が実行されるが、その時には既にログアウト処理がされているため問題なし。
+            // ⚠️ 注意: 2回目の API Callが401エラーで失敗し、ログアウトした場合、
+            // 親の finally が実行される。この時、isLoadingはまだ true のまま。
+            // isLoading の制御は useEffect に任せることでこの複雑さを回避する。
             }
         }
-    }, // useCallbackの依存配列
+    }, // ★ 依存配列から isFetching を削除し、外部状態への依存を減らす
     [
         authenticatedFetch,
         initializeUserData,
         logout,
         isVerificationRedirect,
         reloadAuthToken,
-        isFetching,
         isAuthLoading
     ]);
     // ----------------------------------------------------------------
-    // 3. 認証状態とデータフェッチの監視
+    // 3. 認証状態とデータフェッチの監視 (useEffect)
     // ----------------------------------------------------------------
-    // 認証状態に応じたデータフェッチとリダイレクト
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         // 1. 認証解決待ち、またはリカバリー中の場合はスキップ
         if (isAuthLoading || isRecovering) return;
         // 2. 未認証の場合はログインへリダイレクト
         if (!isAuthenticated) {
-            // 認証リダイレクト中（?verified=true）は、セッション解決を待つ
             if (isVerificationRedirect) {
-                console.log("Verification redirect detected. Waiting for useLaravelSession to resolve session.");
+                // メール認証リダイレクト中は、セッション解決を待つ
+                console.log("Verification redirect detected. Waiting for session resolve.");
                 return;
             }
             console.log("Unauthenticated detected. Redirecting to /login.");
-            // ログアウト処理が完了していない場合は強制リダイレクト
+            // authUserがnullで、認証情報が確実にない場合にリダイレクトを実行
             if (authUser === null) {
                 router.replace("/login");
             }
             return;
         }
-        // 3. 認証済みだがユーザーデータがまだロードされていない場合、データフェッチを実行
-        // isFetching で現在ロード中かチェックし、重複実行を防ぐ
+        // 3. 認証済みだがユーザーデータがまだロードされていない、かつ**現在フェッチ中でない**場合
         if (isAuthenticated && !user && !isFetching) {
             console.log("Authenticated but user data is missing. Fetching profile.");
-            // setIsLoading(true) はレンダリングブロック時に設定されているため、ここでは省略
+            // isLoadingはここで true のまま維持される
             fetchUserProfile(false); // 初回フェッチ
             return;
         }
-        // 4. データがロード済みで認証済みであれば、ローディングを解除して終了
+        // 4. データがロード済みで認証済みであれば、ローディングを解除してUIを表示可能にする
         if (user && isAuthenticated) {
             setIsLoading(false);
+            // メール認証リダイレクトのクエリパラメータをクリーンアップ
+            if (isVerificationRedirect) {
+                // ★★★ 修正箇所: shallow オプションを削除し、単一引数に変更 ★★★
+                // App Router (next/navigation) では shallow は使用できません。
+                // 単一引数で replace を呼ぶことで、クエリパラメータなしのパスに遷移します。
+                router.replace("/mypage/profile");
+            }
             return;
         }
+    // 依存配列に isFetching を追加することで、フェッチの開始・終了を監視し、
+    // 状態に応じた次のアクションを実行できる。
     }, [
         isAuthLoading,
         isAuthenticated,
@@ -383,26 +398,28 @@ function ProfilePage() {
         const formData = new FormData();
         formData.append("user_image", file);
         try {
+            // APIに画像をアップロードし、更新されたユーザーデータを受け取る
             const updatedUser = await uploadImage(formData, "/upload2");
+            // UIの状態を更新
             setUser(updatedUser);
             setSuccessMessage("画像をアップロードしました。");
         } catch (error) {
             console.error("【ERROR】画像アップロードに失敗しました:", error);
             const status = error.status || error.response && error.response.status;
+            // 401 エラーは即時ログアウトで対応 (複雑なリカバリーロジックは実装しない)
             if (status === 401) {
-                // 画像アップロードの401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
-                // ここでのリカバリーロジックの実装は一旦見送り
                 await logout();
                 return;
             }
             if (error.response && error.response.status === 422) {
-                // エラーレスポンスの構造に応じて修正
+                // バリデーションエラー
                 setImageError(error.response.data?.errors?.user_image?.[0] || "無効なファイルです。");
             } else {
                 setImageError(`アップロードに失敗しました (ステータス: ${status || "不明"})。`);
             }
         } finally{
             setIsLoading(false);
+            // ファイルインプットをリセット
             if (fileInput.current) {
                 fileInput.current.value = "";
             }
@@ -418,20 +435,21 @@ function ProfilePage() {
         if (!user) return;
         setIsLoading(true);
         try {
+            // APIにフォームデータを送信し、更新されたユーザーデータを受け取る
             const updatedUser = await updateProfile(form);
             setSuccessMessage("プロフィール情報を更新しました！");
+            // 更新後のデータでフォームとユーザーの状態を初期化/更新
             initializeUserData(updatedUser);
         } catch (error) {
             const statusCode = error.status || (error.response ? error.response.status : "不明");
             console.error(`【ERROR】プロフィール更新に失敗しました (ステータス: ${statusCode})。`, error);
+            // 401 エラーは即時ログアウトで対応
             if (statusCode === 401) {
-                // 更新時の401もトークンリフレッシュを試みるべきだが、今回は即時ログアウトで対応
-                // ここでのリカバリーロジックの実装は一旦見送り
                 await logout();
                 return;
             }
             if (error.response && error.response.status === 422) {
-                // エラーレスポンスの構造に応じて修正
+                // バリデーションエラー
                 setProfileErrors(error.response.data.errors);
             } else {
                 setSuccessMessage(`更新に失敗しました。(Status: ${statusCode}) 再度お試しください。`);
@@ -441,7 +459,7 @@ function ProfilePage() {
         }
     };
     // ----------------------------------------------------------------
-    // 6. ローディング・未認証時の表示
+    // 6. ローディング・未認証時の表示 (レンダリングブロック)
     // ----------------------------------------------------------------
     // 認証解決待ち、APIロード中、またはリカバリー中の全体ローディング
     if (isAuthLoading || isLoading && !user || isRecovering) {
@@ -453,7 +471,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 404,
+                    lineNumber: 426,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -463,32 +481,33 @@ function ProfilePage() {
                             className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 406,
+                            lineNumber: 428,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                             className: "text-lg text-gray-500 mt-3",
-                            children: isAuthLoading ? "認証状態を確認中 / セッションを再確立中..." : isRecovering ? "認証情報を回復中です..." // リカバリー中のメッセージ
+                            children: isAuthLoading ? "認証状態を確認中 / セッションを再確立中..." : isRecovering ? "⚠️ 認証情報を回復中です..." // リカバリー中のメッセージを強調
                              : "データをロード中です..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 407,
+                            lineNumber: 429,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 405,
+                    lineNumber: 427,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 403,
+            lineNumber: 425,
             columnNumber: 7
         }, this);
     }
     // 認証が完了したがユーザーデータがない場合 (fetchで失敗した場合など)
+    // このブロックに入る前に useEffect がリダイレクトを試みるため、短時間のみ表示されるはず
     if (!isAuthenticated || !user) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "login_page max-w-[1400px] mx-auto pt-5 pb-10",
@@ -498,7 +517,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 423,
+                    lineNumber: 446,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -509,7 +528,7 @@ function ProfilePage() {
                             children: "認証エラー、またはユーザー情報がロードできませんでした。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 425,
+                            lineNumber: 448,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -517,82 +536,82 @@ function ProfilePage() {
                             children: "ログインページへ移動しています..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 428,
+                            lineNumber: 451,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 424,
+                    lineNumber: 447,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 422,
+            lineNumber: 445,
             columnNumber: 7
         }, this);
     }
     // ----------------------------------------------------------------
-    // 7. レンダリング
+    // 7. メインレンダリング (UI)
     // ----------------------------------------------------------------
-    return(// authUser?.uid をキーに使用し、ユーザーが変わった場合に強制再描画
+    return(// authUser?.uid をキーに使用し、ユーザーが変わった場合に強制再描画 (保険的な措置)
     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: "jsx-ba5c1f40791bc779" + " " + "login_page max-w-[1400px] mx-auto pt-5 pb-10",
+        className: "jsx-53929b350b281596" + " " + "login_page max-w-[1400px] mx-auto pt-5 pb-10",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                className: "jsx-ba5c1f40791bc779" + " " + "title",
+                className: "jsx-53929b350b281596" + " " + "title",
                 children: "プロフィール設定"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 446,
+                lineNumber: 469,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-ba5c1f40791bc779" + " " + "form-wrapper",
+                className: "jsx-53929b350b281596" + " " + "form-wrapper",
                 children: [
                     successMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-ba5c1f40791bc779" + " " + "alert-success2",
+                        className: "jsx-53929b350b281596" + " " + "alert-success2",
                         children: successMessage
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 451,
+                        lineNumber: 477,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
                         onSubmit: (e)=>e.preventDefault(),
-                        className: "jsx-ba5c1f40791bc779" + " " + "item_sell_contents_box_line",
+                        className: "jsx-53929b350b281596" + " " + "item_sell_contents_box_line",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "image_name",
+                                className: "jsx-53929b350b281596" + " " + "image_name",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-ba5c1f40791bc779" + " " + "image_button_row",
+                                        className: "jsx-53929b350b281596" + " " + "image_button_row",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                                 src: getProfileImageUrl(user.user_image),
                                                 alt: "プロフィール画像",
-                                                className: "jsx-ba5c1f40791bc779" + " " + "user_image_css"
+                                                className: "jsx-53929b350b281596" + " " + "user_image_css"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 462,
+                                                lineNumber: 487,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                                 type: "button",
                                                 onClick: ()=>fileInput.current?.click(),
                                                 disabled: isLoading,
-                                                className: "jsx-ba5c1f40791bc779" + " " + "upload_submit",
+                                                className: "jsx-53929b350b281596" + " " + "upload_submit",
                                                 children: "画像を選択する"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 467,
+                                                lineNumber: 492,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 461,
+                                        lineNumber: 486,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -604,46 +623,46 @@ function ProfilePage() {
                                         },
                                         onChange: handleImageUpload,
                                         accept: "image/*",
-                                        className: "jsx-ba5c1f40791bc779"
+                                        className: "jsx-53929b350b281596"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 476,
+                                        lineNumber: 501,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 459,
+                                lineNumber: 485,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "user_image_error_message",
+                                className: "jsx-53929b350b281596" + " " + "user_image_error_message",
                                 children: imageError
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 485,
+                                lineNumber: 510,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 455,
+                        lineNumber: 481,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
                         onSubmit: handleProfileUpdate,
-                        className: "jsx-ba5c1f40791bc779",
+                        className: "jsx-53929b350b281596",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                className: "jsx-53929b350b281596" + " " + "form-group",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                         htmlFor: "name",
-                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_1",
+                                        className: "jsx-53929b350b281596" + " " + "label_form_1",
                                         children: "ユーザー名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 492,
+                                        lineNumber: 517,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -655,36 +674,36 @@ function ProfilePage() {
                                                     ...prev,
                                                     name: e.target.value
                                                 })),
-                                        className: "jsx-ba5c1f40791bc779" + " " + "name_form"
+                                        className: "jsx-53929b350b281596" + " " + "name_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 495,
+                                        lineNumber: 520,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        className: "jsx-53929b350b281596" + " " + "profile__error",
                                         children: profileErrors.name ? profileErrors.name[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 505,
+                                        lineNumber: 530,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 491,
+                                lineNumber: 516,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                className: "jsx-53929b350b281596" + " " + "form-group",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                         htmlFor: "post_number",
-                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_2",
+                                        className: "jsx-53929b350b281596" + " " + "label_form_2",
                                         children: "郵便番号 (8桁、ハイフンあり)"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 512,
+                                        lineNumber: 537,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -698,36 +717,36 @@ function ProfilePage() {
                                                 })),
                                         placeholder: "例: 100-0001",
                                         maxLength: 8,
-                                        className: "jsx-ba5c1f40791bc779" + " " + "email_form"
+                                        className: "jsx-53929b350b281596" + " " + "email_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 515,
+                                        lineNumber: 540,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        className: "jsx-53929b350b281596" + " " + "profile__error",
                                         children: profileErrors.post_number ? profileErrors.post_number[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 527,
+                                        lineNumber: 552,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 511,
+                                lineNumber: 536,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                className: "jsx-53929b350b281596" + " " + "form-group",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                         htmlFor: "address",
-                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_3",
+                                        className: "jsx-53929b350b281596" + " " + "label_form_3",
                                         children: "住所"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 534,
+                                        lineNumber: 559,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -740,36 +759,36 @@ function ProfilePage() {
                                                     address: e.target.value
                                                 })),
                                         placeholder: "手動で入力してください",
-                                        className: "jsx-ba5c1f40791bc779" + " " + "password_form"
+                                        className: "jsx-53929b350b281596" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 537,
+                                        lineNumber: 562,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        className: "jsx-53929b350b281596" + " " + "profile__error",
                                         children: profileErrors.address ? profileErrors.address[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 548,
+                                        lineNumber: 573,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 533,
+                                lineNumber: 558,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "form-group",
+                                className: "jsx-53929b350b281596" + " " + "form-group",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                         htmlFor: "building",
-                                        className: "jsx-ba5c1f40791bc779" + " " + "label_form_4",
+                                        className: "jsx-53929b350b281596" + " " + "label_form_4",
                                         children: "建物名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 555,
+                                        lineNumber: 580,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -781,63 +800,63 @@ function ProfilePage() {
                                                     ...prev,
                                                     building: e.target.value
                                                 })),
-                                        className: "jsx-ba5c1f40791bc779" + " " + "password_form"
+                                        className: "jsx-53929b350b281596" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 558,
+                                        lineNumber: 583,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-ba5c1f40791bc779" + " " + "profile__error",
+                                        className: "jsx-53929b350b281596" + " " + "profile__error",
                                         children: profileErrors.building ? profileErrors.building[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 568,
+                                        lineNumber: 593,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 554,
+                                lineNumber: 579,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-ba5c1f40791bc779" + " " + "submit",
+                                className: "jsx-53929b350b281596" + " " + "submit",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
                                     type: "submit",
                                     value: "更新する",
                                     disabled: isLoading,
-                                    className: "jsx-ba5c1f40791bc779" + " " + "submit_form"
+                                    className: "jsx-53929b350b281596" + " " + "submit_form"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                    lineNumber: 574,
+                                    lineNumber: 599,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 573,
+                                lineNumber: 598,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 489,
+                        lineNumber: 514,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 448,
+                lineNumber: 474,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
-                id: "ba5c1f40791bc779",
-                children: ".login_page.jsx-ba5c1f40791bc779{text-align:center}.title.jsx-ba5c1f40791bc779{color:#4f46e5;margin-bottom:2rem;font-size:2rem;font-weight:700}.form-wrapper.jsx-ba5c1f40791bc779{text-align:center;display:inline-block}.alert-success2.jsx-ba5c1f40791bc779{color:#065f46;background-color:#d1fae5;border:1px solid #34d399;border-radius:.5rem;margin-bottom:1.5rem;padding:1rem}.profile__error.jsx-ba5c1f40791bc779,.user_image_error_message.jsx-ba5c1f40791bc779{color:#f55;text-align:left;width:400px;margin:-5px auto 5px;padding-left:5px;font-size:15px}.user_image_error_message.jsx-ba5c1f40791bc779{text-align:center;position:relative;bottom:20px}.item_sell_contents_box_line.jsx-ba5c1f40791bc779{margin-bottom:0;padding-bottom:0;display:block}.image_name.jsx-ba5c1f40791bc779{justify-content:center;align-items:center;padding-top:35px;padding-bottom:60px;display:flex;position:relative}.image_button_row.jsx-ba5c1f40791bc779{align-items:center;gap:30px;display:flex;position:relative;right:50px}.user_image_css.jsx-ba5c1f40791bc779{object-fit:cover;object-position:center;border-radius:50%;width:100px;height:100px;position:static;overflow:hidden}.upload_submit.jsx-ba5c1f40791bc779{color:#f55;cursor:pointer;white-space:nowrap;background-color:#fff;border:1px solid #f55;border-radius:5px;margin:0;padding:5px 10px;font-weight:700;position:static}.form-group.jsx-ba5c1f40791bc779{text-align:center;width:400px;margin:0 auto}.label_form_1.jsx-ba5c1f40791bc779,.label_form_2.jsx-ba5c1f40791bc779,.label_form_3.jsx-ba5c1f40791bc779,.label_form_4.jsx-ba5c1f40791bc779{text-align:left;font-weight:700;display:block;position:relative;left:0}.label_form_2.jsx-ba5c1f40791bc779,.label_form_3.jsx-ba5c1f40791bc779,.label_form_4.jsx-ba5c1f40791bc779{margin-top:30px}.name_form.jsx-ba5c1f40791bc779,.email_form.jsx-ba5c1f40791bc779,.password_form.jsx-ba5c1f40791bc779{box-sizing:border-box;border:1px solid #d1d5db;border-radius:3px;width:400px;height:30px;margin-bottom:10px;padding:0 10px}.submit.jsx-ba5c1f40791bc779{margin-top:10px}.submit_form.jsx-ba5c1f40791bc779{color:#fff;cursor:pointer;background-color:#f55;border:#f55;border-radius:5px;width:400px;height:40px;margin:30px auto;font-weight:700;transition:background-color .1s;position:relative;top:20px}.submit_form.jsx-ba5c1f40791bc779:hover{background-color:#e54c4c}.submit_form.jsx-ba5c1f40791bc779:disabled{cursor:not-allowed;background-color:#9ca3af}"
+                id: "53929b350b281596",
+                children: ".login_page.jsx-53929b350b281596{text-align:center}.title.jsx-53929b350b281596{color:#4f46e5;margin-bottom:2rem;font-size:2rem;font-weight:700}.form-wrapper.jsx-53929b350b281596{text-align:center;display:inline-block}.alert-success2.jsx-53929b350b281596{color:#065f46;background-color:#d1fae5;border:1px solid #34d399;border-radius:.5rem;margin-bottom:1.5rem;padding:1rem}.profile__error.jsx-53929b350b281596,.user_image_error_message.jsx-53929b350b281596{color:#f55;text-align:left;width:400px;margin:-5px auto 5px;padding-left:5px;font-size:15px}.user_image_error_message.jsx-53929b350b281596{text-align:center;position:relative;bottom:20px}.item_sell_contents_box_line.jsx-53929b350b281596{margin-bottom:0;padding-bottom:0;display:block}.image_name.jsx-53929b350b281596{justify-content:center;align-items:center;padding-top:35px;padding-bottom:60px;display:flex;position:relative}.image_button_row.jsx-53929b350b281596{align-items:center;gap:30px;display:flex;position:relative;right:50px}.user_image_css.jsx-53929b350b281596{object-fit:cover;object-position:center;border-radius:50%;width:100px;height:100px;position:static;overflow:hidden}.upload_submit.jsx-53929b350b281596{color:#f55;cursor:pointer;white-space:nowrap;background-color:#fff;border:1px solid #f55;border-radius:5px;margin:0;padding:5px 10px;font-weight:700;position:static}.form-group.jsx-53929b350b281596{text-align:center;width:400px;margin:0 auto}.label_form_1.jsx-53929b350b281596,.label_form_2.jsx-53929b350b281596,.label_form_3.jsx-53929b350b281596,.label_form_4.jsx-53929b350b281596{text-align:left;font-weight:700;display:block;position:relative;left:0}.label_form_2.jsx-53929b350b281596,.label_form_3.jsx-53929b350b281596,.label_form_4.jsx-53929b350b281596{margin-top:30px}.name_form.jsx-53929b350b281596,.email_form.jsx-53929b350b281596,.password_form.jsx-53929b350b281596{box-sizing:border-box;border:1px solid #d1d5db;border-radius:3px;width:400px;height:30px;margin-bottom:10px;padding:0 10px}.submit.jsx-53929b350b281596{margin-top:10px}.submit_form.jsx-53929b350b281596{color:#fff;cursor:pointer;background-color:#f55;border:#f55;border-radius:5px;width:400px;height:40px;margin:30px auto;font-weight:700;transition:background-color .1s;position:relative;top:20px}.submit_form.jsx-53929b350b281596:hover{background-color:#e54c4c}.submit_form.jsx-53929b350b281596:disabled{cursor:not-allowed;background-color:#9ca3af}"
             }, void 0, false, void 0, this)
         ]
     }, authUser?.uid || "unauthenticated", true, {
         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-        lineNumber: 442,
+        lineNumber: 465,
         columnNumber: 5
     }, this));
 }

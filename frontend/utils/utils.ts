@@ -7,36 +7,66 @@ export const PLACEHOLDER_IMAGE_URL =
 // Laravel側のStorageを参照する設定を再現します。
 const ASSET_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-/**
- * APIから返された画像パスを、外部アクセス可能なフルURLに変換する
- */
 export const getImageUrl = (
-    path: string | null,
-    imageRefreshKey: number
+  path: string | null,
+  imageRefreshKey: number
 ): string => {
-    if (!path) {
+  if (!path) {
     return PLACEHOLDER_IMAGE_URL;
-    }
+  }
 
-    if (path.startsWith("http")) {
+  // 既にフルURLであればそのまま返す (このケースでは二重結合は起きないはず)
+  if (path.startsWith("http")) {
+    console.log("DEBUG_IMG: Path starts with http, returning:", path);
     return path;
-    }
+  }
 
-    if (!ASSET_BASE_URL) {
+  if (!ASSET_BASE_URL) {
     console.error("ASSET_BASE_URL is not set.");
     return PLACEHOLDER_IMAGE_URL;
-    }
+  }
 
-    const baseUrl = ASSET_BASE_URL.endsWith("/")
+  // --- ここから結合処理 ---
+
+  const baseUrl = ASSET_BASE_URL.endsWith("/")
     ? ASSET_BASE_URL.slice(0, -1)
     : ASSET_BASE_URL;
-    const normalizedPath = path.startsWith("/") ? path.substring(1) : path;
 
-  // キャッシュバスターとして imageRefreshKey の値を付加
-    const cacheBuster = `?t=${imageRefreshKey}`;
+  let cleanPath = path;
 
-  // Laravelのストレージパス (例: https://laravel.test/storage/items/image.jpg) に対応させる
-    return `${baseUrl}/storage/${normalizedPath}${cacheBuster}`;
+  // 💡 修正強化: 二重の結合を招く可能性のある文字列を徹底的に削除
+  // データベースの値は「storage/item_images/...」なので、まずこれを削る
+  if (cleanPath.startsWith("storage/")) {
+    cleanPath = cleanPath.substring("storage/".length);
+  }
+
+  // 念のため、URLのプロトコル部分が残っていないかチェックし、削除
+  if (cleanPath.includes("https://") || cleanPath.includes("http://")) {
+    console.error(
+      "DEBUG_IMG: Path still contains protocol! Data is corrupted:",
+      cleanPath
+    );
+    // ここでクリーンアップ処理を行うべきですが、一旦エラーを表示
+    // 緊急措置として、フルURL全体をファイルパスとして誤って連結するのを防ぎます
+
+    // 🚨 暫定的な強制クリーンアップ (本来は不要)
+    const parts = cleanPath.split("storage/").pop();
+    cleanPath = parts || "";
+  }
+
+  const normalizedPath = cleanPath.startsWith("/")
+    ? cleanPath.substring(1)
+    : cleanPath;
+
+  const cacheBuster = `?t=${imageRefreshKey}`;
+
+  // 結合する要素をコンソールに出力して確認
+  const finalUrl = `${baseUrl}/storage/${normalizedPath}${cacheBuster}`;
+  console.log(
+    `DEBUG_IMG: Base: ${baseUrl}, Final Path: /storage/${normalizedPath}, Result: ${finalUrl}`
+  );
+
+  return finalUrl;
 };
 
 /**
