@@ -1,154 +1,152 @@
-<?php
-
-return array(
-  'codezero/browser-locale' =>
-  array(
-    'providers' =>
-    array(
+<?php return array (
+  'codezero/browser-locale' => 
+  array (
+    'providers' => 
+    array (
       0 => 'CodeZero\\BrowserLocale\\Laravel\\BrowserLocaleServiceProvider',
     ),
   ),
-  'kreait/laravel-firebase' =>
-  array(
-    'aliases' =>
-    array(
+  'kreait/laravel-firebase' => 
+  array (
+    'aliases' => 
+    array (
       'Firebase' => 'Kreait\\Laravel\\Firebase\\Facades\\Firebase',
     ),
-    'providers' =>
-    array(
+    'providers' => 
+    array (
       0 => 'Kreait\\Laravel\\Firebase\\ServiceProvider',
     ),
   ),
-  'laravel-lang/actions' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/actions' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Actions\\ServiceProvider',
     ),
   ),
-  'laravel-lang/attributes' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/attributes' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Attributes\\ServiceProvider',
     ),
   ),
-  'laravel-lang/config' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/config' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Config\\ServiceProvider',
     ),
   ),
-  'laravel-lang/http-statuses' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/http-statuses' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\HttpStatuses\\ServiceProvider',
     ),
   ),
-  'laravel-lang/lang' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/lang' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Lang\\ServiceProvider',
     ),
   ),
-  'laravel-lang/locales' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/locales' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Locales\\ServiceProvider',
     ),
   ),
-  'laravel-lang/models' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/models' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Models\\ServiceProvider',
     ),
   ),
-  'laravel-lang/moonshine' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/moonshine' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\MoonShine\\ServiceProvider',
     ),
   ),
-  'laravel-lang/publisher' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/publisher' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Publisher\\ServiceProvider',
     ),
   ),
-  'laravel-lang/routes' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/routes' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\Routes\\ServiceProvider',
     ),
   ),
-  'laravel-lang/starter-kits' =>
-  array(
-    'providers' =>
-    array(
+  'laravel-lang/starter-kits' => 
+  array (
+    'providers' => 
+    array (
       0 => 'LaravelLang\\StarterKits\\ServiceProvider',
     ),
   ),
-  'laravel/cashier' =>
-  array(
-    'providers' =>
-    array(
+  'laravel/cashier' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Laravel\\Cashier\\CashierServiceProvider',
     ),
   ),
-  'laravel/pail' =>
-  array(
-    'providers' =>
-    array(
+  'laravel/pail' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Laravel\\Pail\\PailServiceProvider',
     ),
   ),
-  'laravel/sail' =>
-  array(
-    'providers' =>
-    array(
+  'laravel/sail' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Laravel\\Sail\\SailServiceProvider',
     ),
   ),
-  'laravel/sanctum' =>
-  array(
-    'providers' =>
-    array(
+  'laravel/sanctum' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Laravel\\Sanctum\\SanctumServiceProvider',
     ),
   ),
-  'laravel/tinker' =>
-  array(
-    'providers' =>
-    array(
+  'laravel/tinker' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Laravel\\Tinker\\TinkerServiceProvider',
     ),
   ),
-  'nesbot/carbon' =>
-  array(
-    'providers' =>
-    array(
+  'nesbot/carbon' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Carbon\\Laravel\\ServiceProvider',
     ),
   ),
-  'nunomaduro/collision' =>
-  array(
-    'providers' =>
-    array(
+  'nunomaduro/collision' => 
+  array (
+    'providers' => 
+    array (
       0 => 'NunoMaduro\\Collision\\Adapters\\Laravel\\CollisionServiceProvider',
     ),
   ),
-  'nunomaduro/termwind' =>
-  array(
-    'providers' =>
-    array(
+  'nunomaduro/termwind' => 
+  array (
+    'providers' => 
+    array (
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
     ),
   ),

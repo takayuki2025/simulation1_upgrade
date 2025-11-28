@@ -176,6 +176,7 @@ function ProfilePage() {
             // 2. 未認証の場合はログインへリダイレクト
             if (!isAuthenticated) {
                 if (isVerificationRedirect) {
+                    // このロジックは残す
                     console.log("Waiting for session resolve.");
                     return;
                 }
@@ -186,73 +187,15 @@ function ProfilePage() {
                 return;
             }
             // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
-            // または、認証済みリダイレクト中で、まだメールが未認証と表示されている場合
             const needsInitialFetch = isAuthenticated && apiClient && !user && !isFetching;
-            const needsPolling = isAuthenticated && apiClient && isVerificationRedirect && user && !user.email_verified_at && !isFetching;
+            // 💡 削除: needsPolling はもう不要です
             // 初回フェッチ
             if (needsInitialFetch) {
                 console.log("[DEBUG] Initial Fetch Triggered.");
                 fetchUserProfile(false);
                 return;
             }
-            // ★★★ メール認証後のポーリング処理 ★★★
-            if (needsPolling) {
-                console.log("[DEBUG] Verification Polling Started.");
-                let attempt = 0;
-                const MAX_ATTEMPTS = 5;
-                const POLLING_INTERVAL = 1000; // 1秒間隔
-                const startPolling = {
-                    "ProfilePage.useEffect.startPolling": async ()=>{
-                        setIsFetching(true); // ポーリング中はフェッチ中とする
-                        setIsLoading(true); // UIをローディング状態に保つ
-                        try {
-                            let currentData = user;
-                            while(isVerificationRedirect && currentData && !currentData.email_verified_at && attempt < MAX_ATTEMPTS){
-                                attempt++;
-                                console.log(`[Polling] Attempt ${attempt}/${MAX_ATTEMPTS}. Checking verification status...`);
-                                if (attempt > 1) {
-                                    // 2回目以降はインターバルを待つ
-                                    await new Promise({
-                                        "ProfilePage.useEffect.startPolling": (resolve)=>setTimeout(resolve, POLLING_INTERVAL)
-                                    }["ProfilePage.useEffect.startPolling"]);
-                                }
-                                // APIから最新データを取得
-                                const response = await apiClient.get("/api/mypage/profile");
-                                const responseData = response.data;
-                                currentData = responseData.user || responseData;
-                                if (currentData && currentData.email_verified_at) {
-                                    console.log("✅ [Polling] Verification success. Updating state.");
-                                    initializeUserData(responseData);
-                                    setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
-                                    // クエリをクリーンアップ
-                                    router.replace("/mypage/profile");
-                                    break; // 認証が確認されたらループを抜ける
-                                }
-                            }
-                            // ポーリング終了時の処理
-                            if (isVerificationRedirect && attempt >= MAX_ATTEMPTS && !currentData?.email_verified_at) {
-                                console.warn("⚠️ [Polling] Max attempts reached. Verification data not synchronized yet.");
-                                setSuccessMessage("⚠️ メール認証データの反映に時間がかかっています。しばらくしてから再度アクセスするか、リロードしてください。");
-                                // クエリをクリーンアップ
-                                router.replace("/mypage/profile");
-                            }
-                            setIsLoading(false);
-                        } catch (error) {
-                            console.error("[Polling Error]", error);
-                            // ポーリング中のエラーは一旦ローディングを解除
-                            setIsLoading(false);
-                            // 401の場合は既存のfetchUserProfileに任せる
-                            fetchUserProfile(false);
-                        } finally{
-                            setIsFetching(false);
-                        }
-                    }
-                }["ProfilePage.useEffect.startPolling"];
-                // ポーリング開始
-                startPolling();
-                return;
-            }
-            // ★★★ ポーリング処理 終わり ★★★
+            // ★★★ メール認証後のポーリング処理 は削除されます ★★★
             // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
             // ポーリング中でない、かつユーザーデータがあれば、ローディングを解除
             if (user && isAuthenticated && !isFetching && isLoading) {
@@ -261,6 +204,7 @@ function ProfilePage() {
             }
         }
     }["ProfilePage.useEffect"], [
+        // 依存配列は維持
         isAuthLoading,
         isAuthenticated,
         router,
@@ -358,7 +302,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 472,
+                    lineNumber: 384,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -368,7 +312,7 @@ function ProfilePage() {
                             className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 474,
+                            lineNumber: 386,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -376,7 +320,7 @@ function ProfilePage() {
                             children: isAuthLoading ? "認証状態を確認中 / セッションを再確立中..." : isRecovering ? "⚠️ 認証情報を回復中です..." : "データをロード中です..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 475,
+                            lineNumber: 387,
                             columnNumber: 11
                         }, this),
                         isVerificationRedirect && isFetching && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -384,19 +328,19 @@ function ProfilePage() {
                             children: "メール認証の状態を確認中です。しばらくお待ちください。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 483,
+                            lineNumber: 395,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 473,
+                    lineNumber: 385,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 471,
+            lineNumber: 383,
             columnNumber: 7
         }, this);
     }
@@ -410,7 +354,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 496,
+                    lineNumber: 408,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -421,7 +365,7 @@ function ProfilePage() {
                             children: "認証エラー、またはユーザー情報がロードできませんでした。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 498,
+                            lineNumber: 410,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -429,19 +373,19 @@ function ProfilePage() {
                             children: "ログインページへ移動しています..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 501,
+                            lineNumber: 413,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 497,
+                    lineNumber: 409,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 495,
+            lineNumber: 407,
             columnNumber: 7
         }, this);
     }
@@ -456,7 +400,7 @@ function ProfilePage() {
                 children: "プロフィール設定"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 518,
+                lineNumber: 430,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -467,7 +411,7 @@ function ProfilePage() {
                         children: successMessage
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 522,
+                        lineNumber: 434,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -486,7 +430,7 @@ function ProfilePage() {
                                                 className: "jsx-f27e8f3c17414dc1" + " " + "user_image_css"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 532,
+                                                lineNumber: 444,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -497,13 +441,13 @@ function ProfilePage() {
                                                 children: "画像を選択する"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 537,
+                                                lineNumber: 449,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 531,
+                                        lineNumber: 443,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -518,13 +462,13 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 546,
+                                        lineNumber: 458,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 530,
+                                lineNumber: 442,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -532,13 +476,13 @@ function ProfilePage() {
                                 children: imageError
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 555,
+                                lineNumber: 467,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 526,
+                        lineNumber: 438,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -554,7 +498,7 @@ function ProfilePage() {
                                         children: "ユーザー名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 562,
+                                        lineNumber: 474,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -569,7 +513,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "name_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 565,
+                                        lineNumber: 477,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -577,13 +521,13 @@ function ProfilePage() {
                                         children: profileErrors.name ? profileErrors.name[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 575,
+                                        lineNumber: 487,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 561,
+                                lineNumber: 473,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -595,7 +539,7 @@ function ProfilePage() {
                                         children: "郵便番号 (8桁、ハイフンあり)"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 582,
+                                        lineNumber: 494,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -612,7 +556,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "email_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 585,
+                                        lineNumber: 497,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -620,13 +564,13 @@ function ProfilePage() {
                                         children: profileErrors.post_number ? profileErrors.post_number[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 597,
+                                        lineNumber: 509,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 581,
+                                lineNumber: 493,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -638,7 +582,7 @@ function ProfilePage() {
                                         children: "住所"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 604,
+                                        lineNumber: 516,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -654,7 +598,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 607,
+                                        lineNumber: 519,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -662,13 +606,13 @@ function ProfilePage() {
                                         children: profileErrors.address ? profileErrors.address[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 618,
+                                        lineNumber: 530,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 603,
+                                lineNumber: 515,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -680,7 +624,7 @@ function ProfilePage() {
                                         children: "建物名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 625,
+                                        lineNumber: 537,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -695,7 +639,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 628,
+                                        lineNumber: 540,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -703,13 +647,13 @@ function ProfilePage() {
                                         children: profileErrors.building ? profileErrors.building[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 638,
+                                        lineNumber: 550,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 624,
+                                lineNumber: 536,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -721,24 +665,24 @@ function ProfilePage() {
                                     className: "jsx-f27e8f3c17414dc1" + " " + "submit_form"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                    lineNumber: 644,
+                                    lineNumber: 556,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 643,
+                                lineNumber: 555,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 559,
+                        lineNumber: 471,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 520,
+                lineNumber: 432,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -748,7 +692,7 @@ function ProfilePage() {
         ]
     }, authUser?.uid || "unauthenticated", true, {
         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-        lineNumber: 514,
+        lineNumber: 426,
         columnNumber: 5
     }, this);
 }

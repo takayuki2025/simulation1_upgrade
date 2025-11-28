@@ -38,7 +38,7 @@ function Header() {
         try {
             // logoutフックは引数なしで呼び出し、その後クライアント側でリダイレクト
             await logout();
-            router.push("/");
+        // router.push("/"); リダイレクトは不要（logout内で完結しているため）
         } catch (e) {
             console.error("Logout failed:", e);
         }
@@ -72,7 +72,7 @@ function Header() {
                             src: "/image_icon/logo.svg",
                             alt: "会社名",
                             fill: true,
-                            priority: true
+                            loading: "eager"
                         }, void 0, false, {
                             fileName: "[project]/components/Header.tsx",
                             lineNumber: 63,

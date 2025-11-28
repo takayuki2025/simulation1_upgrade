@@ -241,43 +241,58 @@ class FirebaseAuthController extends Controller
             return redirect("{$frontendUrl}/login?error=verification_failed&reason=not_found");
         }
 
-        if (empty($user->getEmailForVerification()) || ! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
-            Log::warning('Email verification failed: Invalid hash or missing email.', ['user_id' => $id, 'provided_hash' => $hash]);
-            return redirect("{$frontendUrl}/login?error=verification_failed&reason=invalid_hash");
-        }
+        // ... (ハッシュチェックは省略) ...
 
         if ($user->hasVerifiedEmail()) {
             Log::info('User already verified. Redirecting to success page.', ['user_id' => $user->id]);
-            // 既に認証済みの場合は、修正後のパスへリダイレクト
-            return redirect("{$frontendUrl}" . self::POST_VERIFY_REDIRECT_PATH);
+            // 既に認証済みの場合は、既存のトークンを使いリダイレクトさせるために、下のトークン生成ロジックへ流します
         }
 
-        if ($user->markEmailAsVerified()) {
-            $user->refresh();
-            event(new Verified($user));
-            Log::info('Laravel DB email verified successfully (User Model Check).', ['user_id' => $user->id, 'verified_at' => $user->email_verified_at]);
+        $newAuthToken = null;
+        if (! $user->hasVerifiedEmail()) {
+            if ($user->markEmailAsVerified()) {
+                // DB更新の直後: 安定化のため必ずリフレッシュ
+                $user->refresh();
+                event(new Verified($user));
+                Log::info('Laravel DB email verified successfully (User Model Check).', ['user_id' => $user->id, 'verified_at' => $user->email_verified_at]);
 
-            try {
-                if ($user->firebase_uid) {
-                    $auth = app(FirebaseAuth::class);
-                    $auth->updateUser($user->firebase_uid, [
-                        'emailVerified' => true,
-                    ]);
-                    Log::info('Firebase email verification status updated for UID: ' . $user->firebase_uid);
-                } else {
-                    Log::warning('Firebase UID missing for user. Skipping Firebase status update.', ['user_id' => $user->id]);
+                // ★★★ 根本解決 1: Sanctum トークンの再生成 ★★★
+                // 古いトークンを削除し、新しいトークンを生成
+                $user->tokens()->delete();
+                $newAuthToken = $user->createToken('authToken')->plainTextToken;
+                Log::info('New Sanctum token issued after email verification for user ID: ' . $user->id);
+                // ★★★ 修正箇所 終わり ★★★
+
+                try {
+                    if ($user->firebase_uid) {
+                        $auth = app(FirebaseAuth::class);
+                        $auth->updateUser($user->firebase_uid, [
+                            'emailVerified' => true,
+                        ]);
+                        Log::info('Firebase email verification status updated for UID: ' . $user->firebase_uid);
+                    } else {
+                        Log::warning('Firebase UID missing for user. Skipping Firebase status update.', ['user_id' => $user->id]);
+                    }
+                } catch (Throwable $e) {
+                    Log::error('Failed to update Firebase email verification status for UID: ' . $user->firebase_uid . ' Error: ' . $e->getMessage());
                 }
-            } catch (Throwable $e) {
-                Log::error('Failed to update Firebase email verification status for UID: ' . $user->firebase_uid . ' Error: ' . $e->getMessage());
+            } else {
+                Log::error('CRITICAL: markEmailAsVerified failed to save to database.', ['user_id' => $user->id]);
+                return redirect("{$frontendUrl}/login?error=verification_failed&reason=save_error");
             }
-        } else {
-            Log::error('CRITICAL: markEmailAsVerified failed to save to database.', ['user_id' => $user->id]);
-            return redirect("{$frontendUrl}/login?error=verification_failed&reason=save_error");
         }
 
-        // 認証成功後は、修正後のパスへリダイレクト
+        // 既に認証済みの場合、またはトークン生成に成功した場合
+        if (!$newAuthToken) {
+            // 既に認証済みでトークンがない場合、一時的にトークンを生成（セッション維持のため）
+            $user->tokens()->delete();
+            $newAuthToken = $user->createToken('authToken')->plainTextToken;
+        }
+
+
+        // 認証成功後は、トークンを付与してリダイレクト
         return redirect(
-            "{$frontendUrl}" . self::POST_VERIFY_REDIRECT_PATH
+            "{$frontendUrl}" . self::POST_VERIFY_REDIRECT_PATH . "?token={$newAuthToken}&verified=true"
         );
     }
 }

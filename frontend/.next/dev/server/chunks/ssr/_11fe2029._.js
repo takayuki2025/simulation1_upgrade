@@ -69,12 +69,11 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/styled-jsx/style.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)"); // AxiosError, AxiosResponse を追加
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
-// 💡 useAuth のみを使用 (useApi は削除)
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
-// 💡 getImageUrl, onImageError はプロジェクト内の実際のパスに修正してください
+// 💡 実際のプロジェクトのパスに修正してください
 var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/utils/utils.ts [app-ssr] (ecmascript)");
 "use client";
 ;
@@ -87,17 +86,16 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$ap
 ;
 // 環境変数
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
-// グローバルなaxiosは、認証が不要なリクエストで使用（ただし、今回は apiClient を優先）
-__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
 function Home() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useSearchParams"])();
     // 1. 認証フックから必要な状態とアクションを取得
-    const { user, isLoading: isAuthLoading, isLoggingOut, isAuthenticated, apiClient, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])(); // useAuthから全ての必要な機能を取得
+    const { isLoading: isAuthLoading, isLoggingOut, isAuthenticated, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const [items, setItems] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])([]);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // APIフェッチ中のローディング
-    // 画像URLのキャッシュ打破用キー
     const [imageRefreshKey, setImageRefreshKey] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
+    // リクエストをキャンセルするための AbortController を保持
+    const abortControllerRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
     // =======================================================
     // Computed State
     // =======================================================
@@ -119,85 +117,25 @@ function Home() {
         isAuthLoading,
         loading
     ]);
-    // テンプレートのログインメッセージ表示に使用
-    const isUserLoggedOutComputed = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        return !isAuthLoading && !user;
-    }, [
-        isAuthLoading,
-        user
-    ]);
     // =======================================================
-    // データフェッチロジック (useAuthの apiClient を使用)
+    // データフェッチロジック
     // =======================================================
     /**
-   * 💡 活用ポイント: 認証済みリクエストを実行する汎用ヘルパー関数
-   * useApiが担っていたロジック（特に401エラー時のリトライ）をここに統合します。
-   * 他のページでも同様の認証済み通信が必要な場合は、このロジックを再利用可能なカスタムフックとして切り出してください。
-   */ const authenticatedFetchWithRetry = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (url, params)=>{
-        // ログアウト中であればすぐにエラーを投げる
-        if (isLoggingOut) {
-            throw new Error("Logging out, skipping request.");
-        }
-        // 認証済みクライアントがなければエラー
-        if (!apiClient) {
-            // apiClient が null の場合、isAuthenticated も false のはずだが、念のためチェック
-            if (!isAuthenticated) {
-                throw new Error("Not authenticated, API client unavailable.");
-            }
-            // ロード中などで一時的に apiClient が null の場合は、待機するかエラーとする
-            throw new Error("API client not initialized.");
-        }
-        const requestConfig = {
-            method: "GET",
-            url: url,
-            params: params
-        };
-        try {
-            // 1. 通常のリクエスト実行
-            return await apiClient.request(requestConfig);
-        } catch (e) {
-            const error = e;
-            const status = error.response?.status;
-            // 2. 401 Unauthorized エラーの場合
-            if (status === 401) {
-                console.warn("401 Unauthorized detected. Attempting token refresh...");
-                try {
-                    // トークンを強制リフレッシュ
-                    await reloadAuthToken();
-                    // 3. 再度リクエストを実行（apiClientは useMemo により新しいトークンで再生成されているはず）
-                    // 💡 注意: Next.js/Reactの非同期環境では、apiClientの再生成を待つ必要がありますが、
-                    // ここでは再レンダリングを挟まずにリトライするため、即時実行で試みます。
-                    // 理想的には、Axiosインターセプターを apiClient に設定することで、この処理を自動化すべきです。
-                    const secondResponse = await apiClient.request(requestConfig);
-                    console.log("Token refresh and retry successful.");
-                    return secondResponse;
-                } catch (refreshError) {
-                    // 4. リフレッシュ失敗またはリトライ後のエラー
-                    console.error("Token refresh or retry failed. Logging out.", refreshError);
-                    await logout(); // 致命的な認証エラーとしてログアウト
-                    throw new Error("Authentication failed after retry.");
-                }
-            }
-            // 401 以外のエラーはそのままスロー
-            throw error;
-        }
-    }, [
-        isAuthenticated,
-        isLoggingOut,
-        apiClient,
-        logout,
-        reloadAuthToken
-    ]);
-    /**
-   * 商品データをAPIから取得する関数
+   * 商品データをAPIから取得する関数 (キャンセル機能付き)
    */ const fetchItems = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (tab, search)=>{
-        // ログアウト処理中はフェッチをスキップ
-        if (isLoggingOut) {
+        // 💡 前のリクエストがあればキャンセルする
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        // 新しい AbortController を生成して参照を更新
+        abortControllerRef.current = new AbortController();
+        // 認証状態が解決するまではフェッチをスキップ
+        if (isAuthLoading || isLoggingOut) {
             setItems([]);
             setLoading(false);
             return;
         }
-        // マイリストタブかつ未ログインの場合、フェッチをスキップ
+        // マイリストタブかつ未認証の場合、フェッチをスキップ
         if (tab === "mylist" && !isAuthenticated) {
             setItems([]);
             setLoading(false);
@@ -215,13 +153,26 @@ function Home() {
         try {
             let responseData;
             if (useAuthClient) {
-                // ★★★ 認証済みリクエスト (apiClient/retryロジックを使用) ★★★
-                const response = await authenticatedFetchWithRetry(apiUrl, params);
+                // ★★★ 修正の核心: 認証が必要だが apiClient が null なら中断し、再実行を待つ ★★★
+                if (!apiClient) {
+                    console.warn("API client (token) not ready for authenticated request. Skipping fetch.");
+                    setItems([]);
+                    setLoading(false);
+                    // 💡 ここで return することで、apiClientが準備された後の useEffect の再発火を待つ
+                    return;
+                }
+                // ★★★ 修正終わり ★★★
+                // AbortController をシグナルとして渡す
+                const response = await apiClient.get(apiUrl, {
+                    params: params,
+                    signal: abortControllerRef.current.signal
+                });
                 responseData = response.data;
             } else {
-                // ★★★ 未認証リクエスト (グローバル axios を使用) ★★★
+                // 未認証リクエスト (グローバル axios を使用)
                 const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}${apiUrl}`, {
-                    params: params
+                    params: params,
+                    signal: abortControllerRef.current.signal
                 });
                 responseData = response.data;
             }
@@ -232,29 +183,38 @@ function Home() {
                 setItems([]);
             }
         } catch (e) {
-            // ログアウト処理は authenticatedFetchWithRetry で行われるため、ここではエラーをハンドルするのみ
+            // キャンセルエラーを無視する
+            if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].isCancel(e)) {
+                console.log("Fetch canceled due to state change.");
+                return;
+            }
             console.error("商品の取得中にエラーが発生しました:", e);
             setItems([]);
         } finally{
             setLoading(false);
         }
-    }, // 依存配列: 認証状態とカスタムフェッチャーに依存
-    [
+    }, [
         isAuthenticated,
         isLoggingOut,
-        authenticatedFetchWithRetry
+        isAuthLoading,
+        apiClient
     ]);
     // =======================================================
     // Effect / Watcher
     // =======================================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        // 認証状態の解決を待つ
         if (isAuthLoading) {
             setItems([]);
             return;
         }
         // 認証が解決した後、またはクエリ/認証状態が変わったときにフェッチを実行
         fetchItems(currentTab, currentSearchQuery);
+        // クリーンアップ: コンポーネントがアンマウントされるときや依存関係が変わるときにキャンセルする
+        return ()=>{
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [
         currentTab,
         currentSearchQuery,
@@ -274,7 +234,7 @@ function Home() {
                         className: "jsx-4e0e618d58474dad" + " " + "animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 241,
+                        lineNumber: 201,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -282,13 +242,13 @@ function Home() {
                         children: isLoggingOut ? "ログアウト処理中..." : isAuthLoading ? "認証状態を確認中..." : "商品を読み込み中..."
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 242,
+                        lineNumber: 202,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/page.tsx",
-                lineNumber: 240,
+                lineNumber: 200,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -314,7 +274,7 @@ function Home() {
                                 children: "すべて"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 257,
+                                lineNumber: 217,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -334,13 +294,13 @@ function Home() {
                                 children: "マイリスト"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 273,
+                                lineNumber: 233,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 255,
+                        lineNumber: 215,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -360,7 +320,7 @@ function Home() {
                                                     className: "jsx-4e0e618d58474dad" + " " + "w-full aspect-square object-cover block rounded-lg shadow-md"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 298,
+                                                    lineNumber: 258,
                                                     columnNumber: 21
                                                 }, this),
                                                 item.remain === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -368,13 +328,13 @@ function Home() {
                                                     children: "SOLD"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 305,
+                                                    lineNumber: 265,
                                                     columnNumber: 43
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 297,
+                                            lineNumber: 257,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -385,7 +345,7 @@ function Home() {
                                                     children: item.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 308,
+                                                    lineNumber: 268,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -396,50 +356,49 @@ function Home() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 309,
+                                                    lineNumber: 269,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 307,
+                                            lineNumber: 267,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/page.tsx",
-                                    lineNumber: 296,
+                                    lineNumber: 256,
                                     columnNumber: 17
                                 }, this)
                             }, item.id, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 294,
+                                lineNumber: 254,
                                 columnNumber: 15
                             }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "jsx-4e0e618d58474dad" + " " + "text-center w-full py-10 text-gray-500",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                 className: "jsx-4e0e618d58474dad",
-                                children: currentTab === "mylist" && isUserLoggedOutComputed ? "マイリストを見るにはログインしてください。" : currentTab === "all" && isAuthLoading ? "認証状態を確認中..." // 認証ロード中は認証状態を確認中を表示
-                                 : "該当する商品が見つかりませんでした。"
+                                children: currentTab === "mylist" && !isAuthLoading && !isAuthenticated ? "マイリストを見るにはログインしてください。" : currentTab === "all" && isAuthLoading ? "認証状態を確認中..." : "該当する商品が見つかりませんでした。"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 318,
+                                lineNumber: 278,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/page.tsx",
-                            lineNumber: 317,
+                            lineNumber: 277,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 290,
+                        lineNumber: 250,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/page.tsx",
-                lineNumber: 253,
+                lineNumber: 213,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -449,7 +408,7 @@ function Home() {
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/page.tsx",
-        lineNumber: 237,
+        lineNumber: 197,
         columnNumber: 5
     }, this);
 }

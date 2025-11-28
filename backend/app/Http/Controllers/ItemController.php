@@ -32,11 +32,18 @@ class ItemController extends Controller
     // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
     public function index(Request $request): JsonResponse
     {
+        
+// 💡 暫定デバッグ: 認証状態に関わらず、正常なJSONレスポンスを返す
+return response()->json([
+    'items' => [], // 空の配列を返す
+    'current_tab' => $request->query('tab', 'all'),
+    'debug_message' => 'Controller logic skipped for debug.',
+], 200);
+
+        // ヘッダー情報のデバッグログ
         Log::info('FINAL_AUTHORIZATION_HEADER_CHECK: ' . $request->header('Authorization'));
-        // リクエストヘッダーのフルダンプ
         $allHeaders = $request->headers->all();
         Log::info("ITEM_CONTROLLER_HEADER_DUMP: " . json_encode($allHeaders));
-        // 特にAuthorizationヘッダーの存在を確認
         Log::info("ITEM_CONTROLLER_AUTH_HEADER_FINAL_CHECK: " . ($request->header('Authorization') ?? 'N/A'));
 
         // URLのGETパラメータ'tab'を取得。デフォルトは'all'
@@ -45,27 +52,26 @@ class ItemController extends Controller
         // URLのGETパラメータ'all_item_search'を取得
         $searchQuery = $request->query('all_item_search');
 
-        // ★★★ 認証状態のデバッグ強化 ★★★
-        // 1. Request::user()からユーザーを取得 (ミドルウェアがセットする場所)
+        // ★★★ 認証状態の取得 ★★★
+        // Request::user()からユーザーを取得 (Sanctum認証ミドルウェアが設定した場合)
         $user = $request->user();
 
-        // 2. Authファサードからもユーザーを取得
+        // Authファサードからもユーザーを取得（$userがnullの場合にフォールバックとして使用可能だが、ここではデバッグ用）
         $authFacadeUser = Auth::user();
 
+        // 💡 認証ユーザーIDは $user の id に基づく（なければ null）
         $authId = $user ? $user->id : ($authFacadeUser ? $authFacadeUser->id : null);
 
-        // ログの出力（デバッグ情報として重要）
+        // ログの出力（デバッグ情報）
         Log::info("ItemController@index called. Resolved AuthID: " . ($authId ?? 'N/A'));
-
-        // 3. Sanctumガードの状態を確認
         $authCheckSanctum = Auth::guard('sanctum')->check() ? 'TRUE' : 'FALSE';
         Log::info("ItemController@index: Is Request User Present?: " . ($user ? 'TRUE (ID: ' . $user->id . ')' : 'FALSE') . ", Is Auth Facade User Present?: " . ($authFacadeUser ? 'TRUE (ID: ' . $authFacadeUser->id . ')' : 'FALSE') . ", SanctumCheck: {$authCheckSanctum}");
-        // ★★★ 認証状態のデバッグ強化ここまで ★★★
+        // ★★★ 認証状態の取得ここまで ★★★
 
 
         if ($tab === 'mylist') {
             // 'mylist'タブの場合、いいねした商品を取得
-
+            
             // ★★★ 認証チェックは $user が必須 ★★★
             if (!$user) {
                 $items = collect([]);
@@ -78,12 +84,11 @@ class ItemController extends Controller
                 $query = Item::whereIn('id', $likedItemIds)
                     ->withCount(['comments', 'goods']);
 
-                // 検索キーワードでフィルタリング (クエリビルダに適用)
+                // 検索キーワードでフィルタリング
                 if (!empty($searchQuery)) {
                     $query->where('name', 'like', '%' . $searchQuery . '%');
                 }
 
-                // ★追加: mylistのSQLもデバッグ
                 Log::info("ItemController@index: MYLIST QUERY SQL: " . $query->toSql());
                 Log::info("ItemController@index: MYLIST QUERY BINDINGS: " . json_encode($query->getBindings()));
 
@@ -94,11 +99,12 @@ class ItemController extends Controller
             // 'all'タブ（またはデフォルト）の場合、全商品を取得
             $query = Item::query();
 
-            // 💡 認証済みユーザーの場合のみ、自身が出品した商品を除外する
-            if ($authId) {
+            // 💡 修正箇所: 認証済みユーザーの場合のみ、自身が出品した商品を除外するロジックを修正
+            if ($user && $user->id) {
                 // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
-                $query->where('user_id', '!=', $authId);
-                Log::info("ItemController@index: Filter applied. Excluding items by user {$authId}.");
+                // 🚨 以前の $authId の代わりに、$user->id を直接使用し、クエリビルダに渡す
+                $query->where('user_id', '!=', $user->id);
+                Log::info("ItemController@index: Filter applied. Excluding items by user {$user->id}.");
             }
 
             // 検索キーワードがあれば、クエリをフィルタリング
@@ -106,12 +112,9 @@ class ItemController extends Controller
                 $query->where('name', 'like', '%' . $searchQuery . '%');
             }
 
-            // ★★★ 修正箇所: SQLクエリのデバッグログを追加 ★★★
-            // get()を実行する前にtoSql()とgetBindings()を呼び出してログに出力する
-            // toSql()はバインドされる前のクエリ、getBindings()はバインドされる値を取得
+            // SQLクエリのデバッグログを追加
             Log::info("ItemController@index: ALL ITEMS QUERY SQL: " . $query->toSql());
             Log::info("ItemController@index: ALL ITEMS QUERY BINDINGS: " . json_encode($query->getBindings()));
-            // ★★★ 修正箇所ここまで ★★★
 
             // リレーションをロード
             $items = $query->withCount(['comments', 'goods'])->get();
@@ -121,26 +124,26 @@ class ItemController extends Controller
         $items->each(function ($item) {
 
             // 画像パスが相対パス（storage/images/...）であると仮定し、そのまま返す
-            // Nuxt側でASSET_BASE_URLと結合してフルURLにする
             if ($item->item_image && !Str::startsWith($item->item_image, ['http://', 'https://'])) {
-                // 'storage/' が含まれていない場合は追加（二重に追加されないように注意）
+                // 'storage/' が含まれていない場合は追加
                 if (!Str::startsWith($item->item_image, 'storage/')) {
-                    $item->item_image = 'storage/' . $item->item_image; // 例: storage/images/item_xxx.jpg
+                    $item->item_image = 'storage/' . $item->item_image;
                 }
             }
 
-            // 💡 商品に `remain` カラムがない場合を考慮して、強制的に追加
+            // 商品に `remain` カラムがない場合を考慮して、強制的に追加
             if (!isset($item->remain)) {
-                $item->remain = 1; // 暫定で1を設定、実際の在庫管理ロジックに従う必要があります
+                $item->remain = 1; // 暫定
             }
         });
 
-        // 🚨 HTMLビューではなくJSONデータを返す
+        // JSONデータを返す
         return response()->json([
             'items' => $items,
             'current_tab' => $tab,
         ]);
     }
+
 
 
 

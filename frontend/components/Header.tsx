@@ -29,7 +29,7 @@ export default function Header() {
     try {
       // logoutフックは引数なしで呼び出し、その後クライアント側でリダイレクト
       await logout();
-      router.push("/");
+      // router.push("/"); リダイレクトは不要（logout内で完結しているため）
     } catch (e) {
       console.error("Logout failed:", e);
     }
@@ -65,7 +65,7 @@ export default function Header() {
             src="/image_icon/logo.svg"
             alt="会社名"
             fill
-            priority
+            loading="eager" //priorityは非推奨となった（早い読み込みオプション）
           />
         </Link>
         {/* ★修正箇所: ローディング中は検索フォームとナビゲーションを非表示にし、プレースホルダーを表示 */}

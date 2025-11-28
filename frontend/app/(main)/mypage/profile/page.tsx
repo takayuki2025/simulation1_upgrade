@@ -229,6 +229,7 @@ export default function ProfilePage() {
     // 2. 未認証の場合はログインへリダイレクト
     if (!isAuthenticated) {
       if (isVerificationRedirect) {
+        // このロジックは残す
         console.log("Waiting for session resolve.");
         return;
       }
@@ -240,16 +241,9 @@ export default function ProfilePage() {
     }
 
     // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
-    // または、認証済みリダイレクト中で、まだメールが未認証と表示されている場合
     const needsInitialFetch =
       isAuthenticated && apiClient && !user && !isFetching;
-    const needsPolling =
-      isAuthenticated &&
-      apiClient &&
-      isVerificationRedirect &&
-      user &&
-      !user.email_verified_at &&
-      !isFetching;
+    // 💡 削除: needsPolling はもう不要です
 
     // 初回フェッチ
     if (needsInitialFetch) {
@@ -258,90 +252,7 @@ export default function ProfilePage() {
       return;
     }
 
-    // ★★★ メール認証後のポーリング処理 ★★★
-    if (needsPolling) {
-      console.log("[DEBUG] Verification Polling Started.");
-
-      let attempt = 0;
-      const MAX_ATTEMPTS = 5;
-      const POLLING_INTERVAL = 1000; // 1秒間隔
-
-      const startPolling = async () => {
-        setIsFetching(true); // ポーリング中はフェッチ中とする
-        setIsLoading(true); // UIをローディング状態に保つ
-
-        try {
-          let currentData: User | null = user;
-
-          while (
-            isVerificationRedirect &&
-            currentData &&
-            !currentData.email_verified_at &&
-            attempt < MAX_ATTEMPTS
-          ) {
-            attempt++;
-            console.log(
-              `[Polling] Attempt ${attempt}/${MAX_ATTEMPTS}. Checking verification status...`,
-            );
-
-            if (attempt > 1) {
-              // 2回目以降はインターバルを待つ
-              await new Promise((resolve) =>
-                setTimeout(resolve, POLLING_INTERVAL),
-              );
-            }
-
-            // APIから最新データを取得
-            const response = await apiClient.get("/api/mypage/profile");
-            const responseData = response.data;
-            currentData = responseData.user || responseData;
-
-            if (currentData && currentData.email_verified_at) {
-              console.log("✅ [Polling] Verification success. Updating state.");
-              initializeUserData(responseData);
-              setSuccessMessage(
-                "メール認証が完了しました！引き続きサービスをご利用いただけます。",
-              );
-
-              // クエリをクリーンアップ
-              router.replace("/mypage/profile");
-              break; // 認証が確認されたらループを抜ける
-            }
-          }
-
-          // ポーリング終了時の処理
-          if (
-            isVerificationRedirect &&
-            attempt >= MAX_ATTEMPTS &&
-            !currentData?.email_verified_at
-          ) {
-            console.warn(
-              "⚠️ [Polling] Max attempts reached. Verification data not synchronized yet.",
-            );
-            setSuccessMessage(
-              "⚠️ メール認証データの反映に時間がかかっています。しばらくしてから再度アクセスするか、リロードしてください。",
-            );
-            // クエリをクリーンアップ
-            router.replace("/mypage/profile");
-          }
-
-          setIsLoading(false);
-        } catch (error) {
-          console.error("[Polling Error]", error);
-          // ポーリング中のエラーは一旦ローディングを解除
-          setIsLoading(false);
-          // 401の場合は既存のfetchUserProfileに任せる
-          fetchUserProfile(false);
-        } finally {
-          setIsFetching(false);
-        }
-      };
-
-      // ポーリング開始
-      startPolling();
-      return;
-    }
-    // ★★★ ポーリング処理 終わり ★★★
+    // ★★★ メール認証後のポーリング処理 は削除されます ★★★
 
     // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
     // ポーリング中でない、かつユーザーデータがあれば、ローディングを解除
@@ -350,17 +261,18 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   }, [
+    // 依存配列は維持
     isAuthLoading,
     isAuthenticated,
     router,
     fetchUserProfile,
-    user, // 認証情報が変わったら再評価される
+    user,
     isVerificationRedirect,
     isRecovering,
     authUser,
     apiClient,
-    isFetching, // isFetchingが変わった時も再評価
-    isLoading, // isLoadingが変わった時も再評価
+    isFetching,
+    isLoading,
     initializeUserData,
   ]);
 

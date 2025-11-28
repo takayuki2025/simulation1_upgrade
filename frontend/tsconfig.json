@@ -4,11 +4,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     /* Bundler mode */
@@ -16,7 +12,11 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+
+    // ★★★ 修正箇所: composite と noEmit: false を削除/trueに戻す ★★★
+    "composite": false, // または削除
+    "noEmit": true, // ★★★ true に戻す
+
     "jsx": "preserve", // Reactプロジェクトであることを明示
     /* Linting */
     "strict": true,
@@ -29,7 +29,8 @@
     "src/**/*.jsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "types/**/*.d.ts"
   ],
   "references": [
     {

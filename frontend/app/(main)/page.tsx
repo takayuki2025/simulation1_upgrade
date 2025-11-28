@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import axios, { AxiosError, AxiosResponse } from "axios"; // AxiosError, AxiosResponse を追加
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import axios from "axios";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-// 💡 useAuth のみを使用 (useApi は削除)
-import { useAuth, AuthContextType } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
-// 💡 getImageUrl, onImageError はプロジェクト内の実際のパスに修正してください
+// 💡 実際のプロジェクトのパスに修正してください
 import { getImageUrl, onImageError } from "@/utils/utils";
 
 // 環境変数
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-// グローバルなaxiosは、認証が不要なリクエストで使用（ただし、今回は apiClient を優先）
-axios.defaults.withCredentials = true;
 
 // =======================================================
 // 型定義
@@ -30,7 +32,7 @@ interface Item {
 }
 
 // =======================================================
-// メインコンポーネント
+// メインコンポーネント: Home
 // =======================================================
 
 export default function Home() {
@@ -39,19 +41,18 @@ export default function Home() {
 
   // 1. 認証フックから必要な状態とアクションを取得
   const {
-    user,
     isLoading: isAuthLoading,
     isLoggingOut,
     isAuthenticated,
-    apiClient, // ★ 認証済みクライアント
-    logout, // ★ ログアウト関数
-    reloadAuthToken, // ★ トークンリフレッシュ関数
-  } = useAuth(); // useAuthから全ての必要な機能を取得
+    apiClient, // Interceptor実装済みクライアント
+  } = useAuth();
 
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false); // APIフェッチ中のローディング
-  // 画像URLのキャッシュ打破用キー
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
+
+  // リクエストをキャンセルするための AbortController を保持
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // =======================================================
   // Computed State
@@ -70,98 +71,30 @@ export default function Home() {
     return isLoggingOut || isAuthLoading || loading;
   }, [isLoggingOut, isAuthLoading, loading]);
 
-  // テンプレートのログインメッセージ表示に使用
-  const isUserLoggedOutComputed = useMemo(() => {
-    return !isAuthLoading && !user;
-  }, [isAuthLoading, user]);
-
   // =======================================================
-  // データフェッチロジック (useAuthの apiClient を使用)
+  // データフェッチロジック
   // =======================================================
 
   /**
-   * 💡 活用ポイント: 認証済みリクエストを実行する汎用ヘルパー関数
-   * useApiが担っていたロジック（特に401エラー時のリトライ）をここに統合します。
-   * 他のページでも同様の認証済み通信が必要な場合は、このロジックを再利用可能なカスタムフックとして切り出してください。
-   */
-  const authenticatedFetchWithRetry = useCallback(
-    async (url: string, params: any): Promise<AxiosResponse> => {
-      // ログアウト中であればすぐにエラーを投げる
-      if (isLoggingOut) {
-        throw new Error("Logging out, skipping request.");
-      }
-
-      // 認証済みクライアントがなければエラー
-      if (!apiClient) {
-        // apiClient が null の場合、isAuthenticated も false のはずだが、念のためチェック
-        if (!isAuthenticated) {
-          throw new Error("Not authenticated, API client unavailable.");
-        }
-        // ロード中などで一時的に apiClient が null の場合は、待機するかエラーとする
-        throw new Error("API client not initialized.");
-      }
-
-      const requestConfig = {
-        method: "GET",
-        url: url,
-        params: params,
-      };
-
-      try {
-        // 1. 通常のリクエスト実行
-        return await apiClient.request(requestConfig);
-      } catch (e) {
-        const error = e as AxiosError;
-        const status = error.response?.status;
-
-        // 2. 401 Unauthorized エラーの場合
-        if (status === 401) {
-          console.warn(
-            "401 Unauthorized detected. Attempting token refresh..."
-          );
-
-          try {
-            // トークンを強制リフレッシュ
-            await reloadAuthToken();
-
-            // 3. 再度リクエストを実行（apiClientは useMemo により新しいトークンで再生成されているはず）
-            // 💡 注意: Next.js/Reactの非同期環境では、apiClientの再生成を待つ必要がありますが、
-            // ここでは再レンダリングを挟まずにリトライするため、即時実行で試みます。
-            // 理想的には、Axiosインターセプターを apiClient に設定することで、この処理を自動化すべきです。
-            const secondResponse = await apiClient.request(requestConfig);
-            console.log("Token refresh and retry successful.");
-            return secondResponse;
-          } catch (refreshError) {
-            // 4. リフレッシュ失敗またはリトライ後のエラー
-            console.error(
-              "Token refresh or retry failed. Logging out.",
-              refreshError
-            );
-            await logout(); // 致命的な認証エラーとしてログアウト
-            throw new Error("Authentication failed after retry.");
-          }
-        }
-
-        // 401 以外のエラーはそのままスロー
-        throw error;
-      }
-    },
-    [isAuthenticated, isLoggingOut, apiClient, logout, reloadAuthToken]
-  );
-
-  /**
-   * 商品データをAPIから取得する関数
+   * 商品データをAPIから取得する関数 (キャンセル機能付き)
    */
   const fetchItems = useCallback(
     async (tab: string, search: string) => {
-      // ログアウト処理中はフェッチをスキップ
-      if (isLoggingOut) {
+      // 💡 前のリクエストがあればキャンセルする
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // 新しい AbortController を生成して参照を更新
+      abortControllerRef.current = new AbortController();
+
+      // 認証状態が解決するまではフェッチをスキップ
+      if (isAuthLoading || isLoggingOut) {
         setItems([]);
         setLoading(false);
         return;
       }
 
-      // マイリストタブかつ未ログインの場合、フェッチをスキップ
+      // マイリストタブかつ未認証の場合、フェッチをスキップ
       if (tab === "mylist" && !isAuthenticated) {
         setItems([]);
         setLoading(false);
@@ -181,13 +114,29 @@ export default function Home() {
         let responseData;
 
         if (useAuthClient) {
-          // ★★★ 認証済みリクエスト (apiClient/retryロジックを使用) ★★★
-          const response = await authenticatedFetchWithRetry(apiUrl, params);
+          // ★★★ 修正の核心: 認証が必要だが apiClient が null なら中断し、再実行を待つ ★★★
+          if (!apiClient) {
+            console.warn(
+              "API client (token) not ready for authenticated request. Skipping fetch.",
+            );
+            setItems([]);
+            setLoading(false);
+            // 💡 ここで return することで、apiClientが準備された後の useEffect の再発火を待つ
+            return;
+          }
+          // ★★★ 修正終わり ★★★
+
+          // AbortController をシグナルとして渡す
+          const response = await apiClient.get(apiUrl, {
+            params: params,
+            signal: abortControllerRef.current.signal,
+          });
           responseData = response.data;
         } else {
-          // ★★★ 未認証リクエスト (グローバル axios を使用) ★★★
+          // 未認証リクエスト (グローバル axios を使用)
           const response = await axios.get(`${API_BASE_URL}${apiUrl}`, {
             params: params,
+            signal: abortControllerRef.current.signal,
           });
           responseData = response.data;
         }
@@ -199,19 +148,24 @@ export default function Home() {
           setItems([]);
         }
       } catch (e: any) {
-        // ログアウト処理は authenticatedFetchWithRetry で行われるため、ここではエラーをハンドルするのみ
+        // キャンセルエラーを無視する
+        if (axios.isCancel(e)) {
+          console.log("Fetch canceled due to state change.");
+          return;
+        }
+
         console.error("商品の取得中にエラーが発生しました:", e);
         setItems([]);
       } finally {
         setLoading(false);
       }
     },
-    // 依存配列: 認証状態とカスタムフェッチャーに依存
     [
       isAuthenticated,
       isLoggingOut,
-      authenticatedFetchWithRetry, // 認証クライアントとリトライロジックを内包
-    ]
+      isAuthLoading,
+      apiClient, // apiClient の変更を監視
+    ],
   );
 
   // =======================================================
@@ -219,7 +173,6 @@ export default function Home() {
   // =======================================================
 
   useEffect(() => {
-    // 認証状態の解決を待つ
     if (isAuthLoading) {
       setItems([]);
       return;
@@ -227,6 +180,13 @@ export default function Home() {
 
     // 認証が解決した後、またはクエリ/認証状態が変わったときにフェッチを実行
     fetchItems(currentTab, currentSearchQuery);
+
+    // クリーンアップ: コンポーネントがアンマウントされるときや依存関係が変わるときにキャンセルする
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [currentTab, currentSearchQuery, isAuthLoading, fetchItems]);
 
   // =======================================================
@@ -243,13 +203,13 @@ export default function Home() {
             {isLoggingOut
               ? "ログアウト処理中..."
               : isAuthLoading
-              ? "認証状態を確認中..."
-              : "商品を読み込み中..."}
+                ? "認証状態を確認中..."
+                : "商品を読み込み中..."}
           </p>
         </div>
       )}
 
-      {/* メインコンテンツエリア (ローディング中は非表示) */}
+      {/* メインコンテンツエリア (isPageLoading中は非表示) */}
       <div className={isPageLoading ? "hidden" : ""}>
         {/* タブ切り替えコンポーネント */}
         <div className="main_select">
@@ -316,18 +276,18 @@ export default function Home() {
           ) : (
             <div className="text-center w-full py-10 text-gray-500">
               <p>
-                {currentTab === "mylist" && isUserLoggedOutComputed
+                {currentTab === "mylist" && !isAuthLoading && !isAuthenticated
                   ? "マイリストを見るにはログインしてください。"
                   : currentTab === "all" && isAuthLoading
-                  ? "認証状態を確認中..." // 認証ロード中は認証状態を確認中を表示
-                  : "該当する商品が見つかりませんでした。"}
+                    ? "認証状態を確認中..."
+                    : "該当する商品が見つかりませんでした。"}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* スタイル定義 (変更なし) */}
+      {/* --- スタイル定義 --- */}
       <style jsx>{`
         .main_contents {
           margin: 0 auto;
