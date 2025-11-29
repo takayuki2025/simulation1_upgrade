@@ -304,7 +304,7 @@ export default function Mypage() {
     return (
       <div className="text-center p-8">
         <p className="text-xl text-red-500">
-          ユーザー情報がロードできませんでした。
+          ユーザー情報を再ロード中です。しばらくお待ちください。このページのままでしたら修正が必要です。
         </p>
       </div>
     );

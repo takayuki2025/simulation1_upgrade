@@ -6,6 +6,7 @@ __turbopack_context__.s([
     "default",
     ()=>RegisterPage
 ]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-client] (ecmascript)");
@@ -21,6 +22,8 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
+// API BASE URL をインポート
+const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 function RegisterPage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
@@ -31,12 +34,11 @@ function RegisterPage() {
     const [passwordConfirmation, setPasswordConfirmation] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [apiError, setApiError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [isSubmitting, setIsSubmitting] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    // ★★★ 修正箇所: 競合状態を防ぐため、処理が始まっていることを示す新しいステートを追加 ★★★
+    const [isProcessing, setIsProcessing] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "RegisterPage.useEffect": ()=>{
-        // 💡 認証状態の監視とリダイレクトは、AuthProviderに一任するため、ここでは一時的にコメントアウト
-        // if (!isLoading && isAuthenticated) {
-        //   router.push("/");
-        // }
+        // 認証状態の監視とリダイレクトは、AuthProviderに一任するため、ここでは一時的にコメントアウト
         }
     }["RegisterPage.useEffect"], [
         isLoading,
@@ -48,18 +50,22 @@ function RegisterPage() {
             children: "認証状態を確認中..."
         }, void 0, false, {
             fileName: "[project]/app/(auth)/register/page.tsx",
-            lineNumber: 41,
+            lineNumber: 43,
             columnNumber: 12
         }, this);
     }
-    // 💡 登録ページでは、認証済みでもリダイレクトさせないように一時的に修正
-    // if (isAuthenticated) return null;
     const handleSubmit = async (e)=>{
         e.preventDefault();
+        // ★★★ 修正箇所: 処理中に再度実行されないようガード句を追加 ★★★
+        if (isProcessing) return;
         setApiError("");
         setIsSubmitting(true);
+        setIsProcessing(true); // 処理開始
         try {
             if (!auth) throw new Error("Auth service unavailable");
+            // ★★★ 名前欠落修正1: API_BASE_URLのチェックを追加 ★★★
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
             // 1. Firebase 認証を実行
             const userCredential = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
             // profile 更新（名前）
@@ -69,7 +75,8 @@ function RegisterPage() {
             // Firebase ID Token を取得（Laravel に送る）
             const idToken = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getIdToken"])(userCredential.user);
             // 2. Laravel API に登録（必須！！！）
-            const res = await fetch("https://laravel.test/api/firebase/login", {
+            // ★★★ 名前欠落修正2: エンドポイントを /api/login_or_register に統一 ★★★
+            const res = await fetch(`${API_BASE_URL}/api/login_or_register`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -85,7 +92,7 @@ function RegisterPage() {
             if (!res.ok) {
                 throw new Error(data.error || "Laravel registration failed");
             }
-            // 3. 💡 修正箇所: Laravel API のレスポンスをチェックしてリダイレクト先を決定
+            // 3. Laravel API のレスポンスをチェックしてリダイレクト先を決定
             if (data.needs_email_verification) {
                 // メール未認証が必要な場合、認証ページへ
                 router.push("/email/verify");
@@ -97,6 +104,7 @@ function RegisterPage() {
             setApiError(err.message);
         } finally{
             setIsSubmitting(false);
+            setIsProcessing(false); // 処理完了
         }
     };
     // -------------------------
@@ -110,7 +118,7 @@ function RegisterPage() {
                 children: "会員登録"
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 110,
+                lineNumber: 118,
                 columnNumber: 7
             }, this),
             apiError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -118,7 +126,7 @@ function RegisterPage() {
                 children: apiError
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 116,
+                lineNumber: 124,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -133,7 +141,7 @@ function RegisterPage() {
                                 children: "ユーザー名"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 124,
+                                lineNumber: 133,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -143,16 +151,16 @@ function RegisterPage() {
                                 onChange: (e)=>setName(e.target.value),
                                 className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150",
                                 required: true,
-                                disabled: isSubmitting
+                                disabled: isProcessing
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 130,
+                                lineNumber: 139,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 123,
+                        lineNumber: 132,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -163,7 +171,7 @@ function RegisterPage() {
                                 children: "メールアドレス"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 143,
+                                lineNumber: 152,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -173,16 +181,16 @@ function RegisterPage() {
                                 onChange: (e)=>setEmail(e.target.value),
                                 className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150",
                                 required: true,
-                                disabled: isSubmitting
+                                disabled: isProcessing
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 149,
+                                lineNumber: 158,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 142,
+                        lineNumber: 151,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -193,7 +201,7 @@ function RegisterPage() {
                                 children: "パスワード"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 162,
+                                lineNumber: 171,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -203,16 +211,16 @@ function RegisterPage() {
                                 onChange: (e)=>setPassword(e.target.value),
                                 className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150",
                                 required: true,
-                                disabled: isSubmitting
+                                disabled: isProcessing
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 168,
+                                lineNumber: 177,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 161,
+                        lineNumber: 170,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -223,7 +231,7 @@ function RegisterPage() {
                                 children: "確認用パスワード"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 181,
+                                lineNumber: 190,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -233,39 +241,39 @@ function RegisterPage() {
                                 onChange: (e)=>setPasswordConfirmation(e.target.value),
                                 className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150",
                                 required: true,
-                                disabled: isSubmitting
+                                disabled: isProcessing
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 187,
+                                lineNumber: 196,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 180,
+                        lineNumber: 189,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "pt-2",
                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             type: "submit",
-                            disabled: isSubmitting,
+                            disabled: isProcessing,
                             className: "w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed",
                             children: isSubmitting ? "登録中..." : "登録する"
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/register/page.tsx",
-                            lineNumber: 200,
+                            lineNumber: 209,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 199,
+                        lineNumber: 208,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 121,
+                lineNumber: 130,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -276,22 +284,22 @@ function RegisterPage() {
                     children: "ログインはこちら"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/register/page.tsx",
-                    lineNumber: 212,
+                    lineNumber: 221,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 211,
+                lineNumber: 220,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(auth)/register/page.tsx",
-        lineNumber: 109,
+        lineNumber: 117,
         columnNumber: 5
     }, this);
 }
-_s(RegisterPage, "2P/TX2Rtrj9+3ittcEaXzJNRNZ4=", false, function() {
+_s(RegisterPage, "fdvjE3zLxvaNWdCg/xuzq9qidsc=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]

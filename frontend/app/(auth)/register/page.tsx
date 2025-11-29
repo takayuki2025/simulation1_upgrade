@@ -10,6 +10,9 @@ import {
   getIdToken,
 } from "firebase/auth";
 
+// API BASE URL をインポート
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 // 💡 レスポンスの型を定義
 interface LaravelRegisterResponse {
   message: string;
@@ -29,28 +32,31 @@ export default function RegisterPage() {
 
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // ★★★ 修正箇所: 競合状態を防ぐため、処理が始まっていることを示す新しいステートを追加 ★★★
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // 💡 認証状態の監視とリダイレクトは、AuthProviderに一任するため、ここでは一時的にコメントアウト
-    // if (!isLoading && isAuthenticated) {
-    //   router.push("/");
-    // }
+    // 認証状態の監視とリダイレクトは、AuthProviderに一任するため、ここでは一時的にコメントアウト
   }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return <p>認証状態を確認中...</p>;
   }
 
-  // 💡 登録ページでは、認証済みでもリダイレクトさせないように一時的に修正
-  // if (isAuthenticated) return null;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ★★★ 修正箇所: 処理中に再度実行されないようガード句を追加 ★★★
+    if (isProcessing) return;
+
     setApiError("");
     setIsSubmitting(true);
+    setIsProcessing(true); // 処理開始
 
     try {
       if (!auth) throw new Error("Auth service unavailable");
+      // ★★★ 名前欠落修正1: API_BASE_URLのチェックを追加 ★★★
+      if (!API_BASE_URL) throw new Error("API_BASE_URL is not defined");
 
       // 1. Firebase 認証を実行
       const userCredential = await createUserWithEmailAndPassword(
@@ -68,14 +74,15 @@ export default function RegisterPage() {
       const idToken = await getIdToken(userCredential.user);
 
       // 2. Laravel API に登録（必須！！！）
-      const res = await fetch("https://laravel.test/api/firebase/login", {
+      // ★★★ 名前欠落修正2: エンドポイントを /api/login_or_register に統一 ★★★
+      const res = await fetch(`${API_BASE_URL}/api/login_or_register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           id_token: idToken,
-          name,
+          name, // nameキーはここで確実に送信される (空文字でも送信)
           email,
         }),
         credentials: "include",
@@ -87,7 +94,7 @@ export default function RegisterPage() {
         throw new Error(data.error || "Laravel registration failed");
       }
 
-      // 3. 💡 修正箇所: Laravel API のレスポンスをチェックしてリダイレクト先を決定
+      // 3. Laravel API のレスポンスをチェックしてリダイレクト先を決定
       if (data.needs_email_verification) {
         // メール未認証が必要な場合、認証ページへ
         router.push("/email/verify");
@@ -99,6 +106,7 @@ export default function RegisterPage() {
       setApiError(err.message);
     } finally {
       setIsSubmitting(false);
+      setIsProcessing(false); // 処理完了
     }
   };
 
@@ -118,6 +126,7 @@ export default function RegisterPage() {
         </div>
       )}
 
+      {/* ★★★ 修正箇所: isProcessingがtrueの間はフォーム全体を無効化し、二重操作を防ぐ ★★★ */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* 1. ユーザー名 */}
         <div>
@@ -134,7 +143,7 @@ export default function RegisterPage() {
             onChange={(e) => setName(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
             required
-            disabled={isSubmitting}
+            disabled={isProcessing} // isSubmittingではなくisProcessingを使用
           />
         </div>
 
@@ -153,7 +162,7 @@ export default function RegisterPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
             required
-            disabled={isSubmitting}
+            disabled={isProcessing} // isSubmittingではなくisProcessingを使用
           />
         </div>
 
@@ -172,7 +181,7 @@ export default function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
             required
-            disabled={isSubmitting}
+            disabled={isProcessing} // isSubmittingではなくisProcessingを使用
           />
         </div>
 
@@ -191,7 +200,7 @@ export default function RegisterPage() {
             onChange={(e) => setPasswordConfirmation(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
             required
-            disabled={isSubmitting}
+            disabled={isProcessing} // isSubmittingではなくisProcessingを使用
           />
         </div>
 
@@ -199,7 +208,7 @@ export default function RegisterPage() {
         <div className="pt-2">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isProcessing} // isSubmittingではなくisProcessingを使用
             className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "登録中..." : "登録する"}

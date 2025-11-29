@@ -197,18 +197,21 @@ var _s = __turbopack_context__.k.signature();
 ;
 // --- 設定 ---
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
-const completeLaravelLogin = async (idToken, name)=>{
+const completeLaravelLogin = async (idToken, // nameはオプショナルだが、渡された場合は空文字（""）でも含める
+name)=>{
     if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
     ;
+    // ★★★ 修正箇所: nameがundefinedでない限り、空文字列でもAPIに含めるように修正（ロジックをよりシンプルに） ★★★
     const payload = {
         id_token: idToken,
-        ...name && {
+        // nameがundefinedでない場合にのみ、nameキーをペイロードに追加する。
+        // 値が空文字列であってもキーは確実に存在するため、サーバー側の has('name') は true になる。
+        ...name !== undefined ? {
             name: name
-        }
+        } : {}
     };
     try {
-        const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(// ★★★ 修正箇所: URLを '/api/login_or_register' に修正 (404エラー対策) ★★★
-        `${API_BASE_URL}/api/login_or_register`, payload, {
+        const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, payload, {
             withCredentials: true
         });
         const { token, user: backendUser } = res.data;

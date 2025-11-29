@@ -28,18 +28,21 @@ export interface BackendUser {
 
 export const completeLaravelLogin = async (
   idToken: string,
+  // nameはオプショナルだが、渡された場合は空文字（""）でも含める
   name?: string,
 ): Promise<{ token: string; user: BackendUser }> => {
   if (!API_BASE_URL) throw new Error("API_BASE_URL is not defined.");
 
+  // ★★★ 修正箇所: nameがundefinedでない限り、空文字列でもAPIに含めるように修正（ロジックをよりシンプルに） ★★★
   const payload = {
     id_token: idToken,
-    ...(name && { name: name }),
+    // nameがundefinedでない場合にのみ、nameキーをペイロードに追加する。
+    // 値が空文字列であってもキーは確実に存在するため、サーバー側の has('name') は true になる。
+    ...(name !== undefined ? { name: name } : {}),
   };
 
   try {
     const res = await axios.post(
-      // ★★★ 修正箇所: URLを '/api/login_or_register' に修正 (404エラー対策) ★★★
       `${API_BASE_URL}/api/login_or_register`,
       payload,
       {

@@ -560,7 +560,7 @@ export default function ItemDetailPage() {
                   {isOwner ? (
                     <span>マイページへ移動する</span>
                   ) : isAuthenticated && !isSoldOut ? (
-                    <span>購入手続きへ</span>
+                    <span>カートへ</span>
                   ) : isAuthenticated && isSoldOut ? (
                     <span>SOLD OUT</span>
                   ) : (

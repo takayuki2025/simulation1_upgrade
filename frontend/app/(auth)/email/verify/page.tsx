@@ -1,31 +1,53 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { sendEmailVerification } from "firebase/auth";
-// 💡 useAuth から reloadAuthToken を取得します
+// Next.js Router
+import { useRouter, usePathname } from "next/navigation";
+// Axiosの型定義（AxiosError）のみをインポート
+import { AxiosError } from "axios";
+// カスタムフックから認証状態とAPIクライアントを取得
 import { useAuth } from "@/hooks/useSanctumAuth";
 
-// 💡 定数: 認証状態をチェックする間隔（ミリ秒）
+// --- ユーティリティ: エラーハンドリングのための型述語 ---
+// 💡 catchブロックのerrorを安全に扱うためのプロフェッショナルな解決策
+const isErrorWithMessage = (error: unknown): error is { message: string } => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  );
+};
+
+const toErrorMessage = (error: unknown): string => {
+  if (isErrorWithMessage(error)) {
+    return error.message;
+  }
+  return String(error);
+};
+// --------------------------------------------------------
+
+// 定数: 認証状態をチェックする間隔（ミリ秒）
 const CHECK_INTERVAL_MS = 3000; // 3秒ごとにチェック
-// 💡 認証完了後のリダイレクト先 (ItemSellPageへの競合を避ける)
+// 認証完了後のリダイレクト先
 const POST_VERIFY_REDIRECT_ROUTE = "/mypage/profile?verified=true";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  // ★ 修正: useAuth から reloadAuthToken を取得
-  const { user, auth, isLoading, reloadAuthToken } = useAuth();
+  const pathname = usePathname();
+
+  // useAuthから必要な情報を取得
+  const { user, auth, isLoading, reloadAuthToken, apiClient } = useAuth();
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [isReloading, setIsReloading] = useState(false); // ★ 追加: トークン再取得中
+  const [isReloading, setIsReloading] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   // ---------------------------------------------
-  // 副作用: 認証状態の監視とリダイレクト
+  // 副作用: 認証状態の監視とリダイレクト (変更なし)
   // ---------------------------------------------
 
-  // インターバルを開始/クリアする関数を定義 (前回の修正版)
   const checkVerificationStatus = useCallback(() => {
     if (intervalRef.current !== null) return;
 
@@ -45,10 +67,9 @@ export default function VerifyEmailPage() {
     }, CHECK_INTERVAL_MS);
 
     intervalRef.current = id;
-    return id;
+    return id as unknown as number;
   }, [auth]);
 
-  // クリーンアップ処理を共通化
   const clearCheckInterval = useCallback(() => {
     if (intervalRef.current !== null) {
       window.clearInterval(intervalRef.current);
@@ -58,10 +79,46 @@ export default function VerifyEmailPage() {
   }, []);
 
   useEffect(() => {
-    // 1. 認証状態が解決するまで待つ or トークン再取得中は待つ
     if (isLoading || isReloading) return;
 
-    // 2. 未ログイン（Firebaseのuserオブジェクトがない状態） → login へ
+    // URLパラメータからのトークン取得と処理
+    const params = new URLSearchParams(window.location.search);
+    const isVerifiedFromRedirect = params.get("verified") === "true";
+
+    // Laravelからの認証成功リダイレクトを検知した場合
+    if (isVerifiedFromRedirect) {
+      clearCheckInterval();
+      router.replace(pathname);
+
+      if (!isReloading) {
+        setIsReloading(true);
+        console.log(
+          "Laravel認証リダイレクトを検知。Sanctumセッション確立のため reloadAuthToken を実行します。",
+        );
+
+        reloadAuthToken()
+          .then(() => {
+            console.log("✅ トークンとプロフィール情報のリフレッシュに成功。");
+            router.replace(POST_VERIFY_REDIRECT_ROUTE);
+          })
+          .catch((error) => {
+            console.error(
+              "リダイレクト後のSanctumセッション確立に失敗:",
+              error,
+            );
+            // 💡 toErrorMessageを使用
+            setStatusMessage(
+              `認証情報の更新に失敗しました。再度ログインしてください。 (${toErrorMessage(error)})`,
+            );
+          })
+          .finally(() => {
+            setIsReloading(false);
+          });
+      }
+      return;
+    }
+
+    // 未ログイン（Firebaseのuserオブジェクトがない状態） → login へ
     if (!user) {
       clearCheckInterval();
       console.log("未ログイン状態を検知。/loginへリダイレクト。");
@@ -69,12 +126,10 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    // 3. すでにメール認証済み（userが存在し、emailVerifiedがtrue）
+    // すでにメール認証済み（userが存在し、emailVerifiedがtrue）
     if (user.emailVerified) {
       clearCheckInterval();
 
-      // ★★★ 最重要修正箇所 ★★★
-      // Firebase認証完了後、SanctumセッションとBackendUserの状態を強制的に最新化
       if (!isReloading) {
         setIsReloading(true);
         console.log(
@@ -84,19 +139,17 @@ export default function VerifyEmailPage() {
         reloadAuthToken()
           .then(() => {
             console.log("✅ トークンとプロフィール情報のリフレッシュに成功。");
-            // 状態が完全に更新された後、安全なルートへリダイレクト
             router.replace(POST_VERIFY_REDIRECT_ROUTE);
           })
           .catch((error) => {
-            // リロード失敗時はエラーメッセージを表示するか、ログアウト
             console.error(
               "Sanctumセッション確立/トークンリフレッシュに失敗:",
               error,
             );
+            // 💡 toErrorMessageを使用
             setStatusMessage(
-              "認証情報の更新に失敗しました。再度ログインしてください。",
+              `認証情報の更新に失敗しました。再度ログインしてください。 (${toErrorMessage(error)})`,
             );
-            // 💡 エラー処理: ログアウト処理を入れるのも手ですが、ここでは表示に留めます
           })
           .finally(() => {
             setIsReloading(false);
@@ -104,15 +157,14 @@ export default function VerifyEmailPage() {
       }
       return;
     }
-    // ★★★ 修正箇所終わり ★★★
 
-    // 4. 未認証でこのページに留まる場合: 認証状態を定期的にチェックするインターバルを開始
+    // 未認証でこのページに留まる場合: 認証状態を定期的にチェックするインターバルを開始
     if (!user.emailVerified && intervalRef.current === null) {
       checkVerificationStatus();
     }
 
     return () => {
-      // クリーンアップはクリアCheckIntervalに任せる
+      clearCheckInterval();
     };
   }, [
     isLoading,
@@ -122,6 +174,7 @@ export default function VerifyEmailPage() {
     clearCheckInterval,
     reloadAuthToken,
     isReloading,
+    pathname,
   ]);
 
   // Still loading
@@ -140,10 +193,47 @@ export default function VerifyEmailPage() {
   if (!user || user.emailVerified) return null;
 
   // ---------------------------------------------
-  // 認証メール再送 (ロジックは変更なし)
+  // 認証メール再送 (Laravel API 利用)
   // ---------------------------------------------
   const handleResend = async () => {
-    // ... (省略)
+    if (!apiClient) {
+      setStatusMessage("エラー: APIクライアントが初期化されていません。");
+      return;
+    }
+
+    setIsSending(true);
+    setStatusMessage(null);
+
+    try {
+      // Sanctum Token を使って、Laravelのメール再送エンドポイントを叩く
+      await apiClient.post("/api/email/verification-notification");
+
+      setStatusMessage(
+        "新しい認証メールを送信しました。メールボックスを確認してください。",
+      );
+    } catch (error) {
+      console.error(
+        "Failed to resend email verification via Laravel API:",
+        error,
+      );
+
+      // 💡 プロフェッショナルなエラー処理: AxiosError -> 型述語を使った標準エラー
+      let errorMessage = "不明なエラーです。";
+
+      if (error instanceof AxiosError) {
+        // AxiosErrorの場合、レスポンス内のLaravelエラーメッセージを優先
+        errorMessage = error.response?.data?.message || error.message;
+      } else {
+        // それ以外の場合、汎用ヘルパー関数を使用
+        errorMessage = toErrorMessage(error);
+      }
+
+      setStatusMessage(
+        `認証メールの再送に失敗しました。時間をおいてお試しください。 (${errorMessage})`,
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // ---------------------------------------------
@@ -152,7 +242,6 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="min-h-screen flex justify-center items-start pt-20 bg-gray-50">
-      {/* ... HTMLレンダリング ... */}
       <div className="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl">
         <h2 className="text-3xl font-extrabold text-indigo-600 mb-6 border-b-2 pb-3 text-center">
           💌 メール認証のお願い
