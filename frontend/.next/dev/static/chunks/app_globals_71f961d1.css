@@ -280,8 +280,16 @@ img, video {
   left: .75rem;
 }
 
+.right-2 {
+  right: .5rem;
+}
+
 .top-1\/2 {
   top: 50%;
+}
+
+.top-2 {
+  top: .5rem;
 }
 
 .z-10 {
@@ -998,6 +1006,11 @@ img, video {
 
 .text-right {
   text-align: right;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
 }
 
 .text-3xl {

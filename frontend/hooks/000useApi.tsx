@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 // axios の型を正しくインポート
 import axios, { AxiosRequestConfig, AxiosError } from "axios";
-import { useAuth } from "./useAuth"; // useAuthフックのパスを調整してください
+import { useAuth } from "./useSanctumAuth"; // useAuthフックのパスを調整してください
 
 // Next.jsの環境変数を使用
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -57,7 +57,7 @@ export function useApi() {
   const authenticatedFetch = useCallback(
     async (
       url: string,
-      config: CustomAxiosRequestConfig = {}
+      config: CustomAxiosRequestConfig = {},
     ): Promise<any> => {
       if (isLoggingOut) {
         throw new Error("Logging out, cannot perform API request.");
@@ -78,7 +78,7 @@ export function useApi() {
       } catch (e) {
         console.error(
           "[useApi] Failed to refresh/get ID Token. Forcing logout.",
-          e
+          e,
         );
         await logout(); // トークン取得失敗は致命的エラーのためログアウト
         throw new Error("Failed to retrieve fresh authentication token.");
@@ -139,7 +139,7 @@ export function useApi() {
 
           if (status === 401) {
             console.error(
-              "[useApi] 401 Unauthorized detected. Token likely expired on backend."
+              "[useApi] 401 Unauthorized detected. Token likely expired on backend.",
             );
             // ログアウトせず、エラーをスローして呼び出し元でリカバリ（必要に応じてリロードやリトライ）させる
             const customError = new Error(`API Request Failed with status 401`);
@@ -150,7 +150,7 @@ export function useApi() {
 
           // 401以外のエラーもカスタムエラーとしてスロー
           const customError = new Error(
-            `API Request Failed with status ${status || "Unknown"}`
+            `API Request Failed with status ${status || "Unknown"}`,
           );
           (customError as any).status = status;
           (customError as any).response = error.response;
@@ -162,7 +162,7 @@ export function useApi() {
         throw error;
       }
     },
-    [user, logout, isLoggingOut] // 依存配列: user/logout/isLoggingOut が変わったら関数を再生成
+    [user, logout, isLoggingOut], // 依存配列: user/logout/isLoggingOut が変わったら関数を再生成
   );
 
   // --- プロファイル更新専用ラッパー ---
@@ -179,14 +179,14 @@ export function useApi() {
 
       throw new Error("Profile update failed: Invalid response structure.");
     },
-    [authenticatedFetch] // 依存配列
+    [authenticatedFetch], // 依存配列
   );
 
   // --- 画像アップロード専用ラッパー ---
   const uploadImage = useCallback(
     async (
       formData: FormData,
-      url: string = "/upload2"
+      url: string = "/upload2",
     ): Promise<UpdatedUserResponse> => {
       // FormDataを送信する際、Content-Type: undefined とすることで、
       // Axiosが自動的に適切な 'multipart/form-data' ヘッダーを生成する
@@ -204,7 +204,7 @@ export function useApi() {
 
       throw new Error("Image upload failed: Invalid response structure.");
     },
-    [authenticatedFetch] // 依存配列
+    [authenticatedFetch], // 依存配列
   );
 
   return {

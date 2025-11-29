@@ -3,12 +3,20 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useSanctumAuth";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
   getIdToken,
 } from "firebase/auth";
+
+// 💡 レスポンスの型を定義
+interface LaravelRegisterResponse {
+  message: string;
+  needs_email_verification: boolean; // Laravel APIが返す想定のフラグ
+  user?: any; // 他のユーザー情報など
+  error?: string;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,16 +31,18 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push("/");
-    }
+    // 💡 認証状態の監視とリダイレクトは、AuthProviderに一任するため、ここでは一時的にコメントアウト
+    // if (!isLoading && isAuthenticated) {
+    //   router.push("/");
+    // }
   }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return <p>認証状態を確認中...</p>;
   }
 
-  if (isAuthenticated) return null;
+  // 💡 登録ページでは、認証済みでもリダイレクトさせないように一時的に修正
+  // if (isAuthenticated) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +52,11 @@ export default function RegisterPage() {
     try {
       if (!auth) throw new Error("Auth service unavailable");
 
+      // 1. Firebase 認証を実行
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
 
       // profile 更新（名前）
@@ -56,7 +67,7 @@ export default function RegisterPage() {
       // Firebase ID Token を取得（Laravel に送る）
       const idToken = await getIdToken(userCredential.user);
 
-      // Laravel API に登録（必須！！！）
+      // 2. Laravel API に登録（必須！！！）
       const res = await fetch("https://laravel.test/api/firebase/login", {
         method: "POST",
         headers: {
@@ -70,14 +81,20 @@ export default function RegisterPage() {
         credentials: "include",
       });
 
-      const data = await res.json();
+      const data: LaravelRegisterResponse = await res.json();
 
       if (!res.ok) {
         throw new Error(data.error || "Laravel registration failed");
       }
 
-      // ログイン成功 → email/verify に移動
-      router.push("/email/verify");
+      // 3. 💡 修正箇所: Laravel API のレスポンスをチェックしてリダイレクト先を決定
+      if (data.needs_email_verification) {
+        // メール未認証が必要な場合、認証ページへ
+        router.push("/email/verify");
+      } else {
+        // それ以外の場合、トップページへ
+        router.push("/");
+      }
     } catch (err: any) {
       setApiError(err.message);
     } finally {
@@ -86,7 +103,7 @@ export default function RegisterPage() {
   };
 
   // -------------------------
-  // コンポーネントのレンダリング (ログインページのデザインを踏襲)
+  // コンポーネントのレンダリング
   // -------------------------
   return (
     <div className="w-full max-w-xl p-8 bg-white rounded-xl shadow-2xl mx-auto z-10 mt-10 mb-8">

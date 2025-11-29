@@ -12,7 +12,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$js
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/client/app-dir/link.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-client] (ecmascript)"); // Next.jsのカスタム認証フック
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useSanctumAuth.tsx [app-client] (ecmascript)"); // Next.jsのカスタム認証フック
 ;
 var _s = __turbopack_context__.k.signature();
 "use client";
@@ -56,7 +56,7 @@ function Mypage() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"])();
     // 🔽 修正: useAuth から apiClient を取得
-    const { user: authUser, isAuthenticated, isLoading: isAuthLoading, logout, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { user: authUser, isAuthenticated, isLoading: isAuthLoading, logout, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     // const { authenticatedFetch } = useApi(); // 👈 削除
     // --- 状態管理 ---
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
@@ -164,7 +164,7 @@ function Mypage() {
         logout,
         isVerificationRedirect,
         page,
-        apiClient // 👈 追加: fetcher の依存として必要
+        apiClient
     ]);
     // ----------------------------------------------------------------
     // 2. 商品リスト取得ロジック
@@ -259,22 +259,22 @@ function Mypage() {
                     className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                    lineNumber: 277,
-                    columnNumber: 17
+                    lineNumber: 282,
+                    columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                     className: "ml-3 text-gray-600",
                     children: "認証状態を確認中..."
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                    lineNumber: 278,
-                    columnNumber: 17
+                    lineNumber: 283,
+                    columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/page.tsx",
-            lineNumber: 276,
-            columnNumber: 13
+            lineNumber: 281,
+            columnNumber: 7
         }, this);
     }
     // 認証解決後、未認証でリダイレクトされなかった場合（メール認証リダイレクト中など）
@@ -289,22 +289,22 @@ function Mypage() {
                         className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 290,
-                        columnNumber: 21
+                        lineNumber: 295,
+                        columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                         className: "ml-3 text-gray-600",
                         children: "メール認証後のユーザー情報を確認中..."
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 291,
-                        columnNumber: 21
+                        lineNumber: 296,
+                        columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 289,
-                columnNumber: 17
+                lineNumber: 294,
+                columnNumber: 9
             }, this);
         }
         // 最終的にユーザー情報がない場合は、エラー表示またはリダイレクトを待つ
@@ -315,75 +315,75 @@ function Mypage() {
                 children: "ユーザー情報がロードできませんでした。"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 301,
-                columnNumber: 17
+                lineNumber: 306,
+                columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/app/(main)/mypage/page.tsx",
-            lineNumber: 300,
-            columnNumber: 13
+            lineNumber: 305,
+            columnNumber: 7
         }, this);
     }
     // ユーザー情報とアイテムリストのロード中の表示
     const isContentLoading = isLoading || !user;
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: "jsx-b71dba74520fd182" + " " + "profile_page",
+        className: "jsx-427c850f0f988656" + " " + "profile_page",
         children: [
             successMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-b71dba74520fd182" + " " + "validation-errors bg-green-100 border border-green-400 text-green-700",
+                className: "jsx-427c850f0f988656" + " " + "validation-errors bg-green-100 border border-green-400 text-green-700",
                 children: successMessage
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 315,
-                columnNumber: 17
+                lineNumber: 320,
+                columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-b71dba74520fd182" + " " + "profile_header",
+                className: "jsx-427c850f0f988656" + " " + "profile_header",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-b71dba74520fd182" + " " + "profile_header_1",
+                        className: "jsx-427c850f0f988656" + " " + "profile_header_1",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                 src: getAssetUrl(user.user_image, true),
                                 alt: "プロフィール画像",
-                                className: "jsx-b71dba74520fd182" + " " + "user_image_css"
-                            }, void 0, false, {
-                                fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 323,
-                                columnNumber: 21
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                className: "jsx-b71dba74520fd182" + " " + "user_name_css",
-                                children: user.name
+                                className: "jsx-427c850f0f988656" + " " + "user_image_css"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
                                 lineNumber: 328,
-                                columnNumber: 21
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                className: "jsx-427c850f0f988656" + " " + "user_name_css",
+                                children: user.name
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/mypage/page.tsx",
+                                lineNumber: 333,
+                                columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-b71dba74520fd182" + " " + "user_edit_css1",
+                                className: "jsx-427c850f0f988656" + " " + "user_edit_css1",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                     onClick: goToProfileEdit,
-                                    className: "jsx-b71dba74520fd182" + " " + "user_edit_css2",
+                                    className: "jsx-427c850f0f988656" + " " + "user_edit_css2",
                                     children: "プロフィールを編集"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                                    lineNumber: 331,
-                                    columnNumber: 25
+                                    lineNumber: 336,
+                                    columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 330,
-                                columnNumber: 21
+                                lineNumber: 335,
+                                columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 321,
-                        columnNumber: 17
+                        lineNumber: 326,
+                        columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-b71dba74520fd182" + " " + "profile_header_2",
+                        className: "jsx-427c850f0f988656" + " " + "profile_header_2",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                                 href: "/mypage?page=sell",
@@ -392,8 +392,8 @@ function Mypage() {
                                 children: "出品した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 339,
-                                columnNumber: 21
+                                lineNumber: 344,
+                                columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                                 href: "/mypage?page=buy",
@@ -402,70 +402,70 @@ function Mypage() {
                                 children: "購入した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 347,
-                                columnNumber: 21
+                                lineNumber: 352,
+                                columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 337,
-                        columnNumber: 17
+                        lineNumber: 342,
+                        columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 320,
-                columnNumber: 13
+                lineNumber: 325,
+                columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-b71dba74520fd182" + " " + "profile_content",
+                className: "jsx-427c850f0f988656" + " " + "profile_content",
                 children: [
                     isLoading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-b71dba74520fd182" + " " + "text-center p-8",
+                        className: "jsx-427c850f0f988656" + " " + "text-center p-8",
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-b71dba74520fd182" + " " + "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
+                                className: "jsx-427c850f0f988656" + " " + "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 361,
-                                columnNumber: 25
+                                lineNumber: 366,
+                                columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: "jsx-b71dba74520fd182" + " " + "text-gray-500 mt-3",
+                                className: "jsx-427c850f0f988656" + " " + "text-gray-500 mt-3",
                                 children: "商品リストを読み込み中..."
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 362,
-                                columnNumber: 25
+                                lineNumber: 367,
+                                columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 360,
-                        columnNumber: 21
+                        lineNumber: 365,
+                        columnNumber: 11
                     }, this),
                     !isLoading && items.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-b71dba74520fd182" + " " + "mt-8 text-center text-gray-500",
+                        className: "jsx-427c850f0f988656" + " " + "mt-8 text-center text-gray-500",
                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                            className: "jsx-b71dba74520fd182",
+                            className: "jsx-427c850f0f988656",
                             children: page === "sell" ? "出品した商品はありません。" : "購入した商品はありません。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/page.tsx",
-                            lineNumber: 368,
-                            columnNumber: 25
+                            lineNumber: 373,
+                            columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 367,
-                        columnNumber: 21
+                        lineNumber: 372,
+                        columnNumber: 11
                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "jsx-b71dba74520fd182" + " " + "items_select",
+                        className: "jsx-427c850f0f988656" + " " + "items_select",
                         children: items.map((item)=>{
                             const displayItem = page === "buy" ? item.item : item;
                             // buy ページで item.item が null の場合はスキップ（異常データ）
                             if (page === "buy" && !displayItem) return null;
                             return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-b71dba74520fd182" + " " + "items_select_all",
+                                className: "jsx-427c850f0f988656" + " " + "items_select_all",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                                     href: `/item/${displayItem.id}`,
                                     className: "mypage_item_",
@@ -473,83 +473,83 @@ function Mypage() {
                                         displayItem.item_image ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                             src: getAssetUrl(displayItem.item_image),
                                             alt: displayItem.name + "の商品写真",
-                                            className: "jsx-b71dba74520fd182"
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/(main)/mypage/page.tsx",
-                                            lineNumber: 389,
-                                            columnNumber: 45
-                                        }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-b71dba74520fd182" + " " + "no-image-placeholder",
-                                            children: "No Image"
+                                            className: "jsx-427c850f0f988656"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/mypage/page.tsx",
                                             lineNumber: 394,
-                                            columnNumber: 45
+                                            columnNumber: 23
+                                        }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "jsx-427c850f0f988656" + " " + "no-image-placeholder",
+                                            children: "No Image"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/(main)/mypage/page.tsx",
+                                            lineNumber: 399,
+                                            columnNumber: 23
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-b71dba74520fd182" + " " + "item-details",
+                                            className: "jsx-427c850f0f988656" + " " + "item-details",
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                    className: "jsx-b71dba74520fd182",
+                                                    className: "jsx-427c850f0f988656",
                                                     children: displayItem.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                                                    lineNumber: 397,
-                                                    columnNumber: 45
+                                                    lineNumber: 402,
+                                                    columnNumber: 23
                                                 }, this),
                                                 displayItem.remain === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-b71dba74520fd182" + " " + "sold-text",
+                                                    className: "jsx-427c850f0f988656" + " " + "sold-text",
                                                     children: "sold"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                                                    lineNumber: 399,
-                                                    columnNumber: 49
+                                                    lineNumber: 404,
+                                                    columnNumber: 25
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/mypage/page.tsx",
-                                            lineNumber: 396,
-                                            columnNumber: 41
+                                            lineNumber: 401,
+                                            columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                                    lineNumber: 383,
-                                    columnNumber: 37
+                                    lineNumber: 388,
+                                    columnNumber: 19
                                 }, this)
                             }, item.id, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 382,
-                                columnNumber: 33
+                                lineNumber: 387,
+                                columnNumber: 17
                             }, this);
                         })
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 375,
-                        columnNumber: 21
+                        lineNumber: 380,
+                        columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 357,
-                columnNumber: 13
+                lineNumber: 362,
+                columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-                id: "b71dba74520fd182",
-                children: '.profile_page.jsx-b71dba74520fd182{max-width:1400px;margin:0 auto}.profile_header.jsx-b71dba74520fd182{border-bottom:2px solid #5f5f5f;padding-bottom:20px}.user_image_css.jsx-b71dba74520fd182{object-fit:cover;object-position:center;border-radius:50%;width:90px;height:90px;position:relative;left:200px;overflow:hidden}.user_name_css.jsx-b71dba74520fd182{position:relative;left:220px}.user_edit_css1.jsx-b71dba74520fd182{margin-left:auto}.user_edit_css2.jsx-b71dba74520fd182{color:#f55;cursor:pointer;background-color:#fff;border:2px solid #f55;border-radius:5px;width:200px;height:35px;font-size:15px;font-weight:700;transition:background-color .2s,color .2s;position:relative;right:200px}.user_edit_css2.jsx-b71dba74520fd182:hover{background-color:#ffeaea}.items_select.jsx-b71dba74520fd182{grid-template-columns:repeat(4,1fr);gap:30px;padding:60px;display:grid}.items_select_all.jsx-b71dba74520fd182{flex-direction:column;width:100%;max-width:250px;display:flex}.items_select_all.jsx-b71dba74520fd182 a.jsx-b71dba74520fd182,.mypage_item_.jsx-b71dba74520fd182{color:#000;width:100%;height:auto;text-decoration:none;transition:opacity .2s;display:block}.items_select_all.jsx-b71dba74520fd182 a.jsx-b71dba74520fd182:hover{opacity:.8}.items_select.jsx-b71dba74520fd182 img.jsx-b71dba74520fd182{aspect-ratio:1;object-fit:cover;width:100%;display:block}.no-image-placeholder.jsx-b71dba74520fd182{aspect-ratio:1;color:#a0a0a0;background-color:#f0f0f0;border:1px dashed #ccc;justify-content:center;align-items:center;width:100%;font-size:16px;display:flex}.item-details.jsx-b71dba74520fd182{justify-content:space-between;align-items:center;gap:8px;margin-top:8px;display:flex}.items_select_all.jsx-b71dba74520fd182 label.jsx-b71dba74520fd182{text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.4;overflow:hidden}.sold-text.jsx-b71dba74520fd182{color:#ff4041;white-space:nowrap;font-size:14px;font-weight:700}.profile_header_1.jsx-b71dba74520fd182{text-align:center;align-items:center;height:200px;display:flex;position:relative}.profile_header_2.jsx-b71dba74520fd182{display:flex}.sell_items.jsx-b71dba74520fd182,.buy_items.jsx-b71dba74520fd182{color:#5f5f5f;padding-bottom:5px;font-weight:800;text-decoration:none;transition:color .2s;position:relative}.sell_items.jsx-b71dba74520fd182{left:70px}.buy_items.jsx-b71dba74520fd182{left:120px}.sell_items.jsx-b71dba74520fd182:hover,.buy_items.jsx-b71dba74520fd182:hover{color:#f88}.sell_items.active.jsx-b71dba74520fd182,.buy_items.active.jsx-b71dba74520fd182{color:#f55}.sell_items.active.jsx-b71dba74520fd182:after,.buy_items.active.jsx-b71dba74520fd182:after{content:"";background-color:#f55;border-radius:2px;width:100%;height:3px;position:absolute;bottom:-1px;left:0}.validation-errors.jsx-b71dba74520fd182{z-index:100;text-align:center;color:#155724;background-color:#d4edda;border:1px solid #c3e6cb;border-radius:8px;width:90%;max-width:400px;padding:10px;position:fixed;top:50px;left:50%;transform:translate(-50%);box-shadow:0 4px 6px -1px #0000001a}@media (width<=1024px){.items_select.jsx-b71dba74520fd182{grid-template-columns:repeat(3,1fr);gap:30px;padding:30px}.user_image_css.jsx-b71dba74520fd182,.user_name_css.jsx-b71dba74520fd182,.user_edit_css2.jsx-b71dba74520fd182{margin:0 10px;position:static}.profile_header_1.jsx-b71dba74520fd182{flex-wrap:wrap;justify-content:center;height:auto;padding:20px 0}.user_edit_css1.jsx-b71dba74520fd182{text-align:center;width:100%;margin:10px auto}.user_edit_css2.jsx-b71dba74520fd182{width:80%;max-width:200px}.sell_items.jsx-b71dba74520fd182,.buy_items.jsx-b71dba74520fd182{margin:0 20px;left:0}.profile_header_2.jsx-b71dba74520fd182{justify-content:center}}@media (width<=640px){.items_select.jsx-b71dba74520fd182{grid-template-columns:repeat(2,1fr);gap:20px;padding:20px 10px}.profile_page.jsx-b71dba74520fd182{padding:0 10px}.sell_items.jsx-b71dba74520fd182,.buy_items.jsx-b71dba74520fd182{margin:0 10px}}'
+                id: "427c850f0f988656",
+                children: '.profile_page.jsx-427c850f0f988656{max-width:1400px;margin:0 auto}.profile_header.jsx-427c850f0f988656{border-bottom:2px solid #5f5f5f;padding-bottom:20px}.user_image_css.jsx-427c850f0f988656{object-fit:cover;object-position:center;border-radius:50%;width:90px;height:90px;position:relative;left:200px;overflow:hidden}.user_name_css.jsx-427c850f0f988656{position:relative;left:220px}.user_edit_css1.jsx-427c850f0f988656{margin-left:auto}.user_edit_css2.jsx-427c850f0f988656{color:#f55;cursor:pointer;background-color:#fff;border:2px solid #f55;border-radius:5px;width:200px;height:35px;font-size:15px;font-weight:700;transition:background-color .2s,color .2s;position:relative;right:200px}.user_edit_css2.jsx-427c850f0f988656:hover{background-color:#ffeaea}.items_select.jsx-427c850f0f988656{grid-template-columns:repeat(4,1fr);gap:30px;padding:60px;display:grid}.items_select_all.jsx-427c850f0f988656{flex-direction:column;width:100%;max-width:250px;display:flex}.items_select_all.jsx-427c850f0f988656 a.jsx-427c850f0f988656,.mypage_item_.jsx-427c850f0f988656{color:#000;width:100%;height:auto;text-decoration:none;transition:opacity .2s;display:block}.items_select_all.jsx-427c850f0f988656 a.jsx-427c850f0f988656:hover{opacity:.8}.items_select.jsx-427c850f0f988656 img.jsx-427c850f0f988656{aspect-ratio:1;object-fit:cover;width:100%;display:block}.no-image-placeholder.jsx-427c850f0f988656{aspect-ratio:1;color:#a0a0a0;background-color:#f0f0f0;border:1px dashed #ccc;justify-content:center;align-items:center;width:100%;font-size:16px;display:flex}.item-details.jsx-427c850f0f988656{justify-content:space-between;align-items:center;gap:8px;margin-top:8px;display:flex}.items_select_all.jsx-427c850f0f988656 label.jsx-427c850f0f988656{text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.4;overflow:hidden}.sold-text.jsx-427c850f0f988656{color:#ff4041;white-space:nowrap;font-size:14px;font-weight:700}.profile_header_1.jsx-427c850f0f988656{text-align:center;align-items:center;height:200px;display:flex;position:relative}.profile_header_2.jsx-427c850f0f988656{display:flex}.sell_items.jsx-427c850f0f988656,.buy_items.jsx-427c850f0f988656{color:#5f5f5f;padding-bottom:5px;font-weight:800;text-decoration:none;transition:color .2s;position:relative}.sell_items.jsx-427c850f0f988656{left:70px}.buy_items.jsx-427c850f0f988656{left:120px}.sell_items.jsx-427c850f0f988656:hover,.buy_items.jsx-427c850f0f988656:hover{color:#f88}.sell_items.active.jsx-427c850f0f988656,.buy_items.active.jsx-427c850f0f988656{color:#f55}.sell_items.active.jsx-427c850f0f988656:after,.buy_items.active.jsx-427c850f0f988656:after{content:"";background-color:#f55;border-radius:2px;width:100%;height:3px;position:absolute;bottom:-1px;left:0}.validation-errors.jsx-427c850f0f988656{z-index:100;text-align:center;color:#155724;background-color:#d4edda;border:1px solid #c3e6cb;border-radius:8px;width:90%;max-width:400px;padding:10px;position:fixed;top:50px;left:50%;transform:translate(-50%);box-shadow:0 4px 6px -1px #0000001a}@media (width<=1024px){.items_select.jsx-427c850f0f988656{grid-template-columns:repeat(3,1fr);gap:30px;padding:30px}.user_image_css.jsx-427c850f0f988656,.user_name_css.jsx-427c850f0f988656,.user_edit_css2.jsx-427c850f0f988656{margin:0 10px;position:static}.profile_header_1.jsx-427c850f0f988656{flex-wrap:wrap;justify-content:center;height:auto;padding:20px 0}.user_edit_css1.jsx-427c850f0f988656{text-align:center;width:100%;margin:10px auto}.user_edit_css2.jsx-427c850f0f988656{width:80%;max-width:200px}.sell_items.jsx-427c850f0f988656,.buy_items.jsx-427c850f0f988656{margin:0 20px;left:0}.profile_header_2.jsx-427c850f0f988656{justify-content:center}}@media (width<=640px){.items_select.jsx-427c850f0f988656{grid-template-columns:repeat(2,1fr);gap:20px;padding:20px 10px}.profile_page.jsx-427c850f0f988656{padding:0 10px}.sell_items.jsx-427c850f0f988656,.buy_items.jsx-427c850f0f988656{margin:0 10px}}'
             }, void 0, false, void 0, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/mypage/page.tsx",
-        lineNumber: 312,
-        columnNumber: 9
+        lineNumber: 317,
+        columnNumber: 5
     }, this);
 }
-_s(Mypage, "D0hBAwaOHwQkGblb1CFDs0/QNYQ=", false, function() {
+_s(Mypage, "8BQfcxItN84f6wQjbv8m78Ceyk4=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"],
-        __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]
     ];
 });
 _c = Mypage;

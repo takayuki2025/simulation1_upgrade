@@ -104,11 +104,13 @@ class Item extends Model
     }
 
     /**
-     * 商品に付けられたGoodを取得します。
+     * 　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　商品に付けられたお気に入りGoodを取得します。
      * @return HasMany
      */
-    public function goods(): HasMany
+    public function favorites(): HasMany
     {
+        // 💡 Item (このモデル) は Good (お気に入り) モデルに HasMany の関係を持つ
+        // 💡 Good モデルが item_id カラムを持っていることを前提としています。
         return $this->hasMany(Good::class);
     }
 

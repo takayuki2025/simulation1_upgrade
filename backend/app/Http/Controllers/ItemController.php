@@ -29,165 +29,96 @@ use Stripe\StripeClient;
 class ItemController extends Controller
 {
     // フロントページを表示し、持続検索機能とタブの切り替えを処理します。
-    // NuxtからのAPIリクエストに対応するため、JSONレスポンスに変更します。
     public function index(Request $request): JsonResponse
     {
-        
-// 💡 暫定デバッグ: 認証状態に関わらず、正常なJSONレスポンスを返す
-return response()->json([
-    'items' => [], // 空の配列を返す
-    'current_tab' => $request->query('tab', 'all'),
-    'debug_message' => 'Controller logic skipped for debug.',
-], 200);
-
-        // ヘッダー情報のデバッグログ
-        Log::info('FINAL_AUTHORIZATION_HEADER_CHECK: ' . $request->header('Authorization'));
-        $allHeaders = $request->headers->all();
-        Log::info("ITEM_CONTROLLER_HEADER_DUMP: " . json_encode($allHeaders));
-        Log::info("ITEM_CONTROLLER_AUTH_HEADER_FINAL_CHECK: " . ($request->header('Authorization') ?? 'N/A'));
-
-        // URLのGETパラメータ'tab'を取得。デフォルトは'all'
-        $tab = $request->query('tab', 'all');
-
-        // URLのGETパラメータ'all_item_search'を取得
+        // 💡 ステップ1: Sanctumガードを使ってユーザー認証を試みる
+        $user = Auth::guard('sanctum')->user();
+        $tab = $request->query('tab', 'all'); 
         $searchQuery = $request->query('all_item_search');
 
-        // ★★★ 認証状態の取得 ★★★
-        // Request::user()からユーザーを取得 (Sanctum認証ミドルウェアが設定した場合)
-        $user = $request->user();
+        // ベースクエリ (すべての商品から開始)
+        $query = Item::query();
 
-        // Authファサードからもユーザーを取得（$userがnullの場合にフォールバックとして使用可能だが、ここではデバッグ用）
-        $authFacadeUser = Auth::user();
-
-        // 💡 認証ユーザーIDは $user の id に基づく（なければ null）
-        $authId = $user ? $user->id : ($authFacadeUser ? $authFacadeUser->id : null);
-
-        // ログの出力（デバッグ情報）
-        Log::info("ItemController@index called. Resolved AuthID: " . ($authId ?? 'N/A'));
-        $authCheckSanctum = Auth::guard('sanctum')->check() ? 'TRUE' : 'FALSE';
-        Log::info("ItemController@index: Is Request User Present?: " . ($user ? 'TRUE (ID: ' . $user->id . ')' : 'FALSE') . ", Is Auth Facade User Present?: " . ($authFacadeUser ? 'TRUE (ID: ' . $authFacadeUser->id . ')' : 'FALSE') . ", SanctumCheck: {$authCheckSanctum}");
-        // ★★★ 認証状態の取得ここまで ★★★
-
-
-        if ($tab === 'mylist') {
-            // 'mylist'タブの場合、いいねした商品を取得
-            
-            // ★★★ 認証チェックは $user が必須 ★★★
-            if (!$user) {
-                $items = collect([]);
-                Log::info("ItemController@index: Not authenticated. Returning empty mylist.");
-            } else {
-                // 1. ユーザーがいいねしたItemのIDを取得
-                $likedItemIds = Good::where('user_id', $user->id)->pluck('item_id');
-
-                // 2. そのItem IDを持つ商品を取得し、コメント数といいね数をカウント
-                $query = Item::whereIn('id', $likedItemIds)
-                    ->withCount(['comments', 'goods']);
-
-                // 検索キーワードでフィルタリング
-                if (!empty($searchQuery)) {
-                    $query->where('name', 'like', '%' . $searchQuery . '%');
-                }
-
-                Log::info("ItemController@index: MYLIST QUERY SQL: " . $query->toSql());
-                Log::info("ItemController@index: MYLIST QUERY BINDINGS: " . json_encode($query->getBindings()));
-
-                $items = $query->get();
-            }
-
-        } else {
-            // 'all'タブ（またはデフォルト）の場合、全商品を取得
-            $query = Item::query();
-
-            // 💡 修正箇所: 認証済みユーザーの場合のみ、自身が出品した商品を除外するロジックを修正
-            if ($user && $user->id) {
-                // 認証ユーザーIDが存在する場合のみ、そのユーザーの商品を除外
-                // 🚨 以前の $authId の代わりに、$user->id を直接使用し、クエリビルダに渡す
-                $query->where('user_id', '!=', $user->id);
-                Log::info("ItemController@index: Filter applied. Excluding items by user {$user->id}.");
-            }
-
-            // 検索キーワードがあれば、クエリをフィルタリング
-            if (!empty($searchQuery)) {
-                $query->where('name', 'like', '%' . $searchQuery . '%');
-            }
-
-            // SQLクエリのデバッグログを追加
-            Log::info("ItemController@index: ALL ITEMS QUERY SQL: " . $query->toSql());
-            Log::info("ItemController@index: ALL ITEMS QUERY BINDINGS: " . json_encode($query->getBindings()));
-
-            // リレーションをロード
-            $items = $query->withCount(['comments', 'goods'])->get();
+        // 検索クエリの適用 (どちらのタブでも共通)
+        if ($searchQuery) {
+            $query->where('name', 'LIKE', '%' . $searchQuery . '%');
         }
 
-        // 取得した商品コレクションをループ処理し、表示用のデータを整形
-        $items->each(function ($item) {
+        // ----------------------------------------------------
+        // タブごとのロジック
+        // ----------------------------------------------------
 
-            // 画像パスが相対パス（storage/images/...）であると仮定し、そのまま返す
-            if ($item->item_image && !Str::startsWith($item->item_image, ['http://', 'https://'])) {
-                // 'storage/' が含まれていない場合は追加
-                if (!Str::startsWith($item->item_image, 'storage/')) {
-                    $item->item_image = 'storage/' . $item->item_image;
-                }
+        if ($tab === 'mylist') {
+            // マイリストタブ
+            if (!$user) {
+                // 💡 認証されていない場合、マイリストは空として返す
+                Log::warning('ItemController: Attempted to access mylist without authentication.');
+                return response()->json([
+                    'items' => [],
+                    'is_authenticated' => false,
+                ]);
             }
+            
+            // 認証済みの場合、ユーザーがいいねした商品のみに絞り込む
+            $favoriteItemIds = Good::where('user_id', $user->id)->pluck('item_id');
+            $query->whereIn('id', $favoriteItemIds);
+            
+            Log::info('ItemController: Fetching mylist for user ID: ' . $user->id);
 
-            // 商品に `remain` カラムがない場合を考慮して、強制的に追加
-            if (!isset($item->remain)) {
-                $item->remain = 1; // 暫定
+        } else {
+            // すべて (all) タブ
+            Log::info('ItemController: Fetching ALL items.');
+            
+            // ★★★ 修正箇所: 認証済みの場合、自身の出品を除外する ★★★
+            if ($user) {
+                Log::info('ItemController: Excluding user ' . $user->id . ' items from ALL list.');
+                // ログインユーザーのIDと item_id が一致しない商品をフィルタ
+                $query->where('user_id', '!=', $user->id);
             }
-        });
+            // ★★★ 修正箇所終わり ★★★
+        }
 
-        // JSONデータを返す
+        // ----------------------------------------------------
+        // データ取得と整形
+        // ----------------------------------------------------
+        
+        // 💡 favorites リレーションは Item モデルに定義されていることを前提とする
+        $items = $query->with('favorites')->get();
+
+        // 認証済みユーザーに固有の情報を付与 (「いいね」の状態)
+        if ($user) {
+            $items->each(function ($item) use ($user) {
+                $item->is_favorited = $item->favorites->contains('user_id', $user->id);
+                unset($item->favorites); 
+            });
+        }
+        
+        // 商品を返す
         return response()->json([
             'items' => $items,
-            'current_tab' => $tab,
+            'is_authenticated' => $user !== null,
         ]);
     }
 
-
-
-
-
-
-    public function item_detail_show($item_id)
+    // 商品詳細の表示は、ほぼそのままですが、Sanctum認証ガードの使用を明確にします。
+    public function item_detail_show($item_id): JsonResponse
     {
-
-        // アクセサ(Itemモデム)がフルURLの生成を保証するため、複雑な処理は不要 商品が存在しない場合は404エラーを返す (findOrFailを使用)
         $item = Item::with('user')->findOrFail($item_id);
 
-        // ★★★ 修正: 配列変換と手動URL処理のロジックを全て削除 ★★★
-
-        // デバッグログ: アクセサ経由で取得した最終URLを確認
-        if ($item->item_image) {
-            Log::info("ItemController@item_detail_show: Final URL (via Accessor): " . $item->item_image);
-        }
-
-        // ----------------------------------------------------
-        // お気に入り・コメントデータの取得
-        // ----------------------------------------------------
-
-        $user = auth('sanctum')->user();
+        $user = Auth::guard('sanctum')->user();
         $isFavorited = false;
 
-        // 商品IDに関連するコメントを取得 (ユーザー情報もロード)
         $comments = Comment::with('user')->where('item_id', $item->id)->get();
-
-        // お気に入り数のカウント
         $favoritesCount = Good::where('item_id', $item->id)->count();
 
-        // ログインユーザーのお気に入り状態をチェック
         if ($user) {
             $isFavorited = Good::where('item_id', $item->id)
                 ->where('user_id', $user->id)
                 ->exists();
         }
 
-        // ----------------------------------------------------
-        // レスポンス
-        // ----------------------------------------------------
-
         return response()->json([
-            'item' => $item, // ★ モデルオブジェクトをそのまま返し、アクセサにURL処理を任せる ★
+            'item' => $item,
             'comments' => $comments,
             'is_favorited' => $isFavorited,
             'favorites_count' => $favoritesCount,

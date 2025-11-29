@@ -1,6 +1,6 @@
 "use client";
 
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider } from "@/hooks/useSanctumAuth";
 import { ReactNode } from "react";
 
 /**
@@ -10,5 +10,5 @@ import { ReactNode } from "react";
  */
 export function Providers({ children }: { children: ReactNode }) {
   // AuthProviderはuseContextやuseStateを使用するため、このクライアントコンポーネント内で実行される必要があります。
-    return <AuthProvider>{children}</AuthProvider>;
+  return <AuthProvider>{children}</AuthProvider>;
 }

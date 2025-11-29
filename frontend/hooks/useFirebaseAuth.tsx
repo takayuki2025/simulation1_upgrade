@@ -10,37 +10,39 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-// Firebase Authの主要なインポート
+// 認証ロジックのコア: Firebase Authentication SDK
 import {
   Auth,
   User as FirebaseUser,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-// AxiosとAxiosInterceptorのための型インポート
+// ネットワーク通信ライブラリ: Axios
 import axios, {
   AxiosInstance,
   AxiosError,
   InternalAxiosRequestConfig,
 } from "axios";
-
-// 💡 依存関係: Firebase初期化とLaravelセッション関連のヘルパー
+// 外部の依存フック (Firebase初期化と設定)
 import { useFirebaseInit } from "@/hooks/useFirebaseInit";
+// Next.jsのルーター (リダイレクト処理に利用)
+import { useRouter } from "next/navigation";
+// 💡 useLaravelSession は不要だが、BackendUser型とAPI通信の簡略化のために一部ヘルパー関数は残す
 import {
-  useLaravelSession,
-  completeLaravelLogin,
   BackendUser,
-  checkLaravelSession,
+  // 💡 Firebase認証フローでは、Sanctumセッションの確立は不要
+  // completeLaravelLogin,
+  // checkLaravelSession,
 } from "@/hooks/useLaravelSession";
 
-import { useRouter, usePathname } from "next/navigation";
-
+// --- 設定 ---
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // =======================================================
 // I. 型定義とContextの初期化
 // =======================================================
 
+// 💡 戻り値はBackendUser情報と新しいトークン (ID Token)
 type ReloadResult = BackendUser & { token: string };
 
 /**
@@ -54,37 +56,34 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLoggingOut: boolean;
-  token: string | null;
+  token: string | null; // 💡 Firebase ID Token が格納される
   apiClient: AxiosInstance | null;
   login: (credentials: {
     email: string;
     password: string;
     name?: string;
   }) => Promise<void>;
-  logout: (redirectPath?: string) => Promise<void>; // 💡 該当プロパティ
+  logout: (redirectPath?: string) => Promise<void>;
   reloadAuthToken: () => Promise<ReloadResult>;
   setBackendUserStatus: (user: BackendUser | null) => void;
 }
 
-// 🚨 修正箇所: createContextの初期値として、AuthContextTypeの全プロパティを実装したダミーオブジェクトを提供します。
 const initialAuthContext: AuthContextType = {
   user: null,
   auth: null,
   userId: null,
   backendUser: null,
   isAuthenticated: false,
-  isLoading: true, // 初期ロード中はtrue
+  isLoading: true,
   isLoggingOut: false,
   token: null,
   apiClient: null,
-  // 💡 関数プロパティのダミー実装
   login: () => Promise.reject("Context not initialized"),
-  logout: () => Promise.reject("Context not initialized"), // 💡 エラー解消のため実装
+  logout: () => Promise.reject("Context not initialized"),
   reloadAuthToken: () => Promise.reject("Context not initialized"),
   setBackendUserStatus: () => {},
 };
 
-// 💡 Contextの初期化を AuthContextType の非Nullable型で行う
 const AuthContext = createContext<AuthContextType>(initialAuthContext);
 
 // =======================================================
@@ -92,26 +91,24 @@ const AuthContext = createContext<AuthContextType>(initialAuthContext);
 // =======================================================
 
 /**
- * 💡 認証状態管理の中心となるプロバイダー (Higher-Order Component)
- * 責務: 認証フローの実行、状態の保持、クライアントの状態管理を一元化する。
+ * 💡 認証状態管理の中心となるプロバイダー (FirebaseAuth専用)
+ * 責務: Firebase ID Token の取得と、それを使った API 通信、リフレッシュ。
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { auth, userId, isReady } = useFirebaseInit();
   const router = useRouter();
-  const pathname = usePathname();
 
   // --- Core State ---
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null); // 💡 ID Token
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   const [isBackendUserLoading, setIsBackendUserLoading] = useState(false);
 
-  // --- Laravel Session State (統合管理) ---
-  const [laravelAuthenticated, setLaravelAuthenticated] = useState(false);
+  // --- ローディング完了フラグ ---
   const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
-  // --- トークンリフレッシュ/キューイングのためのRef (Interceptorの排他制御) ---
+  // --- Interceptor 制御のための Ref ---
   const refreshPromiseRef = useRef<Promise<ReloadResult> | null>(null);
   const failedQueueRef = useRef<
     Array<{
@@ -121,29 +118,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }>
   >([]);
 
-  // --- useLaravelSession の利用 (状態監視のヘルパー) ---
-  useLaravelSession(
-    user,
-    auth,
-    checkLaravelSession,
-    setLaravelAuthenticated,
-    setInitialCheckComplete,
-  );
-
-  // --- B. 認証アクション定義 ---
+  // --- A. ヘルパー関数定義 ---
 
   /**
-   * 💡 CSRF Cookieの取得。Sanctum認証に必要な前提処理。
+   * 💡 CSRF Cookieの取得は不要だが、LaravelのAPIへのアクセスを簡易化するため残す。
    */
   const fetchCsrfCookie = useCallback(async () => {
+    // 💡 FirebaseAuthではCSRFは不要だが、Laravelのセッション確立ルートを叩くなら必要。
+    // 今回は Sanctuｍフローではないため、CSRF Cookieの取得は**基本的に不要**。
+    // ログイン処理のシンプル化のため、この関数は空にするか削除が望ましいが、元の構造維持のため残す。
     if (!API_BASE_URL) return;
     try {
       axios.defaults.withCredentials = true;
-      await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`);
+      // 💡 CSRF取得はSanctum特有のため、ここでは削除（またはコメントアウト）する
+      // await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`);
     } catch (error) {
-      console.error("[Sanctum] Failed to fetch CSRF cookie:", error);
+      console.error(
+        "[Sanctum] CSRF process removed for FirebaseAuth study:",
+        error,
+      );
     }
   }, []);
+
+  /**
+   * 💡 ユーザープロフィールをロードするためのシンプルなヘルパー関数
+   * @param idToken 現在有効なFirebase ID Token
+   * @returns ユーザー情報 (BackendUser)
+   */
+  const fetchProfile = useCallback(
+    async (idToken: string): Promise<BackendUser> => {
+      // 💡 /api/mypage/profile を叩く。このルートは `auth:firebase` ミドルウェアで保護されている必要がある。
+      const profileRes = await axios.get(
+        `${API_BASE_URL}/api/mypage/profile/firebase`, // 💡 Firebase専用のルートを叩く
+        { headers: { Authorization: `Bearer ${idToken}` } },
+      );
+      return profileRes.data.user as BackendUser;
+    },
+    [],
+  );
+
+  // --- B. 認証アクション定義 ---
 
   /**
    * 💡 ログアウト処理
@@ -159,8 +173,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         setUser(null);
         setBackendUser(null);
-        // ログアウト時はLaravel認証状態もリセット
-        setLaravelAuthenticated(false);
         setInitialCheckComplete(true);
 
         router.push(redirectPath);
@@ -175,32 +187,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * 💡 認証トークン失効時（401エラー時）のリカバリーロジック。
+   * 責務: Firebase ID Token のリフレッシュのみを実行する (Sanctum交換は不要)。
    */
   const reloadAuthToken = useCallback(async () => {
     if (user) {
       try {
-        // Firebase ID Token を強制的にリフレッシュ
+        // 1. Firebase ID Token を強制的にリフレッシュ
         const idToken = await user.getIdToken(true);
         setToken(idToken);
 
-        // 💡 トークン交換: 新しいID Tokenを使ってLaravelセッションを更新し、新しいSanctumトークンを取得
-        const { token: newToken, user: refreshedBackendUser } =
-          await completeLaravelLogin(idToken);
-
+        // 2. 💡 BackendUser情報も最新化（念のため）
+        const refreshedBackendUser = await fetchProfile(idToken);
         setBackendUser(refreshedBackendUser);
 
-        return { ...refreshedBackendUser, token: newToken }; // 新しいSanctumトークンを返す
+        // 💡 修正点: BackendUser情報と新しいID Tokenを返す
+        return { ...refreshedBackendUser, token: idToken };
       } catch (error) {
-        console.error("[Firebase] Failed to refresh ID Token:", error);
+        console.error("[Firebase Refresh] Failed to refresh ID Token:", error);
         throw error;
       }
     } else {
       throw new Error("User not found for token refresh.");
     }
-  }, [user]);
+  }, [user, fetchProfile]);
 
   /**
-   * 💡 ログイン処理の核。Firebase認証 -> Laravelセッション確立を一連で実行する。
+   * 💡 ログイン処理の核。Firebase認証 -> BackendUser情報ロードを実行する。
    */
   const login = useCallback(
     async ({
@@ -214,7 +226,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       if (!auth) throw new Error("Auth service unavailable.");
 
-      await fetchCsrfCookie();
       // 1. Firebase 認証を実行
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -223,16 +234,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       const idToken = await userCredential.user.getIdToken();
 
-      setToken(idToken); // 一旦ID Tokenをセット
+      setToken(idToken); // 💡 ID Tokenをセット
 
-      // 2. Laravel側でSanctumセッションを確立 (ID Token -> Sanctum Tokenへの交換)
-      const { user: newBackendUser, token: newToken } =
-        await completeLaravelLogin(idToken, name);
+      // 2. 💡 Laravel側でユーザー情報をロード (認証はミドルウェアに委ねる)
+      // ログイン直後なので、/api/mypage/profile を叩き、ユーザー情報をDBから取得
+      const newBackendUser = await fetchProfile(idToken);
       setBackendUser(newBackendUser);
-      setToken(newToken); // 確実にAPIで使用するSanctumトークンをセット
 
       // 3. 認証状態を確定
-      setLaravelAuthenticated(true);
       setInitialCheckComplete(true);
 
       // 4. リダイレクト
@@ -242,13 +251,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push("/");
       }
     },
-    [auth, fetchCsrfCookie, router],
+    [auth, router, fetchProfile],
   );
+
+  // ★外部公開用の setBackendUser ラッパー関数
+  const setBackendUserStatus = useCallback((user: BackendUser | null) => {
+    setBackendUser(user);
+  }, []);
 
   // --- C. 状態監視と同期 (useEffect) ---
 
   /**
    * 責務 1: Firebaseの認証状態変更の監視 (`onAuthStateChanged`)
+   * 💡 リロード/ページ遷移時の ID Token 確立と BackendUser 情報のロードを担う
    */
   useEffect(() => {
     if (!auth || !isReady) return;
@@ -264,18 +279,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (idToken) {
             try {
-              // 💡 認証の核（リロード時）: ID Tokenを使ってLaravelセッションを確立し直す
-              const { user: newBackendUser, token: newToken } =
-                await completeLaravelLogin(idToken);
+              // 💡 認証の核（リロード時）: ID Tokenを使ってLaravelからプロフィールをロード
+              const newBackendUser = await fetchProfile(idToken);
               setBackendUser(newBackendUser);
-              setToken(newToken); // 新しいSanctumトークンをセット
 
               // ★★★ 状態の最終確定 ★★★
-              setLaravelAuthenticated(true);
               setInitialCheckComplete(true);
             } catch (profileError) {
               console.error(
-                "[Profile] Critical: Failed to load backend profile. Initiating logout.",
+                "[Profile] Failed to load backend profile. Initiating logout.",
                 profileError,
               );
               await logout();
@@ -294,39 +306,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ログアウト時
         setToken(null);
         setBackendUser(null);
-        setLaravelAuthenticated(false);
         setInitialCheckComplete(true);
       }
     });
 
     return () => unsub();
-  }, [auth, isReady, logout]);
-
-  /**
-   * 責務 2: CSRF Cookieの初期取得
-   */
-  useEffect(() => {
-    fetchCsrfCookie();
-  }, [fetchCsrfCookie]);
-
-  /**
-   * 責務 3: メール認証後のリダイレクト処理
-   */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const queryParams = new URLSearchParams(window.location.search);
-    const newToken = queryParams.get("token");
-    const isVerifiedRedirect = queryParams.get("verified") === "true";
-
-    if (newToken && isVerifiedRedirect) {
-      router.replace(pathname, { scroll: false });
-    }
-  }, [pathname, router]);
+  }, [auth, isReady, logout, fetchProfile]);
 
   // --- D. apiClient の生成と Interceptor の実装（核心部分） ---
 
   /**
    * 💡 Axios Interceptorの実装とAPI Clientの生成。
+   * 責務: Firebase ID Tokenをヘッダーに付与し、401エラー時に ID Token リフレッシュのみを再試行する。
    */
   const apiClient = useMemo(() => {
     if (!token) {
@@ -335,9 +326,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const instance = axios.create({
       baseURL: API_BASE_URL,
-      withCredentials: true,
+      // 💡 withCredentials: true は Sanctum の Cookie認証で必須。FirebaseAuthでは基本的に不要だが、Laravel側のCSRF対策があれば残す場合もある。
+      withCredentials: false,
       headers: {
-        Authorization: `Bearer ${token}`, // Sanctumトークンを付与
+        Authorization: `Bearer ${token}`, // 💡 Firebase ID Token を付与
         Accept: "application/json",
       },
     });
@@ -377,7 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             refreshPromiseRef.current = reloadAuthToken();
 
             try {
-              const { token: newToken } = await refreshPromiseRef.current;
+              const { token: newToken } = await refreshPromiseRef.current; // 💡 newToken は新しい ID Token
               processQueue(null, newToken);
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               refreshPromiseRef.current = null;
@@ -403,23 +395,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return instance;
   }, [token, logout, reloadAuthToken]);
 
-  const setBackendUserStatus = useCallback((user: BackendUser | null) => {
-    setBackendUser(user);
-  }, []);
-
   // --- E. 状態の計算 (useMemo) ---
 
   /**
    * 💡 最終的な認証状態の計算。
    */
   const isAuthenticated = useMemo(() => {
-    const isAuth =
-      initialCheckComplete &&
-      !!user &&
-      !user.isAnonymous &&
-      laravelAuthenticated === true;
+    // 💡 laravelAuthenticated のチェックは不要。Firebase User と Token の存在のみをチェック。
+    const isAuth = initialCheckComplete && !!user && !user.isAnonymous;
     return isAuth;
-  }, [initialCheckComplete, user, laravelAuthenticated]);
+  }, [initialCheckComplete, user]);
 
   /**
    * 💡 ローディング状態の計算。
@@ -463,8 +448,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
  */
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  // 💡 initialAuthContext を初期値にしたため、null チェックは必須ではありませんが、安全のため残すこともできます。
-  // if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
 
@@ -473,8 +456,6 @@ export const useAuth = () => {
  */
 export const useApiClient = () => {
   const ctx = useContext(AuthContext);
-
-  // 💡 Contextが初期化されていることは保証されるため、ここで ctx が null かどうかはチェックしません。
 
   if (!ctx.apiClient) {
     throw new Error(

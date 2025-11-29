@@ -3,7 +3,7 @@
 import React, { useState, FormEvent, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useAuth } from "@/hooks/useAuth"; // useAuthフックを使用
+import { useAuth } from "@/hooks/useSanctumAuth"; // useAuthフックを使用
 import { useRouter } from "next/navigation";
 
 // LaravelのCSSをTailwindで再現したメインページ用ヘッダー
@@ -20,7 +20,7 @@ export default function Header() {
   // ヘッダー全体を非表示にする必要があるローディング状態
   const isHeaderLoading = useMemo(
     () => isAuthLoading || isLoggingOut,
-    [isAuthLoading, isLoggingOut]
+    [isAuthLoading, isLoggingOut],
   );
 
   // ログアウト処理

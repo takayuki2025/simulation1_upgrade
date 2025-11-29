@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // Next.jsのカスタム認証フック
+import { useAuth } from "@/hooks/useSanctumAuth"; // Next.jsのカスタム認証フック
 // import { useApi } from "@/hooks/useApi"; // 👈 削除
 
 // =======================================================
@@ -51,7 +51,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  */
 const getAssetUrl = (
   path: string | undefined | null,
-  isProfileImage: boolean = false
+  isProfileImage: boolean = false,
 ): string => {
   // 1. path が存在しない、または空の場合は、デフォルト画像を返す
   if (!path) {
@@ -78,340 +78,345 @@ const getAssetUrl = (
 };
 
 export default function Mypage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-    // 🔽 修正: useAuth から apiClient を取得
-    const {
-        user: authUser,
-        isAuthenticated,
-        isLoading: isAuthLoading,
-        logout,
-        apiClient, // 👈 追加
-    } = useAuth();
-    // const { authenticatedFetch } = useApi(); // 👈 削除
+  // 🔽 修正: useAuth から apiClient を取得
+  const {
+    user: authUser,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    logout,
+    apiClient, // 👈 追加
+  } = useAuth();
+  // const { authenticatedFetch } = useApi(); // 👈 削除
 
-    // --- 状態管理 ---
-    const [user, setUser] = useState<User | null>(null);
-    const [items, setItems] = useState<Item[]>([]);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false); // データフェッチ専用のローディング
+  // --- 状態管理 ---
+  const [user, setUser] = useState<User | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // データフェッチ専用のローディング
 
-    // URLクエリパラメータから現在のページ (sell/buy) を取得
-    const page = useMemo(() => {
-        return searchParams.get("page") === "buy" ? "buy" : "sell";
-    }, [searchParams]);
+  // URLクエリパラメータから現在のページ (sell/buy) を取得
+  const page = useMemo(() => {
+    return searchParams.get("page") === "buy" ? "buy" : "sell";
+  }, [searchParams]);
 
-    // URLクエリパラメータからメール認証状態を取得 (Nuxt版ロジックを移植)
-    const isVerificationRedirect = useMemo(() => {
-        return searchParams.get("verified") === "true";
-    }, [searchParams]);
+  // URLクエリパラメータからメール認証状態を取得 (Nuxt版ロジックを移植)
+  const isVerificationRedirect = useMemo(() => {
+    return searchParams.get("verified") === "true";
+  }, [searchParams]);
 
-    // ----------------------------------------------------------------
-    // ヘルパー関数: apiClient を使用したフェッチ (useApi の authenticatedFetch の代替)
-    // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  // ヘルパー関数: apiClient を使用したフェッチ (useApi の authenticatedFetch の代替)
+  // ----------------------------------------------------------------
 
-    // 認証済みリクエストを実行するヘルパー関数
-    const fetcher = useCallback(async (endpoint: string) => {
-        // 🔽 修正: apiClient が null の場合はエラーをスロー (useApiの挙動を再現)
-        if (!apiClient) {
-            // apiClient が null の場合（非認証状態または初期ロード中）は、
-            // 外部でハンドリングされるようにエラーをスロー
-            const error = new Error("API client is not ready (unauthenticated or loading).");
-            (error as any).status = 401; // ログアウト処理をトリガーするために 401 ステータスを設定
-            throw error;
-        }
-
-        try {
-            // 🔽 修正: apiClient を使用
-            const response = await apiClient.get(endpoint);
-            return response.data;
-        } catch (error) {
-            console.error("fetcher error:", error);
-            // エラーを再スローして、呼び出し元でキャッチさせる
-            throw error;
-        }
-    }, [apiClient]); // 👈 依存配列に apiClient を追加
-
-    // ----------------------------------------------------------------
-    // 1. ユーザー情報取得ロジック (認証解決後に一度実行)
-    // ----------------------------------------------------------------
-
-    const fetchUserProfile = useCallback(async () => {
-        // 認証済みでない場合、すぐにログインへリダイレクト
-        if (!isAuthenticated) {
-            if (isVerificationRedirect) {
-                // メール認証リダイレクト中は、URLクエリ除去のためにmypageをロードさせる
-                console.log("Verification redirect detected. Allow loading.");
-                return;
-            }
-            console.log("Unauthenticated detected. Redirecting to /login.");
-            router.replace("/login");
-            return;
-        }
-
-        // 🔽 修正: apiClient が null の場合はスキップ
-        if (!apiClient) {
-            console.log("apiClient is null. Skipping profile fetch.");
-            return;
-        }
-
-        // 認証済みで、かつユーザーデータがまだない場合のみフェッチ
-        if (user) return;
-
-        setIsLoading(true);
-        try {
-            // 🔽 修正: authenticatedFetch の代わりに fetcher を使用し、APIエンドポイントを /api/... に修正
-            const response: { user?: User } = await fetcher("/api/mypage/profile");
-
-            if (response && response.user) {
-                setUser(response.user);
-
-                // メール認証後のクエリパラメータ処理
-                if (isVerificationRedirect) {
-                    setSuccessMessage(
-                        `メール認証が完了しました！引き続きサービスをご利用いただけます。`
-                    );
-                    // URLクエリから 'verified' を除去（replaceで実現）
-                    router.replace(`/mypage?page=${page}`);
-                }
-            }
-        } catch (error: any) {
-            console.error("プロフィールデータの取得に失敗しました:", error);
-            const status = error.status || (error.response && error.response.status);
-
-            if (status === 401) {
-                console.log("401エラーを捕捉 (プロフィール取得)。ログアウト処理開始。");
-                // トークンリフレッシュに失敗した場合、最終的にログアウトを呼び出す
-                await logout();
-            } else {
-                setSuccessMessage("プロフィールデータのロードに失敗しました。");
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    }, [
-        isAuthenticated,
-        user,
-        router,
-        fetcher, // 👈 依存配列を fetcher に変更
-        logout,
-        isVerificationRedirect,
-        page,
-        apiClient // 👈 追加: fetcher の依存として必要
-    ]);
-
-    // ----------------------------------------------------------------
-    // 2. 商品リスト取得ロジック
-    // ----------------------------------------------------------------
-
-    const fetchItems = useCallback(async () => {
-        // ユーザープロフィールのロードが完了していることを確認
-        if (!user) return;
-
-        // 🔽 修正: apiClient が null の場合はスキップ
-        if (!apiClient) {
-            console.log("apiClient is null. Skipping items fetch.");
-            return;
-        }
-
-        setIsLoading(true);
-        setItems([]);
-
-        try {
-            // 🔽 修正: APIエンドポイントを /api/... に修正
-            const endpoint = `/api/mypage/items?page=${page}`;
-            // バックエンドから商品リストを取得する
-            const response: { items: Item[] } = await fetcher(endpoint); // 👈 fetcher を使用
-            setItems(response.items || []);
-        } catch (error: any) {
-            console.error(`${page}商品の取得に失敗しました:`, error);
-            const status = error.status || (error.response && error.response.status);
-
-            if (status === 401) {
-                console.log(`401エラーを捕捉 (アイテム取得)。ログアウト処理開始。`);
-                await logout();
-            }
-            // 商品取得エラーは致命的ではないため、ロード状態のみ解除
-        } finally {
-            setIsLoading(false);
-        }
-    }, [user, page, fetcher, logout, apiClient]); // 👈 依存配列を fetcher と apiClient に変更
-
-    // ----------------------------------------------------------------
-    // 3. useEffect による実行管理
-    // ----------------------------------------------------------------
-
-    // ★★★ 認証解決監視用の useEffect ★★★
-    useEffect(() => {
-        // 認証状態が解決するまで待つ
-        if (isAuthLoading) return;
-
-        // 認証が解決した後、認証済みであればプロフィールを取得し、未認証であればリダイレクト
-        // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
-        fetchUserProfile();
-    }, [isAuthLoading, fetchUserProfile, apiClient]); // 👈 apiClient を追加
-
-    // page (クエリパラメータ) の変更時、または user データ取得完了時に商品リストをフェッチ
-    useEffect(() => {
-        // userが存在し、認証済みであり、認証解決が完了していればアイテムをフェッチ
-        // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
-        if (user && isAuthenticated && !isAuthLoading && apiClient) {
-            fetchItems();
-        }
-    }, [page, user, isAuthenticated, isAuthLoading, fetchItems, apiClient]); // 👈 apiClient を追加
-
-    // ユーティリティ: プロフィール編集ページへ遷移
-    const goToProfileEdit = useCallback(() => {
-        router.push("/mypage/profile");
-    }, [router]);
-
-    // ----------------------------------------------------------------
-    // 4. レンダーロジック
-    // ----------------------------------------------------------------
-
-    // 認証解決待ちの表示 (Home.tsx と同様に isAuthLoading を優先)
-    if (isAuthLoading) {
-        return (
-            <div className="flex justify-center items-center h-screen">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"></div>
-                <p className="ml-3 text-gray-600">認証状態を確認中...</p>
-            </div>
+  // 認証済みリクエストを実行するヘルパー関数
+  const fetcher = useCallback(
+    async (endpoint: string) => {
+      // 🔽 修正: apiClient が null の場合はエラーをスロー (useApiの挙動を再現)
+      if (!apiClient) {
+        // apiClient が null の場合（非認証状態または初期ロード中）は、
+        // 外部でハンドリングされるようにエラーをスロー
+        const error = new Error(
+          "API client is not ready (unauthenticated or loading).",
         );
+        (error as any).status = 401; // ログアウト処理をトリガーするために 401 ステータスを設定
+        throw error;
+      }
+
+      try {
+        // 🔽 修正: apiClient を使用
+        const response = await apiClient.get(endpoint);
+        return response.data;
+      } catch (error) {
+        console.error("fetcher error:", error);
+        // エラーを再スローして、呼び出し元でキャッチさせる
+        throw error;
+      }
+    },
+    [apiClient],
+  ); // 👈 依存配列に apiClient を追加
+
+  // ----------------------------------------------------------------
+  // 1. ユーザー情報取得ロジック (認証解決後に一度実行)
+  // ----------------------------------------------------------------
+
+  const fetchUserProfile = useCallback(async () => {
+    // 認証済みでない場合、すぐにログインへリダイレクト
+    if (!isAuthenticated) {
+      if (isVerificationRedirect) {
+        // メール認証リダイレクト中は、URLクエリ除去のためにmypageをロードさせる
+        console.log("Verification redirect detected. Allow loading.");
+        return;
+      }
+      console.log("Unauthenticated detected. Redirecting to /login.");
+      router.replace("/login");
+      return;
     }
 
-    // 認証解決後、未認証でリダイレクトされなかった場合（メール認証リダイレクト中など）
-    if (!isAuthenticated || !user) {
-        // 認証済みではない、かつユーザープロフィールのロードもまだ（user=null）だが、
-        // isVerificationRedirect=true でリダイレクトを一時的にブロックしているケースなど
-        if (isVerificationRedirect && !user) {
-            return (
-                <div className="flex justify-center items-center h-screen">
-                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"></div>
-                    <p className="ml-3 text-gray-600">
-                        メール認証後のユーザー情報を確認中...
-                    </p>
-                </div>
-            );
-        }
-
-        // 最終的にユーザー情報がない場合は、エラー表示またはリダイレクトを待つ
-        return (
-            <div className="text-center p-8">
-                <p className="text-xl text-red-500">
-                    ユーザー情報がロードできませんでした。
-                </p>
-            </div>
-        );
+    // 🔽 修正: apiClient が null の場合はスキップ
+    if (!apiClient) {
+      console.log("apiClient is null. Skipping profile fetch.");
+      return;
     }
 
-    // ユーザー情報とアイテムリストのロード中の表示
-    const isContentLoading = isLoading || !user;
+    // 認証済みで、かつユーザーデータがまだない場合のみフェッチ
+    if (user) return;
 
+    setIsLoading(true);
+    try {
+      // 🔽 修正: authenticatedFetch の代わりに fetcher を使用し、APIエンドポイントを /api/... に修正
+      const response: { user?: User } = await fetcher("/api/mypage/profile");
+
+      if (response && response.user) {
+        setUser(response.user);
+
+        // メール認証後のクエリパラメータ処理
+        if (isVerificationRedirect) {
+          setSuccessMessage(
+            `メール認証が完了しました！引き続きサービスをご利用いただけます。`,
+          );
+          // URLクエリから 'verified' を除去（replaceで実現）
+          router.replace(`/mypage?page=${page}`);
+        }
+      }
+    } catch (error: any) {
+      console.error("プロフィールデータの取得に失敗しました:", error);
+      const status = error.status || (error.response && error.response.status);
+
+      if (status === 401) {
+        console.log("401エラーを捕捉 (プロフィール取得)。ログアウト処理開始。");
+        // トークンリフレッシュに失敗した場合、最終的にログアウトを呼び出す
+        await logout();
+      } else {
+        setSuccessMessage("プロフィールデータのロードに失敗しました。");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    isAuthenticated,
+    user,
+    router,
+    fetcher, // 👈 依存配列を fetcher に変更
+    logout,
+    isVerificationRedirect,
+    page,
+    apiClient, // 👈 追加: fetcher の依存として必要
+  ]);
+
+  // ----------------------------------------------------------------
+  // 2. 商品リスト取得ロジック
+  // ----------------------------------------------------------------
+
+  const fetchItems = useCallback(async () => {
+    // ユーザープロフィールのロードが完了していることを確認
+    if (!user) return;
+
+    // 🔽 修正: apiClient が null の場合はスキップ
+    if (!apiClient) {
+      console.log("apiClient is null. Skipping items fetch.");
+      return;
+    }
+
+    setIsLoading(true);
+    setItems([]);
+
+    try {
+      // 🔽 修正: APIエンドポイントを /api/... に修正
+      const endpoint = `/api/mypage/items?page=${page}`;
+      // バックエンドから商品リストを取得する
+      const response: { items: Item[] } = await fetcher(endpoint); // 👈 fetcher を使用
+      setItems(response.items || []);
+    } catch (error: any) {
+      console.error(`${page}商品の取得に失敗しました:`, error);
+      const status = error.status || (error.response && error.response.status);
+
+      if (status === 401) {
+        console.log(`401エラーを捕捉 (アイテム取得)。ログアウト処理開始。`);
+        await logout();
+      }
+      // 商品取得エラーは致命的ではないため、ロード状態のみ解除
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, page, fetcher, logout, apiClient]); // 👈 依存配列を fetcher と apiClient に変更
+
+  // ----------------------------------------------------------------
+  // 3. useEffect による実行管理
+  // ----------------------------------------------------------------
+
+  // ★★★ 認証解決監視用の useEffect ★★★
+  useEffect(() => {
+    // 認証状態が解決するまで待つ
+    if (isAuthLoading) return;
+
+    // 認証が解決した後、認証済みであればプロフィールを取得し、未認証であればリダイレクト
+    // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
+    fetchUserProfile();
+  }, [isAuthLoading, fetchUserProfile, apiClient]); // 👈 apiClient を追加
+
+  // page (クエリパラメータ) の変更時、または user データ取得完了時に商品リストをフェッチ
+  useEffect(() => {
+    // userが存在し、認証済みであり、認証解決が完了していればアイテムをフェッチ
+    // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
+    if (user && isAuthenticated && !isAuthLoading && apiClient) {
+      fetchItems();
+    }
+  }, [page, user, isAuthenticated, isAuthLoading, fetchItems, apiClient]); // 👈 apiClient を追加
+
+  // ユーティリティ: プロフィール編集ページへ遷移
+  const goToProfileEdit = useCallback(() => {
+    router.push("/mypage/profile");
+  }, [router]);
+
+  // ----------------------------------------------------------------
+  // 4. レンダーロジック
+  // ----------------------------------------------------------------
+
+  // 認証解決待ちの表示 (Home.tsx と同様に isAuthLoading を優先)
+  if (isAuthLoading) {
     return (
-        <div className="profile_page">
-            {/* 成功メッセージの表示 */}
-            {successMessage && (
-                <div className="validation-errors bg-green-100 border border-green-400 text-green-700">
-                    {successMessage}
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"></div>
+        <p className="ml-3 text-gray-600">認証状態を確認中...</p>
+      </div>
+    );
+  }
+
+  // 認証解決後、未認証でリダイレクトされなかった場合（メール認証リダイレクト中など）
+  if (!isAuthenticated || !user) {
+    // 認証済みではない、かつユーザープロフィールのロードもまだ（user=null）だが、
+    // isVerificationRedirect=true でリダイレクトを一時的にブロックしているケースなど
+    if (isVerificationRedirect && !user) {
+      return (
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500"></div>
+          <p className="ml-3 text-gray-600">
+            メール認証後のユーザー情報を確認中...
+          </p>
+        </div>
+      );
+    }
+
+    // 最終的にユーザー情報がない場合は、エラー表示またはリダイレクトを待つ
+    return (
+      <div className="text-center p-8">
+        <p className="text-xl text-red-500">
+          ユーザー情報がロードできませんでした。
+        </p>
+      </div>
+    );
+  }
+
+  // ユーザー情報とアイテムリストのロード中の表示
+  const isContentLoading = isLoading || !user;
+
+  return (
+    <div className="profile_page">
+      {/* 成功メッセージの表示 */}
+      {successMessage && (
+        <div className="validation-errors bg-green-100 border border-green-400 text-green-700">
+          {successMessage}
+        </div>
+      )}
+
+      <div className="profile_header">
+        <div className="profile_header_1">
+          {/* プロフィール画像 */}
+          <img
+            src={getAssetUrl(user.user_image, true)}
+            alt="プロフィール画像"
+            className="user_image_css"
+          />
+          <h2 className="user_name_css">{user.name}</h2>
+
+          <div className="user_edit_css1">
+            <button onClick={goToProfileEdit} className="user_edit_css2">
+              プロフィールを編集
+            </button>
+          </div>
+        </div>
+
+        <div className="profile_header_2">
+          {/* 出品した商品タブ */}
+          <Link
+            href="/mypage?page=sell"
+            className={`sell_items ${page === "sell" ? "active" : ""}`}
+            scroll={false} // 画面遷移時のスクロールを制御
+          >
+            出品した商品
+          </Link>
+          {/* 購入した商品タブ */}
+          <Link
+            href="/mypage?page=buy"
+            className={`buy_items ${page === "buy" ? "active" : ""}`}
+            scroll={false} // 画面遷移時のスクロールを制御
+          >
+            購入した商品
+          </Link>
+        </div>
+      </div>
+
+      <div className="profile_content">
+        {/* アイテムリストの表示 */}
+        {isLoading && (
+          <div className="text-center p-8">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
+            <p className="text-gray-500 mt-3">商品リストを読み込み中...</p>
+          </div>
+        )}
+
+        {!isLoading && items.length === 0 ? (
+          <div className="mt-8 text-center text-gray-500">
+            <p>
+              {page === "sell"
+                ? "出品した商品はありません。"
+                : "購入した商品はありません。"}
+            </p>
+          </div>
+        ) : (
+          <div className="items_select">
+            {items.map((item) => {
+              const displayItem = page === "buy" ? item.item : item;
+              // buy ページで item.item が null の場合はスキップ（異常データ）
+              if (page === "buy" && !displayItem) return null;
+
+              return (
+                <div key={item.id} className="items_select_all">
+                  <Link
+                    href={`/item/${displayItem!.id}`}
+                    className="mypage_item_"
+                  >
+                    {/* 画像の表示 */}
+                    {displayItem!.item_image ? (
+                      <img
+                        src={getAssetUrl(displayItem!.item_image)}
+                        alt={displayItem!.name + "の商品写真"}
+                      />
+                    ) : (
+                      <div className="no-image-placeholder">No Image</div>
+                    )}
+                    <div className="item-details">
+                      <label>{displayItem!.name}</label>
+                      {displayItem!.remain === 0 && (
+                        <span className="sold-text">sold</span>
+                      )}
+                    </div>
+                  </Link>
                 </div>
-            )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-            <div className="profile_header">
-                <div className="profile_header_1">
-                    {/* プロフィール画像 */}
-                    <img
-                        src={getAssetUrl(user.user_image, true)}
-                        alt="プロフィール画像"
-                        className="user_image_css"
-                    />
-                    <h2 className="user_name_css">{user.name}</h2>
-
-                    <div className="user_edit_css1">
-                        <button onClick={goToProfileEdit} className="user_edit_css2">
-                            プロフィールを編集
-                        </button>
-                    </div>
-                </div>
-
-                <div className="profile_header_2">
-                    {/* 出品した商品タブ */}
-                    <Link
-                        href="/mypage?page=sell"
-                        className={`sell_items ${page === "sell" ? "active" : ""}`}
-                        scroll={false} // 画面遷移時のスクロールを制御
-                    >
-                        出品した商品
-                    </Link>
-                    {/* 購入した商品タブ */}
-                    <Link
-                        href="/mypage?page=buy"
-                        className={`buy_items ${page === "buy" ? "active" : ""}`}
-                        scroll={false} // 画面遷移時のスクロールを制御
-                    >
-                        購入した商品
-                    </Link>
-                </div>
-            </div>
-
-            <div className="profile_content">
-                {/* アイテムリストの表示 */}
-                {isLoading && (
-                    <div className="text-center p-8">
-                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
-                        <p className="text-gray-500 mt-3">商品リストを読み込み中...</p>
-                    </div>
-                )}
-
-                {!isLoading && items.length === 0 ? (
-                    <div className="mt-8 text-center text-gray-500">
-                        <p>
-                            {page === "sell"
-                                ? "出品した商品はありません。"
-                                : "購入した商品はありません。"}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="items_select">
-                        {items.map((item) => {
-                            const displayItem = page === "buy" ? item.item : item;
-                            // buy ページで item.item が null の場合はスキップ（異常データ）
-                            if (page === "buy" && !displayItem) return null;
-
-                            return (
-                                <div key={item.id} className="items_select_all">
-                                    <Link
-                                        href={`/item/${displayItem!.id}`}
-                                        className="mypage_item_"
-                                    >
-                                        {/* 画像の表示 */}
-                                        {displayItem!.item_image ? (
-                                            <img
-                                                src={getAssetUrl(displayItem!.item_image)}
-                                                alt={displayItem!.name + "の商品写真"}
-                                            />
-                                        ) : (
-                                            <div className="no-image-placeholder">No Image</div>
-                                        )}
-                                        <div className="item-details">
-                                            <label>{displayItem!.name}</label>
-                                            {displayItem!.remain === 0 && (
-                                                <span className="sold-text">sold</span>
-                                            )}
-                                        </div>
-                                    </Link>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* 以下の style タグ内の CSS は、ご提示の Nuxt ファイルのものをそのままコピーして使用してください */}
-            {/* Tailwind CSS 環境では、上記コンポーネントの className に反映されるべきですが、
+      {/* 以下の style タグ内の CSS は、ご提示の Nuxt ファイルのものをそのままコピーして使用してください */}
+      {/* Tailwind CSS 環境では、上記コンポーネントの className に反映されるべきですが、
           ここでは Scoped CSS を模倣してそのまま残します。
           Next.jsのグローバルCSSまたはCSS Modulesとして別途定義する必要があります。 */}
-            <style jsx>{`
+      <style jsx>{`
         .profile_page {
           margin: 0 auto;
           max-width: 1400px;
@@ -454,7 +459,9 @@ export default function Mypage() {
           background-color: white;
           border-radius: 5px;
           cursor: pointer;
-          transition: background-color 0.2s, color 0.2s;
+          transition:
+            background-color 0.2s,
+            color 0.2s;
         }
 
         .user_edit_css2:hover {
@@ -653,6 +660,6 @@ export default function Mypage() {
           }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

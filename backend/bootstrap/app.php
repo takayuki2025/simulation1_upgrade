@@ -8,6 +8,8 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Contracts\Container\BindingResolutionException;
+// ★★★ 追加: カスタムミドルウェアをインポート (api/auth/check ルートの未認証→４０１（今回は正常）→２０１にする。No401Redirectで使用したものと同じ) ★★★
+use App\Http\Middleware\No401Redirect;
 
 return Application::configure(basePath: dirname(__DIR__))
 
@@ -15,43 +17,40 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         // アプリケーション固有のプロバイダ
         App\Providers\AppServiceProvider::class,
-        // Kreait\Laravel\Firebase\ServiceProvider::class は config/app.php に登録されているため削除
         App\Providers\AuthServiceProvider::class,
     ])
 
     ->withMiddleware(function (Middleware $middleware) {
 
         // --- Trust Proxies の設定 (Docker環境向け) ---
-    // 🚨 【修正箇所1】Caddyからのリクエストを全て信頼
-    $middleware->trustProxies(
-    at: explode(',', env('TRUSTED_PROXIES', '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16')),
-    // ★★★ 修正: 確実に存在する定数を全て指定する ★★★
-    headers: Request::HEADER_X_FORWARDED_FOR |
-                Request::HEADER_X_FORWARDED_HOST |
-                Request::HEADER_X_FORWARDED_PORT |
-                Request::HEADER_X_FORWARDED_PROTO |
-                Request::HEADER_X_FORWARDED_AWS_ELB |
-                Request::HEADER_FORWARDED
-    );
+        // 🚨 【修正箇所1】Caddyからのリクエストを全て信頼
+        $middleware->trustProxies(
+            at: explode(',', env('TRUSTED_PROXIES', '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16')),
+            // ★★★ 修正: 確実に存在する定数を全て指定する ★★★
+            headers: Request::HEADER_X_FORWARDED_FOR |
+                        Request::HEADER_X_FORWARDED_HOST |
+                        Request::HEADER_X_FORWARDED_PORT |
+                        Request::HEADER_X_FORWARDED_PROTO |
+                        Request::HEADER_X_FORWARDED_AWS_ELB |
+                        Request::HEADER_FORWARDED
+        );
 
         // --- CSRF検証からAPIルートを除外 ---
         $middleware->validateCsrfTokens(except: [
             'api/*'
         ]);
 
-        // ★★★ 暫定対処: 古い名前空間のミドルウェアをLaravel 11のクラスに強制的にマッピング ★★★
+        // ★★★ 修正箇所: ミドルウェアのエイリアス定義を整理 ★★★
         $middleware->alias([
-            'App\Http\Middleware\EncryptCookies' => \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            'App\Http\Middleware\AddQueuedCookiesToResponse' => \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            'App\Http\Middleware\StartSession' => \Illuminate\Session\Middleware\StartSession::class,
-            'App\Http\Middleware\AuthenticateSession' => \Illuminate\Session\Middleware\AuthenticateSession::class,
-
-            // ★★★ 修正箇所: ここに firebase.verify のエイリアスを移動/追加し、確実に認識させる ★★★
-            'firebase.verify' => VerifyFirebaseToken::class,
+            // Laravel 11の推奨クラスにマッピング
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'sanctum.auth' => \Laravel\Sanctum\Http\Middleware\Authenticate::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+
+            // Firebaseカスタムミドルウェアのエイリアス（auth:firebaseで使用）
+            'firebase.verify' => VerifyFirebaseToken::class,
+            // 既存の古い名前空間のミドルウェアのエイリアスはLaravel 11では不要なため、削除
         ]);
         // ★★★ 修正箇所ここまで ★★★
 
@@ -63,15 +62,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // --- APIミドルウェアグループの定義 ---
         $middleware->api(
-            prepend: [
-                // \Illuminate\Http\Middleware\HandleCors::class, // ★★★ 修正: Nginxに処理を一本化するため、Laravel側のCORSミドルウェアを削除 ★★★
-            ],
+            // NginxでCORSを処理するため、HandleCorsは削除した状態を維持
+            prepend: [],
             // 最後にルーティングバインディングを追加
             append: [
                 'throttle:api',
-                // ★★★ 修正箇所: VerifyFirebaseTokenをAPIグループ全体に適用 ★★★
-                VerifyFirebaseToken::class,
                 \Illuminate\Routing\Middleware\SubstituteBindings::class,
+                // ★★★ 修正箇所: APIグループ全体へのVerifyFirebaseTokenの適用を削除 ★★★
+                // VerifyFirebaseToken::class, // これを削除することで、ルートごとにauth:sanctumやauth:firebaseを制御可能にする
             ]
         );
 
@@ -93,13 +91,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            // AuthenticationException (認証エラー 401) の処理
+            // ★★★ 修正箇所: AuthenticationException (例外、認証エラー ８０１（４０１）の時だけ) の処理をカスタムレスポンスに置き換える ★★★
             if ($e instanceof AuthenticationException) {
+
+                // 💡 401 を回避し、代わりに 200 OK とカスタムJSONを返す
                 return response()->json([
                     'error_type' => 'AuthenticationException',
-                    'message' => 'Unauthenticated.',
-                ], Response::HTTP_UNAUTHORIZED);
+                    'message' => 'Unauthenticated or Token Expired. Please refresh token.',
+                    // 💡 401相当であることをフロントエンドに伝えるカスタムステータスコード
+                    'status_code_override' => No401Redirect::UNAUTHENTICATED_CODE, // 801
+                    'authenticated' => false,
+                ], Response::HTTP_OK); // ★★★ ここを 200 OK に変更 ★★★
             }
+            // ★★★ 修正箇所ここまで ★★★
 
             // BindingResolutionException（クラス見つからない系エラー 500）の処理
             if ($e instanceof BindingResolutionException) {

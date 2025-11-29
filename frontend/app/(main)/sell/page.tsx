@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useSanctumAuth";
 // getImageUrl は、utils.ts などで定義されているものと仮定
 import { getImageUrl } from "@/utils/utils";
 import Image from "next/image";
@@ -82,7 +82,7 @@ export default function ItemSellPage() {
   // -------------------- State --------------------
   // ProfilePage と同じく、ローカルなユーザー情報とフェッチ状態を持つ
   const [localBackendUser, setLocalBackendUser] = useState<BackendUser | null>(
-    null
+    null,
   );
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
@@ -180,7 +180,7 @@ export default function ItemSellPage() {
 
         if (status === 401) {
           console.warn(
-            "401 Unauthorized detected. Attempting token refresh..."
+            "401 Unauthorized detected. Attempting token refresh...",
           );
 
           try {
@@ -191,7 +191,7 @@ export default function ItemSellPage() {
           } catch (refreshError) {
             console.error(
               "Token refresh or retry failed. Logging out.",
-              refreshError
+              refreshError,
             );
             await logout();
             throw new Error("Authentication failed after retry.");
@@ -201,7 +201,7 @@ export default function ItemSellPage() {
         throw error;
       }
     },
-    [isAuthenticated, apiClient, logout, reloadAuthToken]
+    [isAuthenticated, apiClient, logout, reloadAuthToken],
   );
 
   /**
@@ -211,7 +211,7 @@ export default function ItemSellPage() {
     (
       e: React.ChangeEvent<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >
+      >,
     ) => {
       const { name, value } = e.target;
       setForm((prev) => ({
@@ -219,7 +219,7 @@ export default function ItemSellPage() {
         [name]: name === "price" ? (value ? Number(value) : null) : value,
       }));
     },
-    []
+    [],
   );
 
   /**
@@ -285,7 +285,7 @@ export default function ItemSellPage() {
         } else {
           setErrorMessage(
             error.message ||
-              "画像アップロード中に予期せぬエラーが発生しました。"
+              "画像アップロード中に予期せぬエラーが発生しました。",
           );
         }
       } finally {
@@ -293,7 +293,7 @@ export default function ItemSellPage() {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [authenticatedFetchWithRetry]
+    [authenticatedFetchWithRetry],
   );
 
   /**
@@ -352,7 +352,7 @@ export default function ItemSellPage() {
           setErrorMessage("入力内容に誤りがあります。ご確認ください。");
         } else {
           setErrorMessage(
-            error.message || `出品中に予期せぬエラーが発生しました。`
+            error.message || `出品中に予期せぬエラーが発生しました。`,
           );
         }
       } finally {
@@ -367,7 +367,7 @@ export default function ItemSellPage() {
       hasVerifiedEmail,
       authenticatedFetchWithRetry,
       router,
-    ]
+    ],
   );
 
   // -------------------- アクセス制御 (useEffect) --------------------
@@ -386,7 +386,7 @@ export default function ItemSellPage() {
     // 3. 認証済みだが、ローカルデータがまだロードされていない場合
     if (isAuthenticated && !localBackendUser && !isFetchingProfile) {
       console.log(
-        "[Auth Check] 認証済みだがプロファイル未ロード。フェッチ開始。"
+        "[Auth Check] 認証済みだがプロファイル未ロード。フェッチ開始。",
       );
       fetchBackendProfile();
       return;
@@ -395,7 +395,7 @@ export default function ItemSellPage() {
     // 4. ローカルデータがロード済みで、メール未認証の場合
     if (isAuthenticated && localBackendUser && !hasVerifiedEmail) {
       console.log(
-        "[Auth Check] 認証済みだがメール未確認。/email/verifyへ即時リダイレクト。"
+        "[Auth Check] 認証済みだがメール未確認。/email/verifyへ即時リダイレクト。",
       );
       router.replace("/email/verify");
       return;
@@ -735,7 +735,10 @@ export default function ItemSellPage() {
           border-radius: 9999px;
           cursor: pointer;
           background-color: white;
-          transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+          transition:
+            background-color 0.2s,
+            border-color 0.2s,
+            color 0.2s;
           line-height: 1;
           white-space: nowrap;
         }

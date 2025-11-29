@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { sendEmailVerification } from "firebase/auth";
 // 💡 useAuth から reloadAuthToken を取得します
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useSanctumAuth";
 
 // 💡 定数: 認証状態をチェックする間隔（ミリ秒）
 const CHECK_INTERVAL_MS = 3000; // 3秒ごとにチェック
@@ -36,7 +36,7 @@ export default function VerifyEmailPage() {
         try {
           await auth.currentUser.reload();
           console.log(
-            "Firebase user reloaded. Checking verification status..."
+            "Firebase user reloaded. Checking verification status...",
           );
         } catch (error) {
           console.warn("Firebase user reload failed:", error);
@@ -78,7 +78,7 @@ export default function VerifyEmailPage() {
       if (!isReloading) {
         setIsReloading(true);
         console.log(
-          "Firebaseメール認証完了。Sanctumセッション確立のため reloadAuthToken を実行します。"
+          "Firebaseメール認証完了。Sanctumセッション確立のため reloadAuthToken を実行します。",
         );
 
         reloadAuthToken()
@@ -91,10 +91,10 @@ export default function VerifyEmailPage() {
             // リロード失敗時はエラーメッセージを表示するか、ログアウト
             console.error(
               "Sanctumセッション確立/トークンリフレッシュに失敗:",
-              error
+              error,
             );
             setStatusMessage(
-              "認証情報の更新に失敗しました。再度ログインしてください。"
+              "認証情報の更新に失敗しました。再度ログインしてください。",
             );
             // 💡 エラー処理: ログアウト処理を入れるのも手ですが、ここでは表示に留めます
           })
@@ -211,8 +211,8 @@ export default function VerifyEmailPage() {
             {isSending
               ? "送信中..."
               : isReloading
-              ? "認証情報の確定中..."
-              : "認証メールを再送する"}
+                ? "認証情報の確定中..."
+                : "認証メールを再送する"}
           </button>
         </form>
       </div>

@@ -11,6 +11,17 @@ use Laravel\Fortify\Fortify; // ★ Fortifyをインポート
 
 class RouteServiceProvider extends ServiceProvider
 {
+
+
+    /**
+     * ★ 修正: メール認証後のリダイレクト先をFRONTEND_URLに設定 ★
+     * メール認証成功後は、Next.jsのトップページへ戻します。
+     * この値は、認証コントローラーなどでリダイレクトURIとして使用されます。
+     */
+    public const HOME = '/'; // ルートパスに変更
+
+
+
     /**
      * アプリケーションのルートマッピングを定義します。
      *

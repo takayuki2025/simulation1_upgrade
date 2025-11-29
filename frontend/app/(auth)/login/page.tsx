@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useContext } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // 実際の useAuth を利用
+import { useAuth } from "@/hooks/useSanctumAuth"; // 実際の useAuth を利用
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function LoginPage() {
       "PAGE_EFFECT: Auth Status Check. Loading:",
       isLoading,
       "Authenticated:",
-      isAuthenticated
+      isAuthenticated,
     );
     // isAuthLoadingが解決し、かつisAuthenticatedがtrueであればリダイレクト
     if (!isLoading && isAuthenticated) {
@@ -63,7 +63,7 @@ export default function LoginPage() {
       // 2. 成功後の処理: useAuth内部でメール認証へのリダイレクトが行われなかった場合
       //    (つまり、認証済みとしてトップページへ移動する場合) はここで明示的にリダイレクトする
       console.log(
-        "PAGE_HANDLE: Login successful. Immediately redirecting to /"
+        "PAGE_HANDLE: Login successful. Immediately redirecting to /",
       );
       // 🔥 修正: ログイン成功後、router.push("/") を実行
       router.push("/");
@@ -81,7 +81,7 @@ export default function LoginPage() {
         errorMessage = `APIエラー: ${error.response.data.message}`;
       } else if (error.code) {
         console.log(
-          `PAGE_HANDLE: Detected Firebase Auth error code: ${error.code}`
+          `PAGE_HANDLE: Detected Firebase Auth error code: ${error.code}`,
         );
         switch (error.code) {
           case "auth/user-not-found":

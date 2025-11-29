@@ -11,7 +11,7 @@ import axios from "axios";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useSanctumAuth";
 
 // 💡 実際のプロジェクトのパスに修正してください
 import { getImageUrl, onImageError } from "@/utils/utils";
@@ -29,6 +29,7 @@ interface Item {
   price: number | null;
   item_image: string | null;
   remain: number;
+  is_favorited?: boolean;
 }
 
 // =======================================================
@@ -45,6 +46,7 @@ export default function Home() {
     isLoggingOut,
     isAuthenticated,
     apiClient, // Interceptor実装済みクライアント
+    initialCheckComplete, // 💡 初期認証チェック完了フラグ
   } = useAuth();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -68,8 +70,9 @@ export default function Home() {
 
   // ページ全体のローディング状態の判定
   const isPageLoading = useMemo(() => {
-    return isLoggingOut || isAuthLoading || loading;
-  }, [isLoggingOut, isAuthLoading, loading]);
+    // 💡 認証初期チェックが完了するまではローディング状態とする
+    return isLoggingOut || isAuthLoading || loading || !initialCheckComplete;
+  }, [isLoggingOut, isAuthLoading, loading, initialCheckComplete]);
 
   // =======================================================
   // データフェッチロジック
@@ -88,13 +91,13 @@ export default function Home() {
       abortControllerRef.current = new AbortController();
 
       // 認証状態が解決するまではフェッチをスキップ
-      if (isAuthLoading || isLoggingOut) {
+      if (isAuthLoading || isLoggingOut || !initialCheckComplete) {
         setItems([]);
         setLoading(false);
         return;
       }
 
-      // マイリストタブかつ未認証の場合、フェッチをスキップ
+      // マイリストタブかつ未認証の場合、フェッチをスキップ（サーバー側で空リストが返るが、ここでスキップ可能）
       if (tab === "mylist" && !isAuthenticated) {
         setItems([]);
         setLoading(false);
@@ -107,39 +110,21 @@ export default function Home() {
       const apiUrl = `/api/items`;
       const params = { tab: tab, all_item_search: search };
 
-      // 認証クライアントとグローバルAxiosの選択ロジック
-      const useAuthClient = tab === "mylist" || isAuthenticated;
+      // ★★★ 修正箇所: 認証クライアントの使用ロジック ★★★
+      // 💡 常に apiClient を使用する（apiClientは認証されていない場合でもグローバルaxiosをラップしているため、最も安全）
+      const clientToUse = apiClient
+        ? apiClient
+        : axios.create({ baseURL: API_BASE_URL }); // フォールバック: apiClientが未設定の場合はグローバルaxiosを使用
+      // ★★★ 修正箇所終わり ★★★
 
       try {
-        let responseData;
+        // 認証チェック後、クライアントを使ってリクエスト
+        const response = await clientToUse.get(apiUrl, {
+          params: params,
+          signal: abortControllerRef.current.signal,
+        });
 
-        if (useAuthClient) {
-          // ★★★ 修正の核心: 認証が必要だが apiClient が null なら中断し、再実行を待つ ★★★
-          if (!apiClient) {
-            console.warn(
-              "API client (token) not ready for authenticated request. Skipping fetch.",
-            );
-            setItems([]);
-            setLoading(false);
-            // 💡 ここで return することで、apiClientが準備された後の useEffect の再発火を待つ
-            return;
-          }
-          // ★★★ 修正終わり ★★★
-
-          // AbortController をシグナルとして渡す
-          const response = await apiClient.get(apiUrl, {
-            params: params,
-            signal: abortControllerRef.current.signal,
-          });
-          responseData = response.data;
-        } else {
-          // 未認証リクエスト (グローバル axios を使用)
-          const response = await axios.get(`${API_BASE_URL}${apiUrl}`, {
-            params: params,
-            signal: abortControllerRef.current.signal,
-          });
-          responseData = response.data;
-        }
+        const responseData = response.data;
 
         if (responseData && Array.isArray(responseData.items)) {
           setItems(responseData.items as Item[]);
@@ -155,7 +140,7 @@ export default function Home() {
         }
 
         console.error("商品の取得中にエラーが発生しました:", e);
-        setItems([]);
+        setItems([]); // エラー発生時はリストをクリア
       } finally {
         setLoading(false);
       }
@@ -165,6 +150,7 @@ export default function Home() {
       isLoggingOut,
       isAuthLoading,
       apiClient, // apiClient の変更を監視
+      initialCheckComplete,
     ],
   );
 
@@ -173,7 +159,8 @@ export default function Home() {
   // =======================================================
 
   useEffect(() => {
-    if (isAuthLoading) {
+    // 💡 認証チェックが完了していない、またはロード中の場合はフェッチをブロック
+    if (isAuthLoading || !initialCheckComplete) {
       setItems([]);
       return;
     }
@@ -181,13 +168,21 @@ export default function Home() {
     // 認証が解決した後、またはクエリ/認証状態が変わったときにフェッチを実行
     fetchItems(currentTab, currentSearchQuery);
 
-    // クリーンアップ: コンポーネントがアンマウントされるときや依存関係が変わるときにキャンセルする
+    // クリーンアップ関数
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [currentTab, currentSearchQuery, isAuthLoading, fetchItems]);
+  }, [
+    currentTab,
+    currentSearchQuery,
+    isAuthLoading,
+    apiClient,
+    fetchItems,
+    initialCheckComplete,
+    isAuthenticated, // 認証状態の変化を監視
+  ]);
 
   // =======================================================
   // レンダリング
@@ -202,7 +197,7 @@ export default function Home() {
           <p className="ml-4 text-lg text-gray-400">
             {isLoggingOut
               ? "ログアウト処理中..."
-              : isAuthLoading
+              : isAuthLoading || !initialCheckComplete
                 ? "認証状態を確認中..."
                 : "商品を読み込み中..."}
           </p>
@@ -263,6 +258,13 @@ export default function Home() {
                     />
                     {/* remainが0の場合にSOLDタグを表示 */}
                     {item.remain === 0 && <div className="sold-text">SOLD</div>}
+
+                    {/* 認証済みユーザーの場合、いいね状態を表示 (例) */}
+                    {isAuthenticated && item.is_favorited && (
+                      <div className="absolute top-2 right-2 text-red-500 text-2xl">
+                        ❤️
+                      </div>
+                    )}
                   </div>
                   <div className="item-info">
                     <p className="item-name text-gray-100">{item.name}</p>
@@ -276,18 +278,19 @@ export default function Home() {
           ) : (
             <div className="text-center w-full py-10 text-gray-500">
               <p>
-                {currentTab === "mylist" && !isAuthLoading && !isAuthenticated
-                  ? "マイリストを見るにはログインしてください。"
-                  : currentTab === "all" && isAuthLoading
-                    ? "認証状態を確認中..."
-                    : "該当する商品が見つかりませんでした。"}
+                {/* 認証チェック完了後かつ未認証でマイリストの場合のメッセージ */}
+                {currentTab === "mylist" &&
+                initialCheckComplete &&
+                !isAuthenticated
+                  ? "マイリストを見るにはログインが必要です。"
+                  : "該当する商品が見つかりませんでした。"}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* --- スタイル定義 --- */}
+      {/* --- スタイル定義 (省略) --- */}
       <style jsx>{`
         .main_contents {
           margin: 0 auto;

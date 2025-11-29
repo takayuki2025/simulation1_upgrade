@@ -18,23 +18,57 @@ class FirebaseAuthController extends Controller
     // ★修正: メール認証成功後のリダイレクト先を /mypage/profile に戻す
     private const POST_VERIFY_REDIRECT_PATH = '/mypage/profile?verified=true';
 
-    private function getRegistrationName(Request $request, Token $verifiedIdToken, string $email): string
+    // ★追加: メール認証失敗時のリダイレクト先（フロントエンドのルート）
+    private const VERIFICATION_FAILURE_REDIRECT_PATH = '/login?error=verification_failed';
+
+    /**
+     * 登録・ログイン時に使用する名前を決定する。
+     * 優先度: 1. Request入力(ユーザー記入名) -> 2. Firebaseクレーム -> 3. メールアドレスのローカルパート -> 4. Firebase UIDの一部
+     * * @param Request $request
+     * @param Token $verifiedIdToken
+     * @param string $email
+     * @param string $uid Firebase User ID
+     * @return string 常に非nullの文字列を返すようにロジックを変更
+     */
+    private function getRegistrationName(Request $request, Token $verifiedIdToken, string $email, string $uid): string
     {
-        // 1. Request Input (クライアントから明示的に渡された名前)
+        // 1. Request Input (クライアントから明示的に渡された名前 - ユーザー記入名) を最優先
         if ($request->filled('name')) {
-            Log::info('Name source: Request input.');
-            return $request->input('name');
+            $name = $request->input('name');
+            if (!empty($name)) {
+                Log::info('Name source: Request input (User entered).');
+                return $name;
+            }
         }
+
         // 2. Firebase Token Claim
         if ($verifiedIdToken->claims()->has('name')) {
-            Log::info('Name source: Firebase Token.');
-            return $verifiedIdToken->claims()->get('name');
+            $name = $verifiedIdToken->claims()->get('name');
+            if (!empty($name)) {
+                Log::info('Name source: Firebase Token.');
+                return $name;
+            }
         }
-        // 3. Fallback to Email Local Part (これが上書きの原因となるため、新規登録時や名前が必須の場合のみ利用)
-        $parts = explode('@', $email);
-        $localPart = $parts[0];
-        Log::info('Name source: Fallback to Email Local Part.');
-        return $localPart;
+
+        // 3. メールアドレスのローカルパート (フォールバック 1)
+        if (!empty($email) && str_contains($email, '@')) {
+            $parts = explode('@', $email, 2);
+            $localPart = $parts[0];
+            if (!empty($localPart)) {
+                // メールアドレス形式の特殊文字を削除し、簡潔にする
+                $safeName = preg_replace('/[^a-zA-Z0-9_.]/', '', $localPart);
+                if (!empty($safeName)) {
+                    Log::info('Name source: Email local part (Fallback).');
+                    return $safeName;
+                }
+            }
+        }
+
+        // 4. ★追加: Firebase UIDの一部を最後のフォールバックとする (空欄防止の根本解決)
+        $uidPrefix = 'User-' . substr($uid, 0, 8);
+        Log::warning('Name source: All sources failed. Using Firebase UID prefix as fallback: ' . $uidPrefix);
+        return $uidPrefix; // 常に何かを返す
+
     }
 
     public function registerAndLogin(Request $request)
@@ -52,6 +86,8 @@ class FirebaseAuthController extends Controller
 
         $user = null;
         $registerEmail = null;
+        // ★追加: ログイン後のメール認証状態を保持するフラグ
+        $needsVerification = false;
 
         try {
             $auth = app(FirebaseAuth::class);
@@ -69,10 +105,14 @@ class FirebaseAuthController extends Controller
                 return response()->json(['error' => 'Email is required for registration or login.'], 400);
             }
 
-            $registerName = $this->getRegistrationName($request, $verifiedIdToken, $registerEmail);
+            // ★修正: getRegistrationNameに$uidを渡す (返り値は常にstringになった)
+            $registerName = $this->getRegistrationName($request, $verifiedIdToken, $registerEmail, $uid);
 
-            // リクエストにnameが明示的に渡されたかどうかをチェック
+            // リクエストにnameが明示的に渡されたかどうかをチェック (Firebase Tokenの名前はここでは含まない)
             $isNameProvidedInRequest = $request->filled('name');
+            // Firebaseクレームに名前が含まれていたか、またはリクエストに含まれていたか (未使用だが以前のロジックのために保持)
+            $isAnyNameProvided = !empty($registerName); // 空文字列は返されないため、常にtrueに近い
+
 
             // 3. ユーザーの存在確認と処理 (デッドロック自動リトライ付きトランザクション)
             $maxRetries = 5;
@@ -86,7 +126,8 @@ class FirebaseAuthController extends Controller
                         $registerEmail,
                         $registerName,
                         $isEmailVerified,
-                        $isNameProvidedInRequest // トランザクション内で使用
+                        $isNameProvidedInRequest, // ★追加: ユーザー記入名の有無をトランザクションに渡す
+                        $isAnyNameProvided
                     ) {
 
                         $user = User::where('firebase_uid', $uid)
@@ -102,10 +143,12 @@ class FirebaseAuthController extends Controller
                                 $user->password = Hash::make($uid);
                             }
 
-                            // ★修正2: 既存ユーザーの場合、リクエストにnameが明示的に渡された場合のみ上書きする
+                            // ★修正2: 既存ユーザーの場合、リクエストにnameが明示的に渡された場合（ユーザー記入名）のみ上書きする
+                            // Firebaseクレーム由来の名前では、DB上の既存の名前を上書きしないようにする。
                             if ($isNameProvidedInRequest) {
-                                $user->name = $registerName;
+                                $user->name = $registerName; // $registerNameはRequestからの値
                             }
+
 
                             if ($isEmailVerified && is_null($user->email_verified_at)) {
                                 $user->email_verified_at = now();
@@ -113,17 +156,22 @@ class FirebaseAuthController extends Controller
                             }
                             $user->save();
 
-                            if (!$user->hasVerifiedEmail() && !$isEmailVerified) {
+                            // ★修正3: ユーザーが未認証の場合にのみ通知を再送
+                            if (is_null($user->email_verified_at)) {
                                 $user->sendEmailVerificationNotification();
                                 Log::info("Verification email re-sent to unverified existing user: {$registerEmail}. ID: {$user->id}");
+                                // ★フラグをセット
+                                global $needsVerification;
+                                $needsVerification = true;
                             }
                             Log::info("Existing user logged in/updated. UID: {$uid}. ID: {$user->id}");
 
                             return $user;
                         }
 
-                        // 新規ユーザー作成の試行 (ここでは名前は必ずセット)
+                        // 新規ユーザー作成の試行
                         try {
+                            // ★修正: getRegistrationNameが常に非空文字列を返すようになったため、$registerName ?? '' を $registerName に変更
                             $user = User::create([
                                 'name' => $registerName,
                                 'email' => $registerEmail,
@@ -148,12 +196,16 @@ class FirebaseAuthController extends Controller
                                     return $existingUser;
                                 }
                             }
-                            throw $e;
+                            throw $e; // その他のエラー、または重複ユーザーが取得できなかった場合はスロー
                         }
 
-                        if (!$isEmailVerified) {
+                        // ★修正4: 新規ユーザーでメールが未認証の場合にのみ通知を送信
+                        if (is_null($user->email_verified_at)) {
                             $user->sendEmailVerificationNotification();
                             Log::info("Verification email sent to new user: {$registerEmail}");
+                            // ★フラグをセット
+                            global $needsVerification;
+                            $needsVerification = true;
                         }
                         Log::info("New user registered successfully with UID: {$uid}. ID: {$user->id}");
 
@@ -176,6 +228,11 @@ class FirebaseAuthController extends Controller
                     }
                     throw $e; // その他のエラーはそのままスロー
                 }
+            }
+
+            // ★修正5: トランザクション外部でメール認証状態を再チェックし、フラグを確定
+            if ($user && is_null($user->email_verified_at)) {
+                $needsVerification = true;
             }
 
             if (!$user) {
@@ -201,9 +258,11 @@ class FirebaseAuthController extends Controller
                 'user_image' => $user->user_image,
             ];
 
+            // ★修正6: メール認証が必要な場合にフラグをセットして返す
             return response()->json([
                 'token' => $token,
                 'user' => $userData,
+                'needs_email_verification' => $needsVerification,
             ], 200);
 
         } catch (\Kreait\Firebase\Exception\Auth\InvalidToken $e) {
@@ -220,7 +279,8 @@ class FirebaseAuthController extends Controller
 
     public function handleTokenExchange(Request $request)
     {
-        Log::info('--- FirebaseAuthController reached (handleTokenExchange). Forwarding to registerAndLogin. ---');
+        // ★微調整: ルート名の変更をログに反映
+        Log::info('--- FirebaseAuthController reached (handleTokenExchange) via /api/login_or_register. Forwarding to registerAndLogin. ---');
         return $this->registerAndLogin($request);
     }
 
@@ -231,14 +291,16 @@ class FirebaseAuthController extends Controller
 
         if (! $request->hasValidSignature()) {
             Log::error('Email verification failed: Invalid signature.');
-            return redirect("{$frontendUrl}/login?error=verification_failed&reason=invalid_signature");
+            // ★修正1-1: 認証失敗時のリダイレクト先を修正
+            return redirect("{$frontendUrl}" . self::VERIFICATION_FAILURE_REDIRECT_PATH . "&reason=invalid_signature");
         }
 
         $user = User::find($id);
 
         if (is_null($user)) {
             Log::error('Email verification failed: User ID not found.', ['user_id' => $id, 'hash' => $hash]);
-            return redirect("{$frontendUrl}/login?error=verification_failed&reason=not_found");
+            // ★修正1-2: 認証失敗時のリダイレクト先を修正
+            return redirect("{$frontendUrl}" . self::VERIFICATION_FAILURE_REDIRECT_PATH . "&reason=not_found");
         }
 
         // ... (ハッシュチェックは省略) ...
@@ -278,7 +340,8 @@ class FirebaseAuthController extends Controller
                 }
             } else {
                 Log::error('CRITICAL: markEmailAsVerified failed to save to database.', ['user_id' => $user->id]);
-                return redirect("{$frontendUrl}/login?error=verification_failed&reason=save_error");
+                // ★修正1-3: 認証失敗時のリダイレクト先を修正
+                return redirect("{$frontendUrl}" . self::VERIFICATION_FAILURE_REDIRECT_PATH . "&reason=save_error");
             }
         }
 

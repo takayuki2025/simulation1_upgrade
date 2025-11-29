@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { User, signOut } from "firebase/auth"; // ★修正: signOutをインポート
+import { User, signOut } from "firebase/auth";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { Auth } from "firebase/auth";
@@ -39,7 +39,8 @@ export const completeLaravelLogin = async (
 
   try {
     const res = await axios.post(
-      `${API_BASE_URL}/api/register_or_login`,
+      // ★★★ 修正箇所: URLを '/api/login_or_register' に修正 (404エラー対策) ★★★
+      `${API_BASE_URL}/api/login_or_register`,
       payload,
       {
         withCredentials: true,
@@ -59,6 +60,10 @@ export const completeLaravelLogin = async (
     if (axios.isAxiosError(error) && error.response) {
       const status = error.response.status;
       const detail = JSON.stringify(error.response.data);
+      console.error(
+        "PAGE_HANDLE: Login failed in catch block. Error:",
+        `Laravel API Error (${status}): ${detail}`,
+      );
       throw new Error(`Laravel API Error (${status}): ${detail}`);
     } else {
       throw error;
@@ -74,6 +79,7 @@ export const checkLaravelSession = async (): Promise<{
     const res = await axios.get(`${API_BASE_URL}/api/auth/check`);
     return res.data;
   } catch {
+    // 401 Unauthorized の場合はここに来る。
     return { authenticated: false };
   }
 };
@@ -111,8 +117,11 @@ export const useLaravelSession = (
       if (!user || !auth || user.isAnonymous) {
         // 💡 匿名ユーザーだがLaravelセッションがある場合、Firebase側を強制ログアウト（状態のクリーンアップ）
         if (user?.isAnonymous && sessionData.authenticated && auth) {
-          await signOut(auth); // ★修正: インポートしたsignOutを使用
+          await signOut(auth);
           finalAuthStatus = false;
+          console.log(
+            "[Sanctum Sync] Forced Firebase sign-out due to anonymous user having Laravel session.",
+          );
         }
         // ログアウト状態はここで状態を確定させる
         setLaravelAuthenticated(finalAuthStatus);
@@ -122,6 +131,12 @@ export const useLaravelSession = (
 
       // 2. ユーザーはいるがセッションがない場合 (ログイン直後の競合回避)
       else if (!sessionData.authenticated) {
+        // セッションがない場合は、外部のログイン処理（useSanctumAuth）が Firebase Token を使って
+        // completeLaravelLogin を実行するのを待つため、ここでは何もしない。
+        // checkLaravelSessionが再実行されるのを待機
+        console.log(
+          "[Sanctum Sync] Firebase user present but no Laravel session. Awaiting token exchange.",
+        );
         return;
       }
 
@@ -130,12 +145,16 @@ export const useLaravelSession = (
         // 💡 既にセッションが確立されている場合は確定させる
         setLaravelAuthenticated(finalAuthStatus);
         setInitialCheckComplete(true);
+        console.log(
+          "[Sanctum Sync] Laravel session confirmed and user authenticated.",
+        );
 
         // メール認証チェックとURLクリーンアップ（リダイレクト補助ロジック）
         const backendUser = sessionData.user;
         if (backendUser && !backendUser.email_verified_at) {
           router.push("/email/verify");
         } else if (isVerificationRedirect()) {
+          // メール認証完了後のリダイレクトパラメータをクリーンアップ
           router.replace(window.location.pathname);
         }
       }

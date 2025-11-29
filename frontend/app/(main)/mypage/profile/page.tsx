@@ -8,7 +8,7 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // 認証と認証済みAxiosクライアントの提供元
+import { useAuth } from "@/hooks/useSanctumAuth"; // 認証と認証済みAxiosクライアントの提供元
 
 // =======================================================
 // 型定義 (TypeScript の整合性を高める)

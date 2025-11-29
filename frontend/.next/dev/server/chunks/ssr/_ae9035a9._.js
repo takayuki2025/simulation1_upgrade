@@ -2,7 +2,6 @@ module.exports = [
 "[project]/utils/utils.ts [app-ssr] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
-// プレースホルダー画像URL
 __turbopack_context__.s([
     "PLACEHOLDER_IMAGE_URL",
     ()=>PLACEHOLDER_IMAGE_URL,
@@ -11,51 +10,45 @@ __turbopack_context__.s([
     "onImageError",
     ()=>onImageError
 ]);
+const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 const PLACEHOLDER_IMAGE_URL = "https://placehold.co/300x300/e0e0e0/333?text=No+Image";
-// Next.jsの環境変数からASSET_BASE_URLを取得 (今回はAPI_BASE_URLと同じとして扱う)
-// 実際のNext.js環境では静的アセットはパブリックディレクトリに置くことが多いですが、
-// Laravel側のStorageを参照する設定を再現します。
-const ASSET_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
+// Next.jsの環境変数からASSET_BASE_URLを取得 (API_BASE_URLと同じと仮定)
+const ASSET_BASE_URL = API_BASE_URL;
 const getImageUrl = (path, imageRefreshKey)=>{
     if (!path) {
         return PLACEHOLDER_IMAGE_URL;
     }
-    // 既にフルURLであればそのまま返す (このケースでは二重結合は起きないはず)
+    // 1. 既にフルURL (Laravelのアクセサで変換済み) の場合はそのまま返す
     if (path.startsWith("http")) {
-        console.log("DEBUG_IMG: Path starts with http, returning:", path);
-        return path;
+        console.log("DEBUG_IMG: Path starts with http (Absolute URL), returning:", path);
+        // キャッシュバスターが必要な場合はここで付与
+        const cacheBuster = `?t=${imageRefreshKey}`;
+        // 既にクエリパラメータがある場合は & を使うなど考慮が必要ですが、ここではシンプルに付与
+        // Laravelのアクセサが生成するURLにクエリが含まれる可能性は低いため、このままとします。
+        return `${path}${cacheBuster}`;
     }
+    // 2. フルURLでない場合 (Laravelのアクセサが機能していない/フォールバックの場合)
     if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
     ;
-    // --- ここから結合処理 ---
+    // --- フォールバックの結合処理 ---
+    // ASSET_BASE_URLから末尾のスラッシュを削除
     const baseUrl = ASSET_BASE_URL.endsWith("/") ? ASSET_BASE_URL.slice(0, -1) : ASSET_BASE_URL;
     let cleanPath = path;
-    // 💡 修正強化: 二重の結合を招く可能性のある文字列を徹底的に削除
-    // データベースの値は「storage/item_images/...」なので、まずこれを削る
-    if (cleanPath.startsWith("storage/")) {
-        cleanPath = cleanPath.substring("storage/".length);
-    }
-    // 念のため、URLのプロトコル部分が残っていないかチェックし、削除
-    if (cleanPath.includes("https://") || cleanPath.includes("http://")) {
-        console.error("DEBUG_IMG: Path still contains protocol! Data is corrupted:", cleanPath);
-        // ここでクリーンアップ処理を行うべきですが、一旦エラーを表示
-        // 緊急措置として、フルURL全体をファイルパスとして誤って連結するのを防ぎます
-        // 🚨 暫定的な強制クリーンアップ (本来は不要)
-        const parts = cleanPath.split("storage/").pop();
-        cleanPath = parts || "";
-    }
-    const normalizedPath = cleanPath.startsWith("/") ? cleanPath.substring(1) : cleanPath;
+    // パスの先頭にあるスラッシュやバックスラッシュを削除
+    cleanPath = cleanPath.replace(/^[/\\]+/, "");
     const cacheBuster = `?t=${imageRefreshKey}`;
-    // 結合する要素をコンソールに出力して確認
-    const finalUrl = `${baseUrl}/storage/${normalizedPath}${cacheBuster}`;
-    console.log(`DEBUG_IMG: Base: ${baseUrl}, Final Path: /storage/${normalizedPath}, Result: ${finalUrl}`);
+    // ベースURLとクリーンアップされたパスを結合
+    // データベースの値が 'storage/item_images/xxx.jpg' のような相対パスの場合に使用されます。
+    const finalUrl = `${baseUrl}/${cleanPath}${cacheBuster}`;
+    console.log(`DEBUG_IMG: Base: ${baseUrl}, Final Path: /${cleanPath}, Result: ${finalUrl} (Fallback)`);
     return finalUrl;
 };
 const onImageError = (e, itemName)=>{
     const target = e.target;
+    // エラーが何度も発生しないように、イベントハンドラを無効化
     target.onerror = null;
     const placeholderText = itemName ? itemName.replace(/\s/g, "+") : "Error";
-    // エラーハンドリング時にプレースホルダーに切り替える
+    // エラーハンドリング時に商品名入りのプレースホルダーに切り替える
     target.src = `https://placehold.co/300x300/e0e0e0/333?text=${placeholderText}`;
 };
 }),
@@ -72,7 +65,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
 // 💡 useAuth のみを使用
-var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useAuth.tsx [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useSanctumAuth.tsx [app-ssr] (ecmascript)");
 // 💡 外部のutils/utils.tsから画像ヘルパーをインポート
 var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/utils/utils.ts [app-ssr] (ecmascript)");
 "use client";
@@ -92,7 +85,7 @@ function ItemDetailPage() {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
     const params = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useParams"])();
     // 1. useAuth から必要な状態とアクションを取得
-    const { user, isAuthenticated, isLoading: isAuthLoading, isLoggingOut, apiClient, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { user, isAuthenticated, isLoading: isAuthLoading, isLoggingOut, apiClient, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     // 💡 データフェッチが一度試行されたことを記録するRef
     const hasFetchedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(false);
     // ----------------------------------------------------------------

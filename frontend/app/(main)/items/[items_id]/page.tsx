@@ -11,7 +11,7 @@ import { useRouter, useParams } from "next/navigation";
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from "axios";
 
 // 💡 useAuth のみを使用
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useSanctumAuth";
 // 💡 外部のutils/utils.tsから画像ヘルパーをインポート
 import { getImageUrl, onImageError } from "@/utils/utils";
 
@@ -160,7 +160,7 @@ export default function ItemDetailPage() {
     async (config: any): Promise<AxiosResponse> => {
       if (isAuthLoading || isLoggingOut || !apiClient) {
         throw new Error(
-          "Authentication or client not ready (isAuthLoading/isLoggingOut/apiClient check failed)."
+          "Authentication or client not ready (isAuthLoading/isLoggingOut/apiClient check failed).",
         );
       }
 
@@ -174,7 +174,7 @@ export default function ItemDetailPage() {
         // 2. 401 Unauthorized エラーの場合
         if (status === 401) {
           console.warn(
-            "401 Unauthorized detected. Attempting token refresh and retry..."
+            "401 Unauthorized detected. Attempting token refresh and retry...",
           );
           try {
             // トークンを強制リフレッシュ
@@ -187,7 +187,7 @@ export default function ItemDetailPage() {
             // 4. リフレッシュ失敗またはリトライ後のエラー
             console.error(
               "Token refresh or retry failed. Logging out.",
-              refreshError
+              refreshError,
             );
             await logout();
             throw new Error("Authentication failed after retry.");
@@ -205,7 +205,7 @@ export default function ItemDetailPage() {
       apiClient,
       logout,
       reloadAuthToken,
-    ]
+    ],
   );
 
   /**
@@ -257,7 +257,7 @@ export default function ItemDetailPage() {
         setIsLoading(false);
       }
     },
-    [isAuthenticated, apiClient, authenticatedFetchWithRetry]
+    [isAuthenticated, apiClient, authenticatedFetchWithRetry],
   );
 
   // ----------------------------------------------------------------
@@ -373,7 +373,7 @@ export default function ItemDetailPage() {
         setNewComment("");
       } else {
         throw new Error(
-          "コメントの投稿に成功しましたが、データ更新に失敗しました。"
+          "コメントの投稿に成功しましたが、データ更新に失敗しました。",
         );
       }
     } catch (e: any) {
