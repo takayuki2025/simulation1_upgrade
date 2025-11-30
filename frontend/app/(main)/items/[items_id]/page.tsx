@@ -12,67 +12,23 @@ import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 
 // 認証フックのインポート
 import { useAuth } from "@/hooks/useSanctumAuth";
-// 画像ヘルパーのインポート (今回はここで関数を定義し、元の utils.ts は使用しない前提)
-// import { getImageUrl, onImageError } from "@/utils/utils";
+// 💡 【修正】汎用化された画像ヘルパーをインポート
+import { getImageUrl, onImageError, IMAGE_TYPE } from "@/utils/utils";
 
 // 💡 ライフサイクル診断ログ: コンポーネントがいつ再レンダリングされたかを確認
 console.log("DIAGNOSTICS: ItemDetailPage RE-RENDERED.");
 
 // =======================================================
-// グローバル設定 & ユーティリティの追加
+// グローバル設定 & ユーティリティ
 // =======================================================
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 // 認証情報付きリクエストをaxios全体で許可
 axios.defaults.withCredentials = true;
 
-// 💡 【Mypage.tsxから移植】アセットURLを生成する汎用ヘルパー関数
-const getAssetUrl = (
-  path: string | undefined | null,
-  isProfileImage: boolean = false,
-): string => {
-  // 1. path が存在しない、または空の場合は、デフォルト画像を返す
-  if (!path) {
-    if (isProfileImage) {
-      // プロフィール画像がない場合のデフォルトパス
-      const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
-      return `${API_BASE_URL?.replace(/\/$/, "")}/${DEFAULT_IMAGE_PATH}`;
-    }
-    // 商品画像の場合はパスがないので空文字列を返す。onImageErrorでプレースホルダーに置換される
-    return "";
-  }
-
-  // 2. pathがURL形式（http:// または https:// で始まる）であれば、そのまま返す
-  if (/^https?:\/\//i.test(path)) {
-    return path;
-  }
-
-  // 3. パスが絶対URL形式でなく、/storage/などで始まっている場合
-  const cleanBase = API_BASE_URL?.replace(/\/$/, "") || "";
-  const cleanPath = path.startsWith("/") ? path.substring(1) : path;
-
-  // 例: [API_BASE_URL]/storage/item_images/xxx.jpg
-  return `${cleanBase}/${cleanPath}`;
-};
-
-// 💡 【再定義】画像読み込みエラー発生時の処理 (商品名/ユーザー名入りのプレースホルダーに置き換え)
-export const onImageError = (
-  e: React.SyntheticEvent<HTMLImageElement, Event>,
-  name: string,
-) => {
-  const target = e.target as HTMLImageElement;
-  target.onerror = null;
-
-  const placeholderText = name ? name.replace(/\s/g, "+") : "Error";
-
-  // エラーハンドリング時に商品名/ユーザー名入りのプレースホルダーに切り替える
-  // ユーザー画像と商品画像でサイズが異なるため、ここでは両方に対応できるサイズを使用
-  target.src = `https://placehold.co/100x100/e0e0e0/333?text=${placeholderText}`;
-};
-
-// =======================================================
+// ----------------------------------------------------------------
 // 型定義
-// =======================================================
+// ----------------------------------------------------------------
 
 interface ApiUser {
   id: number;
@@ -158,7 +114,7 @@ export default function ItemDetailPage() {
     isLoggingOut,
     apiClient,
     logout,
-    backendUser, // 💡 backendUserを直接取得 (extendedUserの代替)
+    backendUser, // 💡 backendUser を取得
   } = useAuth();
 
   // 💡 データフェッチが一度試行されたことを記録するRef
@@ -216,9 +172,10 @@ export default function ItemDetailPage() {
     }
   }, [item]);
 
-  // 💡 【修正】getImageUrl の代わりに getAssetUrl を使用
+  // 💡 【修正】getImageUrl を使用し、画像タイプに IMAGE_TYPE.ITEM (0) を渡す
   const fullItemImageUrl = useMemo(() => {
-    return getAssetUrl(item?.item_image || null, false); // isProfileImage=false (商品画像)
+    // 0 は商品画像タイプ、キャッシュキー 0 はバスターなしを意味
+    return getImageUrl(item?.item_image || null, IMAGE_TYPE.ITEM, 0);
   }, [item?.item_image]);
 
   // ----------------------------------------------------------------
@@ -590,6 +547,7 @@ export default function ItemDetailPage() {
             <img
               src={fullItemImageUrl}
               alt="商品写真"
+              // 💡 【修正】onImageError をインポートしたものに置き換え
               onError={(e) => onImageError(e, item.name)}
               className="item_detail_image1 w-full h-auto object-cover rounded-lg shadow-md"
             />
@@ -768,13 +726,15 @@ export default function ItemDetailPage() {
                     >
                       <div className="comment_name_image flex items-center space-x-3">
                         <img
-                          // 💡 【修正適用済み】 getAssetUrl を使用し、ユーザー画像(true)として呼び出す
-                          src={getAssetUrl(
+                          // 💡 【修正】getImageUrl を使用し、ユーザー画像タイプ (1) を渡す
+                          src={getImageUrl(
                             comment.user.user_image || null,
-                            true,
+                            IMAGE_TYPE.USER, // ユーザー画像タイプ (1)
+                            0, // キャッシュキー
                           )}
                           alt="プロフィール画像"
                           className="user_image_css w-10 h-10 rounded-full object-cover"
+                          // 💡 【修正】onImageError をインポートしたものに置き換え
                           onError={(e) => onImageError(e, comment.user.name)}
                         />
                         <p className="comment_name font-semibold text-gray-800">

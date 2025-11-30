@@ -343,7 +343,7 @@ export default function ProfilePage() {
 
     try {
       // apiClient.put でプロフィール情報更新
-      const response = await apiClient.put("/mypage/profile", form);
+      const response = await apiClient.patch("/api/mypage/profile_update", form);
 
       const updatedUser: UpdatedUserResponse = response.data;
 

@@ -8,7 +8,8 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'user', 'register', 'firebase/*','mypage/*',],
+    // 'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'user', 'register', 'firebase/*','mypage/*',],
+    'paths' => ['*'],
 
     'allowed_methods' => ['*'],
 

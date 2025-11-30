@@ -4,10 +4,13 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useSanctumAuth"; // Next.jsのカスタム認証フック
-// import { useApi } from "@/hooks/useApi"; // 👈 削除
+
+// 💡 【修正】汎用化された画像ヘルパーをインポート
+import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
+// getImageUrl と IMAGE_TYPE を使用するため、元の getAssetUrl は削除します。
 
 // =======================================================
-// 型定義 (Nuxt 3 コンポーネントに合わせる)
+// 型定義
 // =======================================================
 
 interface User {
@@ -42,54 +45,22 @@ interface Item {
 // =======================================================
 
 // 環境変数からAPIベースURLを取得
-// Next.jsでは process.env.NEXT_PUBLIC_... の形式
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-/**
- * アセットURLを生成する汎用ヘルパー関数
- * Nuxt 3 コンポーネントの getAssetUrl() ロジックを移植
- */
-const getAssetUrl = (
-  path: string | undefined | null,
-  isProfileImage: boolean = false,
-): string => {
-  // 1. path が存在しない、または空の場合は、デフォルト画像を返す
-  if (!path) {
-    if (isProfileImage) {
-      const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
-      // ベースURLの末尾が / で終わるか、DEFAULT_IMAGE_PATHの先頭が / で始まるかを考慮
-      return `${API_BASE_URL?.replace(/\/$/, "")}/${DEFAULT_IMAGE_PATH}`;
-    }
-    // 商品画像の場合はパスがないので空文字列を返す
-    return "";
-  }
-
-  // 2. pathがURL形式（http:// または https:// で始まる）であれば、そのまま返す
-  if (/^https?:\/\//i.test(path)) {
-    return path;
-  }
-
-  // 3. パスが絶対URL形式でなく、/storage/などで始まっている場合
-  const cleanBase = API_BASE_URL?.replace(/\/$/, "") || "";
-  const cleanPath = path.startsWith("/") ? path.substring(1) : path;
-
-  // 例: [API_BASE_URL]/storage/images/item/xxx.jpg
-  return `${cleanBase}/${cleanPath}`;
-};
+// 💡 【削除】ローカルで定義されていた getAssetUrl は削除し、utilsからインポートしたものを使用
 
 export default function Mypage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 🔽 修正: useAuth から apiClient を取得
+  // useAuth から必要な状態と apiClient を取得
   const {
     user: authUser,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
-    apiClient, // 👈 追加
+    apiClient,
   } = useAuth();
-  // const { authenticatedFetch } = useApi(); // 👈 削除
 
   // --- 状態管理 ---
   const [user, setUser] = useState<User | null>(null);
@@ -102,7 +73,7 @@ export default function Mypage() {
     return searchParams.get("page") === "buy" ? "buy" : "sell";
   }, [searchParams]);
 
-  // URLクエリパラメータからメール認証状態を取得 (Nuxt版ロジックを移植)
+  // URLクエリパラメータからメール認証状態を取得
   const isVerificationRedirect = useMemo(() => {
     return searchParams.get("verified") === "true";
   }, [searchParams]);
@@ -114,29 +85,25 @@ export default function Mypage() {
   // 認証済みリクエストを実行するヘルパー関数
   const fetcher = useCallback(
     async (endpoint: string) => {
-      // 🔽 修正: apiClient が null の場合はエラーをスロー (useApiの挙動を再現)
+      // apiClient が null の場合はエラーをスロー (非認証状態または初期ロード中)
       if (!apiClient) {
-        // apiClient が null の場合（非認証状態または初期ロード中）は、
-        // 外部でハンドリングされるようにエラーをスロー
         const error = new Error(
           "API client is not ready (unauthenticated or loading).",
         );
-        (error as any).status = 401; // ログアウト処理をトリガーするために 401 ステータスを設定
+        (error as any).status = 401;
         throw error;
       }
 
       try {
-        // 🔽 修正: apiClient を使用
         const response = await apiClient.get(endpoint);
         return response.data;
       } catch (error) {
         console.error("fetcher error:", error);
-        // エラーを再スローして、呼び出し元でキャッチさせる
         throw error;
       }
     },
     [apiClient],
-  ); // 👈 依存配列に apiClient を追加
+  );
 
   // ----------------------------------------------------------------
   // 1. ユーザー情報取得ロジック (認証解決後に一度実行)
@@ -155,7 +122,7 @@ export default function Mypage() {
       return;
     }
 
-    // 🔽 修正: apiClient が null の場合はスキップ
+    // apiClient が null の場合はスキップ
     if (!apiClient) {
       console.log("apiClient is null. Skipping profile fetch.");
       return;
@@ -166,7 +133,6 @@ export default function Mypage() {
 
     setIsLoading(true);
     try {
-      // 🔽 修正: authenticatedFetch の代わりに fetcher を使用し、APIエンドポイントを /api/... に修正
       const response: { user?: User } = await fetcher("/api/mypage/profile");
 
       if (response && response.user) {
@@ -199,11 +165,11 @@ export default function Mypage() {
     isAuthenticated,
     user,
     router,
-    fetcher, // 👈 依存配列を fetcher に変更
+    fetcher,
     logout,
     isVerificationRedirect,
     page,
-    apiClient, // 👈 追加: fetcher の依存として必要
+    apiClient,
   ]);
 
   // ----------------------------------------------------------------
@@ -214,7 +180,7 @@ export default function Mypage() {
     // ユーザープロフィールのロードが完了していることを確認
     if (!user) return;
 
-    // 🔽 修正: apiClient が null の場合はスキップ
+    // apiClient が null の場合はスキップ
     if (!apiClient) {
       console.log("apiClient is null. Skipping items fetch.");
       return;
@@ -224,7 +190,7 @@ export default function Mypage() {
     setItems([]);
 
     try {
-      // 🔽 修正: APIエンドポイントを /api/... に修正
+      // APIエンドポイントを /api/... に修正
       const endpoint = `/api/mypage/items?page=${page}`;
       // バックエンドから商品リストを取得する
       const response: { items: Item[] } = await fetcher(endpoint); // 👈 fetcher を使用
@@ -241,30 +207,27 @@ export default function Mypage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, page, fetcher, logout, apiClient]); // 👈 依存配列を fetcher と apiClient に変更
+  }, [user, page, fetcher, logout, apiClient]);
 
   // ----------------------------------------------------------------
   // 3. useEffect による実行管理
   // ----------------------------------------------------------------
 
-  // ★★★ 認証解決監視用の useEffect ★★★
+  // 認証解決監視用の useEffect
   useEffect(() => {
     // 認証状態が解決するまで待つ
     if (isAuthLoading) return;
 
     // 認証が解決した後、認証済みであればプロフィールを取得し、未認証であればリダイレクト
-    // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
     fetchUserProfile();
-  }, [isAuthLoading, fetchUserProfile, apiClient]); // 👈 apiClient を追加
+  }, [isAuthLoading, fetchUserProfile, apiClient]);
 
   // page (クエリパラメータ) の変更時、または user データ取得完了時に商品リストをフェッチ
   useEffect(() => {
-    // userが存在し、認証済みであり、認証解決が完了していればアイテムをフェッチ
-    // 🔽 修正: 依存配列に apiClient を追加 (apiClient の変更 = トークン更新 の際に再実行)
     if (user && isAuthenticated && !isAuthLoading && apiClient) {
       fetchItems();
     }
-  }, [page, user, isAuthenticated, isAuthLoading, fetchItems, apiClient]); // 👈 apiClient を追加
+  }, [page, user, isAuthenticated, isAuthLoading, fetchItems, apiClient]);
 
   // ユーティリティ: プロフィール編集ページへ遷移
   const goToProfileEdit = useCallback(() => {
@@ -275,7 +238,7 @@ export default function Mypage() {
   // 4. レンダーロジック
   // ----------------------------------------------------------------
 
-  // 認証解決待ちの表示 (Home.tsx と同様に isAuthLoading を優先)
+  // 認証解決待ちの表示
   if (isAuthLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -287,8 +250,6 @@ export default function Mypage() {
 
   // 認証解決後、未認証でリダイレクトされなかった場合（メール認証リダイレクト中など）
   if (!isAuthenticated || !user) {
-    // 認証済みではない、かつユーザープロフィールのロードもまだ（user=null）だが、
-    // isVerificationRedirect=true でリダイレクトを一時的にブロックしているケースなど
     if (isVerificationRedirect && !user) {
       return (
         <div className="flex justify-center items-center h-screen">
@@ -300,7 +261,6 @@ export default function Mypage() {
       );
     }
 
-    // 最終的にユーザー情報がない場合は、エラー表示またはリダイレクトを待つ
     return (
       <div className="text-center p-8">
         <p className="text-xl text-red-500">
@@ -309,9 +269,6 @@ export default function Mypage() {
       </div>
     );
   }
-
-  // ユーザー情報とアイテムリストのロード中の表示
-  const isContentLoading = isLoading || !user;
 
   return (
     <div className="profile_page">
@@ -326,9 +283,17 @@ export default function Mypage() {
         <div className="profile_header_1">
           {/* プロフィール画像 */}
           <img
-            src={getAssetUrl(user.user_image, true)}
+            // 💡 修正: user.user_image が undefined の場合は null を渡す
+            src={getImageUrl(user.user_image ?? null, IMAGE_TYPE.USER)}
             alt="プロフィール画像"
             className="user_image_css"
+            // 💡 【追加】onImageError を使用してエラー時の表示を改善
+            onError={(e) => {
+              // utils.ts の onImageError は第2引数が name なので、user.name を渡す
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = `https://placehold.co/90x90/e0e0e0/333?text=${user.name.replace(/\s/g, "+")}`;
+            }}
           />
           <h2 className="user_name_css">{user.name}</h2>
 
@@ -344,7 +309,7 @@ export default function Mypage() {
           <Link
             href="/mypage?page=sell"
             className={`sell_items ${page === "sell" ? "active" : ""}`}
-            scroll={false} // 画面遷移時のスクロールを制御
+            scroll={false}
           >
             出品した商品
           </Link>
@@ -352,7 +317,7 @@ export default function Mypage() {
           <Link
             href="/mypage?page=buy"
             className={`buy_items ${page === "buy" ? "active" : ""}`}
-            scroll={false} // 画面遷移時のスクロールを制御
+            scroll={false}
           >
             購入した商品
           </Link>
@@ -392,8 +357,18 @@ export default function Mypage() {
                     {/* 画像の表示 */}
                     {displayItem!.item_image ? (
                       <img
-                        src={getAssetUrl(displayItem!.item_image)}
+                        // 💡 【修正】getImageUrl を使用し、商品画像タイプ (0) を渡す
+                        src={getImageUrl(
+                          displayItem!.item_image,
+                          IMAGE_TYPE.ITEM,
+                        )}
                         alt={displayItem!.name + "の商品写真"}
+                        // 💡 【追加】onImageError を使用してエラー時の表示を改善
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = `https://placehold.co/250x250/e0e0e0/333?text=${displayItem!.name.replace(/\s/g, "+")}`;
+                        }}
                       />
                     ) : (
                       <div className="no-image-placeholder">No Image</div>
@@ -412,10 +387,7 @@ export default function Mypage() {
         )}
       </div>
 
-      {/* 以下の style タグ内の CSS は、ご提示の Nuxt ファイルのものをそのままコピーして使用してください */}
-      {/* Tailwind CSS 環境では、上記コンポーネントの className に反映されるべきですが、
-          ここでは Scoped CSS を模倣してそのまま残します。
-          Next.jsのグローバルCSSまたはCSS Modulesとして別途定義する必要があります。 */}
+      {/* スタイル定義 (省略せずに含める) */}
       <style jsx>{`
         .profile_page {
           margin: 0 auto;

@@ -3,6 +3,8 @@
 "use strict";
 
 __turbopack_context__.s([
+    "IMAGE_TYPE",
+    ()=>IMAGE_TYPE,
     "PLACEHOLDER_IMAGE_URL",
     ()=>PLACEHOLDER_IMAGE_URL,
     "getImageUrl",
@@ -13,22 +15,34 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 const PLACEHOLDER_IMAGE_URL = "https://placehold.co/300x300/e0e0e0/333?text=No+Image";
+// プロフィール画像がない場合のデフォルトパス
+const DEFAULT_PROFILE_IMAGE_PATH = "storage/images/default-profile2.jpg";
 // Next.jsの環境変数からASSET_BASE_URLを取得 (API_BASE_URLと同じと仮定)
 const ASSET_BASE_URL = API_BASE_URL;
-const getImageUrl = (path, imageRefreshKey)=>{
+const IMAGE_TYPE = {
+    // 0: 商品画像 (デフォルトのプレースホルダーを使用)
+    ITEM: 0,
+    // 1: ユーザー画像 (デフォルトのプロフィール画像を使用)
+    USER: 1
+};
+const getImageUrl = (path, imageType, cacheKey = 0)=>{
+    // 1. パスがない場合の処理
     if (!path) {
+        if (imageType === IMAGE_TYPE.USER) {
+            // ユーザー画像の場合は専用のデフォルト画像を返す
+            return `${API_BASE_URL?.replace(/\/$/, "")}/${DEFAULT_PROFILE_IMAGE_PATH}`;
+        }
+        // 商品画像の場合は汎用のプレースホルダーを返す
         return PLACEHOLDER_IMAGE_URL;
     }
-    // 1. 既にフルURL (Laravelのアクセサで変換済み) の場合はそのまま返す
+    // 2. 既にフルURL (Laravelのアクセサで変換済み) の場合はそのまま返す
     if (path.startsWith("http")) {
         console.log("DEBUG_IMG: Path starts with http (Absolute URL), returning:", path);
-        // キャッシュバスターが必要な場合はここで付与
-        const cacheBuster = `?t=${imageRefreshKey}`;
-        // 既にクエリパラメータがある場合は & を使うなど考慮が必要ですが、ここではシンプルに付与
-        // Laravelのアクセサが生成するURLにクエリが含まれる可能性は低いため、このままとします。
+        // キャッシュバスターを付与
+        const cacheBuster = cacheKey > 0 ? `?t=${cacheKey}` : "";
         return `${path}${cacheBuster}`;
     }
-    // 2. フルURLでない場合 (Laravelのアクセサが機能していない/フォールバックの場合)
+    // 3. フルURLでない場合 (フォールバック)
     if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
     ;
     // --- フォールバックの結合処理 ---
@@ -37,19 +51,24 @@ const getImageUrl = (path, imageRefreshKey)=>{
     let cleanPath = path;
     // パスの先頭にあるスラッシュやバックスラッシュを削除
     cleanPath = cleanPath.replace(/^[/\\]+/, "");
-    const cacheBuster = `?t=${imageRefreshKey}`;
+    // 💡 パスが 'storage/' で始まっていない場合は補完 (Laravelのシンボリックリンク構造対応)
+    // 例外: API側で既に 'storage/...' が含まれたパスが渡ってくる場合があるため、補完は最小限にする
+    if (!cleanPath.startsWith("storage/") && !cleanPath.startsWith("images/")) {
+        cleanPath = `storage/${cleanPath}`;
+    }
+    const cacheBuster = cacheKey > 0 ? `?t=${cacheKey}` : "";
     // ベースURLとクリーンアップされたパスを結合
-    // データベースの値が 'storage/item_images/xxx.jpg' のような相対パスの場合に使用されます。
     const finalUrl = `${baseUrl}/${cleanPath}${cacheBuster}`;
     console.log(`DEBUG_IMG: Base: ${baseUrl}, Final Path: /${cleanPath}, Result: ${finalUrl} (Fallback)`);
     return finalUrl;
 };
-const onImageError = (e, itemName)=>{
+const onImageError = (e, name)=>{
     const target = e.target;
     // エラーが何度も発生しないように、イベントハンドラを無効化
     target.onerror = null;
-    const placeholderText = itemName ? itemName.replace(/\s/g, "+") : "Error";
-    // エラーハンドリング時に商品名入りのプレースホルダーに切り替える
+    const placeholderText = name ? name.replace(/\s/g, "+") : "Error";
+    // エラーハンドリング時に名前入りのプレースホルダーに切り替える
+    // サイズは画像の用途に応じて調整できるように、ここでは汎用の300x300を使用
     target.src = `https://placehold.co/300x300/e0e0e0/333?text=${placeholderText}`;
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
