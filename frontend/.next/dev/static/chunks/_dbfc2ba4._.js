@@ -230,7 +230,7 @@ function Mypage() {
             setItems([]);
             try {
                 // APIエンドポイントを /api/... に修正
-                const endpoint = `/api/mypage/items?page=${page}`;
+                const endpoint = `/api/mypage/item?page=${page}`;
                 // バックエンドから商品リストを取得する
                 const response = await fetcher(endpoint); // 👈 fetcher を使用
                 setItems(response.items || []);

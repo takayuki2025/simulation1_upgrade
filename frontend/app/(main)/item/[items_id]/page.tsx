@@ -201,7 +201,7 @@ export default function ItemDetailPage() {
       setError("");
       setItemErrors([]);
 
-      const endpoint = `/api/items/${id}`;
+      const endpoint = `/api/item/${id}`;
 
       try {
         let data: ItemDetailResponse;

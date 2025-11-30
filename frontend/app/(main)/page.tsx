@@ -107,7 +107,7 @@ export default function Home() {
 
       setLoading(true);
 
-      const apiUrl = `/api/items`;
+      const apiUrl = `/api/item`;
       const params = { tab: tab, all_item_search: search };
 
       // ★★★ 修正箇所: 認証クライアントの使用ロジック ★★★
@@ -248,7 +248,7 @@ export default function Home() {
             items.map((item) => (
               <div key={item.id} className="items_select_all">
                 {/* 💡 商品詳細ページへのリンク */}
-                <Link href={`/items/${item.id}`}>
+                <Link href={`/item/${item.id}`}>
                   <div className="relative">
                     <img
                       src={getImageUrl(item.item_image, imageRefreshKey)}

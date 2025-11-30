@@ -26,11 +26,11 @@ Route::post('/login_or_register', [FirebaseAuthController::class, 'handleTokenEx
 // **********************************************
 
 // 商品詳細情報取得
-Route::get('/items/{items_id}', [ItemController::class, 'item_detail_show']);
+Route::get('/item/{items_id}', [ItemController::class, 'item_detail_show']);
 
-// ★★★ 修正箇所: /items を公開ルートに戻す ★★★
+// ★★★ 修正箇所: /item を公開ルートに戻す ★★★
 // フロントページ（商品一覧）取得 (未認証でもアクセス可能にするが、コントローラー内で認証を試みる)
-Route::get('/items', [ItemController::class, 'index']);
+Route::get('/item', [ItemController::class, 'index']);
 
 // コメント取得 (GET)
 Route::get('/item/{item_id}/comments', [ItemController::class, 'getComments']);
@@ -53,14 +53,14 @@ Route::middleware(['auth:sanctum', No401Redirect::class])->group(function () {
     });
 });
 
-// 💡 【一般的な保護されたルート】認証失敗時に 401 Unauthorized (赤字) を返す
-Route::middleware('auth:sanctum')->group(function () {
+// // 💡 【一般的な保護されたルート】認証失敗時に 401 Unauthorized (赤字) を返す
+// Route::middleware('auth:sanctum')->group(function () {
 
-    // /api/items/list は認証失敗時に本来の 401 Unauthorized を返す
-    Route::get('/items/list', function (Request $request) {
-        // ... 商品リスト取得ロジック ...
-    });
-});
+//     // /api/items/list は認証失敗時に本来の 401 Unauthorized を返す
+//     Route::get('/items/list', function (Request $request) {
+//         // ... 商品リスト取得ロジック ...
+//     });
+// });
 
 
 // **********************************************
@@ -90,7 +90,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/mypage', [ItemController::class, 'profile_show'])->name('profile');
 
     // マイページの商品リスト取得エンドポイント
-    Route::get('/mypage/items', [ItemController::class, 'fetch_mypage_items']);
+    Route::get('/mypage/item', [ItemController::class, 'fetch_mypage_items']);
 
     // プロフィール情報更新
     Route::patch('/mypage/profile_update', [ItemController::class, 'profile_update']);
@@ -119,6 +119,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // いいね機能
     Route::post('/items/{item}/favorite', [ItemController::class, 'apiFavorite']);
+
+
+    // 🌟 お気に入り解除 (DELETE) を追加
+    Route::delete('/items/{item}/favorite', [ItemController::class, 'apiFavorite']);
+
 });
 
 
