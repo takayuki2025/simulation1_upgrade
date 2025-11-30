@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { User, signOut } from "firebase/auth";
-import axios from "axios";
+import { User } from "firebase/auth";
+import axios, { AxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { Auth } from "firebase/auth";
 
@@ -22,22 +22,25 @@ export interface BackendUser {
   user_image?: string | null;
 }
 
+export interface CheckSessionResult {
+  authenticated: boolean;
+  user?: BackendUser;
+  message?: string;
+  status_code_override?: number;
+}
+
 // -----------------------------------------------------------------
 // 1. ヘルパー関数: Laravelセッション確立 (completeLaravelLogin)
 // -----------------------------------------------------------------
 
 export const completeLaravelLogin = async (
   idToken: string,
-  // nameはオプショナルだが、渡された場合は空文字（""）でも含める
   name?: string,
 ): Promise<{ token: string; user: BackendUser }> => {
   if (!API_BASE_URL) throw new Error("API_BASE_URL is not defined.");
 
-  // ★★★ 修正箇所: nameがundefinedでない限り、空文字列でもAPIに含めるように修正（ロジックをよりシンプルに） ★★★
   const payload = {
     id_token: idToken,
-    // nameがundefinedでない場合にのみ、nameキーをペイロードに追加する。
-    // 値が空文字列であってもキーは確実に存在するため、サーバー側の has('name') は true になる。
     ...(name !== undefined ? { name: name } : {}),
   };
 
@@ -50,13 +53,15 @@ export const completeLaravelLogin = async (
       },
     );
 
+    // 💡 【修正】成功時の処理を追加し、必ず値を返すようにする
     const { token, user: backendUser } = res.data;
 
     if (token && backendUser) {
-      return { token, user: backendUser };
+      return { token, user: backendUser }; // ✅ 成功時はここで return
     } else {
+      // APIがデータの一部を返さなかった場合
       throw new Error(
-        "Sanctum token exchange failed: Missing token or user data.",
+        "Sanctum token exchange failed: Missing token or user data in response.",
       );
     }
   } catch (error) {
@@ -64,25 +69,46 @@ export const completeLaravelLogin = async (
       const status = error.response.status;
       const detail = JSON.stringify(error.response.data);
       console.error(
-        "PAGE_HANDLE: Login failed in catch block. Error:",
-        `Laravel API Error (${status}): ${detail}`,
+        `[LOGIN_API_ERROR] Laravel API Error (${status}): ${detail}`,
+        `Endpoint: ${API_BASE_URL}/api/login_or_register`,
+        `Payload Keys: ${Object.keys(payload).join(", ")}`,
       );
-      throw new Error(`Laravel API Error (${status}): ${detail}`);
+      throw new Error(`Laravel API Error (${status}): ${detail}`); // 💡 throwで終了
+    } else if (axios.isAxiosError(error) && error.request) {
+      console.error(
+        "[NETWORK_ERROR] Request made but no response received (possible timeout or network issue).",
+        error.message,
+      );
+      throw new Error(`Network Error: ${error.message}`); // 💡 throwで終了
     } else {
-      throw error;
+      console.error("[UNKNOWN_LOGIN_ERROR] Unknown error during login:", error);
+      throw error; // 💡 throwで終了
     }
   }
+  // ⚠️ try/catchブロックの後に処理は到達しないため、ts(2355)は解消される
 };
 
-export const checkLaravelSession = async (): Promise<{
-  authenticated: boolean;
-  user?: BackendUser;
-}> => {
+/**
+ * 💡 Laravelサーバーのセッション状態を確認する関数
+ */
+export const checkLaravelSession = async (): Promise<CheckSessionResult> => {
+  if (!API_BASE_URL) return { authenticated: false };
+
   try {
     const res = await axios.get(`${API_BASE_URL}/api/auth/check`);
     return res.data;
-  } catch {
-    // 401 Unauthorized の場合はここに来る。
+  } catch (e) {
+    const error = e as AxiosError;
+    if (error.response?.status === 401) {
+      // 401 Unauthorized の場合
+      return {
+        authenticated: false,
+        message: "Unauthenticated by server.",
+        status_code_override: 401,
+      };
+    }
+    // その他のエラー
+    console.error("[checkLaravelSession] Error:", error);
     return { authenticated: false };
   }
 };
@@ -94,12 +120,10 @@ export const checkLaravelSession = async (): Promise<{
 export const useLaravelSession = (
   user: User | null,
   auth: Auth | null,
-  checkLaravelSession: () => Promise<{
-    authenticated: boolean;
-    user?: BackendUser;
-  }>,
+  checkLaravelSession: () => Promise<CheckSessionResult>,
   setLaravelAuthenticated: (isAuthenticated: boolean) => void,
   setInitialCheckComplete: (isComplete: boolean) => void,
+  setBackendUser: (user: BackendUser | null) => void,
 ) => {
   const router = useRouter();
 
@@ -109,61 +133,41 @@ export const useLaravelSession = (
     return params.get("verified") === "true" || params.get("token") !== null;
   }, []);
 
+  /**
+   * 💡 セッション確立後にリダイレクトをチェックするロジックに特化
+   */
   const syncAndRedirect = useCallback(async () => {
-    let finalAuthStatus = false;
+    // 💡 ログアウト状態や匿名ユーザーの場合は何もしない
+    if (!user || !auth || user.isAnonymous) {
+      setInitialCheckComplete(true);
+      return;
+    }
 
     try {
+      // 💡 サーバーにセッション状態を問い合わせ、結果をAuthProviderにフィードバック
       const sessionData = await checkLaravelSession();
-      finalAuthStatus = sessionData.authenticated;
+      setLaravelAuthenticated(sessionData.authenticated);
 
-      // 1. ログアウト状態 or 匿名ユーザーの場合の処理
-      if (!user || !auth || user.isAnonymous) {
-        // 💡 匿名ユーザーだがLaravelセッションがある場合、Firebase側を強制ログアウト（状態のクリーンアップ）
-        if (user?.isAnonymous && sessionData.authenticated && auth) {
-          await signOut(auth);
-          finalAuthStatus = false;
-          console.log(
-            "[Sanctum Sync] Forced Firebase sign-out due to anonymous user having Laravel session.",
-          );
-        }
-        // ログアウト状態はここで状態を確定させる
-        setLaravelAuthenticated(finalAuthStatus);
-        setInitialCheckComplete(true);
-        return;
-      }
+      if (sessionData.authenticated && sessionData.user) {
+        setBackendUser(sessionData.user);
 
-      // 2. ユーザーはいるがセッションがない場合 (ログイン直後の競合回避)
-      else if (!sessionData.authenticated) {
-        // セッションがない場合は、外部のログイン処理（useSanctumAuth）が Firebase Token を使って
-        // completeLaravelLogin を実行するのを待つため、ここでは何もしない。
-        // checkLaravelSessionが再実行されるのを待機
-        console.log(
-          "[Sanctum Sync] Firebase user present but no Laravel session. Awaiting token exchange.",
-        );
-        return;
-      }
-
-      // 3. セッション確立済みの場合 (リロード時など)
-      else {
-        // 💡 既にセッションが確立されている場合は確定させる
-        setLaravelAuthenticated(finalAuthStatus);
-        setInitialCheckComplete(true);
-        console.log(
-          "[Sanctum Sync] Laravel session confirmed and user authenticated.",
-        );
-
-        // メール認証チェックとURLクリーンアップ（リダイレクト補助ロジック）
+        // メール認証チェックとURLクリーンアップ
         const backendUser = sessionData.user;
         if (backendUser && !backendUser.email_verified_at) {
           router.push("/email/verify");
         } else if (isVerificationRedirect()) {
-          // メール認証完了後のリダイレクトパラメータをクリーンアップ
+          // 認証完了後のURLクリーンアップ
           router.replace(window.location.pathname);
         }
+      } else {
+        // セッションがない場合はログアウト状態として扱う
+        setBackendUser(null);
       }
     } catch (error) {
       console.error("[Sanctum Sync] An error occurred during sync:", error);
       setLaravelAuthenticated(false);
+      setBackendUser(null);
+    } finally {
       setInitialCheckComplete(true);
     }
   }, [
@@ -174,12 +178,15 @@ export const useLaravelSession = (
     isVerificationRedirect,
     setLaravelAuthenticated,
     setInitialCheckComplete,
+    setBackendUser,
   ]);
 
   useEffect(() => {
+    // Firebaseユーザーが設定された後、Laravelセッションの同期とリダイレクトチェックを開始
     if (user !== undefined && auth) {
       syncAndRedirect();
     }
+    // 💡 依存配列
   }, [user, auth, syncAndRedirect]);
 
   return {};

@@ -107,11 +107,24 @@ services:
       - ./ssl_certs:/app/ssl_certs
     working_dir: /app
     environment:
-      - CHOKIDAR_USEPOLLING=true
+      # - CHOKIDAR_USEPOLLING=true. メモリ高騰の主因の可能性ありのため削除
       - NEXT_PUBLIC_API_BASE_URL=https://laravel.test
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.7
+    # ★★★ 追記: メモリ上限と再起動ポリシーの設定 ★★★
+    # メモリ不足になったら自動でコンテナを再起動する設定 (Docker Swarmモードで使用されますが、
+    # Docker Composeではリソース制限として機能します)
+    deploy:
+      resources:
+        limits:
+          # フロントエンド開発サーバーのメモリ使用上限を2GBに設定
+          memory: 2048M
+        reservations:
+          # 最低限必要なメモリを確保 (optional)
+          memory: 512M
+      # restart_policy:
+      #   condition: on-failure # プロセス終了時のみ再起動
 
 networks:
   simulation1_network:

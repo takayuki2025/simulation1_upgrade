@@ -8,19 +8,67 @@ import React, {
   useRef,
 } from "react";
 import { useRouter, useParams } from "next/navigation";
-import axios, { AxiosInstance, AxiosError, AxiosResponse } from "axios";
+import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 
-// 💡 useAuth のみを使用
+// 認証フックのインポート
 import { useAuth } from "@/hooks/useSanctumAuth";
-// 💡 外部のutils/utils.tsから画像ヘルパーをインポート
-import { getImageUrl, onImageError } from "@/utils/utils";
+// 画像ヘルパーのインポート (今回はここで関数を定義し、元の utils.ts は使用しない前提)
+// import { getImageUrl, onImageError } from "@/utils/utils";
+
+// 💡 ライフサイクル診断ログ: コンポーネントがいつ再レンダリングされたかを確認
+console.log("DIAGNOSTICS: ItemDetailPage RE-RENDERED.");
 
 // =======================================================
-// グローバル変数
+// グローバル設定 & ユーティリティの追加
 // =======================================================
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// 認証情報付きリクエストをaxios全体で許可
 axios.defaults.withCredentials = true;
+
+// 💡 【Mypage.tsxから移植】アセットURLを生成する汎用ヘルパー関数
+const getAssetUrl = (
+  path: string | undefined | null,
+  isProfileImage: boolean = false,
+): string => {
+  // 1. path が存在しない、または空の場合は、デフォルト画像を返す
+  if (!path) {
+    if (isProfileImage) {
+      // プロフィール画像がない場合のデフォルトパス
+      const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
+      return `${API_BASE_URL?.replace(/\/$/, "")}/${DEFAULT_IMAGE_PATH}`;
+    }
+    // 商品画像の場合はパスがないので空文字列を返す。onImageErrorでプレースホルダーに置換される
+    return "";
+  }
+
+  // 2. pathがURL形式（http:// または https:// で始まる）であれば、そのまま返す
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  // 3. パスが絶対URL形式でなく、/storage/などで始まっている場合
+  const cleanBase = API_BASE_URL?.replace(/\/$/, "") || "";
+  const cleanPath = path.startsWith("/") ? path.substring(1) : path;
+
+  // 例: [API_BASE_URL]/storage/item_images/xxx.jpg
+  return `${cleanBase}/${cleanPath}`;
+};
+
+// 💡 【再定義】画像読み込みエラー発生時の処理 (商品名/ユーザー名入りのプレースホルダーに置き換え)
+export const onImageError = (
+  e: React.SyntheticEvent<HTMLImageElement, Event>,
+  name: string,
+) => {
+  const target = e.target as HTMLImageElement;
+  target.onerror = null;
+
+  const placeholderText = name ? name.replace(/\s/g, "+") : "Error";
+
+  // エラーハンドリング時に商品名/ユーザー名入りのプレースホルダーに切り替える
+  // ユーザー画像と商品画像でサイズが異なるため、ここでは両方に対応できるサイズを使用
+  target.src = `https://placehold.co/100x100/e0e0e0/333?text=${placeholderText}`;
+};
 
 // =======================================================
 // 型定義
@@ -52,9 +100,6 @@ interface Comment {
   created_at: string;
 }
 
-/**
- * サーバーからのレスポンス型
- */
 interface ItemDetailResponse {
   item: Item;
   is_favorited: boolean;
@@ -62,6 +107,39 @@ interface ItemDetailResponse {
   comments: Comment[];
   errors?: string[];
 }
+
+interface RetryableAxiosRequestConfig extends AxiosRequestConfig {
+  signal?: AbortSignal;
+}
+
+// ----------------------------------------------------------------
+// ユーティリティ: エラーハンドリングのための型ガードとヘルパー
+// ----------------------------------------------------------------
+
+const getErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (
+      data &&
+      typeof data === "object" &&
+      "message" in data &&
+      typeof data.message === "string"
+    ) {
+      return data.message;
+    }
+    // 404エラーの場合は、特に「ルートが見つからない」ことを明示
+    if (error.response?.status === 404) {
+      return `リクエストエラー: ルートが見つかりません (${error.config?.url})`;
+    }
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+};
 
 // =======================================================
 // メインコンポーネント
@@ -76,17 +154,21 @@ export default function ItemDetailPage() {
     user,
     isAuthenticated,
     isLoading: isAuthLoading,
-    isLoggingOut, // ★ エラー解消のため追加
+    isRefreshing,
+    isLoggingOut,
     apiClient,
     logout,
-    reloadAuthToken,
+    backendUser, // 💡 backendUserを直接取得 (extendedUserの代替)
   } = useAuth();
 
   // 💡 データフェッチが一度試行されたことを記録するRef
   const hasFetchedRef = useRef(false);
 
+  // 💡 コメント投稿リクエストのAbortControllerを保持するRef
+  const commentAbortControllerRef = useRef<AbortController | null>(null);
+
   // ----------------------------------------------------------------
-  // Computed Properties: itemId
+  // State & Computed Properties
   // ----------------------------------------------------------------
   const itemId = useMemo(() => {
     const idParam = params.items_id;
@@ -95,14 +177,11 @@ export default function ItemDetailPage() {
       return null;
     }
     const parsedId = parseInt(idString as string);
-    if (isNaN(parsedId) || parsedId <= 0) {
-      return -1;
-    }
-    return parsedId;
+    return isNaN(parsedId) || parsedId <= 0 ? -1 : parsedId;
   }, [params.items_id]);
 
-  // userオブジェクトにuser_imageなどが含まれていることを期待し、型アサーション
-  const extendedUser = user as any;
+  // 💡 backendUser を extendedUser の代替として使用
+  const extendedUser = backendUser as ApiUser | null;
 
   const [item, setItem] = useState<Item | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -113,104 +192,52 @@ export default function ItemDetailPage() {
   const [itemErrors, setItemErrors] = useState<string[]>([]);
   const [newComment, setNewComment] = useState("");
   const [commentErrors, setCommentErrors] = useState<string[]>([]);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
-  // ----------------------------------------------------------------
-  // Computed Properties (useMemo) ★ 欠落部分をすべて追加
-  // ----------------------------------------------------------------
-
-  // 商品の所有者であるか
   const isOwner = useMemo(() => {
     return isAuthenticated && extendedUser?.id === item?.user_id;
   }, [isAuthenticated, extendedUser, item]);
 
-  // お気に入り/購入操作が可能か (非所有者かつログイン済み)
   const canInteract = useMemo(() => {
     return isAuthenticated && extendedUser?.id !== item?.user_id;
   }, [isAuthenticated, extendedUser, item]);
 
-  // 売り切れ状態か
   const isSoldOut = useMemo(() => {
     return (item?.remain ?? 0) < 1;
   }, [item]);
 
-  // カテゴリ文字列を配列にパース
   const itemCategories = useMemo(() => {
     if (!item?.category) return [];
     try {
       const categories = JSON.parse(item.category);
-      return Array.isArray(categories) ? categories : [item.category];
+      return Array.isArray(categories) ? categories : [String(item.category)];
     } catch (e) {
       return [item.category];
     }
   }, [item]);
 
-  // 商品画像のフルURL
+  // 💡 【修正】getImageUrl の代わりに getAssetUrl を使用
   const fullItemImageUrl = useMemo(() => {
-    return getImageUrl(item?.item_image || null, 0);
+    return getAssetUrl(item?.item_image || null, false); // isProfileImage=false (商品画像)
   }, [item?.item_image]);
 
   // ----------------------------------------------------------------
-  // データフェッチヘルパー (useCallbackでラップ)
+  // データフェッチヘルパー (useCallback)
   // ----------------------------------------------------------------
 
-  /**
-   * 💡 責務: 認証済みリクエストを実行し、401エラー時にトークンをリフレッシュして再試行する。
-   */
   const authenticatedFetchWithRetry = useCallback(
-    async (config: any): Promise<AxiosResponse> => {
+    async (config: RetryableAxiosRequestConfig): Promise<AxiosResponse> => {
       if (isAuthLoading || isLoggingOut || !apiClient) {
         throw new Error(
           "Authentication or client not ready (isAuthLoading/isLoggingOut/apiClient check failed).",
         );
       }
 
-      try {
-        // 1. 通常のリクエスト実行
-        return await apiClient.request(config);
-      } catch (e) {
-        const error = e as AxiosError;
-        const status = error.response?.status;
-
-        // 2. 401 Unauthorized エラーの場合
-        if (status === 401) {
-          console.warn(
-            "401 Unauthorized detected. Attempting token refresh and retry...",
-          );
-          try {
-            // トークンを強制リフレッシュ
-            await reloadAuthToken();
-            // 3. 再度リクエストを実行
-            const secondResponse = await apiClient.request(config);
-            console.log("Token refresh and retry successful.");
-            return secondResponse;
-          } catch (refreshError) {
-            // 4. リフレッシュ失敗またはリトライ後のエラー
-            console.error(
-              "Token refresh or retry failed. Logging out.",
-              refreshError,
-            );
-            await logout();
-            throw new Error("Authentication failed after retry.");
-          }
-        }
-        // 401 以外のエラーはそのままスロー
-        throw error;
-      }
+      return await apiClient.request(config);
     },
-    // ★ 依存配列に isLoggingOut を追加
-    [
-      isAuthLoading,
-      isLoggingOut,
-      isAuthenticated,
-      apiClient,
-      logout,
-      reloadAuthToken,
-    ],
+    [isAuthLoading, isLoggingOut, apiClient],
   );
 
-  /**
-   * 商品詳細データをAPIから取得する関数
-   */
   const fetchData = useCallback(
     async (id: number) => {
       setIsLoading(true);
@@ -222,21 +249,19 @@ export default function ItemDetailPage() {
       try {
         let data: ItemDetailResponse;
 
-        // 💡 認証状態によってクライアントを使い分ける
         if (isAuthenticated && apiClient) {
           const response = await authenticatedFetchWithRetry({
             method: "GET",
             url: endpoint,
           });
-          data = response.data as ItemDetailResponse; // ★ 型アサーション
+          data = response.data as ItemDetailResponse;
         } else {
           const response = await axios.get(`${API_BASE_URL}${endpoint}`);
-          data = response.data as ItemDetailResponse; // ★ 型アサーション
+          data = response.data as ItemDetailResponse;
         }
 
         if (data.item) {
           setItem(data.item);
-          // APIが返すプロパティを使用。??演算子で未定義の場合に備える
           setIsFavorited(data.is_favorited ?? false);
           setFavoritesCount(data.favorites_count ?? 0);
           setComments(data.comments ?? []);
@@ -246,12 +271,12 @@ export default function ItemDetailPage() {
         } else {
           setError("商品情報が見つかりませんでした。");
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("データの取得中に予期せぬエラーが発生しました。", e);
-        const errMsg =
-          e.message ||
-          e.response?.data?.message ||
-          "データの取得中にエラーが発生しました。";
+        let errMsg = getErrorMessage(e);
+        if (axios.isAxiosError(e) && !e.response?.data?.message) {
+          errMsg = "データの取得中にエラーが発生しました。";
+        }
         setError(errMsg);
       } finally {
         setIsLoading(false);
@@ -263,18 +288,8 @@ export default function ItemDetailPage() {
   // ----------------------------------------------------------------
   // Effect / Watcher
   // ----------------------------------------------------------------
+
   useEffect(() => {
-    if (hasFetchedRef.current) {
-      if (item) {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    if (isAuthLoading) {
-      return;
-    }
-
     if (itemId === null || itemId === -1) {
       let errorMessage =
         itemId === -1
@@ -286,89 +301,173 @@ export default function ItemDetailPage() {
       return;
     }
 
+    if (hasFetchedRef.current && item !== null) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (isAuthLoading) {
+      return;
+    }
+
     hasFetchedRef.current = true;
     fetchData(itemId);
   }, [itemId, isAuthLoading, fetchData, item]);
+
+  useEffect(() => {
+    return () => {
+      if (commentAbortControllerRef.current) {
+        commentAbortControllerRef.current.abort();
+        commentAbortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   // ----------------------------------------------------------------
   // 機能ロジック
   // ----------------------------------------------------------------
 
-  /**
-   * お気に入り追加/削除処理
-   */
   const submitFavorite = useCallback(async () => {
     if (!item || !isAuthenticated) {
       if (!isAuthenticated) router.push("/login");
       return;
     }
+    if (isOwner) {
+      setItemErrors(["ご自身の商品の操作はできません。"]);
+      return;
+    }
+    if (isAuthLoading || isRefreshing) {
+      setItemErrors(["認証情報の同期中です。しばらくお待ちください..."]);
+      return;
+    }
+
     const isCurrentlyFavorited = isFavorited;
     setIsFavorited(!isCurrentlyFavorited);
     setFavoritesCount((prev) => (isCurrentlyFavorited ? prev - 1 : prev + 1));
 
     try {
-      const endpoint = isCurrentlyFavorited
-        ? `/api/favorite/${item.id}`
-        : `/api/favorite`;
+      // 💡 【修正】お気に入りエンドポイントの URL 形式を統一
+      const endpoint = `/api/items/${item.id}/favorite`;
+
       const config = isCurrentlyFavorited
         ? { method: "DELETE" as const, url: endpoint }
         : {
             method: "POST" as const,
             url: endpoint,
-            data: { item_id: item.id },
+            // POSTの場合は、item_idはURLに含まれるため、dataは不要だが、あっても害はない
+            // data: { item_id: item.id },
           };
 
       await authenticatedFetchWithRetry(config);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("お気に入り操作中にエラーが発生しました:", e);
+      // 失敗した場合は状態を元に戻す
       setIsFavorited((prev) => !prev);
       setFavoritesCount((prev) => (isCurrentlyFavorited ? prev + 1 : prev - 1));
-      const errMsg =
-        e.message ||
-        e.response?.data?.message ||
-        "お気に入り操作中に予期せぬエラーが発生しました。";
+
+      let errMsg = getErrorMessage(e);
       setItemErrors([errMsg]);
     }
-  }, [item, isAuthenticated, isFavorited, authenticatedFetchWithRetry, router]);
+  }, [
+    item,
+    isAuthenticated,
+    isFavorited,
+    authenticatedFetchWithRetry,
+    router,
+    isOwner,
+    isAuthLoading,
+    isRefreshing,
+  ]);
 
   /**
    * コメント投稿処理
    */
   const submitComment = useCallback(async () => {
-    setCommentErrors([]);
-    if (!isAuthenticated || !item || newComment.trim() === "") {
-      if (!isAuthenticated) router.push("/login");
-      if (newComment.trim() === "")
-        setCommentErrors(["コメントを入力してください"]);
-      return;
-    }
-    if (!extendedUser || !extendedUser.id) {
-      setCommentErrors([
-        "ユーザー情報が取得できませんでした。再度ログインしてください。",
-      ]);
-      await logout();
+    // 💡 新しいガード句: 既に送信中であれば即座に終了 (二重実行の防御)
+    if (isSubmittingComment) {
+      console.log("DEBUG: Already submitting, blocking new request.");
       return;
     }
 
+    // 1. 既存のコントローラーがあれば、新しいリクエストを開始する前にキャンセルを試みる
+    if (commentAbortControllerRef.current) {
+      console.log(
+        "DEBUG: Cancelling previous comment submission to prevent duplicate.",
+      );
+      commentAbortControllerRef.current.abort();
+      commentAbortControllerRef.current = null;
+    }
+
+    setCommentErrors([]);
+    setIsSubmittingComment(true);
+
+    // 2. 新しいコントローラーを作成し、Refに保持
+    const controller = new AbortController();
+    commentAbortControllerRef.current = controller;
+
+    console.log("DEBUG: submitComment function started.");
+    console.log("DEBUG: isAuthenticated =", isAuthenticated);
+    console.log("DEBUG: isAuthLoading =", isAuthLoading);
+    console.log("DEBUG: isRefreshing =", isRefreshing);
+
+    // --- ガード句 ---
+    if (!isAuthenticated) {
+      router.push("/login");
+      setIsSubmittingComment(false);
+      commentAbortControllerRef.current = null;
+      return;
+    }
+    if (!item) {
+      setCommentErrors(["商品情報が読み込まれていません。"]);
+      setIsSubmittingComment(false);
+      commentAbortControllerRef.current = null;
+      return;
+    }
+
+    if (newComment.trim() === "") {
+      setCommentErrors(["コメントを入力してください"]);
+      setIsSubmittingComment(false);
+      commentAbortControllerRef.current = null;
+      return;
+    }
+
+    // 💡 認証状態の矛盾を確実に捉えて中断する (extendedUser のチェック)
+    if (!extendedUser || !extendedUser.id) {
+      console.error(
+        "DIAGNOSTICS_ERROR: Authentication Mismatch. isAuthenticated=true but extendedUser is null.",
+      );
+      setCommentErrors([
+        "ユーザー情報が取得できませんでした。セッションが不安定です。再度ログインしてください。",
+      ]);
+      setIsSubmittingComment(false);
+      commentAbortControllerRef.current = null;
+      return;
+    }
+    // --- ガード句終了 ---
+
     try {
-      const response: any = await authenticatedFetchWithRetry({
+      // 5. コメント投稿リクエストを実行 (signalを追加)
+      const response: AxiosResponse = await authenticatedFetchWithRetry({
         method: "POST",
         url: "/api/comment",
         data: { item_id: item.id, comment: newComment },
+        signal: controller.signal,
       });
 
+      // 6. 成功時の処理
       if (response.data.comment) {
         const resComment = response.data.comment;
         const newCommentData: Comment = {
           id: resComment.id,
           comment: resComment.comment,
           created_at: resComment.created_at,
-          user: {
+          user: resComment.user || {
             id: extendedUser.id,
             name: extendedUser.name,
             user_image: extendedUser.user_image,
           },
         };
+
         setComments((prev) => [...prev, newCommentData]);
         setNewComment("");
       } else {
@@ -376,13 +475,44 @@ export default function ItemDetailPage() {
           "コメントの投稿に成功しましたが、データ更新に失敗しました。",
         );
       }
-    } catch (e: any) {
+
+      setIsSubmittingComment(false);
+    } catch (e: unknown) {
+      // 💡 キャンセルエラーの判定と処理 (ここでキャンセルを捕捉)
+      if (axios.isAxiosError(e) && e.code === "ERR_CANCELED") {
+        if (commentAbortControllerRef.current !== controller) {
+          console.log(
+            "DIAGNOSTICS: Cancel reason: Previous request aborted by new submission (Scenario 1 - NORMAL).",
+          );
+          return;
+        }
+
+        console.log(
+          "DIAGNOSTICS: Cancel reason: Page Unmount or Token Refresh Failure (Scenario 2/3 - ABNORMAL).",
+        );
+        setIsSubmittingComment(false);
+        return;
+      }
+
+      // 致命的なエラーが発生した場合
       console.error("コメント投稿中にエラーが発生しました:", e);
-      const errMsg =
-        e.message ||
-        e.response?.data?.message ||
-        "コメント投稿中に予期せぬエラーが発生しました。";
+
+      let errMsg = getErrorMessage(e);
       setCommentErrors([errMsg]);
+
+      // 🚨 致命的なエラー発生時は必ずローディング状態を解除
+      setIsSubmittingComment(false);
+
+      if (errMsg.includes("Authentication failed after retry")) {
+        setCommentErrors([
+          "セッションの有効期限が切れました。再度ログインが必要です。",
+        ]);
+      }
+    } finally {
+      // 💡 成功またはエラーの完了時に、このリクエストのコントローラーがまだ Ref に残っている場合のみクリア
+      if (commentAbortControllerRef.current === controller) {
+        commentAbortControllerRef.current = null;
+      }
     }
   }, [
     item,
@@ -392,6 +522,7 @@ export default function ItemDetailPage() {
     logout,
     authenticatedFetchWithRetry,
     router,
+    isSubmittingComment,
   ]);
 
   /**
@@ -403,7 +534,6 @@ export default function ItemDetailPage() {
     } else if (isAuthenticated && item) {
       router.push(`/purchase/${item.id}`);
     } else {
-      // 未認証ならログインページへ
       router.push("/login");
     }
   };
@@ -412,20 +542,24 @@ export default function ItemDetailPage() {
   // レンダリング
   // ----------------------------------------------------------------
 
-  if (isAuthLoading || isLoading) {
-    // ローディング/認証確認中の表示
+  const totalLoading = isAuthLoading || isLoading || isRefreshing;
+
+  if (totalLoading) {
     return (
       <div className="flex justify-center items-center h-48 my-20 w-full">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"></div>
         <p className="ml-4 text-xl font-semibold text-gray-600">
-          {isAuthLoading ? "認証状態を確認中..." : "商品情報を読み込み中..."}
+          {isAuthLoading
+            ? "認証状態を確認中..."
+            : isRefreshing
+              ? "認証情報を更新中..."
+              : "商品情報を読み込み中..."}
         </p>
       </div>
     );
   }
 
   if (error || (itemErrors && itemErrors.length > 0)) {
-    // エラーメッセージの表示
     return (
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md my-10 w-full max-w-5xl mx-auto">
         <p className="font-bold">データの取得エラー</p>
@@ -438,7 +572,6 @@ export default function ItemDetailPage() {
   }
 
   if (!item) {
-    // 商品が見つからない場合の表示
     return (
       <div className="text-center py-20 w-full">
         <p className="text-xl font-semibold text-gray-600">
@@ -501,7 +634,8 @@ export default function ItemDetailPage() {
                     <button
                       onClick={submitFavorite}
                       type="button"
-                      className="text-3xl transition-transform transform hover:scale-110 active:scale-90 p-0 m-0 leading-none focus:outline-none"
+                      disabled={totalLoading || isSubmittingComment}
+                      className="text-3xl transition-transform transform hover:scale-110 active:scale-90 p-0 m-0 leading-none focus:outline-none disabled:opacity-50"
                     >
                       <span
                         className={`heart_icon text-4xl ${
@@ -550,12 +684,12 @@ export default function ItemDetailPage() {
               <div className="item_detail_form pt-4">
                 <button
                   onClick={navigateToPurchase}
-                  disabled={isSoldOut && !isOwner}
+                  disabled={(isSoldOut && !isOwner) || totalLoading}
                   className={`w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg ${
                     !isSoldOut
                       ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
                       : "bg-gray-400 text-gray-700 cursor-not-allowed"
-                  }`}
+                  } disabled:bg-gray-400 disabled:opacity-70`}
                 >
                   {isOwner ? (
                     <span>マイページへ移動する</span>
@@ -634,7 +768,11 @@ export default function ItemDetailPage() {
                     >
                       <div className="comment_name_image flex items-center space-x-3">
                         <img
-                          src={getImageUrl(comment.user.user_image || null, 0)}
+                          // 💡 【修正適用済み】 getAssetUrl を使用し、ユーザー画像(true)として呼び出す
+                          src={getAssetUrl(
+                            comment.user.user_image || null,
+                            true,
+                          )}
                           alt="プロフィール画像"
                           className="user_image_css w-10 h-10 rounded-full object-cover"
                           onError={(e) => onImageError(e, comment.user.name)}
@@ -693,12 +831,18 @@ export default function ItemDetailPage() {
                     rows={5}
                     placeholder="コメントを入力してください"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none text-gray-700"
+                    disabled={isSubmittingComment || totalLoading}
                   ></textarea>
                   <button
                     type="submit"
-                    className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200"
+                    className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200 disabled:bg-red-300"
+                    disabled={
+                      isSubmittingComment ||
+                      totalLoading ||
+                      newComment.trim() === ""
+                    }
                   >
-                    コメントを送信する
+                    {isSubmittingComment ? "投稿中..." : "コメントを送信する"}
                   </button>
                 </form>
               ) : (
@@ -718,7 +862,7 @@ export default function ItemDetailPage() {
 
       {/* スタイル定義 */}
       <style jsx>{`
-        /* スタイルは変更なし */
+        /* スタイルは省略されたもののみを記載 */
         .item_detail_contents {
           display: flex;
           justify-content: center;
@@ -750,41 +894,6 @@ export default function ItemDetailPage() {
           padding: 50px;
         }
 
-        .information h2,
-        .information h3,
-        .information p {
-          margin-left: 0 !important;
-          position: static;
-        }
-
-        .item_detail_brand {
-          display: flex;
-          align-items: center;
-          margin-top: 10px;
-        }
-        .item_detail_brand_1 {
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .item_detail_brand_2 {
-          position: relative;
-          left: 50px;
-          font-weight: 600;
-          font-size: 14px;
-        }
-
-        .item_detail_price {
-          margin-top: 10px;
-          margin-bottom: 20px;
-        }
-        .item_detail_price h2 {
-          font-size: 26px;
-        }
-        .price_after {
-          font-size: 19px;
-          font-weight: 500;
-        }
-
         .explain_word {
           word-break: break-all;
           overflow-wrap: break-word;
@@ -796,13 +905,6 @@ export default function ItemDetailPage() {
           font-size: 14px;
         }
 
-        .comments_count {
-          position: relative;
-          top: 0;
-          margin-left: 10px;
-          font-size: 14px;
-          font-weight: normal;
-        }
         .comment {
           max-width: 320px;
           word-break: break-all;
@@ -819,11 +921,6 @@ export default function ItemDetailPage() {
           margin-left: 50px;
           font-size: 14px;
         }
-        .comment_name_image {
-          display: flex;
-          align-items: center;
-          margin-bottom: 5px;
-        }
         .user_image_css {
           width: 40px;
           height: 40px;
@@ -833,18 +930,6 @@ export default function ItemDetailPage() {
           object-position: center;
           position: relative;
           left: 0px;
-        }
-        .comment_name {
-          position: relative;
-          left: 10px;
-          font-size: 17px;
-          font-weight: 700;
-        }
-        .item_detail_comment_form h2 {
-          font-size: 18px;
-          position: relative;
-          top: 8px;
-          margin-bottom: 10px;
         }
 
         @media (max-width: 768px) {

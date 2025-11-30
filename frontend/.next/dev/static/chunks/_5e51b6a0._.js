@@ -69,9 +69,9 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$js
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
-// 💡 useAuth のみを使用
+// 認証フックのインポート
 var __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/hooks/useSanctumAuth.tsx [app-client] (ecmascript)");
-// 💡 外部のutils/utils.tsから画像ヘルパーをインポート
+// 画像ヘルパーのインポート
 var __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/utils/utils.ts [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature();
@@ -82,21 +82,42 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
+// 💡 ライフサイクル診断ログ: コンポーネントがいつ再レンダリングされたかを確認
+console.log("DIAGNOSTICS: ItemDetailPage RE-RENDERED.");
 // =======================================================
-// グローバル変数
+// グローバル設定
 // =======================================================
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
+// 認証情報付きリクエストをaxios全体で許可
 __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
+// ----------------------------------------------------------------
+// ユーティリティ: エラーハンドリングのための型ガードとヘルパー
+// ----------------------------------------------------------------
+const getErrorMessage = (error)=>{
+    if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].isAxiosError(error)) {
+        const data = error.response?.data;
+        if (data && typeof data === "object" && "message" in data && typeof data.message === "string") {
+            return data.message;
+        }
+        return error.message;
+    }
+    if (error instanceof Error) {
+        return error.message;
+    }
+    return String(error);
+};
 function ItemDetailPage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const params = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"])();
     // 1. useAuth から必要な状態とアクションを取得
-    const { user, isAuthenticated, isLoading: isAuthLoading, isLoggingOut, apiClient, logout, reloadAuthToken } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { user, isAuthenticated, isLoading: isAuthLoading, isRefreshing, isLoggingOut, apiClient, logout, backendUser } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     // 💡 データフェッチが一度試行されたことを記録するRef
     const hasFetchedRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
+    // 💡 コメント投稿リクエストのAbortControllerを保持するRef
+    const commentAbortControllerRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     // ----------------------------------------------------------------
-    // Computed Properties: itemId
+    // State & Computed Properties
     // ----------------------------------------------------------------
     const itemId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[itemId]": ()=>{
@@ -106,16 +127,13 @@ function ItemDetailPage() {
                 return null;
             }
             const parsedId = parseInt(idString);
-            if (isNaN(parsedId) || parsedId <= 0) {
-                return -1;
-            }
-            return parsedId;
+            return isNaN(parsedId) || parsedId <= 0 ? -1 : parsedId;
         }
     }["ItemDetailPage.useMemo[itemId]"], [
         params.items_id
     ]);
-    // userオブジェクトにuser_imageなどが含まれていることを期待し、型アサーション
-    const extendedUser = user;
+    // 💡 backendUser を extendedUser の代替として使用
+    const extendedUser = backendUser;
     const [item, setItem] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isFavorited, setIsFavorited] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [favoritesCount, setFavoritesCount] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(0);
@@ -125,10 +143,7 @@ function ItemDetailPage() {
     const [itemErrors, setItemErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
     const [newComment, setNewComment] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [commentErrors, setCommentErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
-    // ----------------------------------------------------------------
-    // Computed Properties (useMemo) ★ 欠落部分をすべて追加
-    // ----------------------------------------------------------------
-    // 商品の所有者であるか
+    const [isSubmittingComment, setIsSubmittingComment] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const isOwner = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[isOwner]": ()=>{
             return isAuthenticated && extendedUser?.id === item?.user_id;
@@ -138,7 +153,6 @@ function ItemDetailPage() {
         extendedUser,
         item
     ]);
-    // お気に入り/購入操作が可能か (非所有者かつログイン済み)
     const canInteract = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[canInteract]": ()=>{
             return isAuthenticated && extendedUser?.id !== item?.user_id;
@@ -148,7 +162,6 @@ function ItemDetailPage() {
         extendedUser,
         item
     ]);
-    // 売り切れ状態か
     const isSoldOut = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[isSoldOut]": ()=>{
             return (item?.remain ?? 0) < 1;
@@ -156,14 +169,13 @@ function ItemDetailPage() {
     }["ItemDetailPage.useMemo[isSoldOut]"], [
         item
     ]);
-    // カテゴリ文字列を配列にパース
     const itemCategories = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[itemCategories]": ()=>{
             if (!item?.category) return [];
             try {
                 const categories = JSON.parse(item.category);
                 return Array.isArray(categories) ? categories : [
-                    item.category
+                    String(item.category)
                 ];
             } catch (e) {
                 return [
@@ -174,63 +186,29 @@ function ItemDetailPage() {
     }["ItemDetailPage.useMemo[itemCategories]"], [
         item
     ]);
-    // 商品画像のフルURL
     const fullItemImageUrl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "ItemDetailPage.useMemo[fullItemImageUrl]": ()=>{
-            return (0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(item?.item_image || null, 0);
+            return (0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(item?.item_image || null, 1);
         }
     }["ItemDetailPage.useMemo[fullItemImageUrl]"], [
         item?.item_image
     ]);
     // ----------------------------------------------------------------
-    // データフェッチヘルパー (useCallbackでラップ)
+    // データフェッチヘルパー (useCallback)
     // ----------------------------------------------------------------
-    /**
-   * 💡 責務: 認証済みリクエストを実行し、401エラー時にトークンをリフレッシュして再試行する。
-   */ const authenticatedFetchWithRetry = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const authenticatedFetchWithRetry = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ItemDetailPage.useCallback[authenticatedFetchWithRetry]": async (config)=>{
             if (isAuthLoading || isLoggingOut || !apiClient) {
                 throw new Error("Authentication or client not ready (isAuthLoading/isLoggingOut/apiClient check failed).");
             }
-            try {
-                // 1. 通常のリクエスト実行
-                return await apiClient.request(config);
-            } catch (e) {
-                const error = e;
-                const status = error.response?.status;
-                // 2. 401 Unauthorized エラーの場合
-                if (status === 401) {
-                    console.warn("401 Unauthorized detected. Attempting token refresh and retry...");
-                    try {
-                        // トークンを強制リフレッシュ
-                        await reloadAuthToken();
-                        // 3. 再度リクエストを実行
-                        const secondResponse = await apiClient.request(config);
-                        console.log("Token refresh and retry successful.");
-                        return secondResponse;
-                    } catch (refreshError) {
-                        // 4. リフレッシュ失敗またはリトライ後のエラー
-                        console.error("Token refresh or retry failed. Logging out.", refreshError);
-                        await logout();
-                        throw new Error("Authentication failed after retry.");
-                    }
-                }
-                // 401 以外のエラーはそのままスロー
-                throw error;
-            }
+            return await apiClient.request(config);
         }
-    }["ItemDetailPage.useCallback[authenticatedFetchWithRetry]"], // ★ 依存配列に isLoggingOut を追加
-    [
+    }["ItemDetailPage.useCallback[authenticatedFetchWithRetry]"], [
         isAuthLoading,
         isLoggingOut,
-        isAuthenticated,
-        apiClient,
-        logout,
-        reloadAuthToken
+        apiClient
     ]);
-    /**
-   * 商品詳細データをAPIから取得する関数
-   */ const fetchData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const fetchData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ItemDetailPage.useCallback[fetchData]": async (id)=>{
             setIsLoading(true);
             setError("");
@@ -238,20 +216,18 @@ function ItemDetailPage() {
             const endpoint = `/api/items/${id}`;
             try {
                 let data;
-                // 💡 認証状態によってクライアントを使い分ける
                 if (isAuthenticated && apiClient) {
                     const response = await authenticatedFetchWithRetry({
                         method: "GET",
                         url: endpoint
                     });
-                    data = response.data; // ★ 型アサーション
+                    data = response.data;
                 } else {
                     const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}${endpoint}`);
-                    data = response.data; // ★ 型アサーション
+                    data = response.data;
                 }
                 if (data.item) {
                     setItem(data.item);
-                    // APIが返すプロパティを使用。??演算子で未定義の場合に備える
                     setIsFavorited(data.is_favorited ?? false);
                     setFavoritesCount(data.favorites_count ?? 0);
                     setComments(data.comments ?? []);
@@ -263,7 +239,10 @@ function ItemDetailPage() {
                 }
             } catch (e) {
                 console.error("データの取得中に予期せぬエラーが発生しました。", e);
-                const errMsg = e.message || e.response?.data?.message || "データの取得中にエラーが発生しました。";
+                let errMsg = getErrorMessage(e);
+                if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].isAxiosError(e) && !e.response?.data?.message) {
+                    errMsg = "データの取得中にエラーが発生しました。";
+                }
                 setError(errMsg);
             } finally{
                 setIsLoading(false);
@@ -279,20 +258,18 @@ function ItemDetailPage() {
     // ----------------------------------------------------------------
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ItemDetailPage.useEffect": ()=>{
-            if (hasFetchedRef.current) {
-                if (item) {
-                    setIsLoading(false);
-                }
-                return;
-            }
-            if (isAuthLoading) {
-                return;
-            }
             if (itemId === null || itemId === -1) {
                 let errorMessage = itemId === -1 ? "無効な商品IDの形式です。" : "商品IDが指定されていません。";
                 setError(errorMessage);
                 setIsLoading(false);
                 hasFetchedRef.current = true;
+                return;
+            }
+            if (hasFetchedRef.current && item !== null) {
+                setIsLoading(false);
+                return;
+            }
+            if (isAuthLoading) {
                 return;
             }
             hasFetchedRef.current = true;
@@ -304,15 +281,37 @@ function ItemDetailPage() {
         fetchData,
         item
     ]);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "ItemDetailPage.useEffect": ()=>{
+            return ({
+                "ItemDetailPage.useEffect": ()=>{
+                    if (commentAbortControllerRef.current) {
+                        commentAbortControllerRef.current.abort();
+                        commentAbortControllerRef.current = null;
+                    }
+                }
+            })["ItemDetailPage.useEffect"];
+        }
+    }["ItemDetailPage.useEffect"], []);
     // ----------------------------------------------------------------
     // 機能ロジック
     // ----------------------------------------------------------------
-    /**
-   * お気に入り追加/削除処理
-   */ const submitFavorite = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const submitFavorite = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ItemDetailPage.useCallback[submitFavorite]": async ()=>{
             if (!item || !isAuthenticated) {
                 if (!isAuthenticated) router.push("/login");
+                return;
+            }
+            if (isOwner) {
+                setItemErrors([
+                    "ご自身の商品の操作はできません。"
+                ]);
+                return;
+            }
+            if (isAuthLoading || isRefreshing) {
+                setItemErrors([
+                    "認証情報の同期中です。しばらくお待ちください..."
+                ]);
                 return;
             }
             const isCurrentlyFavorited = isFavorited;
@@ -321,7 +320,7 @@ function ItemDetailPage() {
                 "ItemDetailPage.useCallback[submitFavorite]": (prev)=>isCurrentlyFavorited ? prev - 1 : prev + 1
             }["ItemDetailPage.useCallback[submitFavorite]"]);
             try {
-                const endpoint = isCurrentlyFavorited ? `/api/favorite/${item.id}` : `/api/favorite`;
+                const endpoint = `/api/items/${item.id}/favorite`;
                 const config = isCurrentlyFavorited ? {
                     method: "DELETE",
                     url: endpoint
@@ -335,13 +334,14 @@ function ItemDetailPage() {
                 await authenticatedFetchWithRetry(config);
             } catch (e) {
                 console.error("お気に入り操作中にエラーが発生しました:", e);
+                // 失敗した場合は状態を元に戻す
                 setIsFavorited({
                     "ItemDetailPage.useCallback[submitFavorite]": (prev)=>!prev
                 }["ItemDetailPage.useCallback[submitFavorite]"]);
                 setFavoritesCount({
                     "ItemDetailPage.useCallback[submitFavorite]": (prev)=>isCurrentlyFavorited ? prev + 1 : prev - 1
                 }["ItemDetailPage.useCallback[submitFavorite]"]);
-                const errMsg = e.message || e.response?.data?.message || "お気に入り操作中に予期せぬエラーが発生しました。";
+                let errMsg = getErrorMessage(e);
                 setItemErrors([
                     errMsg
                 ]);
@@ -352,43 +352,99 @@ function ItemDetailPage() {
         isAuthenticated,
         isFavorited,
         authenticatedFetchWithRetry,
-        router
+        router,
+        isOwner,
+        isAuthLoading,
+        isRefreshing
     ]);
     /**
    * コメント投稿処理
    */ const submitComment = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ItemDetailPage.useCallback[submitComment]": async ()=>{
+            // 💡 新しいガード句: 既に送信中であれば即座に終了 (二重実行の防御)
+            if (isSubmittingComment) {
+                console.log("DEBUG: Already submitting, blocking new request.");
+                return;
+            }
+            // 1. 既存のコントローラーがあれば、新しいリクエストを開始する前にキャンセルを試みる
+            if (commentAbortControllerRef.current) {
+                console.log("DEBUG: Cancelling previous comment submission to prevent duplicate.");
+                commentAbortControllerRef.current.abort();
+                commentAbortControllerRef.current = null;
+            }
             setCommentErrors([]);
-            if (!isAuthenticated || !item || newComment.trim() === "") {
-                if (!isAuthenticated) router.push("/login");
-                if (newComment.trim() === "") setCommentErrors([
+            setIsSubmittingComment(true);
+            // 2. 新しいコントローラーを作成し、Refに保持
+            const controller = new AbortController();
+            commentAbortControllerRef.current = controller;
+            console.log("DEBUG: submitComment function started.");
+            console.log("DEBUG: isAuthenticated =", isAuthenticated);
+            console.log("DEBUG: isAuthLoading =", isAuthLoading);
+            console.log("DEBUG: isRefreshing =", isRefreshing);
+            // --- ガード句 ---
+            if (!isAuthenticated) {
+                router.push("/login");
+                setIsSubmittingComment(false);
+                commentAbortControllerRef.current = null;
+                return;
+            }
+            if (!item) {
+                setCommentErrors([
+                    "商品情報が読み込まれていません。"
+                ]);
+                setIsSubmittingComment(false);
+                commentAbortControllerRef.current = null;
+                return;
+            }
+            // 【修正】認証同期中のチェックを削除 (Auth Provider側でリダイレクトされるべき)
+            /*
+    if (isAuthLoading || isRefreshing) {
+      setCommentErrors([
+        "認証情報の同期中です。しばらくお待ちください... (ユーザー情報確認中)",
+      ]);
+      setIsSubmittingComment(false);
+      commentAbortControllerRef.current = null;
+      return;
+    }
+    */ if (newComment.trim() === "") {
+                setCommentErrors([
                     "コメントを入力してください"
                 ]);
+                setIsSubmittingComment(false);
+                commentAbortControllerRef.current = null;
                 return;
             }
+            // 💡 認証状態の矛盾を確実に捉えて中断する (extendedUser のチェック)
             if (!extendedUser || !extendedUser.id) {
+                console.error("DIAGNOSTICS_ERROR: Authentication Mismatch. isAuthenticated=true but extendedUser is null.");
                 setCommentErrors([
-                    "ユーザー情報が取得できませんでした。再度ログインしてください。"
+                    "ユーザー情報が取得できませんでした。セッションが不安定です。再度ログインしてください。"
                 ]);
-                await logout();
+                setIsSubmittingComment(false);
+                commentAbortControllerRef.current = null;
+                // 🚨 ログアウト処理を呼ばずに中断し、ページ移動を防ぐ
                 return;
             }
+            // --- ガード句終了 ---
             try {
+                // 5. コメント投稿リクエストを実行 (signalを追加)
                 const response = await authenticatedFetchWithRetry({
                     method: "POST",
                     url: "/api/comment",
                     data: {
                         item_id: item.id,
                         comment: newComment
-                    }
+                    },
+                    signal: controller.signal
                 });
+                // 6. 成功時の処理
                 if (response.data.comment) {
                     const resComment = response.data.comment;
                     const newCommentData = {
                         id: resComment.id,
                         comment: resComment.comment,
                         created_at: resComment.created_at,
-                        user: {
+                        user: resComment.user || {
                             id: extendedUser.id,
                             name: extendedUser.name,
                             user_image: extendedUser.user_image
@@ -404,12 +460,36 @@ function ItemDetailPage() {
                 } else {
                     throw new Error("コメントの投稿に成功しましたが、データ更新に失敗しました。");
                 }
+                setIsSubmittingComment(false);
             } catch (e) {
+                // 💡 キャンセルエラーの判定と処理 (ここでキャンセルを捕捉)
+                if (__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].isAxiosError(e) && e.code === "ERR_CANCELED") {
+                    if (commentAbortControllerRef.current !== controller) {
+                        console.log("DIAGNOSTICS: Cancel reason: Previous request aborted by new submission (Scenario 1 - NORMAL).");
+                        return;
+                    }
+                    console.log("DIAGNOSTICS: Cancel reason: Page Unmount or Token Refresh Failure (Scenario 2/3 - ABNORMAL).");
+                    setIsSubmittingComment(false);
+                    return;
+                }
+                // 致命的なエラーが発生した場合
                 console.error("コメント投稿中にエラーが発生しました:", e);
-                const errMsg = e.message || e.response?.data?.message || "コメント投稿中に予期せぬエラーが発生しました。";
+                let errMsg = getErrorMessage(e);
                 setCommentErrors([
                     errMsg
                 ]);
+                // 🚨 致命的なエラー発生時は必ずローディング状態を解除
+                setIsSubmittingComment(false);
+                if (errMsg.includes("Authentication failed after retry")) {
+                    setCommentErrors([
+                        "セッションの有効期限が切れました。再度ログインが必要です。"
+                    ]);
+                }
+            } finally{
+                // 💡 成功またはエラーの完了時に、このリクエストのコントローラーがまだ Ref に残っている場合のみクリア
+                if (commentAbortControllerRef.current === controller) {
+                    commentAbortControllerRef.current = null;
+                }
             }
         }
     }["ItemDetailPage.useCallback[submitComment]"], [
@@ -419,7 +499,8 @@ function ItemDetailPage() {
         extendedUser,
         logout,
         authenticatedFetchWithRetry,
-        router
+        router,
+        isSubmittingComment
     ]);
     /**
    * 購入/マイページへの遷移
@@ -429,15 +510,14 @@ function ItemDetailPage() {
         } else if (isAuthenticated && item) {
             router.push(`/purchase/${item.id}`);
         } else {
-            // 未認証ならログインページへ
             router.push("/login");
         }
     };
     // ----------------------------------------------------------------
     // レンダリング
     // ----------------------------------------------------------------
-    if (isAuthLoading || isLoading) {
-        // ローディング/認証確認中の表示
+    const totalLoading = isAuthLoading || isLoading || isRefreshing;
+    if (totalLoading) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "flex justify-center items-center h-48 my-20 w-full",
             children: [
@@ -445,26 +525,25 @@ function ItemDetailPage() {
                     className: "animate-spin rounded-full h-10 w-10 border-4 border-t-4 border-red-500 border-opacity-25 border-t-red-500"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                    lineNumber: 419,
+                    lineNumber: 512,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                     className: "ml-4 text-xl font-semibold text-gray-600",
-                    children: isAuthLoading ? "認証状態を確認中..." : "商品情報を読み込み中..."
+                    children: isAuthLoading ? "認証状態を確認中..." : isRefreshing ? "認証情報を更新中..." : "商品情報を読み込み中..."
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                    lineNumber: 420,
+                    lineNumber: 513,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-            lineNumber: 418,
+            lineNumber: 511,
             columnNumber: 7
         }, this);
     }
     if (error || itemErrors && itemErrors.length > 0) {
-        // エラーメッセージの表示
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md my-10 w-full max-w-5xl mx-auto",
             children: [
@@ -473,32 +552,31 @@ function ItemDetailPage() {
                     children: "データの取得エラー"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                    lineNumber: 431,
+                    lineNumber: 527,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                     children: error
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                    lineNumber: 432,
+                    lineNumber: 528,
                     columnNumber: 9
                 }, this),
                 itemErrors.map((err, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                         children: err
                     }, index, false, {
                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                        lineNumber: 434,
+                        lineNumber: 530,
                         columnNumber: 11
                     }, this))
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-            lineNumber: 430,
+            lineNumber: 526,
             columnNumber: 7
         }, this);
     }
     if (!item) {
-        // 商品が見つからない場合の表示
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "text-center py-20 w-full",
             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -506,175 +584,176 @@ function ItemDetailPage() {
                 children: "商品が見つかりませんでした。"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                lineNumber: 444,
+                lineNumber: 539,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-            lineNumber: 443,
+            lineNumber: 538,
             columnNumber: 7
         }, this);
     }
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: "jsx-c7603b6afd9f8724" + " " + "item_detail_wrapper bg-gray-100 min-h-screen",
+        className: "jsx-498f873c93d73e9a" + " " + "item_detail_wrapper bg-gray-100 min-h-screen",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-c7603b6afd9f8724" + " " + "item_detail_contents",
+                className: "jsx-498f873c93d73e9a" + " " + "item_detail_contents",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "jsx-c7603b6afd9f8724" + " " + "flex flex-wrap lg:flex-nowrap w-full max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden",
+                    className: "jsx-498f873c93d73e9a" + " " + "flex flex-wrap lg:flex-nowrap w-full max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "jsx-c7603b6afd9f8724" + " " + "item_detail_image p-4 lg:p-8 w-full lg:w-1/2",
+                            className: "jsx-498f873c93d73e9a" + " " + "item_detail_image p-4 lg:p-8 w-full lg:w-1/2",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                 src: fullItemImageUrl,
                                 alt: "商品写真",
                                 onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"])(e, item.name),
-                                className: "jsx-c7603b6afd9f8724" + " " + "item_detail_image1 w-full h-auto object-cover rounded-lg shadow-md"
+                                className: "jsx-498f873c93d73e9a" + " " + "item_detail_image1 w-full h-auto object-cover rounded-lg shadow-md"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                lineNumber: 457,
+                                lineNumber: 552,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                            lineNumber: 456,
+                            lineNumber: 551,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "jsx-c7603b6afd9f8724" + " " + "information p-4 lg:p-8 w-full lg:w-1/2 space-y-4",
+                            className: "jsx-498f873c93d73e9a" + " " + "information p-4 lg:p-8 w-full lg:w-1/2 space-y-4",
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_name",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_name",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                        className: "jsx-c7603b6afd9f8724" + " " + "text-3xl font-extrabold text-gray-800",
+                                        className: "jsx-498f873c93d73e9a" + " " + "text-3xl font-extrabold text-gray-800",
                                         children: item.name
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                        lineNumber: 468,
+                                        lineNumber: 563,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 467,
+                                    lineNumber: 562,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_brand text-sm text-gray-600",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_brand text-sm text-gray-600",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "item_detail_brand_1 font-semibold",
+                                            className: "jsx-498f873c93d73e9a" + " " + "item_detail_brand_1 font-semibold",
                                             children: "ブランド名"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 474,
+                                            lineNumber: 569,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "item_detail_brand_2",
+                                            className: "jsx-498f873c93d73e9a" + " " + "item_detail_brand_2",
                                             children: item.brand || "未登録"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 475,
+                                            lineNumber: 570,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 473,
+                                    lineNumber: 568,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_price",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_price",
                                     children: isSoldOut ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                        className: "jsx-c7603b6afd9f8724" + " " + "text-3xl font-bold text-red-500 bg-red-100 px-3 py-1 rounded inline-block",
+                                        className: "jsx-498f873c93d73e9a" + " " + "text-3xl font-bold text-red-500 bg-red-100 px-3 py-1 rounded inline-block",
                                         children: "SOLD OUT"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                        lineNumber: 480,
+                                        lineNumber: 575,
                                         columnNumber: 17
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                        className: "jsx-c7603b6afd9f8724" + " " + "text-3xl font-bold text-gray-900",
+                                        className: "jsx-498f873c93d73e9a" + " " + "text-3xl font-bold text-gray-900",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "price_after text-xl font-normal",
+                                                className: "jsx-498f873c93d73e9a" + " " + "price_after text-xl font-normal",
                                                 children: "¥"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 485,
+                                                lineNumber: 580,
                                                 columnNumber: 19
                                             }, this),
                                             item.price ? item.price.toLocaleString() : "---",
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "price_after text-lg font-normal",
+                                                className: "jsx-498f873c93d73e9a" + " " + "price_after text-lg font-normal",
                                                 children: [
                                                     " ",
                                                     "(税込)"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 487,
+                                                lineNumber: 582,
                                                 columnNumber: 19
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                        lineNumber: 484,
+                                        lineNumber: 579,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 478,
+                                    lineNumber: 573,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "space-y-6 pt-4",
+                                    className: "jsx-498f873c93d73e9a" + " " + "space-y-6 pt-4",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "flex items-center space-x-8",
+                                            className: "jsx-498f873c93d73e9a" + " " + "flex items-center space-x-8",
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "flex items-center",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "flex items-center",
                                                     children: [
                                                         canInteract ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                                             onClick: submitFavorite,
                                                             type: "button",
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-3xl transition-transform transform hover:scale-110 active:scale-90 p-0 m-0 leading-none focus:outline-none",
+                                                            disabled: totalLoading || isSubmittingComment,
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-3xl transition-transform transform hover:scale-110 active:scale-90 p-0 m-0 leading-none focus:outline-none disabled:opacity-50",
                                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                className: "jsx-c7603b6afd9f8724" + " " + `heart_icon text-4xl ${isFavorited ? "text-red-500" : ""}`,
+                                                                className: "jsx-498f873c93d73e9a" + " " + `heart_icon text-4xl ${isFavorited ? "text-red-500" : ""}`,
                                                                 children: isFavorited ? "❤️" : "🤍"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                lineNumber: 506,
+                                                                lineNumber: 602,
                                                                 columnNumber: 23
                                                             }, this)
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 501,
+                                                            lineNumber: 596,
                                                             columnNumber: 21
                                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-3xl text-gray-400 leading-none",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-3xl text-gray-400 leading-none",
                                                             children: "🤍"
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 515,
+                                                            lineNumber: 611,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-xl ml-2 font-semibold text-gray-600",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-xl ml-2 font-semibold text-gray-600",
                                                             children: favoritesCount
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 519,
+                                                            lineNumber: 615,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 499,
+                                                    lineNumber: 594,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "flex items-center",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "flex items-center",
                                                     children: [
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
                                                             xmlns: "http://www.w3.org/2000/svg",
@@ -686,252 +765,252 @@ function ItemDetailPage() {
                                                             strokeWidth: "1.8",
                                                             strokeLinecap: "round",
                                                             strokeLinejoin: "round",
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-gray-500",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-gray-500",
                                                             children: [
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                                     d: "M21 11.5a8.38 8.38 0 0 1-.6 3.2 12.16 12.16 0 0 1-1.9 2.5c-.8 1.1-1.7 2-2.8 2.5a5.77 5.77 0 0 1-3.6 0c-1.1-.5-2.1-1.4-2.8-2.5a12.16 12.16 0 0 1-1.9-2.5 8.38 8.38 0 0 1-.6-3.2",
-                                                                    className: "jsx-c7603b6afd9f8724"
+                                                                    className: "jsx-498f873c93d73e9a"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 538,
+                                                                    lineNumber: 634,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                                     d: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
-                                                                    className: "jsx-c7603b6afd9f8724"
+                                                                    className: "jsx-498f873c93d73e9a"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 539,
+                                                                    lineNumber: 635,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                                     d: "M8 10h8",
-                                                                    className: "jsx-c7603b6afd9f8724"
+                                                                    className: "jsx-498f873c93d73e9a"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 540,
+                                                                    lineNumber: 636,
                                                                     columnNumber: 21
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 526,
+                                                            lineNumber: 622,
                                                             columnNumber: 19
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-xl ml-2 font-semibold text-gray-600",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-xl ml-2 font-semibold text-gray-600",
                                                             children: comments.length
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 543,
+                                                            lineNumber: 639,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 525,
+                                                    lineNumber: 621,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 497,
+                                            lineNumber: 592,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "item_detail_form pt-4",
+                                            className: "jsx-498f873c93d73e9a" + " " + "item_detail_form pt-4",
                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                                 onClick: navigateToPurchase,
-                                                disabled: isSoldOut && !isOwner,
-                                                className: "jsx-c7603b6afd9f8724" + " " + `w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg ${!isSoldOut ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800" : "bg-gray-400 text-gray-700 cursor-not-allowed"}`,
+                                                disabled: isSoldOut && !isOwner || totalLoading,
+                                                className: "jsx-498f873c93d73e9a" + " " + `w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg ${!isSoldOut ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800" : "bg-gray-400 text-gray-700 cursor-not-allowed"} disabled:bg-gray-400 disabled:opacity-70`,
                                                 children: isOwner ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-c7603b6afd9f8724",
+                                                    className: "jsx-498f873c93d73e9a",
                                                     children: "マイページへ移動する"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 561,
+                                                    lineNumber: 657,
                                                     columnNumber: 21
                                                 }, this) : isAuthenticated && !isSoldOut ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-c7603b6afd9f8724",
-                                                    children: "購入手続きへ"
+                                                    className: "jsx-498f873c93d73e9a",
+                                                    children: "カートへ"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 563,
+                                                    lineNumber: 659,
                                                     columnNumber: 21
                                                 }, this) : isAuthenticated && isSoldOut ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-c7603b6afd9f8724",
+                                                    className: "jsx-498f873c93d73e9a",
                                                     children: "SOLD OUT"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 565,
+                                                    lineNumber: 661,
                                                     columnNumber: 21
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-c7603b6afd9f8724",
+                                                    className: "jsx-498f873c93d73e9a",
                                                     children: "ログインして購入"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 567,
+                                                    lineNumber: 663,
                                                     columnNumber: 21
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 551,
+                                                lineNumber: 647,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 550,
+                                            lineNumber: 646,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 495,
+                                    lineNumber: 590,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_explain mt-8 border-t border-gray-200 pt-6",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_explain mt-8 border-t border-gray-200 pt-6",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "text-xl font-bold text-gray-800 mb-2",
+                                            className: "jsx-498f873c93d73e9a" + " " + "text-xl font-bold text-gray-800 mb-2",
                                             children: "商品説明"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 575,
+                                            lineNumber: 671,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "explain_word text-gray-700 whitespace-pre-wrap",
+                                            className: "jsx-498f873c93d73e9a" + " " + "explain_word text-gray-700 whitespace-pre-wrap",
                                             children: item.explain
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 576,
+                                            lineNumber: 672,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 574,
+                                    lineNumber: 670,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_category mt-8 border-t border-gray-200 pt-6",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_category mt-8 border-t border-gray-200 pt-6",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-c7603b6afd9f8724",
+                                        className: "jsx-498f873c93d73e9a",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "text-xl font-bold text-gray-800 mb-2",
+                                                className: "jsx-498f873c93d73e9a" + " " + "text-xl font-bold text-gray-800 mb-2",
                                                 children: "商品情報"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 584,
+                                                lineNumber: 680,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "flex flex-col space-y-2",
+                                                className: "jsx-498f873c93d73e9a" + " " + "flex flex-col space-y-2",
                                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "flex items-center space-x-4",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "flex items-center space-x-4",
                                                     children: [
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "w-24 text-gray-600 font-medium",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "w-24 text-gray-600 font-medium",
                                                             children: "カテゴリー"
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 589,
+                                                            lineNumber: 685,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("ul", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "flex flex-wrap gap-2",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "flex flex-wrap gap-2",
                                                             children: itemCategories.length > 0 ? itemCategories.map((category, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
-                                                                    className: "jsx-c7603b6afd9f8724" + " " + "px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-full",
+                                                                    className: "jsx-498f873c93d73e9a" + " " + "px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-full",
                                                                     children: category
                                                                 }, index, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 593,
+                                                                    lineNumber: 689,
                                                                     columnNumber: 27
                                                                 }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                                className: "jsx-c7603b6afd9f8724" + " " + "text-gray-500",
+                                                                className: "jsx-498f873c93d73e9a" + " " + "text-gray-500",
                                                                 children: "カテゴリーは登録されていません。"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                lineNumber: 601,
+                                                                lineNumber: 697,
                                                                 columnNumber: 25
                                                             }, this)
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 590,
+                                                            lineNumber: 686,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 588,
+                                                    lineNumber: 684,
                                                     columnNumber: 19
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 587,
+                                                lineNumber: 683,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                        lineNumber: 583,
+                                        lineNumber: 679,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 582,
+                                    lineNumber: 678,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_condition mt-4",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_condition mt-4",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-c7603b6afd9f8724" + " " + "flex items-center space-x-4",
+                                        className: "jsx-498f873c93d73e9a" + " " + "flex items-center space-x-4",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "w-24 text-gray-600 font-medium",
+                                                className: "jsx-498f873c93d73e9a" + " " + "w-24 text-gray-600 font-medium",
                                                 children: "商品の状態"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 612,
+                                                lineNumber: 708,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                className: "jsx-c7603b6afd9f8724" + " " + "text-gray-700 font-semibold",
+                                                className: "jsx-498f873c93d73e9a" + " " + "text-gray-700 font-semibold",
                                                 children: item.condition || "未登録"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 613,
+                                                lineNumber: 709,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                        lineNumber: 611,
+                                        lineNumber: 707,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 610,
+                                    lineNumber: 706,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_comment_history mt-10 border-t border-gray-200 pt-6",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_comment_history mt-10 border-t border-gray-200 pt-6",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "comment_count_flex flex justify-between items-center mb-4",
+                                            className: "jsx-498f873c93d73e9a" + " " + "comment_count_flex flex justify-between items-center mb-4",
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "text-xl font-bold text-gray-800",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "text-xl font-bold text-gray-800",
                                                     children: "コメント"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 622,
+                                                    lineNumber: 718,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "comments_count text-gray-500",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "comments_count text-gray-500",
                                                     children: [
                                                         "(",
                                                         comments.length,
@@ -939,57 +1018,57 @@ function ItemDetailPage() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 623,
+                                                    lineNumber: 719,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 621,
+                                            lineNumber: 717,
                                             columnNumber: 15
                                         }, this),
                                         comments && comments.length > 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "max-h-80 overflow-y-auto pr-2 pt-2 space-y-4",
+                                            className: "jsx-498f873c93d73e9a" + " " + "max-h-80 overflow-y-auto pr-2 pt-2 space-y-4",
                                             children: comments.map((comment)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "comment border-b border-gray-100 pb-3",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "comment border-b border-gray-100 pb-3",
                                                     children: [
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "comment_name_image flex items-center space-x-3",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "comment_name_image flex items-center space-x-3",
                                                             children: [
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                                                     src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(comment.user.user_image || null, 0),
                                                                     alt: "プロフィール画像",
                                                                     onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"])(e, comment.user.name),
-                                                                    className: "jsx-c7603b6afd9f8724" + " " + "user_image_css w-10 h-10 rounded-full object-cover"
+                                                                    className: "jsx-498f873c93d73e9a" + " " + "user_image_css w-10 h-10 rounded-full object-cover"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 636,
+                                                                    lineNumber: 732,
                                                                     columnNumber: 25
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                                    className: "jsx-c7603b6afd9f8724" + " " + "comment_name font-semibold text-gray-800",
+                                                                    className: "jsx-498f873c93d73e9a" + " " + "comment_name font-semibold text-gray-800",
                                                                     children: comment.user.name
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                                    lineNumber: 642,
+                                                                    lineNumber: 738,
                                                                     columnNumber: 25
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 635,
+                                                            lineNumber: 731,
                                                             columnNumber: 23
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "comment-text ml-10 mt-1 text-gray-700 whitespace-pre-wrap",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "comment-text ml-10 mt-1 text-gray-700 whitespace-pre-wrap",
                                                             children: comment.comment
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 646,
+                                                            lineNumber: 742,
                                                             columnNumber: 23
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
-                                                            className: "jsx-c7603b6afd9f8724" + " " + "text-xs ml-10 text-gray-500 block mt-1",
+                                                            className: "jsx-498f873c93d73e9a" + " " + "text-xs ml-10 text-gray-500 block mt-1",
                                                             children: [
                                                                 "投稿日時:",
                                                                 " ",
@@ -997,64 +1076,64 @@ function ItemDetailPage() {
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                            lineNumber: 649,
+                                                            lineNumber: 745,
                                                             columnNumber: 23
                                                         }, this)
                                                     ]
                                                 }, comment.id, true, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 631,
+                                                    lineNumber: 727,
                                                     columnNumber: 21
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 629,
+                                            lineNumber: 725,
                                             columnNumber: 17
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "mt-4 ml-5 text-gray-500 text-sm",
+                                            className: "jsx-498f873c93d73e9a" + " " + "mt-4 ml-5 text-gray-500 text-sm",
                                             children: "まだコメントはありません。"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 657,
+                                            lineNumber: 753,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 620,
+                                    lineNumber: 716,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "jsx-c7603b6afd9f8724" + " " + "item_detail_comment_form mt-10",
+                                    className: "jsx-498f873c93d73e9a" + " " + "item_detail_comment_form mt-10",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "comment_word text-xl font-bold text-gray-800 mb-4",
+                                            className: "jsx-498f873c93d73e9a" + " " + "comment_word text-xl font-bold text-gray-800 mb-4",
                                             children: "商品へのコメント"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 665,
+                                            lineNumber: 761,
                                             columnNumber: 15
                                         }, this),
                                         commentErrors.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded",
+                                            className: "jsx-498f873c93d73e9a" + " " + "bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded",
                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("ul", {
-                                                className: "jsx-c7603b6afd9f8724",
+                                                className: "jsx-498f873c93d73e9a",
                                                 children: commentErrors.map((err, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
-                                                        className: "jsx-c7603b6afd9f8724" + " " + "text-sm",
+                                                        className: "jsx-498f873c93d73e9a" + " " + "text-sm",
                                                         children: err
                                                     }, index, false, {
                                                         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                        lineNumber: 674,
+                                                        lineNumber: 770,
                                                         columnNumber: 23
                                                     }, this))
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 672,
+                                                lineNumber: 768,
                                                 columnNumber: 19
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 671,
+                                            lineNumber: 767,
                                             columnNumber: 17
                                         }, this),
                                         isAuthenticated ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -1062,84 +1141,86 @@ function ItemDetailPage() {
                                                 e.preventDefault();
                                                 submitComment();
                                             },
-                                            className: "jsx-c7603b6afd9f8724" + " " + "comment_form space-y-3",
+                                            className: "jsx-498f873c93d73e9a" + " " + "comment_form space-y-3",
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
                                                     value: newComment,
                                                     onChange: (e)=>setNewComment(e.target.value),
                                                     rows: 5,
                                                     placeholder: "コメントを入力してください",
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none text-gray-700"
+                                                    disabled: isSubmittingComment || totalLoading,
+                                                    className: "jsx-498f873c93d73e9a" + " " + "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none text-gray-700"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 690,
+                                                    lineNumber: 786,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                                     type: "submit",
-                                                    className: "jsx-c7603b6afd9f8724" + " " + "w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200",
-                                                    children: "コメントを送信する"
+                                                    disabled: isSubmittingComment || totalLoading || newComment.trim() === "",
+                                                    className: "jsx-498f873c93d73e9a" + " " + "w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200 disabled:bg-red-300",
+                                                    children: isSubmittingComment ? "投稿中..." : "コメントを送信する"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                    lineNumber: 697,
+                                                    lineNumber: 794,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 683,
+                                            lineNumber: 779,
                                             columnNumber: 17
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-c7603b6afd9f8724" + " " + "text-center p-4 border border-dashed rounded-lg",
+                                            className: "jsx-498f873c93d73e9a" + " " + "text-center p-4 border border-dashed rounded-lg",
                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
                                                 onClick: ()=>router.push("/login"),
-                                                className: "jsx-c7603b6afd9f8724" + " " + "text-red-600 font-semibold cursor-pointer hover:underline",
+                                                className: "jsx-498f873c93d73e9a" + " " + "text-red-600 font-semibold cursor-pointer hover:underline",
                                                 children: "ログインしてコメントする"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                                lineNumber: 706,
+                                                lineNumber: 808,
                                                 columnNumber: 19
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                            lineNumber: 705,
+                                            lineNumber: 807,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                                    lineNumber: 664,
+                                    lineNumber: 760,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                            lineNumber: 466,
+                            lineNumber: 561,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                    lineNumber: 454,
+                    lineNumber: 549,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-                lineNumber: 453,
+                lineNumber: 548,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-                id: "c7603b6afd9f8724",
-                children: ".item_detail_contents.jsx-c7603b6afd9f8724{flex-wrap:wrap;justify-content:center;max-width:1400px;margin:0 auto;padding:20px;display:flex}.item_detail_image.jsx-c7603b6afd9f8724{width:50%;min-width:300px;max-width:450px;padding:50px}.item_detail_image1.jsx-c7603b6afd9f8724{aspect-ratio:1;object-fit:cover;object-position:center;width:100%;height:auto}.information.jsx-c7603b6afd9f8724{width:50%;min-width:300px;max-width:450px;padding:50px}.information.jsx-c7603b6afd9f8724 h2.jsx-c7603b6afd9f8724,.information.jsx-c7603b6afd9f8724 h3.jsx-c7603b6afd9f8724,.information.jsx-c7603b6afd9f8724 p.jsx-c7603b6afd9f8724{position:static;margin-left:0!important}.item_detail_brand.jsx-c7603b6afd9f8724{align-items:center;margin-top:10px;display:flex}.item_detail_brand_1.jsx-c7603b6afd9f8724{font-size:14px;font-weight:700}.item_detail_brand_2.jsx-c7603b6afd9f8724{font-size:14px;font-weight:600;position:relative;left:50px}.item_detail_price.jsx-c7603b6afd9f8724{margin-top:10px;margin-bottom:20px}.item_detail_price.jsx-c7603b6afd9f8724 h2.jsx-c7603b6afd9f8724{font-size:26px}.price_after.jsx-c7603b6afd9f8724{font-size:19px;font-weight:500}.explain_word.jsx-c7603b6afd9f8724{word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word;margin-left:20px;font-size:14px;font-weight:600;line-height:1.6}.comments_count.jsx-c7603b6afd9f8724{margin-left:10px;font-size:14px;font-weight:400;position:relative;top:0}.comment.jsx-c7603b6afd9f8724{word-break:break-all;overflow-wrap:break-word;border-top:1px dashed #ccc;max-width:320px;margin-top:15px;padding-top:10px}.comment-text.jsx-c7603b6afd9f8724{white-space:pre-wrap;word-wrap:break-word;margin-left:50px;font-size:14px;font-weight:600;line-height:1.6}.comment_name_image.jsx-c7603b6afd9f8724{align-items:center;margin-bottom:5px;display:flex}.user_image_css.jsx-c7603b6afd9f8724{object-fit:cover;object-position:center;border-radius:50%;width:40px;height:40px;position:relative;left:0;overflow:hidden}.comment_name.jsx-c7603b6afd9f8724{font-size:17px;font-weight:700;position:relative;left:10px}.item_detail_comment_form.jsx-c7603b6afd9f8724 h2.jsx-c7603b6afd9f8724{margin-bottom:10px;font-size:18px;position:relative;top:8px}@media (width<=768px){.item_detail_image.jsx-c7603b6afd9f8724,.information.jsx-c7603b6afd9f8724{width:100%;max-width:100%;min-width:unset;padding:20px}}"
+                id: "498f873c93d73e9a",
+                children: ".item_detail_contents.jsx-498f873c93d73e9a{flex-wrap:wrap;justify-content:center;max-width:1400px;margin:0 auto;padding:20px;display:flex}.item_detail_image.jsx-498f873c93d73e9a{width:50%;min-width:300px;max-width:450px;padding:50px}.item_detail_image1.jsx-498f873c93d73e9a{aspect-ratio:1;object-fit:cover;object-position:center;width:100%;height:auto}.information.jsx-498f873c93d73e9a{width:50%;min-width:300px;max-width:450px;padding:50px}.explain_word.jsx-498f873c93d73e9a{word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;word-wrap:break-word;margin-left:20px;font-size:14px;font-weight:600;line-height:1.6}.comment.jsx-498f873c93d73e9a{word-break:break-all;overflow-wrap:break-word;border-top:1px dashed #ccc;max-width:320px;margin-top:15px;padding-top:10px}.comment-text.jsx-498f873c93d73e9a{white-space:pre-wrap;word-wrap:break-word;margin-left:50px;font-size:14px;font-weight:600;line-height:1.6}.user_image_css.jsx-498f873c93d73e9a{object-fit:cover;object-position:center;border-radius:50%;width:40px;height:40px;position:relative;left:0;overflow:hidden}@media (width<=768px){.item_detail_image.jsx-498f873c93d73e9a,.information.jsx-498f873c93d73e9a{width:100%;max-width:100%;min-width:unset;padding:20px}}"
             }, void 0, false, void 0, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/items/[items_id]/page.tsx",
-        lineNumber: 452,
+        lineNumber: 547,
         columnNumber: 5
     }, this);
 }
-_s(ItemDetailPage, "w9HYF71q7QU8J8qMkRX3EurGh1Q=", false, function() {
+_s(ItemDetailPage, "+bUu502nP5LQmr6y9UjwgQSCyGQ=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"],

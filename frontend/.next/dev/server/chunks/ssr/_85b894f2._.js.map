@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///app/app/layout.tsx"],"sourcesContent":["import \"./globals.css\";\nimport { AuthProvider } from \"@/hooks/useAuth\"; // AuthProviderをインポート\n\nexport const metadata = {\n  title: \"Next.js + Laravel\",\n  description: \"Frontend by Next.js, Backend by Laravel\",\n};\n\nexport default function RootLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  return (\n    <html lang=\"ja\">\n      <body>\n        {/* ★★★ AuthProviderでアプリケーション全体をラップ ★★★ */}\n        <AuthProvider>{children}</AuthProvider>\n      </body>\n    </html>\n  );\n}\n"],"names":[],"mappings":";;;;;;;AACA,qMAAgD,qBAAqB;;;;AAE9D,MAAM,WAAW;IACtB,OAAO;IACP,aAAa;AACf;AAEe,SAAS,WAAW,EACjC,QAAQ,EAGT;IACC,qBACE,8OAAC;QAAK,MAAK;kBACT,cAAA,8OAAC;sBAEC,cAAA,8OAAC,gIAAY;0BAAE;;;;;;;;;;;;;;;;AAIvB","debugId":null}},
-    {"offset": {"line": 51, "column": 0}, "map": {"version":3,"sources":["file:///app/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = (\n  require('../../module.compiled') as typeof import('../../module.compiled')\n).vendored['react-rsc']!.ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":"AAAAA,OAAOC,OAAO,GACZC,QAAQ,4HACRC,QAAQ,CAAC,YAAY,CAAEC,kBAAkB","ignoreList":[0],"debugId":null}}]
-}

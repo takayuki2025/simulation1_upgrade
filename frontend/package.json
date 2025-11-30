@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node start-https.js",
+    "dev": "node --max-old-space-size=4096 start-https.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
