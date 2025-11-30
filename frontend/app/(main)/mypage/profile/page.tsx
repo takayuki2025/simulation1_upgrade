@@ -10,8 +10,11 @@ import React, {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useSanctumAuth"; // 認証と認証済みAxiosクライアントの提供元
 
+// 汎用ヘルパー関数のインポート (ご自身のプロジェクトのパスに合わせてください)
+import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
+
 // =======================================================
-// 型定義 (TypeScript の整合性を高める)
+// 型定義
 // =======================================================
 
 interface User {
@@ -29,28 +32,10 @@ interface User {
 interface UpdatedUserResponse extends User {}
 
 // =======================================================
-// グローバル変数・ヘルパー関数
+// グローバル変数
 // =======================================================
 
-// 環境変数からAPIベースURLを取得
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-/**
- * プロフィール画像のURLを生成するヘルパー関数
- */
-const getProfileImageUrl = (path: string | undefined | null): string => {
-  const base = API_BASE_URL;
-  const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
-  const DEFAULT_IMAGE_FULL_URL = `${base}/${DEFAULT_IMAGE_PATH}`;
-
-  if (!path) {
-    return DEFAULT_IMAGE_FULL_URL;
-  }
-  if (path.startsWith("http")) {
-    return path;
-  }
-  return `${base}/${path.replace(/^\//, "")}`;
-};
 
 // =======================================================
 // メインコンポーネント: ProfilePage
@@ -60,14 +45,14 @@ export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 1. 認証フック: ユーザー状態とAPIクライアントを取得
+  // 1. 認証フック
   const {
     user: authUser,
     isAuthenticated,
     isLoading: isAuthLoading,
     logout,
-    reloadAuthToken, // 401リカバリー用
-    apiClient, // 認証済み Axios インスタンス
+    reloadAuthToken,
+    apiClient,
   } = useAuth();
 
   // -------------------- State --------------------
@@ -83,18 +68,29 @@ export default function ProfilePage() {
   const [imageError, setImageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true); // UI全体のローディング
-  const [isFetching, setIsFetching] = useState(false); // データ取得中の状態
-  const [isRecovering, setIsRecovering] = useState(false); // 401リカバリー中
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
 
   // -------------------- Computed Value (useMemo) --------------------
 
-  // URLクエリパラメータからメール認証状態を取得
   const isVerificationRedirect = useMemo(() => {
     return searchParams.get("verified") === "true";
   }, [searchParams]);
+
+  /**
+   * 画像URLを useMemo でメモ化し、キャッシュバスターとしてタイムスタンプを渡す。
+   * user.user_image の変更時のみ再計算される。
+   */
+  const profileImageUrl = useMemo(() => {
+    return getImageUrl(
+      user?.user_image ?? null,
+      IMAGE_TYPE.USER,
+      Date.now(), // キャッシュバスター
+    );
+  }, [user?.user_image]);
 
   // ----------------------------------------------------------------
   // 1. データ初期化ヘルパー
@@ -104,17 +100,10 @@ export default function ProfilePage() {
    * APIから取得したユーザーデータでフォームと状態を初期化する。
    */
   const initializeUserData = useCallback((apiData: any) => {
-    let sourceData: User | null = null;
-
-    // APIレスポンスの構造をチェック
-    if (apiData && apiData.user) {
-      sourceData = apiData.user as User;
-    } else if (apiData && apiData.id && apiData.name) {
-      sourceData = apiData as User;
-    }
+    // APIレスポンスが { user: {...} } の形式か、{ id: 1, name: "..." } の形式かを自動判定
+    const sourceData: User | null = apiData?.user || apiData;
 
     setUser((current) => {
-      // データの変更がなければステート更新をスキップ
       if (JSON.stringify(current) !== JSON.stringify(sourceData)) {
         console.log("✅ [InitData] user State を更新しました。");
         return sourceData;
@@ -133,32 +122,24 @@ export default function ProfilePage() {
   }, []);
 
   // ----------------------------------------------------------------
-  // 2. データ取得ロジック (401リカバリー処理を含む)
+  // 2. データ取得ロジック
   // ----------------------------------------------------------------
 
   /**
-   * サーバーからプロフィールデータを取得する関数。401エラー時にトークンリフレッシュを試みる。
-   * (認証リダイレクト時のポーリングロジックはuseEffectに分離)
+   * サーバーからプロフィールデータを取得する関数。
    */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
       if (!apiClient) return;
 
-      if (!isRetry) setIsFetching(true); // 初回試行時のみフェッチ中フラグを立てる
+      if (!isRetry) setIsFetching(true);
 
       try {
         const response = await apiClient.get("/api/mypage/profile");
         const responseData = response.data;
 
-        console.log("API Response Data:", responseData);
-
         initializeUserData(responseData);
         console.log("✅ [Fetch] プロフィールデータ取得に成功。");
-
-        // ★修正: 認証成功メッセージ表示ロジックはポーリング側に移譲するか、削除する
-        // if (isVerificationRedirect) {
-        //   setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
-        // }
 
         if (isRetry) {
           setIsRecovering(false);
@@ -168,20 +149,14 @@ export default function ProfilePage() {
         setIsLoading(false);
       } catch (err: any) {
         console.error("プロフィールデータのロードに失敗しました:", err);
-        console.error("Fetch Error Details:", err);
-
         const status = err.response ? err.response.status : null;
 
         if (status === 401) {
           if (isRetry) {
-            console.error(
-              "401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。",
-            );
             await logout();
             return;
           }
 
-          console.log(`401エラーを検出。トークンリフレッシュを試行...`);
           setSuccessMessage("認証情報を更新中...");
           setIsRecovering(true);
 
@@ -190,10 +165,6 @@ export default function ProfilePage() {
             setSuccessMessage("認証情報を更新しました。データを再取得します。");
             await fetchUserProfile(true);
           } catch (reloadError) {
-            console.error(
-              "トークンのリロードに失敗。ログアウトします。",
-              reloadError,
-            );
             await logout();
             setSuccessMessage(
               "セッションが切れました。再度ログインが必要です。",
@@ -202,7 +173,6 @@ export default function ProfilePage() {
           return;
         }
 
-        // 401以外のエラー
         setSuccessMessage(
           `データのロード中に予期せぬエラーが発生しました。(Status: ${
             status || "不明"
@@ -219,49 +189,34 @@ export default function ProfilePage() {
   );
 
   // ----------------------------------------------------------------
-  // 3. 認証状態とデータフェッチの監視 (useEffect) - ★ポーリングロジックを実装★
+  // 3. 認証状態とデータフェッチの監視
   // ----------------------------------------------------------------
 
   useEffect(() => {
-    // 1. 認証解決待ち、またはリカバリー中の場合はスキップ
     if (isAuthLoading || isRecovering) return;
 
-    // 2. 未認証の場合はログインへリダイレクト
     if (!isAuthenticated) {
       if (isVerificationRedirect) {
-        // このロジックは残す
-        console.log("Waiting for session resolve.");
         return;
       }
-      console.log("Unauthenticated detected. Redirecting to /login.");
       if (authUser === null) {
         router.replace("/login");
       }
       return;
     }
 
-    // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
     const needsInitialFetch =
       isAuthenticated && apiClient && !user && !isFetching;
-    // 💡 削除: needsPolling はもう不要です
 
-    // 初回フェッチ
     if (needsInitialFetch) {
-      console.log("[DEBUG] Initial Fetch Triggered.");
       fetchUserProfile(false);
       return;
     }
 
-    // ★★★ メール認証後のポーリング処理 は削除されます ★★★
-
-    // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
-    // ポーリング中でない、かつユーザーデータがあれば、ローディングを解除
     if (user && isAuthenticated && !isFetching && isLoading) {
-      console.log("[DEBUG] Guard: User loaded, setting isLoading=false.");
       setIsLoading(false);
     }
   }, [
-    // 依存配列は維持
     isAuthLoading,
     isAuthenticated,
     router,
@@ -293,15 +248,21 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      // apiClient.post で画像アップロード
-      const response = await apiClient.post("/upload2", formData, {
+      const response = await apiClient.post("/api/upload2", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      const updatedUser: UpdatedUserResponse = response.data;
+      const responseData = response.data;
 
+      // ★★★ 修正箇所：response.data.user からユーザー情報を抽出する ★★★
+      const updatedUser: UpdatedUserResponse = responseData.user;
+
+      // デバッグ用コンソール出力（確認後削除可）
+      console.log("NEW_IMAGE_PATH (Corrected):", updatedUser.user_image);
+
+      // user ステートを新しい情報で更新
       setUser(updatedUser as User);
       setSuccessMessage("画像をアップロードしました。");
     } catch (error: any) {
@@ -342,9 +303,10 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      // apiClient.put でプロフィール情報更新
-      const response = await apiClient.patch("/api/mypage/profile_update", form);
-
+      const response = await apiClient.patch(
+        "/api/mypage/profile_update",
+        form,
+      );
       const updatedUser: UpdatedUserResponse = response.data;
 
       setSuccessMessage("プロフィール情報を更新しました！");
@@ -374,10 +336,9 @@ export default function ProfilePage() {
   };
 
   // ----------------------------------------------------------------
-  // 6. ローディング・未認証時の表示 (レンダリングブロック)
+  // 6. ローディング・未認証時の表示
   // ----------------------------------------------------------------
 
-  // 認証解決待ち、APIロード中、またはリカバリー中の全体ローディング
   if (isAuthLoading || (isLoading && !user) || isRecovering) {
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
@@ -401,7 +362,6 @@ export default function ProfilePage() {
     );
   }
 
-  // 認証が完了したがユーザーデータがない場合
   if (!isAuthenticated || !user) {
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
@@ -442,7 +402,10 @@ export default function ProfilePage() {
           <div className="image_name">
             <div className="image_button_row">
               <img
-                src={getProfileImageUrl(user.user_image)}
+                // 強制再マウントのための key
+                key={user?.user_image || "default"}
+                // キャッシュバスター付きURL
+                src={profileImageUrl}
                 alt="プロフィール画像"
                 className="user_image_css"
               />

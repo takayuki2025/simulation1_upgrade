@@ -22,10 +22,10 @@ var _s = __turbopack_context__.k.signature();
 // =======================================================
 // グローバル変数・ヘルパー関数
 // =======================================================
-// 環境変数からAPIベースURLを取得
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 /**
  * プロフィール画像のURLを生成するヘルパー関数
+ * ★キャッシュ無効化のためのタイムスタンプを追加
  */ const getProfileImageUrl = (path)=>{
     const base = API_BASE_URL;
     const DEFAULT_IMAGE_PATH = "storage/images/default-profile2.jpg";
@@ -36,13 +36,15 @@ const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
     if (path.startsWith("http")) {
         return path;
     }
-    return `${base}/${path.replace(/^\//, "")}`;
+    const url = `${base}/${path.replace(/^\//, "")}`;
+    // 新しい画像を強制的に読み込ませるためにタイムスタンプをクエリとして追加
+    return `${url}?t=${Date.now()}`;
 };
 function ProfilePage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"])();
-    // 1. 認証フック: ユーザー状態とAPIクライアントを取得
+    // 1. 認証フック
     const { user: authUser, isAuthenticated, isLoading: isAuthLoading, logout, reloadAuthToken, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     // -------------------- State --------------------
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
@@ -55,9 +57,9 @@ function ProfilePage() {
     const [profileErrors, setProfileErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({});
     const [imageError, setImageError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [successMessage, setSuccessMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
-    const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true); // UI全体のローディング
-    const [isFetching, setIsFetching] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false); // データ取得中の状態
-    const [isRecovering, setIsRecovering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false); // 401リカバリー中
+    const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    const [isFetching, setIsFetching] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [isRecovering, setIsRecovering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const fileInput = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     // -------------------- Computed Value (useMemo) --------------------
     // URLクエリパラメータからメール認証状態を取得
@@ -68,15 +70,22 @@ function ProfilePage() {
     }["ProfilePage.useMemo[isVerificationRedirect]"], [
         searchParams
     ]);
+    /**
+   * 画像のURLを user.user_image の変更時のみ計算し、キャッシュ無効化クエリを適用
+   * ★追加/修正: レンダリング安定化のため useMemo を使用
+   */ const profileImageUrl = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "ProfilePage.useMemo[profileImageUrl]": ()=>{
+            return getProfileImageUrl(user?.user_image ?? null);
+        }
+    }["ProfilePage.useMemo[profileImageUrl]"], [
+        user?.user_image
+    ]); // user.user_image の値が変更されたときのみ再計算
     // ----------------------------------------------------------------
     // 1. データ初期化ヘルパー
     // ----------------------------------------------------------------
-    /**
-   * APIから取得したユーザーデータでフォームと状態を初期化する。
-   */ const initializeUserData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const initializeUserData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ProfilePage.useCallback[initializeUserData]": (apiData)=>{
             let sourceData = null;
-            // APIレスポンスの構造をチェック
             if (apiData && apiData.user) {
                 sourceData = apiData.user;
             } else if (apiData && apiData.id && apiData.name) {
@@ -84,7 +93,6 @@ function ProfilePage() {
             }
             setUser({
                 "ProfilePage.useCallback[initializeUserData]": (current)=>{
-                    // データの変更がなければステート更新をスキップ
                     if (JSON.stringify(current) !== JSON.stringify(sourceData)) {
                         console.log("✅ [InitData] user State を更新しました。");
                         return sourceData;
@@ -105,23 +113,15 @@ function ProfilePage() {
     // ----------------------------------------------------------------
     // 2. データ取得ロジック (401リカバリー処理を含む)
     // ----------------------------------------------------------------
-    /**
-   * サーバーからプロフィールデータを取得する関数。401エラー時にトークンリフレッシュを試みる。
-   * (認証リダイレクト時のポーリングロジックはuseEffectに分離)
-   */ const fetchUserProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const fetchUserProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ProfilePage.useCallback[fetchUserProfile]": async (isRetry = false)=>{
             if (!apiClient) return;
-            if (!isRetry) setIsFetching(true); // 初回試行時のみフェッチ中フラグを立てる
+            if (!isRetry) setIsFetching(true);
             try {
                 const response = await apiClient.get("/api/mypage/profile");
                 const responseData = response.data;
-                console.log("API Response Data:", responseData);
                 initializeUserData(responseData);
                 console.log("✅ [Fetch] プロフィールデータ取得に成功。");
-                // ★修正: 認証成功メッセージ表示ロジックはポーリング側に移譲するか、削除する
-                // if (isVerificationRedirect) {
-                //   setSuccessMessage("メール認証が完了しました！引き続きサービスをご利用いただけます。");
-                // }
                 if (isRetry) {
                     setIsRecovering(false);
                     setSuccessMessage("認証情報を回復し、データを再取得しました。");
@@ -129,15 +129,12 @@ function ProfilePage() {
                 setIsLoading(false);
             } catch (err) {
                 console.error("プロフィールデータのロードに失敗しました:", err);
-                console.error("Fetch Error Details:", err);
                 const status = err.response ? err.response.status : null;
                 if (status === 401) {
                     if (isRetry) {
-                        console.error("401再検出 (再試行時)。リカバリー失敗とみなしログアウトします。");
                         await logout();
                         return;
                     }
-                    console.log(`401エラーを検出。トークンリフレッシュを試行...`);
                     setSuccessMessage("認証情報を更新中...");
                     setIsRecovering(true);
                     try {
@@ -145,13 +142,11 @@ function ProfilePage() {
                         setSuccessMessage("認証情報を更新しました。データを再取得します。");
                         await fetchUserProfile(true);
                     } catch (reloadError) {
-                        console.error("トークンのリロードに失敗。ログアウトします。", reloadError);
                         await logout();
                         setSuccessMessage("セッションが切れました。再度ログインが必要です。");
                     }
                     return;
                 }
-                // 401以外のエラー
                 setSuccessMessage(`データのロード中に予期せぬエラーが発生しました。(Status: ${status || "不明"})`);
                 setIsLoading(false);
             } finally{
@@ -167,44 +162,30 @@ function ProfilePage() {
         reloadAuthToken
     ]);
     // ----------------------------------------------------------------
-    // 3. 認証状態とデータフェッチの監視 (useEffect) - ★ポーリングロジックを実装★
+    // 3. 認証状態とデータフェッチの監視 (useEffect)
     // ----------------------------------------------------------------
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ProfilePage.useEffect": ()=>{
-            // 1. 認証解決待ち、またはリカバリー中の場合はスキップ
             if (isAuthLoading || isRecovering) return;
-            // 2. 未認証の場合はログインへリダイレクト
             if (!isAuthenticated) {
                 if (isVerificationRedirect) {
-                    // このロジックは残す
-                    console.log("Waiting for session resolve.");
                     return;
                 }
-                console.log("Unauthenticated detected. Redirecting to /login.");
                 if (authUser === null) {
                     router.replace("/login");
                 }
                 return;
             }
-            // 3. 認証済みで、APIクライアントも利用可能だが、データがまだロードされていない場合
             const needsInitialFetch = isAuthenticated && apiClient && !user && !isFetching;
-            // 💡 削除: needsPolling はもう不要です
-            // 初回フェッチ
             if (needsInitialFetch) {
-                console.log("[DEBUG] Initial Fetch Triggered.");
                 fetchUserProfile(false);
                 return;
             }
-            // ★★★ メール認証後のポーリング処理 は削除されます ★★★
-            // 4. データがロード済みで認証済みであれば、ローディングを解除（ガードロジック）
-            // ポーリング中でない、かつユーザーデータがあれば、ローディングを解除
             if (user && isAuthenticated && !isFetching && isLoading) {
-                console.log("[DEBUG] Guard: User loaded, setting isLoading=false.");
                 setIsLoading(false);
             }
         }
     }["ProfilePage.useEffect"], [
-        // 依存配列は維持
         isAuthLoading,
         isAuthenticated,
         router,
@@ -230,13 +211,14 @@ function ProfilePage() {
         const formData = new FormData();
         formData.append("user_image", file);
         try {
-            // apiClient.post で画像アップロード
-            const response = await apiClient.post("/upload2", formData, {
+            // /api/upload2 への POST リクエスト
+            const response = await apiClient.post("/api/upload2", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data"
                 }
             });
             const updatedUser = response.data;
+            // user ステートを更新
             setUser(updatedUser);
             setSuccessMessage("画像をアップロードしました。");
         } catch (error) {
@@ -268,7 +250,6 @@ function ProfilePage() {
         if (!user || !apiClient) return;
         setIsLoading(true);
         try {
-            // apiClient.put でプロフィール情報更新
             const response = await apiClient.patch("/api/mypage/profile_update", form);
             const updatedUser = response.data;
             setSuccessMessage("プロフィール情報を更新しました！");
@@ -290,9 +271,8 @@ function ProfilePage() {
         }
     };
     // ----------------------------------------------------------------
-    // 6. ローディング・未認証時の表示 (レンダリングブロック)
+    // 6. ローディング・未認証時の表示
     // ----------------------------------------------------------------
-    // 認証解決待ち、APIロード中、またはリカバリー中の全体ローディング
     if (isAuthLoading || isLoading && !user || isRecovering) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "login_page max-w-[1400px] mx-auto pt-5 pb-10",
@@ -302,7 +282,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 384,
+                    lineNumber: 354,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -312,7 +292,7 @@ function ProfilePage() {
                             className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 386,
+                            lineNumber: 356,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -320,7 +300,7 @@ function ProfilePage() {
                             children: isAuthLoading ? "認証状態を確認中 / セッションを再確立中..." : isRecovering ? "⚠️ 認証情報を回復中です..." : "データをロード中です..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 387,
+                            lineNumber: 357,
                             columnNumber: 11
                         }, this),
                         isVerificationRedirect && isFetching && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -328,23 +308,22 @@ function ProfilePage() {
                             children: "メール認証の状態を確認中です。しばらくお待ちください。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 395,
+                            lineNumber: 365,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 385,
+                    lineNumber: 355,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 383,
+            lineNumber: 353,
             columnNumber: 7
         }, this);
     }
-    // 認証が完了したがユーザーデータがない場合
     if (!isAuthenticated || !user) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "login_page max-w-[1400px] mx-auto pt-5 pb-10",
@@ -354,7 +333,7 @@ function ProfilePage() {
                     children: "プロフィール設定"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 408,
+                    lineNumber: 377,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -365,7 +344,7 @@ function ProfilePage() {
                             children: "認証エラー、またはユーザー情報がロードできませんでした。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 410,
+                            lineNumber: 379,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -373,19 +352,19 @@ function ProfilePage() {
                             children: "ログインページへ移動しています..."
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                            lineNumber: 413,
+                            lineNumber: 382,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                    lineNumber: 409,
+                    lineNumber: 378,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-            lineNumber: 407,
+            lineNumber: 376,
             columnNumber: 7
         }, this);
     }
@@ -400,7 +379,7 @@ function ProfilePage() {
                 children: "プロフィール設定"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 430,
+                lineNumber: 399,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -411,7 +390,7 @@ function ProfilePage() {
                         children: successMessage
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 434,
+                        lineNumber: 403,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -425,12 +404,13 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "image_button_row",
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                src: getProfileImageUrl(user.user_image),
+                                                // ★修正: メモ化された URL を使用
+                                                src: profileImageUrl,
                                                 alt: "プロフィール画像",
                                                 className: "jsx-f27e8f3c17414dc1" + " " + "user_image_css"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 444,
+                                                lineNumber: 413,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -441,13 +421,13 @@ function ProfilePage() {
                                                 children: "画像を選択する"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                                lineNumber: 449,
+                                                lineNumber: 419,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 443,
+                                        lineNumber: 412,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -462,13 +442,13 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 458,
+                                        lineNumber: 428,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 442,
+                                lineNumber: 411,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -476,13 +456,13 @@ function ProfilePage() {
                                 children: imageError
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 467,
+                                lineNumber: 437,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 438,
+                        lineNumber: 407,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -498,7 +478,7 @@ function ProfilePage() {
                                         children: "ユーザー名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 474,
+                                        lineNumber: 444,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -513,7 +493,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "name_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 477,
+                                        lineNumber: 447,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -521,13 +501,13 @@ function ProfilePage() {
                                         children: profileErrors.name ? profileErrors.name[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 487,
+                                        lineNumber: 457,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 473,
+                                lineNumber: 443,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -539,7 +519,7 @@ function ProfilePage() {
                                         children: "郵便番号 (8桁、ハイフンあり)"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 494,
+                                        lineNumber: 464,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -556,7 +536,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "email_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 497,
+                                        lineNumber: 467,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -564,13 +544,13 @@ function ProfilePage() {
                                         children: profileErrors.post_number ? profileErrors.post_number[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 509,
+                                        lineNumber: 479,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 493,
+                                lineNumber: 463,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -582,7 +562,7 @@ function ProfilePage() {
                                         children: "住所"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 516,
+                                        lineNumber: 486,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -598,7 +578,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 519,
+                                        lineNumber: 489,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -606,13 +586,13 @@ function ProfilePage() {
                                         children: profileErrors.address ? profileErrors.address[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 530,
+                                        lineNumber: 500,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 515,
+                                lineNumber: 485,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -624,7 +604,7 @@ function ProfilePage() {
                                         children: "建物名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 537,
+                                        lineNumber: 507,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -639,7 +619,7 @@ function ProfilePage() {
                                         className: "jsx-f27e8f3c17414dc1" + " " + "password_form"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 540,
+                                        lineNumber: 510,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -647,13 +627,13 @@ function ProfilePage() {
                                         children: profileErrors.building ? profileErrors.building[0] : ""
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                        lineNumber: 550,
+                                        lineNumber: 520,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 536,
+                                lineNumber: 506,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -665,24 +645,24 @@ function ProfilePage() {
                                     className: "jsx-f27e8f3c17414dc1" + " " + "submit_form"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                    lineNumber: 556,
+                                    lineNumber: 526,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                                lineNumber: 555,
+                                lineNumber: 525,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                        lineNumber: 471,
+                        lineNumber: 441,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-                lineNumber: 432,
+                lineNumber: 401,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -692,11 +672,11 @@ function ProfilePage() {
         ]
     }, authUser?.uid || "unauthenticated", true, {
         fileName: "[project]/app/(main)/mypage/profile/page.tsx",
-        lineNumber: 426,
+        lineNumber: 395,
         columnNumber: 5
     }, this);
 }
-_s(ProfilePage, "zuEATvEg4M+z+bq1kzc4CoSV2DI=", false, function() {
+_s(ProfilePage, "fdQomkHKqXfCSKp3ohX8lyf1sls=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"],

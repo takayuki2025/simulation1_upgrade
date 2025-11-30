@@ -122,4 +122,13 @@ class Item extends Model
     {
         return $this->hasMany(Comment::class);
     }
+
+    // この商品がどのユーザーのカートに入っているかを関連付ける
+    public function usersInCart()
+    {
+        // usersテーブルと関連付け
+        return $this->belongsToMany(User::class, 'cart_items')
+                    ->withPivot('quantity')
+                    ->withTimestamps();
+    }
 }

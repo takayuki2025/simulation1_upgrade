@@ -115,16 +115,16 @@ services:
     # ★★★ 追記: メモリ上限と再起動ポリシーの設定 ★★★
     # メモリ不足になったら自動でコンテナを再起動する設定 (Docker Swarmモードで使用されますが、
     # Docker Composeではリソース制限として機能します)
+    # ★★★ 追記: Next.js の起動コマンドを明示し、Node.jsのメモリを制限 ★★★
+    command: sh -c "node --max-old-space-size=3072 start-https.js"
+    # deploy セクションは上記 1. の修正 (memory: 3072M) を反映すること
     deploy:
       resources:
         limits:
-          # フロントエンド開発サーバーのメモリ使用上限を2GBに設定
-          memory: 2048M
+          memory: 3072M
         reservations:
-          # 最低限必要なメモリを確保 (optional)
           memory: 512M
-      # restart_policy:
-      #   condition: on-failure # プロセス終了時のみ再起動
+
 
 networks:
   simulation1_network:
