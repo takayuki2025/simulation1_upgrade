@@ -5,7 +5,7 @@ Dockerビルド
 <br>
 　1\. 　git cloneリンク（ターミナルコマンド） git clone https://github.com/takayuki2025/simulation1_upgrade.git  の実行
 <br>
-　2\. （ターミナルコマンド）cd simulation1　の実行。
+　2\. （ターミナルコマンド）cd simulation1_upgrade　の実行。
                          git checkout feature/react+next.js-develop の実行
 <br>
  　3\.   　ダミーデーターの商品画像ファイルをstrageディレクトリーの中にitem_imagesディレクトリーを作成して商品画像ファイルをコピーする。<br>
@@ -25,16 +25,18 @@ laravel環境構築
 <br>
 　2\. （PHPコンテナー）composer install　の実行
 <br>
-　3\. 　env.exampleファイルから.envを作成し、.envファイルの環境変数を変更<br>
+　3\. 　env.exampleファイルから.envを作成し、backend,frontendの.envファイルの環境変数を変更、その後ReactやReact-DOMのインストール<br>
 　(PHPコンテナー)  cp .env.example .env　の実行後.envの環境変数の変更<br>
-  その後　frontend_derに移動後、　cp .env.example .env　の実行後frontend.envの環境変数の追加<br>
+  その後　exit　（実行）でカレントディレクトリーに戻りfrontendに移動、　cd frontend   (実行後)<br>
+  cp .env.example .env　の実行後frontend.envの環境変数の追加<br>
+  そのままフロントエンドで、npm install　実行（node_modulesフォルダ（Reactなどのライブラリ本体）などは管理対象外になっているため）<br>
 
-　・stripeの公開キーなどは個人情報保護のためgitで追跡していません。必要でしたらコード伝えます。<br>
+  ・stripeの公開キーなどは個人情報保護のためgitで追跡していません。必要でしたらコード伝えます。<br>
 
   ・firebaseのAPIキーなど６項目（frontend .env　追記用）、firebaseのサービスアカウントキー（新規ファイル作成用）などは個人情報保護のためgitで追跡していません。（画面表示、新規登録もログインもできない状態です。）
   必要でしたら　frontend .env　追記用　と　./backend/config/firebase-service-account.json　ファイルに必要なコード伝えます。<br>
 
-  (.env追加後　カレントディレクトリーに戻り)　docker compose restart （frontend_dev）or（frontend_dev）　の実行   <br>
+  (.env追加後　カレントディレクトリーに戻り)　docker compose restart　の実行   <br>
 
 <br>
 <br>
@@ -122,9 +124,3 @@ WEBサイトにも良く反映されて景気の波にも負けないような�
   - Next.js: 16.0.0
   - node: 22-bullseye
 <br>
-
-# URL<br>
-  - フリマアプリトップページ： https://localhost:3000/
-  - ユーザー登録： https://localhost:3000/register
-  - phpMyAdmin:http://localhost:8080/
-  - meilhog： http://localhost:8025/
