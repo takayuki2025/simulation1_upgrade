@@ -1,32 +1,30 @@
 import { createServer } from "https";
-import { parse } from "url";
 import next from "next";
-import fs from "fs"; // fsはNode.jsの組み込みモジュール
+import fs from "fs";
+import url from "url";
 
 const port = 3000;
 const dev = process.env.NODE_ENV !== "production";
-const app = next({ dev });
+
+const app = next({
+  dev,
+  hostname: "localhost",
+  port,
+});
+
 const handle = app.getRequestHandler();
 
-// ★★★ ここは以前mkcertで作成されたファイル名に合わせてください ★★★
+// mkcert で生成した証明書を使用（あなたの環境に合わせる）
 const httpsOptions = {
-  // 例: mkcert localhost laravel.test で作成されたファイル名
-    key: fs.readFileSync("./ssl_certs/localhost+3-key.pem"),
-    cert: fs.readFileSync("./ssl_certs/localhost+3.pem"),
+  key: fs.readFileSync("./ssl_certs/localhost+2-key.pem"),
+  cert: fs.readFileSync("./ssl_certs/localhost+2.pem"),
 };
 
-app
-    .prepare()
-    .then(() => {
-    createServer(httpsOptions, (req, res) => {
-        const parsedUrl = parse(req.url, true);
-        handle(req, res, parsedUrl);
-    }).listen(port, (err) => {
-        if (err) throw err;
-        console.log(`> Ready on https://localhost:${port}`);
-    });
-    })
-    .catch((ex) => {
-    console.error(ex.stack);
-    process.exit(1);
-    });
+app.prepare().then(() => {
+  createServer(httpsOptions, (req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    handle(req, res, parsedUrl);
+  }).listen(port, () => {
+    console.log(`> Ready on https://localhost:${port}`);
+  });
+});

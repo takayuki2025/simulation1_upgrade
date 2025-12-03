@@ -2,7 +2,6 @@
 
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Session\Middleware\AuthenticateSession;
-
 use Laravel\Sanctum\Sanctum;
 
 return [
@@ -18,18 +17,21 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
-        'localhost',
-        'localhost:3000',
-        '127.0.0.1',
-        '127.0.0.1:8000',
-        '::1',
-        'nuxt.test',
-        'nuxt.test:4440',
-        'laravel.test',
-        'laravel.test:4430',
-        'laravel.test:4431',
-    ]))),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost:3000,localhost:9000')),
+
+    // 'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
+    //     'localhost',
+    //     'localhost:3000',
+    //     'localhost:9000',
+    //     // '127.0.0.1',
+    //     // '127.0.0.1:8000',
+    //     // '::1',
+    //     // 'nuxt.test',
+    //     // 'nuxt.test:4440',
+    //     // 'laravel.test',
+    //     // 'laravel.test:4430',
+    //     // 'laravel.test:4431',
+    // ]))),
 
     /*
     |--------------------------------------------------------------------------
@@ -72,7 +74,7 @@ return [
     'middleware' => [
         'encrypt_cookies' => EncryptCookies::class,
     ],
-    
+
     /*
     |--------------------------------------------------------------------------
     | Secure Cookies
@@ -84,6 +86,6 @@ return [
     |
     */
     // ★★★ 修正箇所: ここを修正し、.envの値（SESSION_SECURE_COOKIE）を参照するように変更 ★★★
-    'secure_cookies' => env('SESSION_SECURE_COOKIE', false), 
+    'secure_cookies' => env('SESSION_SECURE_COOKIE', false),
 
 ];

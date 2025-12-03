@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useSanctumAuth"; // 実際の useAuth を利用
+
+// 🔥 Hexagonal: ここがアプリケーションサービス（useAuth）
+import { useAuth } from "@/hooks/useSanctumAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading } = useAuth(); // 👈 実際の login を使用
+
+  const { login, isAuthenticated, isLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,22 +18,15 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // -------------------------
-  // 副作用: 認証済みならトップへリダイレクト（ページ読み込み時の安全策として維持）
+  // 👀 認証済みならトップへリダイレクト
   // -------------------------
   useEffect(() => {
-    console.log(
-      "PAGE_EFFECT: Auth Status Check. Loading:",
-      isLoading,
-      "Authenticated:",
-      isAuthenticated,
-    );
-    // isAuthLoadingが解決し、かつisAuthenticatedがtrueであればリダイレクト
     if (!isLoading && isAuthenticated) {
-      console.log("PAGE_EFFECT: Redirecting to / (via useEffect)");
-      router.replace("/"); // replaceを使って履歴を残さないようにする
+      router.replace("/");
     }
   }, [isLoading, isAuthenticated, router]);
 
+  // 🔄 読み込み表示
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -39,14 +35,16 @@ export default function LoginPage() {
     );
   }
 
-  // 既に認証済みの場合、useEffectでリダイレクトされるのを待つ
+  // 🔄 認証済みなら画面を空にする
   if (isAuthenticated) return null;
 
+  // --------------------------------------
+  // 🎯 ログインボタンクリック
+  // --------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError("");
     setIsSubmitting(true);
-    console.log("PAGE_HANDLE: Submission started.");
 
     if (!email || !password) {
       setApiError("メールアドレスとパスワードを入力してください。");
@@ -54,63 +52,32 @@ export default function LoginPage() {
       return;
     }
 
+    console.log("[LoginPage] Try login:", { email, passLen: password.length });
+
     try {
-      console.log("PAGE_HANDLE: Calling actual login function from useAuth...");
+      // 🔥 引数の形式を修正！
+      await login(email.trim(), password);
 
-      // 1. ログイン処理の実行
-      await login({ email, password });
+      console.log("[LoginPage] Login success → redirect /");
 
-      // 2. 成功後の処理: useAuth内部でメール認証へのリダイレクトが行われなかった場合
-      //    (つまり、認証済みとしてトップページへ移動する場合) はここで明示的にリダイレクトする
-      console.log(
-        "PAGE_HANDLE: Login successful. Immediately redirecting to /",
-      );
-      // 🔥 修正: ログイン成功後、router.push("/") を実行
       router.push("/");
     } catch (error: any) {
-      console.error("PAGE_HANDLE: Login failed in catch block.", error);
+      console.error("[LoginPage] Login failed", error);
 
-      let errorMessage = "ログインに失敗しました。再試行してください。";
+      const message =
+        error?.message ||
+        error?.response?.data?.message ||
+        "ログインに失敗しました。もう一度お試しください。";
 
-      // Axios エラー (Laravel API 失敗) の処理を追加
-      if (
-        error.response &&
-        error.response.data &&
-        error.response.data.message
-      ) {
-        errorMessage = `APIエラー: ${error.response.data.message}`;
-      } else if (error.code) {
-        console.log(
-          `PAGE_HANDLE: Detected Firebase Auth error code: ${error.code}`,
-        );
-        switch (error.code) {
-          case "auth/user-not-found":
-          case "auth/wrong-password":
-            errorMessage = "メールアドレスまたはパスワードが正しくありません。";
-            break;
-          case "auth/invalid-email":
-            errorMessage = "メールアドレスの形式が正しくありません。";
-            break;
-          case "auth/too-many-requests":
-            errorMessage = "短時間にログインが集中しています。";
-            break;
-          default:
-            errorMessage = `ログインに失敗しました: ${error.message}`;
-        }
-      }
-
-      console.log(`PAGE_HANDLE: Displaying API Error message: ${errorMessage}`);
-      setApiError(errorMessage);
+      setApiError(message);
     } finally {
-      // ログイン成功時にリダイレクト処理が行われるため、
-      // 成功時は setIsSubmitting(false) が実行される前にページ遷移する
-      if (apiError) {
-        setIsSubmitting(false);
-      }
-      console.log("PAGE_HANDLE: Submission process finished.");
+      setIsSubmitting(false);
     }
   };
 
+  // --------------------------------------
+  // 🎨 UI（デザインはそのまま）
+  // --------------------------------------
   return (
     <div className="w-full max-w-xl p-8 bg-white rounded-xl shadow-2xl mx-auto z-10 mt-20 mb-8">
       <h2 className="text-center text-3xl font-bold text-gray-800 mb-6 border-b pb-3">
@@ -124,11 +91,9 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* メールアドレス */}
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             メールアドレス
           </label>
           <input
@@ -136,17 +101,15 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             required
             disabled={isSubmitting}
           />
         </div>
 
+        {/* パスワード */}
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             パスワード
           </label>
           <input
@@ -154,7 +117,7 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500 transition duration-150"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             required
             disabled={isSubmitting}
           />
@@ -164,7 +127,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg"
           >
             {isSubmitting ? "ログイン中..." : "ログインする"}
           </button>
@@ -172,10 +135,7 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-6 text-center">
-        <Link
-          href="/register"
-          className="text-sm text-blue-500 hover:text-blue-700 transition duration-150 font-medium"
-        >
+        <Link href="/register" className="text-sm text-blue-500">
           会員登録はこちら
         </Link>
       </div>

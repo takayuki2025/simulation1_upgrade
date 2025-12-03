@@ -1,5 +1,4 @@
 {
-  // 拡張としてtsconfig.node.jsonを読み込み、共通設定を継承
   "extends": "./tsconfig.node.json",
   "compilerOptions": {
     "target": "ES2022",
@@ -7,18 +6,23 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "composite": false,
+    "noEmit": true,
+    "jsx": "preserve",
 
-    // ★★★ 修正箇所: composite と noEmit: false を削除/trueに戻す ★★★
-    "composite": false, // または削除
-    "noEmit": true, // ★★★ true に戻す
+    // 🔥 必須追加（これが無いから '@/lib/firebase' が見つからない）
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"],
+      "@/src/*": ["src/*"],
+      "@/hooks/*": ["hooks/*"],
+      "@/utils/*": ["utils/*"]
+    },
 
-    "jsx": "preserve", // Reactプロジェクトであることを明示
-    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

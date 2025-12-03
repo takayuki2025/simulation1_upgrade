@@ -1,23 +1,29 @@
 import "./globals.css";
-// ★ 修正: AuthProviderを直接インポートする代わりに、クライアントラッパーをインポート
 import { Providers } from "@/components/Providers";
 
 export const metadata = {
-    title: "Next.js + Laravel",
-    description: "Frontend by Next.js, Backend by Laravel",
+  title: "Next.js + Laravel",
+  description: "Frontend + Laravel API",
 };
 
+console.log(
+  "🔵 SSR: RootLayout loaded. BASE =",
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+);
+
 export default function RootLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
+  return (
     <html lang="ja">
-        <body>
-        {/* ★★★ 修正: クライアントコンポーネントであるProvidersでラップ ★★★ */}
+      <body>
+        {/* SSR（server component）領域ここまで */}
+
+        {/* Client コンポーネント（Providers）は “別 wrapper” の中に配置 */}
         <Providers>{children}</Providers>
-        </body>
+      </body>
     </html>
-    );
+  );
 }

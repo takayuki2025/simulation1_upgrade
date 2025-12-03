@@ -5,7 +5,7 @@ import { getAuth, onAuthStateChanged, User, Auth } from "firebase/auth";
 import { FirebaseApp } from "firebase/app";
 
 // lib/firebase.tsからシングルトン関数をインポート
-import { getFirebaseApp, getFirebaseAuth } from "@/lib/firebase";
+import { getFirebaseApp, getFirebaseAuth } from "@/src/lib/firebase";
 
 // Firebaseの状態インターフェース
 interface FirebaseState {

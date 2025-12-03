@@ -1,22 +1,20 @@
+"use client";
+
 import React from "react";
-import Header from "@/components/Header"; // 作成したHeaderコンポーネントをインポート
+import HeaderWrapper from "@/components/HeaderWrapper"; // 作成したHeaderコンポーネントをインポート
+
+console.log("SSR BASE =", process.env.NEXT_PUBLIC_API_BASE_URL);
 
 // 認証不要のメインページ群に適用されるレイアウト
 export default function MainLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
-    // Laravel CSSの @media (min-width: 1400px) { body { width: 1300px; margin: 0 auto; } } を再現
+  return (
     <div className="mx-auto max-w-[1300px] min-h-screen flex flex-col">
-      {/* 共通ヘッダー */}
-        <Header />
-
-      {/* メインコンテンツ */}
-        <main className="flex-grow">{children}</main>
-
-      {/* ここにフッターが必要であれば追加します */}
+      <HeaderWrapper /> {/* ← Header を直接 import しない */}
+      <main className="flex-grow">{children}</main>
     </div>
-    );
+  );
 }
