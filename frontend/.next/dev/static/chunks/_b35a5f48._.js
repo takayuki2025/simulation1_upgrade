@@ -22,15 +22,14 @@ var _s = __turbopack_context__.k.signature();
 ;
 function Header() {
     _s();
-    const { isAuthenticated, logout, isLoading: isAuthLoading, isLoggingOut } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, logout, isLoading: isAuthLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const [searchTerm, setSearchTerm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     // ヘッダー全体を非表示にする必要があるローディング状態
     const isHeaderLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
-        "Header.useMemo[isHeaderLoading]": ()=>isAuthLoading || isLoggingOut
+        "Header.useMemo[isHeaderLoading]": ()=>isAuthLoading
     }["Header.useMemo[isHeaderLoading]"], [
-        isAuthLoading,
-        isLoggingOut
+        isAuthLoading
     ]);
     // ログアウト処理
     const handleLogout = async (e)=>{
@@ -235,7 +234,7 @@ function Header() {
         columnNumber: 5
     }, this);
 }
-_s(Header, "ECbhAu2ejvlF7MGrnBZmF3wJIfA=", false, function() {
+_s(Header, "sz97s43G+3DCQCSgSU6+bI4Q9qI=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]

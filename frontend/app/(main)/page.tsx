@@ -1,107 +1,55 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
-// Hexagonal Service
-import { itemService } from "@/src/services/itemService";
-
-// Utility
+import { useItemsSWR } from "@/src/services/itemService";
 import { getImageUrl, onImageError } from "@/utils/utils";
-
-// Auth
 import { useAuth } from "@/hooks/useSanctumAuth";
 
-// 型
-import type { Item } from "@/src/types/item";
-
 export default function Home() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { apiClient, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const {
-    isLoading: isAuthLoading,
-    isLoggingOut,
-    isAuthenticated,
-    apiClient, // AxiosInstance | null
-  } = useAuth();
-
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(false);
-
-
-console.log("[Home] apiClient =", apiClient);
-
-  // ---------------------------------------------------
-  // タブ判定（all / mylist）
-  // ---------------------------------------------------
+  // -------------------------------
+  // タブ
+  // -------------------------------
   const currentTab = useMemo(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
     [searchParams],
   );
 
-  // ---------------------------------------------------
-  // 検索クエリ（all のみ有効）
-  // ---------------------------------------------------
   const currentSearchQuery = useMemo(
     () => searchParams.get("all_item_search") || "",
     [searchParams],
   );
 
-  // ---------------------------------------------------
-  // 全体ローディング状態
-  // ---------------------------------------------------
-  const isPageLoading = useMemo(() => {
-    return isAuthLoading || isLoggingOut || loading;
-  }, [isAuthLoading, isLoggingOut, loading]);
-
-  // ---------------------------------------------------
-  // アイテム取得
-  // ---------------------------------------------------
-  async function loadItems() {
-    if (isAuthLoading) return; // 認証チェック中は待つ
-
-    // mylist で未認証 → 空でOK
-    if (currentTab === "mylist" && !isAuthenticated) {
-      setItems([]);
-      return;
+  // -------------------------------
+  // ★ 全タブで、ログインしていれば apiClient を使う
+  // -------------------------------
+  const effectiveApiClient = useMemo(() => {
+    if (isAuthenticated && apiClient) {
+      return apiClient; // ALLでもTOKEN付きでAPI呼び出す！
     }
+    return null;
+  }, [currentTab, isAuthenticated, apiClient]);
 
-    setLoading(true);
-
-    try {
-      const list = await itemService.getItems({
-        tab: currentTab,
-        search: currentSearchQuery,
-        apiClient: apiClient ?? undefined, // null 防止
-      });
-
-      setItems(list ?? []);
-    } catch (err) {
-      console.error("[Home] Item fetch error:", err);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ---------------------------------------------------
-  // Effect
-  // ---------------------------------------------------
-  useEffect(() => {
-    loadItems();
-  }, [
+  // -------------------------------
+  // SWR fetch
+  // -------------------------------
+  const { items, isLoading: isItemsLoading } = useItemsSWR(
     currentTab,
     currentSearchQuery,
-    isAuthenticated,
-    apiClient,
-    isAuthLoading,
-  ]);
+    isAuthLoading ? null : effectiveApiClient,
+  );
 
-  // ---------------------------------------------------
-  // Render
-  // ---------------------------------------------------
+  console.log("[Home] apiClient =", apiClient);
+  console.log("[Home] isAuthLoading =", isAuthLoading);
+  console.log("[Home] isAuthenticated =", isAuthenticated);
+
+  const isPageLoading = isAuthLoading || isItemsLoading;
+
   return (
     <div className="main_contents">
       {isPageLoading && (
@@ -113,9 +61,7 @@ console.log("[Home] apiClient =", apiClient);
 
       {!isPageLoading && (
         <>
-          {/* ---------------------------------------------------
-              タブ
-            --------------------------------------------------- */}
+          {/* タブ */}
           <div className="main_select">
             <Link
               href={{
@@ -128,19 +74,14 @@ console.log("[Home] apiClient =", apiClient);
             </Link>
 
             <Link
-              href={{
-                pathname: "/",
-                query: { tab: "mylist" },
-              }}
+              href={{ pathname: "/", query: { tab: "mylist" } }}
               className={`mylists ${currentTab === "mylist" ? "active" : ""}`}
             >
               マイリスト
             </Link>
           </div>
 
-          {/* ---------------------------------------------------
-              商品一覧
-            --------------------------------------------------- */}
+          {/* 商品一覧 */}
           <div className="items_select">
             {items.length > 0 ? (
               items.map((item) => (

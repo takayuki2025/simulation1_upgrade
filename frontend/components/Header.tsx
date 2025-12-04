@@ -12,15 +12,15 @@ export default function Header() {
     isAuthenticated,
     logout,
     isLoading: isAuthLoading, // useFirebaseInit.isReady (!isReady) と連動
-    isLoggingOut,
+    // isLoggingOut,
   } = useAuth();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
 
   // ヘッダー全体を非表示にする必要があるローディング状態
   const isHeaderLoading = useMemo(
-    () => isAuthLoading || isLoggingOut,
-    [isAuthLoading, isLoggingOut],
+    () => isAuthLoading ,
+    [isAuthLoading],
   );
 
   // ログアウト処理

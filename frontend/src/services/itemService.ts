@@ -1,40 +1,55 @@
+import useSWR from "swr";
+import axios from "axios";
 import type { AxiosInstance } from "axios";
 import type { Item } from "@/src/types/item";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
-export interface GetItemsParams {
-  tab: "all" | "mylist";
-  search?: string;
-  apiClient?: AxiosInstance;
-}
+export function useItemsSWR(
+  tab: "all" | "mylist",
+  search: string,
+  apiClient: AxiosInstance | null,
+) {
+  const query = new URLSearchParams();
+  if (tab === "all" && search) query.append("search", search);
+  if (tab === "mylist") query.append("mylist", "true");
 
-export const itemService = {
-  async getItems({ tab, search, apiClient }: GetItemsParams): Promise<Item[]> {
-    const query = encodeURIComponent(search ?? "");
+  const qs = query.toString();
+  const url = `/api/item${qs ? `?${qs}` : ""}`;
 
-    // --------------------------------------
-    // ① すべて
-    // --------------------------------------
-    if (tab === "all") {
-      // 🔥 認証済み → Sanctum の認証を通して自分の商品を除外できる
-      if (apiClient) {
-        const res = await apiClient.get(`/api/item?search=${query}`);
-        return res.data.items ?? [];
-      }
+  console.log("[useItemsSWR] URL =", url, "apiClient=", !!apiClient);
 
-      // 🔓 未認証 → 完全公開一覧
-      const res = await fetch(`${BASE}/api/item?search=${query}`);
-      const json = await res.json();
-      return json.items ?? [];
+  // -----------------------------------------------------
+  // ★ swrKey を auth/public の2種類に分ける
+  // -----------------------------------------------------
+  const swrKey = apiClient ? [url, "auth"] : [url, "public"];
+  console.log("[useItemsSWR] swrKey =", swrKey);
+
+  // -----------------------------------------------------
+  // fetcher
+  // -----------------------------------------------------
+  const swrFetcher = async () => {
+    if (apiClient) {
+      const res = await apiClient.get(url);
+      return res.data;
     }
+    const res = await axios.get(`${API_BASE_URL}${url}`);
+    return res.data;
+  };
 
-    // --------------------------------------
-    // ② マイリスト（認証必要）
-    // --------------------------------------
-    if (!apiClient) return [];
+  const swrConfig = {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    revalidateIfStale: true,
+    refreshInterval: 0,
+  };
 
-    const res = await apiClient.get(`/api/mypage/favorites?search=${query}`);
-    return res.data.items ?? [];
-  },
-};
+  const swr = useSWR(swrKey, swrFetcher, swrConfig);
+
+  return {
+    items: (swr.data?.items ?? []) as Item[],
+    isLoading: swr.isLoading,
+    isError: swr.error,
+    mutate: swr.mutate,
+  };
+}

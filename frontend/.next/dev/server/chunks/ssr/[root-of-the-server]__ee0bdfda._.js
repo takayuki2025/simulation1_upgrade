@@ -99,14 +99,14 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-ssr] (ecmascript)");
 ;
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
-function createApiClient() {
-    console.log("[createApiClient] BASE =", API_BASE_URL);
+function createApiClient(token) {
     return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].create({
         baseURL: API_BASE_URL,
-        withCredentials: true,
+        withCredentials: false,
         headers: {
             "Content-Type": "application/json",
-            Accept: "application/json"
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`
         },
         timeout: 15000
     });
@@ -295,47 +295,52 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts
 ;
 ;
 ;
-// Context
 const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"])(null);
-// API Base
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
 function AuthProvider({ children }) {
     const auth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getFirebaseAuth"])();
     const [firebaseUser, setFirebaseUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [apiClient, setApiClient] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
-    const [isLoggingOut, setIsLoggingOut] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
-    const refreshPromiseRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
-    // -----------------------------------------------
-    // Firebase onAuthStateChanged
-    // -----------------------------------------------
+    // ====================================================================
+    // Firebase 状態監視
+    // ====================================================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        console.log("[AuthProvider] onAuthStateChanged START");
+        console.log("[AuthProvider] START onAuthStateChanged");
         const unsub = auth.onAuthStateChanged(async (u)=>{
             console.log("[AuthProvider] Firebase user =", u);
-            console.log("[AuthProvider] BEFORE createApiClient apiClient =", apiClient);
-            if (u) {
-                const idToken = await u.getIdToken();
-                console.log("[AuthProvider] Firebase ID token =", idToken.substring(0, 12));
-                // Cookie
-                await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-                    withCredentials: true
-                });
-                await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
-                    id_token: idToken
-                }, {
-                    withCredentials: true
-                });
-                const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])();
-                console.log("[AuthProvider] NEW apiClient =", client);
-                setApiClient(()=>client); // これで Promise 化を防止
-                const me = await client.get("/api/user");
-                console.log("[AuthProvider] /api/user response =", me.data);
-                setUser(me.data.user);
-            } else {
-                console.log("[AuthProvider] Firebase user not found");
+            // ---------------------------
+            // 未ログインならログアウト状態に戻す
+            // ---------------------------
+            if (!u) {
+                setFirebaseUser(null);
                 setUser(null);
+                setToken(null);
+                setApiClient(null);
+                setIsLoading(false);
+                return;
+            }
+            setFirebaseUser(u);
+            // Firebase → ID Token
+            const idToken = await u.getIdToken();
+            try {
+                // Laravel Token Login
+                const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
+                    id_token: idToken
+                });
+                const newToken = data.token;
+                setToken(newToken);
+                // API Client 作成
+                const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(newToken);
+                setApiClient(client);
+                const me = await client.get("/api/user");
+                setUser(me.data.user);
+            } catch (err) {
+                console.error("[AuthProvider] Token Login failed", err);
+                setUser(null);
+                setToken(null);
                 setApiClient(null);
             }
             setIsLoading(false);
@@ -344,31 +349,24 @@ function AuthProvider({ children }) {
     }, [
         auth
     ]);
-    // -----------------------------------------------
-    // login(email, password)
-    // -----------------------------------------------
+    // ====================================================================
+    // login
+    // ====================================================================
     const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async (email, password)=>{
         setIsLoading(true);
         try {
-            console.log("[Login] Firebase login start:", email);
             const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
             const idToken = await cred.user.getIdToken();
-            // Sanctum CSRF
-            await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-                withCredentials: true
-            });
-            // Laravel にログイン要求
-            await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
+            // Laravel Login
+            const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
                 id_token: idToken
-            }, {
-                withCredentials: true
             });
-            // Cookie 認証 API Client
-            const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])();
-            setApiClient(()=>client); // これで Promise 化を防止
+            const newToken = data.token;
+            setToken(newToken);
+            const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(newToken);
+            setApiClient(client);
             const me = await client.get("/api/user");
             setUser(me.data.user);
-            console.log("[Login] Success → Laravel cookie authenticated");
         } catch (err) {
             console.error("[Login] Failed", err);
             throw err;
@@ -378,46 +376,36 @@ function AuthProvider({ children }) {
     }, [
         auth
     ]);
-    // -----------------------------------------------
+    // ====================================================================
     // logout
-    // -----------------------------------------------
+    // ====================================================================
     const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
-        setIsLoggingOut(true);
-        try {
-            if (apiClient) {
-                await apiClient.post("/api/logout");
-            }
-        } catch (err) {
-            console.error("logout error:", err);
-        }
-        if (auth) {
-            await auth.signOut();
-        }
+        await auth.signOut();
         setUser(null);
+        setToken(null);
         setApiClient(null);
-        setIsLoggingOut(false);
     }, [
-        apiClient,
         auth
     ]);
-    // -----------------------------------------------
-    // isAuthenticated
-    // -----------------------------------------------
+    // ====================================================================
+    // ログイン判定
+    // ====================================================================
     const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        return !!user;
+        return !!user && !!token;
     }, [
-        user
+        user,
+        token
     ]);
-    // -----------------------------------------------
-    // 値
-    // -----------------------------------------------
+    // ====================================================================
+    // 提供値
+    // ====================================================================
     const value = {
         user,
         firebaseUser,
         apiClient,
+        token,
         isAuthenticated,
         isLoading,
-        isLoggingOut,
         login,
         logout
     };
@@ -426,14 +414,14 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 210,
+        lineNumber: 188,
         columnNumber: 10
     }, this);
 }
 function useAuth() {
-    const c = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
-    if (!c) throw new Error("useAuth must be used inside <AuthProvider>");
-    return c;
+    const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
+    if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+    return ctx;
 }
 function useApiClient() {
     const { apiClient } = useAuth();

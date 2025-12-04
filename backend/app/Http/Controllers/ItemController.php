@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Application\UseCase\Item\ItemUseCase;
+use App\Application\UseCase\Auth\AuthUseCase;
 use App\Http\Requests\ExhibitionRequest;
 use App\Http\Requests\ItemImageRequest;
 use Illuminate\Http\Request;
@@ -12,29 +13,50 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $search = $request->query('search');
+        $user = auth('sanctum')->user();
 
-        $userId = $request->user()?->id;
+        // -----------------------------
+        // mylist = いいねした商品のみ取得
+        // -----------------------------
+        if ($request->boolean('mylist')) {
 
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
 
-        $query = Item::query();
+            $items = Item::query()
+                ->select('items.*')
+                ->join('goods', 'goods.item_id', '=', 'items.id')
+                ->where('goods.user_id', $user->id)
+                ->with('user')
+                ->orderByDesc('goods.created_at')
+                ->get();
 
-
-        if ($userId) {
-            $query->where('user_id', '!=', $userId);
+            return response()->json(['items' => $items]);
         }
 
+        // -----------------------------
+        // ALL（一覧）
+        // ・検索対応
+        // ・ログインユーザーの出品は表示しない
+        // -----------------------------
+        $query = Item::query()->with('user');
 
-        if ($search) {
-            $query->where('name', 'LIKE', "%{$search}%");
+        // 検索
+        if ($search = $request->query('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
         }
 
-        $items = $query->orderBy('created_at', 'desc')->get();
+        // ログインしてる場合、自分の出品は除外
+        if ($user) {
+            $query->where('user_id', '!=', $user->id);
+        }
 
-        return response()->json([
-            'items' => $items
-        ]);
+        $items = $query->orderByDesc('id')->get();
+
+        return response()->json(['items' => $items]);
     }
+
 
     public function show($itemId, ItemUseCase $useCase)
     {

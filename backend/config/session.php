@@ -164,6 +164,6 @@ return [
     |
     */
 
-    'samesite' => env('SESSION_SAMESITE', 'None'),
+    'same_site' => env('SESSION_SAME_SITE', 'none'),
 
 ];

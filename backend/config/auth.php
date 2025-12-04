@@ -1,36 +1,35 @@
 <?php
 
 return [
+
     'defaults' => [
-        'guard' => 'web',
+        'guard' => 'sanctum', // ← ここ重要！
         'passwords' => 'users',
     ],
 
     'guards' => [
+
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
         ],
 
-        // ★★★ ここに Firebase 認証ガードを追加 ★★★
-        'firebase' => [
-            'driver' => 'firebase', // kreait/laravel-firebase パッケージが提供するドライバー名
-            'provider' => 'users', // ユーザー情報を取得するプロバイダ (通常は users でOK)
-        ],
-
         'sanctum' => [
             'driver' => 'sanctum',
             'provider' => 'users',
-            'hash' => false,
+        ],
+
+        // ← これが無いと必ず「api guard not defined」が発生します
+        'api' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
         ],
     ],
 
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\User::class, // あなたのUserモデルのパス
+            'model' => App\Models\User::class,
         ],
     ],
-
-    // ... (パスワード設定などは省略またはデフォルトでOK)
 ];

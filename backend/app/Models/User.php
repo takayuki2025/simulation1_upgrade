@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 use App\Notifications\CustomVerifyEmail;
 
+
+
 // use Illuminate\Auth\Notifications\VerifyEmail; // sendEmailVerificationNotificationで使用　
 
 class User extends Authenticatable implements MustVerifyEmail

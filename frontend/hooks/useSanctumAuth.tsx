@@ -7,22 +7,23 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  useRef,
   type ReactNode,
 } from "react";
 
-import axios, { AxiosInstance, AxiosError } from "axios";
-import { createApiClient } from "@/src/lib/api";
-
-// Firebase
+import axios, { AxiosInstance } from "axios";
+import { onIdTokenChanged } from "firebase/auth";
 import {
-  getAuth,
   signInWithEmailAndPassword,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { getFirebaseAuth } from "@/src/lib/firebase";
 
-// Laravel User Type
+import { getFirebaseAuth } from "@/src/lib/firebase";
+import { createApiClient } from "@/src/lib/api";
+import type { LoginResponse } from "@/src/types/auth";
+
+// ================================
+// 型
+// ================================
 export interface LaravelUser {
   id: number;
   name: string;
@@ -30,132 +31,150 @@ export interface LaravelUser {
   user_image?: string | null;
 }
 
-// CONTEXT 型
 export interface AuthContextType {
   user: LaravelUser | null;
   firebaseUser: FirebaseUser | null;
 
   apiClient: AxiosInstance | null;
+  token: string | null;
 
   isAuthenticated: boolean;
   isLoading: boolean;
-  isLoggingOut: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-// Context
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// API Base
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
-// -----------------------------------------------
-// Provider
-// -----------------------------------------------
+// ================================
+// 🔑 Laravel トークンだけを返す関数
+// ================================
+async function loginWithLaravel(idToken: string): Promise<string> {
+  const { data } = await axios.post<LoginResponse>(
+    `${API_BASE_URL}/api/login_or_register`,
+    { id_token: idToken },
+  );
 
+  // ここでは token（文字列）だけ返す
+  return data.token;
+}
+
+// ================================
+// Provider 本体
+// ================================
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = getFirebaseAuth();
 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<LaravelUser | null>(null);
 
-  const [apiClient, setApiClient] = useState<AxiosInstance | null>(null);
+  // ★ ここが一番重要：API トークンだけを state で持つ
+  const [token, setToken] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  // ================================
+  // apiClient は token から同期的に生成
+  // ================================
+  const apiClient: AxiosInstance | null = useMemo(() => {
+    if (!token) return null;
+    const client = createApiClient(token);
+    // デバッグ用
+    // console.log("[AuthProvider] createApiClient from token:", token.slice(0, 10));
+    return client;
+  }, [token]);
 
-  // -----------------------------------------------
-  // Firebase onAuthStateChanged
-  // -----------------------------------------------
+  // ================================
+  // 初期ログイン (onAuthStateChanged)
+  // ================================
   useEffect(() => {
-    console.log("[AuthProvider] onAuthStateChanged START");
+    console.log("[AuthProvider] START onAuthStateChanged");
 
     const unsub = auth.onAuthStateChanged(async (u) => {
       console.log("[AuthProvider] Firebase user =", u);
-      console.log(
-        "[AuthProvider] BEFORE createApiClient apiClient =",
-        apiClient,
-      );
 
-      if (u) {
-        const idToken = await u.getIdToken();
-        console.log(
-          "[AuthProvider] Firebase ID token =",
-          idToken.substring(0, 12),
-        );
-
-        // Cookie
-        await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-          withCredentials: true,
-        });
-
-        await axios.post(
-          `${API_BASE_URL}/api/login_or_register`,
-          { id_token: idToken },
-          { withCredentials: true },
-        );
-
-        const client = createApiClient();
-        console.log("[AuthProvider] NEW apiClient =", client);
-        setApiClient(() => client); // これで Promise 化を防止
-
-        const me = await client.get("/api/user");
-        console.log("[AuthProvider] /api/user response =", me.data);
-
-        setUser(me.data.user);
-      } else {
-        console.log("[AuthProvider] Firebase user not found");
+      if (!u) {
+        setFirebaseUser(null);
         setUser(null);
-        setApiClient(null);
+        setToken(null);
+        setIsLoading(false);
+        return;
       }
 
-      setIsLoading(false);
+      setFirebaseUser(u);
+      setIsLoading(true);
+
+      try {
+        const idToken = await u.getIdToken();
+
+        // Laravel でアプリ用トークンを発行
+        const appToken = await loginWithLaravel(idToken);
+        setToken(appToken);
+
+        // /api/user を取るときだけ一時的に client を作る
+        const client = createApiClient(appToken);
+        const me = await client.get("/api/user");
+        setUser(me.data.user);
+      } catch (e) {
+        console.error("[AuthProvider] Token Login failed", e);
+        setUser(null);
+        setToken(null);
+      } finally {
+        setIsLoading(false);
+      }
     });
 
     return () => unsub();
   }, [auth]);
 
-  // -----------------------------------------------
-  // login(email, password)
-  // -----------------------------------------------
+  // ================================
+  // Token 自動更新 (onIdTokenChanged)
+  // ================================
+  useEffect(() => {
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      if (!u) {
+        // サインアウト済み
+        return;
+      }
+
+      try {
+        const newFirebaseToken = await u.getIdToken();
+        const appToken = await loginWithLaravel(newFirebaseToken);
+        setToken(appToken);
+      } catch (e) {
+        console.error("[AuthProvider] Token refresh failed", e);
+      }
+    });
+
+    return () => unsub();
+  }, [auth]);
+
+  // ================================
+  // login
+  // ================================
   const login = useCallback(
     async (email: string, password: string) => {
       setIsLoading(true);
 
       try {
-        console.log("[Login] Firebase login start:", email);
-
         const cred = await signInWithEmailAndPassword(auth, email, password);
-
         const idToken = await cred.user.getIdToken();
 
-        // Sanctum CSRF
-        await axios.get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-          withCredentials: true,
-        });
+        const appToken = await loginWithLaravel(idToken);
 
-        // Laravel にログイン要求
-        await axios.post(
-          `${API_BASE_URL}/api/login_or_register`,
-          { id_token: idToken },
-          { withCredentials: true },
-        );
+        setFirebaseUser(cred.user);
+        setToken(appToken);
 
-        // Cookie 認証 API Client
-        const client = createApiClient();
-        setApiClient(() => client); // これで Promise 化を防止
-
+        const client = createApiClient(appToken);
         const me = await client.get("/api/user");
         setUser(me.data.user);
-
-        console.log("[Login] Success → Laravel cookie authenticated");
-      } catch (err) {
-        console.error("[Login] Failed", err);
-        throw err;
+      } catch (e) {
+        console.error("[AuthProvider] login failed", e);
+        setUser(null);
+        setToken(null);
       } finally {
         setIsLoading(false);
       }
@@ -163,60 +182,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [auth],
   );
 
-  // -----------------------------------------------
+  // ================================
   // logout
-  // -----------------------------------------------
+  // ================================
   const logout = useCallback(async () => {
-    setIsLoggingOut(true);
-
-    try {
-      if (apiClient) {
-        await apiClient.post("/api/logout");
-      }
-    } catch (err) {
-      console.error("logout error:", err);
-    }
-
-    if (auth) {
-      await auth.signOut();
-    }
-
+    await auth.signOut();
+    setFirebaseUser(null);
     setUser(null);
-    setApiClient(null);
-    setIsLoggingOut(false);
-  }, [apiClient, auth]);
+    setToken(null);
+  }, [auth]);
 
-  // -----------------------------------------------
-  // isAuthenticated
-  // -----------------------------------------------
+  // ================================
+  // ログイン判定
+  // ================================
   const isAuthenticated = useMemo(() => {
-    return !!user;
-  }, [user]);
+    // user がまだ取れていない瞬間があっても、token があれば「ログイン中」とみなす
+    return !!token;
+  }, [token]);
 
-  // -----------------------------------------------
-  // 値
-  // -----------------------------------------------
-  const value: AuthContextType = {
-    user,
-    firebaseUser,
-    apiClient,
-    isAuthenticated,
-    isLoading,
-    isLoggingOut,
-    login,
-    logout,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        apiClient,
+        token,
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-// -----------------------------------------------
+// ================================
 // Hooks
-// -----------------------------------------------
+// ================================
 export function useAuth() {
-  const c = useContext(AuthContext);
-  if (!c) throw new Error("useAuth must be used inside <AuthProvider>");
-  return c;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+  return ctx;
 }
 
 export function useApiClient() {

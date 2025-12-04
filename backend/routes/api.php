@@ -18,81 +18,85 @@ use App\Http\Controllers\CommentController;
 Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 
 
+// ============================================
+// 🔐 Firebase → Sanctum Token 認証
+// ============================================
 
-// ================================
-// 🔐 Firebase ID Token ベース認証
-// ================================
+// Firebase ID Token → Laravel Token 発行
+Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegister']);
 
-// 1) ログイン専用（既存ユーザーのみ）
-Route::post('/login', [FirebaseAuthController::class, 'login'])
-    ->name('api.login');
+// Firebase Login 専用
+Route::post('/login', [FirebaseAuthController::class, 'login']);
 
-// 2) 新規登録専用（存在しない場合のみ作成）
-Route::post('/register', [FirebaseAuthController::class, 'register'])
-    ->name('api.register');
-
-// Firebase ID Token → Laravel 認証（Sanctum Token発行）
-// 
-Route::post('/login_or_register', [FirebaseAuthController::class, 'handleTokenExchange'])
-    ->name('api.login_or_register');
+// Firebase Register 専用
+Route::post('/register', [FirebaseAuthController::class, 'register']);
 
 
+// ============================================
+// 🔑 認証が必要ない公開 API
+// ============================================
 
-// ================================
-// 公開ルート（商品一覧など）
-// ================================
-
-// アイテム一覧・詳細
+// 商品一覧・詳細（公開）
 Route::get('/item', [ItemController::class, 'index']);
-Route::get('/item/{itemId}', [ItemController::class, 'show']);
+Route::get('/item/{id}', [ItemController::class, 'show']);
 
 // コメント一覧（公開）
 Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
 
 
 // ============================================
-// 🚀 3. 認証後ルート（auth:sanctum）
+// 🔐 Token 認証（auth:sanctum）
 // ============================================
+Route::middleware('auth:sanctum')->group(function () {
 
-Route::middleware(['auth:sanctum'])->group(function () {
+    // --- User 情報 ---
+    Route::get('/user', function (Request $request) {
+        return response()->json(['user' => $request->user()]);
+    });
 
+    Route::get('/me', function (Request $request) {
+        return response()->json(['user' => $request->user()]);
+    });
 
+    // --- Logout ---
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // ---- ユーザー基本情報 ----
-    Route::get('/user', fn (Request $request) => $request->user());
-    Route::post('/logout', [AuthController::class, 'logout']);
 
-    // ---- Profile ----
+    //        これにより、ItemController::index 内で $request->user() が利用可能になる。
+    // Route::get('/item', [ItemController::class, 'index']);
+
+    // --- Item（認証が必要な操作のみ） ---
+    Route::post('/item', [ItemController::class, 'store']);
+    Route::put('/item/{id}', [ItemController::class, 'update']);
+    Route::delete('/item/{id}', [ItemController::class, 'destroy']);
+
+    // --- Profile ---
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
 
-    // ---- Mypage ----
+    // --- Mypage ---
     Route::get('/mypage/profile', [MypageController::class, 'profile']);
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
     Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
 
-    // ---- Comment ----
+    // --- Comment 作成 ---
     Route::post('/comment', [CommentController::class, 'create']);
 
-    // ---- Favorite ----
-
+    // --- Favorite ---
     Route::get('/items/favorite', [FavoriteController::class, 'index']);
-
     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
 
-    // ---- Purchase ----
+    // --- Purchase ---
     Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
     Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
     Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
 });
 
 
-
 // ============================================
-// 🚀 4. メール認証（Webミドルウェアで処理）
+// 📩 メール認証
 // ============================================
 Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
     ->middleware(['signed'])

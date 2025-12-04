@@ -10,14 +10,14 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
 ;
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
-function createApiClient() {
-    console.log("[createApiClient] BASE =", API_BASE_URL);
+function createApiClient(token) {
     return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].create({
         baseURL: API_BASE_URL,
-        withCredentials: true,
+        withCredentials: false,
         headers: {
             "Content-Type": "application/json",
-            Accept: "application/json"
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`
         },
         timeout: 15000
     });
@@ -81,11 +81,10 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/api.ts [app-client] (ecmascript)");
-// Firebase
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/esm/index.esm.js [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/firebase/node_modules/@firebase/auth/dist/esm2017/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/api.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/firebase.ts [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature();
@@ -95,53 +94,47 @@ var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.sign
 ;
 ;
 ;
-// Context
+;
 const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createContext"])(null);
-// API Base
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
 function AuthProvider({ children }) {
     _s();
     const auth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getFirebaseAuth"])();
     const [firebaseUser, setFirebaseUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [apiClient, setApiClient] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
-    const [isLoggingOut, setIsLoggingOut] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
-    const refreshPromiseRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
-    // -----------------------------------------------
-    // Firebase onAuthStateChanged
-    // -----------------------------------------------
+    // ====================================================================
+    // 初期ログイン確定処理（onAuthStateChanged）
+    // ====================================================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthProvider.useEffect": ()=>{
-            console.log("[AuthProvider] onAuthStateChanged START");
+            console.log("[AuthProvider] START onAuthStateChanged");
             const unsub = auth.onAuthStateChanged({
                 "AuthProvider.useEffect.unsub": async (u)=>{
                     console.log("[AuthProvider] Firebase user =", u);
-                    console.log("[AuthProvider] BEFORE createApiClient apiClient =", apiClient);
-                    if (u) {
-                        const idToken = await u.getIdToken();
-                        console.log("[AuthProvider] Firebase ID token =", idToken.substring(0, 12));
-                        // Cookie
-                        await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-                            withCredentials: true
-                        });
-                        await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
+                    // --- ★★ 修正ポイント：初回 null を無視する ★★ ---
+                    if (!u) {
+                        console.log("[AuthProvider] Firebase user = null → 初回なので無視");
+                        setIsLoading(false);
+                        return;
+                    }
+                    // Firebase ユーザーをセット
+                    setFirebaseUser(u);
+                    const idToken = await u.getIdToken();
+                    try {
+                        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
                             id_token: idToken
-                        }, {
-                            withCredentials: true
                         });
-                        const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createApiClient"])();
-                        console.log("[AuthProvider] NEW apiClient =", client);
-                        setApiClient({
-                            "AuthProvider.useEffect.unsub": ()=>client
-                        }["AuthProvider.useEffect.unsub"]); // これで Promise 化を防止
+                        const newToken = data.token;
+                        setToken(newToken);
+                        const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createApiClient"])(newToken);
+                        setApiClient(client);
                         const me = await client.get("/api/user");
-                        console.log("[AuthProvider] /api/user response =", me.data);
                         setUser(me.data.user);
-                    } else {
-                        console.log("[AuthProvider] Firebase user not found");
-                        setUser(null);
-                        setApiClient(null);
+                    } catch (err) {
+                        console.error("[AuthProvider] Token Login failed", err);
                     }
                     setIsLoading(false);
                 }
@@ -153,37 +146,55 @@ function AuthProvider({ children }) {
     }["AuthProvider.useEffect"], [
         auth
     ]);
-    // -----------------------------------------------
-    // login(email, password)
-    // -----------------------------------------------
+    // ====================================================================
+    // Token 自動更新（onIdTokenChanged）
+    // ====================================================================
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AuthProvider.useEffect": ()=>{
+            const unsub = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onIdTokenChanged"])(auth, {
+                "AuthProvider.useEffect.unsub": async (u)=>{
+                    if (!u) {
+                        console.log("[TokenRefresh] Firebase user null (ignore)");
+                        return;
+                    }
+                    const newFirebaseToken = await u.getIdToken();
+                    console.log("[TokenRefresh] New Firebase ID Token issued");
+                    // Laravel へ再ログイン（Token 更新）
+                    const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
+                        id_token: newFirebaseToken
+                    });
+                    const newToken = response.data.token;
+                    console.log("[TokenRefresh] New Laravel API Token =", newToken.substring(0, 10));
+                    setToken(newToken);
+                    setApiClient((0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createApiClient"])(newToken));
+                }
+            }["AuthProvider.useEffect.unsub"]);
+            return ({
+                "AuthProvider.useEffect": ()=>unsub()
+            })["AuthProvider.useEffect"];
+        }
+    }["AuthProvider.useEffect"], [
+        auth
+    ]);
+    // ====================================================================
+    // login（メールログイン）
+    // ====================================================================
     const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[login]": async (email, password)=>{
             setIsLoading(true);
             try {
-                console.log("[Login] Firebase login start:", email);
                 const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
                 const idToken = await cred.user.getIdToken();
-                // Sanctum CSRF
-                await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}/sanctum/csrf-cookie`, {
-                    withCredentials: true
-                });
-                // Laravel にログイン要求
-                await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
+                const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
                     id_token: idToken
-                }, {
-                    withCredentials: true
                 });
-                // Cookie 認証 API Client
-                const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createApiClient"])();
-                setApiClient({
-                    "AuthProvider.useCallback[login]": ()=>client
-                }["AuthProvider.useCallback[login]"]); // これで Promise 化を防止
+                const newToken = data.token;
+                setFirebaseUser(cred.user);
+                setToken(newToken);
+                const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createApiClient"])(newToken);
+                setApiClient(client);
                 const me = await client.get("/api/user");
                 setUser(me.data.user);
-                console.log("[Login] Success → Laravel cookie authenticated");
-            } catch (err) {
-                console.error("[Login] Failed", err);
-                throw err;
             } finally{
                 setIsLoading(false);
             }
@@ -191,50 +202,38 @@ function AuthProvider({ children }) {
     }["AuthProvider.useCallback[login]"], [
         auth
     ]);
-    // -----------------------------------------------
+    // ====================================================================
     // logout
-    // -----------------------------------------------
+    // ====================================================================
     const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[logout]": async ()=>{
-            setIsLoggingOut(true);
-            try {
-                if (apiClient) {
-                    await apiClient.post("/api/logout");
-                }
-            } catch (err) {
-                console.error("logout error:", err);
-            }
-            if (auth) {
-                await auth.signOut();
-            }
+            await auth.signOut();
             setUser(null);
+            setToken(null);
             setApiClient(null);
-            setIsLoggingOut(false);
+            setFirebaseUser(null);
         }
     }["AuthProvider.useCallback[logout]"], [
-        apiClient,
         auth
     ]);
-    // -----------------------------------------------
-    // isAuthenticated
-    // -----------------------------------------------
+    // ====================================================================
+    // ログイン判定
+    // ====================================================================
     const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AuthProvider.useMemo[isAuthenticated]": ()=>{
-            return !!user;
+            return !!user && !!token;
         }
     }["AuthProvider.useMemo[isAuthenticated]"], [
-        user
+        user,
+        token
     ]);
-    // -----------------------------------------------
-    // 値
-    // -----------------------------------------------
     const value = {
         user,
         firebaseUser,
         apiClient,
+        token,
         isAuthenticated,
         isLoading,
-        isLoggingOut,
         login,
         logout
     };
@@ -243,19 +242,19 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 210,
+        lineNumber: 204,
         columnNumber: 10
     }, this);
 }
-_s(AuthProvider, "I3e8hkY57AwpqFCr/ww3KVUsnf0=");
+_s(AuthProvider, "e6Rol8KoWUwd/1oo9T/QsrT/kBE=");
 _c = AuthProvider;
 function useAuth() {
     _s1();
-    const c = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
-    if (!c) throw new Error("useAuth must be used inside <AuthProvider>");
-    return c;
+    const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
+    if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+    return ctx;
 }
-_s1(useAuth, "rCFJOMMDYLWM7qBzTJAGkiO6eRA=");
+_s1(useAuth, "/dMy7t63NXD4eYACoT93CePwGrg=");
 function useApiClient() {
     _s2();
     const { apiClient } = useAuth();

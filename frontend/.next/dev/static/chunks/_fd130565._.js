@@ -6,31 +6,21 @@ __turbopack_context__.s([
     "itemService",
     ()=>itemService
 ]);
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
-const BASE = ("TURBOPACK compile-time value", "https://localhost:9000");
 const itemService = {
-    async getItems ({ tab, search, apiClient }) {
-        const query = encodeURIComponent(search ?? "");
-        // --------------------------------------
-        // ① すべて
-        // --------------------------------------
-        if (tab === "all") {
-            // 🔥 認証済み → Sanctum の認証を通して自分の商品を除外できる
-            if (apiClient) {
-                const res = await apiClient.get(`/api/item?search=${query}`);
-                return res.data.items ?? [];
-            }
-            // 🔓 未認証 → 完全公開一覧
-            const res = await fetch(`${BASE}/api/item?search=${query}`);
-            const json = await res.json();
-            return json.items ?? [];
+    async getItems (params) {
+        if (!params.apiClient) {
+            console.warn("[itemService] apiClient が未初期化");
+            return [];
         }
-        // --------------------------------------
-        // ② マイリスト（認証必要）
-        // --------------------------------------
-        if (!apiClient) return [];
-        const res = await apiClient.get(`/api/mypage/favorites?search=${query}`);
-        return res.data.items ?? [];
+        const { tab, search } = params;
+        let url = "/api/item";
+        const query = {};
+        if (tab === "all" && search) query.search = search;
+        if (tab === "mylist") query.mylist = true;
+        const res = await params.apiClient.get(url, {
+            params: query
+        });
+        return res.data.items ?? res.data ?? [];
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
