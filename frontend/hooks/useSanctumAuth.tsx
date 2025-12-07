@@ -14,6 +14,8 @@ import axios, { AxiosInstance } from "axios";
 import { onIdTokenChanged } from "firebase/auth";
 import {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   type User as FirebaseUser,
 } from "firebase/auth";
 
@@ -42,6 +44,15 @@ export interface AuthContextType {
   isLoading: boolean;
 
   login: (email: string, password: string) => Promise<void>;
+  register: ({
+    name,
+    email,
+    password,
+  }: {
+    name: string;
+    email: string;
+    password: string;
+  }) => Promise<{ needsEmailVerification: boolean }>;
   logout: () => Promise<void>;
 }
 
@@ -50,7 +61,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 // ================================
-// 🔑 Laravel トークンだけを返す関数
+// 🔑 Laravel Token 発行専用関数
 // ================================
 async function loginWithLaravel(idToken: string): Promise<string> {
   const { data } = await axios.post<LoginResponse>(
@@ -58,12 +69,11 @@ async function loginWithLaravel(idToken: string): Promise<string> {
     { id_token: idToken },
   );
 
-  // ここでは token（文字列）だけ返す
   return data.token;
 }
 
 // ================================
-// Provider 本体
+// AuthProvider 本体
 // ================================
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = getFirebaseAuth();
@@ -71,24 +81,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<LaravelUser | null>(null);
 
-  // ★ ここが一番重要：API トークンだけを state で持つ
   const [token, setToken] = useState<string | null>(null);
-
   const [isLoading, setIsLoading] = useState(true);
 
   // ================================
-  // apiClient は token から同期的に生成
+  // token → axios client へ同期
   // ================================
   const apiClient: AxiosInstance | null = useMemo(() => {
     if (!token) return null;
-    const client = createApiClient(token);
-    // デバッグ用
-    // console.log("[AuthProvider] createApiClient from token:", token.slice(0, 10));
-    return client;
+    return createApiClient(token);
   }, [token]);
 
   // ================================
-  // 初期ログイン (onAuthStateChanged)
+  // 初期ログイン: Firebase → Laravel 同期
   // ================================
   useEffect(() => {
     console.log("[AuthProvider] START onAuthStateChanged");
@@ -110,11 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const idToken = await u.getIdToken();
 
-        // Laravel でアプリ用トークンを発行
         const appToken = await loginWithLaravel(idToken);
         setToken(appToken);
 
-        // /api/user を取るときだけ一時的に client を作る
         const client = createApiClient(appToken);
         const me = await client.get("/api/user");
         setUser(me.data.user);
@@ -131,18 +134,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [auth]);
 
   // ================================
-  // Token 自動更新 (onIdTokenChanged)
+  // Token 自動更新
   // ================================
   useEffect(() => {
     const unsub = onIdTokenChanged(auth, async (u) => {
-      if (!u) {
-        // サインアウト済み
-        return;
-      }
+      if (!u) return;
 
       try {
-        const newFirebaseToken = await u.getIdToken();
-        const appToken = await loginWithLaravel(newFirebaseToken);
+        const idToken = await u.getIdToken();
+        const appToken = await loginWithLaravel(idToken);
         setToken(appToken);
       } catch (e) {
         console.error("[AuthProvider] Token refresh failed", e);
@@ -175,6 +175,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("[AuthProvider] login failed", e);
         setUser(null);
         setToken(null);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [auth],
+  );
+
+  // ================================
+  // register（新規登録）
+  // ================================
+  const register = useCallback(
+    async ({
+      name,
+      email,
+      password,
+    }: {
+      name: string;
+      email: string;
+      password: string;
+    }) => {
+      setIsLoading(true);
+
+      try {
+        // ① Firebase アカウント作成
+        const cred = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+
+        // ② 表示名を Firebase に保存
+        await updateProfile(cred.user, { displayName: name });
+
+        const idToken = await cred.user.getIdToken();
+
+        // ③ Laravel 側で DB 登録 or login
+        const appToken = await loginWithLaravel(idToken);
+        setToken(appToken);
+
+        const client = createApiClient(appToken);
+        const me = await client.get("/api/user");
+        setUser(me.data.user);
+
+        return { needsEmailVerification: false };
+      } catch (e) {
+        console.error("[AuthProvider] register failed", e);
+        setUser(null);
+        setToken(null);
+        throw e;
       } finally {
         setIsLoading(false);
       }
@@ -193,12 +243,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [auth]);
 
   // ================================
-  // ログイン判定
+  // isAuthenticated
   // ================================
-  const isAuthenticated = useMemo(() => {
-    // user がまだ取れていない瞬間があっても、token があれば「ログイン中」とみなす
-    return !!token;
-  }, [token]);
+  const isAuthenticated = useMemo(() => !!token, [token]);
 
   return (
     <AuthContext.Provider
@@ -210,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         isLoading,
         login,
+        register,
         logout,
       }}
     >

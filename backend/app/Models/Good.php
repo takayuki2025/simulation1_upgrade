@@ -10,8 +10,8 @@ class Good extends Model
     use HasFactory;
 
     protected $fillable = [
-            'item_id',
-            'user_id'
+        'item_id',
+        'user_id',
     ];
 
     public function item()

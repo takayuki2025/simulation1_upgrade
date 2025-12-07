@@ -10,23 +10,41 @@ export function useItemsSWR(
   search: string,
   apiClient: AxiosInstance | null,
 ) {
-  const query = new URLSearchParams();
-  if (tab === "all" && search) query.append("search", search);
-  if (tab === "mylist") query.append("mylist", "true");
+  // -----------------------------------------------------
+  // 🔥 1. URL の決定（ここが今回の修正点）
+  // -----------------------------------------------------
+  let url = "/api/item";
 
-  const qs = query.toString();
-  const url = `/api/item${qs ? `?${qs}` : ""}`;
+  if (tab === "mylist") {
+    url = "/api/items/favorite"; // ⭐ いいね一覧 API に切り替え
+  } else {
+    // all の検索
+    const query = new URLSearchParams();
+    if (search) query.append("search", search);
 
-  console.log("[useItemsSWR] URL =", url, "apiClient=", !!apiClient);
+    const qs = query.toString();
+    url = `/api/item${qs ? `?${qs}` : ""}`;
+  }
+
+  console.log(
+    "[useItemsSWR] URL =",
+    url,
+    "tab=",
+    tab,
+    "apiClient=",
+    !!apiClient,
+  );
 
   // -----------------------------------------------------
-  // ★ swrKey を auth/public の2種類に分ける
+  // 2. SWR key を mode（public/auth）で分ける
   // -----------------------------------------------------
-  const swrKey = apiClient ? [url, "auth"] : [url, "public"];
+  const keyTag = apiClient ? "auth" : "public";
+  const swrKey = [url, keyTag];
+
   console.log("[useItemsSWR] swrKey =", swrKey);
 
   // -----------------------------------------------------
-  // fetcher
+  // 3. fetcher
   // -----------------------------------------------------
   const swrFetcher = async () => {
     if (apiClient) {

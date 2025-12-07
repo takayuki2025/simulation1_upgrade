@@ -12,25 +12,31 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib
 ;
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
 function useItemsSWR(tab, search, apiClient) {
-    const query = new URLSearchParams();
-    if (tab === "all" && search) query.append("search", search);
-    if (tab === "mylist") query.append("mylist", "true");
-    const qs = query.toString();
-    const url = `/api/item${qs ? `?${qs}` : ""}`;
-    console.log("[useItemsSWR] URL =", url, "apiClient=", !!apiClient);
     // -----------------------------------------------------
-    // ★ swrKey を auth/public の2種類に分ける
+    // 🔥 1. URL の決定（ここが今回の修正点）
     // -----------------------------------------------------
-    const swrKey = apiClient ? [
+    let url = "/api/item";
+    if (tab === "mylist") {
+        url = "/api/items/favorite"; // ⭐ いいね一覧 API に切り替え
+    } else {
+        // all の検索
+        const query = new URLSearchParams();
+        if (search) query.append("search", search);
+        const qs = query.toString();
+        url = `/api/item${qs ? `?${qs}` : ""}`;
+    }
+    console.log("[useItemsSWR] URL =", url, "tab=", tab, "apiClient=", !!apiClient);
+    // -----------------------------------------------------
+    // 2. SWR key を mode（public/auth）で分ける
+    // -----------------------------------------------------
+    const keyTag = apiClient ? "auth" : "public";
+    const swrKey = [
         url,
-        "auth"
-    ] : [
-        url,
-        "public"
+        keyTag
     ];
     console.log("[useItemsSWR] swrKey =", swrKey);
     // -----------------------------------------------------
-    // fetcher
+    // 3. fetcher
     // -----------------------------------------------------
     const swrFetcher = async ()=>{
         if (apiClient) {
@@ -141,15 +147,12 @@ function Home() {
         searchParams
     ]);
     // -------------------------------
-    // ★ 全タブで、ログインしていれば apiClient を使う
+    // ★ 認証済みなら token クライアントを使う
     // -------------------------------
     const effectiveApiClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        if (isAuthenticated && apiClient) {
-            return apiClient; // ALLでもTOKEN付きでAPI呼び出す！
-        }
+        if (isAuthenticated && apiClient) return apiClient;
         return null;
     }, [
-        currentTab,
         isAuthenticated,
         apiClient
     ]);
@@ -157,10 +160,10 @@ function Home() {
     // SWR fetch
     // -------------------------------
     const { items, isLoading: isItemsLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$itemService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useItemsSWR"])(currentTab, currentSearchQuery, isAuthLoading ? null : effectiveApiClient);
-    console.log("[Home] apiClient =", apiClient);
-    console.log("[Home] isAuthLoading =", isAuthLoading);
-    console.log("[Home] isAuthenticated =", isAuthenticated);
     const isPageLoading = isAuthLoading || isItemsLoading;
+    // -------------------------------
+    // 表示
+    // -------------------------------
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "main_contents",
         children: [
@@ -171,7 +174,7 @@ function Home() {
                         className: "animate-spin rounded-full h-10 w-10 border-4 border-t-red-500 border-red-300"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 57,
+                        lineNumber: 54,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -179,13 +182,13 @@ function Home() {
                         children: "読み込み中..."
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 58,
+                        lineNumber: 55,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/page.tsx",
-                lineNumber: 56,
+                lineNumber: 53,
                 columnNumber: 9
             }, this),
             !isPageLoading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -205,7 +208,7 @@ function Home() {
                                 children: "すべて"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 66,
+                                lineNumber: 63,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -219,13 +222,13 @@ function Home() {
                                 children: "マイリスト"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 76,
+                                lineNumber: 73,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 65,
+                        lineNumber: 62,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -244,7 +247,7 @@ function Home() {
                                                     onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onImageError"])(e, item.name)
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 91,
+                                                    lineNumber: 88,
                                                     columnNumber: 23
                                                 }, this),
                                                 item.remain === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -252,13 +255,13 @@ function Home() {
                                                     children: "SOLD"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 97,
+                                                    lineNumber: 94,
                                                     columnNumber: 25
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 90,
+                                            lineNumber: 87,
                                             columnNumber: 21
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -269,7 +272,7 @@ function Home() {
                                                     children: item.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 102,
+                                                    lineNumber: 99,
                                                     columnNumber: 23
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -280,36 +283,36 @@ function Home() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 103,
+                                                    lineNumber: 100,
                                                     columnNumber: 23
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 101,
+                                            lineNumber: 98,
                                             columnNumber: 21
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/page.tsx",
-                                    lineNumber: 89,
+                                    lineNumber: 86,
                                     columnNumber: 19
                                 }, this)
                             }, item.id, false, {
                                 fileName: "[project]/app/(main)/page.tsx",
-                                lineNumber: 88,
+                                lineNumber: 85,
                                 columnNumber: 17
                             }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "text-center w-full py-10 text-gray-500",
                             children: currentTab === "mylist" && !isAuthenticated ? "マイリストを見るにはログインが必要です。" : "該当する商品が見つかりませんでした。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/page.tsx",
-                            lineNumber: 111,
+                            lineNumber: 108,
                             columnNumber: 15
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/page.tsx",
-                        lineNumber: 85,
+                        lineNumber: 82,
                         columnNumber: 11
                     }, this)
                 ]
@@ -317,7 +320,7 @@ function Home() {
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/page.tsx",
-        lineNumber: 54,
+        lineNumber: 51,
         columnNumber: 5
     }, this);
 }

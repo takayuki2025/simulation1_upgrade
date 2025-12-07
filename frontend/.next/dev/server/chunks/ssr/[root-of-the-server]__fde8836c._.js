@@ -298,36 +298,31 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b
 const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"])(null);
 const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
 // ================================
-// 🔑 Laravel トークンだけを返す関数
+// 🔑 Laravel Token 発行専用関数
 // ================================
 async function loginWithLaravel(idToken) {
     const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
         id_token: idToken
     });
-    // ここでは token（文字列）だけ返す
     return data.token;
 }
 function AuthProvider({ children }) {
     const auth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getFirebaseAuth"])();
     const [firebaseUser, setFirebaseUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
-    // ★ ここが一番重要：API トークンだけを state で持つ
     const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
     // ================================
-    // apiClient は token から同期的に生成
+    // token → axios client へ同期
     // ================================
     const apiClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         if (!token) return null;
-        const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(token);
-        // デバッグ用
-        // console.log("[AuthProvider] createApiClient from token:", token.slice(0, 10));
-        return client;
+        return (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(token);
     }, [
         token
     ]);
     // ================================
-    // 初期ログイン (onAuthStateChanged)
+    // 初期ログイン: Firebase → Laravel 同期
     // ================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         console.log("[AuthProvider] START onAuthStateChanged");
@@ -344,10 +339,8 @@ function AuthProvider({ children }) {
             setIsLoading(true);
             try {
                 const idToken = await u.getIdToken();
-                // Laravel でアプリ用トークンを発行
                 const appToken = await loginWithLaravel(idToken);
                 setToken(appToken);
-                // /api/user を取るときだけ一時的に client を作る
                 const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(appToken);
                 const me = await client.get("/api/user");
                 setUser(me.data.user);
@@ -364,17 +357,14 @@ function AuthProvider({ children }) {
         auth
     ]);
     // ================================
-    // Token 自動更新 (onIdTokenChanged)
+    // Token 自動更新
     // ================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         const unsub = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onIdTokenChanged"])(auth, async (u)=>{
-            if (!u) {
-                // サインアウト済み
-                return;
-            }
+            if (!u) return;
             try {
-                const newFirebaseToken = await u.getIdToken();
-                const appToken = await loginWithLaravel(newFirebaseToken);
+                const idToken = await u.getIdToken();
+                const appToken = await loginWithLaravel(idToken);
                 setToken(appToken);
             } catch (e) {
                 console.error("[AuthProvider] Token refresh failed", e);
@@ -402,6 +392,40 @@ function AuthProvider({ children }) {
             console.error("[AuthProvider] login failed", e);
             setUser(null);
             setToken(null);
+            throw e;
+        } finally{
+            setIsLoading(false);
+        }
+    }, [
+        auth
+    ]);
+    // ================================
+    // register（新規登録）
+    // ================================
+    const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ name, email, password })=>{
+        setIsLoading(true);
+        try {
+            // ① Firebase アカウント作成
+            const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
+            // ② 表示名を Firebase に保存
+            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
+                displayName: name
+            });
+            const idToken = await cred.user.getIdToken();
+            // ③ Laravel 側で DB 登録 or login
+            const appToken = await loginWithLaravel(idToken);
+            setToken(appToken);
+            const client = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createApiClient"])(appToken);
+            const me = await client.get("/api/user");
+            setUser(me.data.user);
+            return {
+                needsEmailVerification: false
+            };
+        } catch (e) {
+            console.error("[AuthProvider] register failed", e);
+            setUser(null);
+            setToken(null);
+            throw e;
         } finally{
             setIsLoading(false);
         }
@@ -420,12 +444,9 @@ function AuthProvider({ children }) {
         auth
     ]);
     // ================================
-    // ログイン判定
+    // isAuthenticated
     // ================================
-    const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        // user がまだ取れていない瞬間があっても、token があれば「ログイン中」とみなす
-        return !!token;
-    }, [
+    const isAuthenticated = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>!!token, [
         token
     ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
@@ -437,12 +458,13 @@ function AuthProvider({ children }) {
             isAuthenticated,
             isLoading,
             login,
+            register,
             logout
         },
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 204,
+        lineNumber: 251,
         columnNumber: 5
     }, this);
 }

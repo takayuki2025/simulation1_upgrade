@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Favorite;
-use Illuminate\Support\Facades\Auth;
+use App\Models\Good;
+use App\Models\Item;
 
 class FavoriteController extends Controller
 {
     /**
-     * ⭐ お気に入り一覧を返す
+     * ⭐ いいね一覧（マイリスト）
      * GET /api/items/favorite
      */
     public function index(Request $request)
@@ -17,29 +17,30 @@ class FavoriteController extends Controller
         $user = $request->user();
         $search = $request->query('search');
 
-        $favorites = Item::query()
+        $items = Item::query()
             ->select('items.*')
-            ->join('favorites', 'favorites.item_id', '=', 'items.id')
-            ->where('favorites.user_id', $user->id)
-            ->when($search, function ($q) use ($search) {
-                $q->where('items.name', 'LIKE', "%{$search}%");
-            })
-            ->orderBy('favorites.created_at', 'desc')
+            ->join('goods', 'goods.item_id', '=', 'items.id')
+            ->where('goods.user_id', $user->id)
+            ->when(
+                $search,
+                fn ($q) =>
+                $q->where('items.name', 'LIKE', "%{$search}%")
+            )
+            ->orderByDesc('goods.created_at')
             ->get();
 
-        return response()->json([
-            'items' => $favorites
-        ]);
+        return response()->json(['items' => $items]);
     }
 
     /**
-     * お気に入り追加
+     * ⭐ いいね追加
+     * POST /api/items/{itemId}/favorite
      */
-    public function add(Request $req, $itemId)
+    public function add(Request $request, $itemId)
     {
-        $user = $req->user();
+        $user = $request->user();
 
-        Favorite::firstOrCreate([
+        Good::firstOrCreate([
             'user_id' => $user->id,
             'item_id' => $itemId,
         ]);
@@ -48,30 +49,17 @@ class FavoriteController extends Controller
     }
 
     /**
-     * お気に入り削除
+     * ⭐ いいね削除
+     * DELETE /api/items/{itemId}/favorite
      */
-    public function remove(Request $req, $itemId)
+    public function remove(Request $request, $itemId)
     {
-        $user = $req->user();
+        $user = $request->user();
 
-        Favorite::where('user_id', $user->id)
+        Good::where('user_id', $user->id)
             ->where('item_id', $itemId)
             ->delete();
 
         return response()->json(['success' => true]);
-    }
-
-    public function list(Request $request)
-    {
-        $userId = $request->user()->id;
-
-        $favorites = Favorite::where('user_id', $userId)
-            ->with('item')
-            ->get()
-            ->pluck('item');
-
-        return response()->json([
-            'items' => $favorites
-        ]);
     }
 }

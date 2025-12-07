@@ -26,14 +26,12 @@ export default function Home() {
   );
 
   // -------------------------------
-  // ★ 全タブで、ログインしていれば apiClient を使う
+  // ★ 認証済みなら token クライアントを使う
   // -------------------------------
   const effectiveApiClient = useMemo(() => {
-    if (isAuthenticated && apiClient) {
-      return apiClient; // ALLでもTOKEN付きでAPI呼び出す！
-    }
+    if (isAuthenticated && apiClient) return apiClient;
     return null;
-  }, [currentTab, isAuthenticated, apiClient]);
+  }, [isAuthenticated, apiClient]);
 
   // -------------------------------
   // SWR fetch
@@ -44,12 +42,11 @@ export default function Home() {
     isAuthLoading ? null : effectiveApiClient,
   );
 
-  console.log("[Home] apiClient =", apiClient);
-  console.log("[Home] isAuthLoading =", isAuthLoading);
-  console.log("[Home] isAuthenticated =", isAuthenticated);
-
   const isPageLoading = isAuthLoading || isItemsLoading;
 
+  // -------------------------------
+  // 表示
+  // -------------------------------
   return (
     <div className="main_contents">
       {isPageLoading && (
