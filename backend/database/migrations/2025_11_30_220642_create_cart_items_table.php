@@ -17,6 +17,12 @@ class CreateCartItemsTable extends Migration
             // カートアイテムのID
             $table->id();
 
+
+            $table->foreignId('shop_id')->nullable() // 💡 ここを追加
+      ->constrained()
+      ->cascadeOnDelete();
+
+
             // どのユーザーのカートか (usersテーブルへの外部キー)
             // ユーザーが削除されたらカートアイテムも削除
             $table->foreignId('user_id')

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use App\Models\User; // Userモデルを使用するために追加
+use App\Models\Shop;
 
 class ItemsTableSeeder extends Seeder
 {
@@ -15,6 +16,20 @@ class ItemsTableSeeder extends Seeder
      */
     public function run()
     {
+
+
+        // =============================================
+        // 💡 修正箇所 1: shop_id に使う Shop レコードを取得する
+        // =============================================
+        $shop = Shop::first();
+
+        // if (!$shop) {
+        //     \Log::error("ItemsTableSeeder: Shop record not found. Cannot set shop_id.");
+        //     // ショップが存在しない場合は処理を停止
+        //     return;
+        // }
+        // $defaultShopId = $shop->id;
+
         // UsersTableSeeder で作成したユーザーのメールアドレスリスト (最新版に更新)
         $userEmails = [
             'valid.email@example.com',      // ユーザー1
@@ -49,6 +64,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['メンズ']),
                 'item_image' => 'storage/item_images/Armani+Mens+Clock.jpg',
                 'remain' => 1,
+                'shop_id' => 1, // 💡 ここを追加
             ],
             [
                 'user_id' => $userIds['valid.email@example.com'] ?? 1, // ユーザー1のIDを使用
@@ -60,6 +76,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['家電']),
                 'item_image' => 'storage/item_images/HDD+Hard+Disk.jpg',
                 'remain' => 1,
+                'shop_id' => 1,
             ],
             [
                 'user_id' => $userIds['taro.y@coachtech.com'] ?? 2, // ユーザー2のIDを使用
@@ -71,6 +88,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['キッチン']),
                 'item_image' => 'storage/item_images/iLoveIMG+d.jpg',
                 'remain' => 1,
+                'shop_id' => 2,
             ],
             [
                 'user_id' => $userIds['taro.y@coachtech.com'] ?? 2, // ユーザー2のIDを使用
@@ -82,6 +100,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['メンズ']),
                 'item_image' => 'storage/item_images/Leather+Shoes+Product+Photo.jpg',
                 'remain' => 1,
+                'shop_id' => 2,
             ],
             [
                 'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
@@ -93,6 +112,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['家電']),
                 'item_image' => 'storage/item_images/Living+Room+Laptop.jpg',
                 'remain' => 1,
+                'shop_id' => 3,
             ],
             [
                 'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
@@ -104,6 +124,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['家電']),
                 'item_image' => 'storage/item_images/Music+Mic+4632231.jpg',
                 'remain' => 1,
+                'shop_id' => 3,
             ],
             [
                 'user_id' => $userIds['reina.n@coachtech.com'] ?? 3, // ユーザー3のIDを使用
@@ -115,6 +136,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['レディース']),
                 'item_image' => 'storage/item_images/Purse+fashion+pocket.jpg',
                 'remain' => 1,
+                'shop_id' => 3,
             ],
             [
                 'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
@@ -126,6 +148,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['キッチン']),
                 'item_image' => 'storage/item_images/Tumbler+souvenir.jpg',
                 'remain' => 1,
+                'shop_id' => 4,
             ],
             [
                 'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
@@ -137,6 +160,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['キッチン']),
                 'item_image' => 'storage/item_images/Waitress+with+Coffee+Grinder.jpg',
                 'remain' => 1,
+                'shop_id' => 4,
             ],
             [
                 'user_id' => $userIds['tomomi.a@coachtech.com'] ?? 4, // ユーザー4のIDを使用
@@ -148,6 +172,7 @@ class ItemsTableSeeder extends Seeder
                 'category' => json_encode(['レディース']),
                 'item_image' => 'storage/item_images/外出メイクアップセット.jpg',
                 'remain' => 1,
+                'shop_id' => 4, // 💡 ここを追加
             ],
         ];
 

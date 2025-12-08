@@ -22,6 +22,7 @@ class Item extends Model
         'item_image',
         'brand',
         'remain',
+        'shop_id',
     ];
 
     protected $casts = [
@@ -63,12 +64,17 @@ class Item extends Model
         return $this->hasMany(Comment::class);
     }
 
-                                                            // この商品がどのユーザーのカートに入っているかを関連付ける
+    // この商品がどのユーザーのカートに入っているかを関連付ける
     public function usersInCart()
     {
         // usersテーブルと関連付け
         return $this->belongsToMany(User::class, 'cart_items')
                     ->withPivot('quantity')
                     ->withTimestamps();
+    }
+
+    public function shop()
+    {
+        return $this->belongsTo(Shop::class);
     }
 }

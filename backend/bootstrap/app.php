@@ -22,6 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
     ->withMiddleware(function (Middleware $middleware) {
 
+
+        $middleware->append(\App\Http\Middleware\AddTenantInfoToLogs::class);
+
+
         // --- Trust Proxies の設定 (Docker環境向け) ---
         // 🚨 【修正箇所1】Caddyからのリクエストを全て信頼
         $middleware->trustProxies(
@@ -51,6 +55,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Firebaseカスタムミドルウェアのエイリアス（auth:firebaseで使用）
             'firebase.verify' => VerifyFirebaseToken::class,
             // 既存の古い名前空間のミドルウェアのエイリアスはLaravel 11では不要なため、削除
+            // ⭐ ここに 'tenant' ミドルウェアのエイリアスを追加 ⭐
+            'tenant' => \App\Http\Middleware\SetCurrentShop::class,
+            'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
         // ★★★ 修正箇所ここまで ★★★
 
@@ -67,9 +74,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // 最後にルーティングバインディングを追加
             append: [
                 'throttle:api',
+                \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+                \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
                 \Illuminate\Routing\Middleware\SubstituteBindings::class,
-                // ★★★ 修正箇所: APIグループ全体へのVerifyFirebaseTokenの適用を削除 ★★★
-                // VerifyFirebaseToken::class, // これを削除することで、ルートごとにauth:sanctumやauth:firebaseを制御可能にする
+                // \App\Http\Middleware\SetCurrentShop::class, // ←これもOK
             ]
         );
 

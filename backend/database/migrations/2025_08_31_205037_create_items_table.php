@@ -15,6 +15,12 @@ class CreateItemsTable extends Migration
     {
         Schema::create('items', function (Blueprint $table) {
             $table->id();
+
+
+            $table->foreignId('shop_id')->nullable() // 💡 ここを追加
+      ->constrained()
+      ->cascadeOnDelete();
+
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('name', 20);
             $table->integer('price');
@@ -24,6 +30,8 @@ class CreateItemsTable extends Migration
             $table->json('category');
             $table->string('item_image');
             $table->integer('remain');
+
+
             $table->timestamps();
         });
     }

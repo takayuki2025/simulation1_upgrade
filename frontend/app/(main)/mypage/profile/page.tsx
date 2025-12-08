@@ -10,7 +10,6 @@ import React, {
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useSanctumAuth";
-
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
 
 /* ------------------------------------
@@ -45,8 +44,14 @@ export default function ProfilePage() {
     apiClient,
   } = useAuth();
 
+  console.log("🔥 ProfilePage: 初期レンダリング");
+  console.log("authUser =", authUser);
+  console.log("isAuthenticated =", isAuthenticated);
+  console.log("isAuthLoading =", isAuthLoading);
+
   /* 状態管理 */
   const [user, setUser] = useState<User | null>(null);
+  const [isVerifiedSyncing, setIsVerifiedSyncing] = useState(false); // ← 認証同期中
 
   const [form, setForm] = useState({
     name: "",
@@ -65,25 +70,25 @@ export default function ProfilePage() {
 
   const fileInput = useRef<HTMLInputElement>(null);
 
-  /* メール検証リダイレクト判定 */
+  /* メール認証リダイレクト判定 */
   const isVerificationRedirect = useMemo(
     () => searchParams.get("verified") === "true",
     [searchParams],
   );
 
+  console.log("🔍 verified flag =", isVerificationRedirect);
+
   /* プロフィール画像（キャッシュバスター付き） */
   const profileImageUrl = useMemo(() => {
-    return getImageUrl(
-      user?.user_image ?? null,
-      IMAGE_TYPE.USER,
-      Date.now(), // キャッシュ避け
-    );
+    return getImageUrl(user?.user_image ?? null, IMAGE_TYPE.USER, Date.now());
   }, [user?.user_image]);
 
   /* ------------------------------------
      APIデータ → state 初期化
   ------------------------------------ */
   const initializeUserData = useCallback((src: any) => {
+    console.log("🟦 initializeUserData:", src);
+
     const data = src?.user ?? src;
 
     setUser(data);
@@ -100,11 +105,19 @@ export default function ProfilePage() {
   ------------------------------------ */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
-      if (!apiClient) return;
+      if (!apiClient) {
+        console.log("⚠️ fetchUserProfile: apiClient が null");
+        return;
+      }
 
       if (!isRetry) setIsFetching(true);
+
+      console.log("🟦 fetchUserProfile(): START isRetry =", isRetry);
+
       try {
         const res = await apiClient.get("/api/mypage/profile");
+        console.log("🟩 fetchUserProfile(): SUCCESS →", res.data);
+
         initializeUserData(res.data);
 
         if (isRetry) {
@@ -114,11 +127,16 @@ export default function ProfilePage() {
 
         setIsLoading(false);
       } catch (err: any) {
+        console.log("❌ fetchUserProfile(): ERROR", err);
+
         const status = err?.response?.status;
 
-        // --- 認証切れ（401） → トークン再取得
+        // --- 認証切れ（401）
         if (status === 401) {
+          console.log("⚠️ 401 → reloadAuthToken 実行");
+
           if (isRetry) {
+            console.log("❌ retry 後も 401 → logout");
             await logout();
             return;
           }
@@ -130,12 +148,12 @@ export default function ProfilePage() {
             await reloadAuthToken();
             await fetchUserProfile(true);
           } catch (e) {
+            console.log("❌ reloadAuthToken エラー → logout");
             await logout();
           }
           return;
         }
 
-        console.error("[Profile Load] Error:", err);
         setIsLoading(false);
       } finally {
         if (!isRetry) setIsFetching(false);
@@ -145,109 +163,72 @@ export default function ProfilePage() {
   );
 
   /* ------------------------------------
-     初期データフェッチ
+     🔥 Step 1：新規登録直後 verified=true を検知して同期
   ------------------------------------ */
   useEffect(() => {
-    if (isAuthLoading || isRecovering) return;
+    if (!isVerificationRedirect) return;
+
+    console.log("🔥 verified=true detected → reloadAuthToken を実行");
+
+    setIsVerifiedSyncing(true);
+
+    (async () => {
+      try {
+        await reloadAuthToken(); // ← Laravel 側の最新ユーザー取得
+        console.log("🟩 reloadAuthToken: SUCCESS");
+
+        if (apiClient) {
+          await fetchUserProfile(true); // ← プロフィール再取得
+        }
+      } catch (err) {
+        console.log("❌ verified sync error:", err);
+      } finally {
+        setIsVerifiedSyncing(false);
+        setIsLoading(false);
+      }
+    })();
+  }, [isVerificationRedirect, reloadAuthToken, fetchUserProfile, apiClient]);
+
+  /* ------------------------------------
+     初期データフェッチ（通常ルート）
+  ------------------------------------ */
+  useEffect(() => {
+    if (isAuthLoading || isRecovering || isVerifiedSyncing) {
+      console.log(
+        "⏳ 認証ローディング中 or 再認証中 → fetchUserProfile 実行しない",
+      );
+      return;
+    }
 
     if (!isAuthenticated) {
-      if (!authUser) router.replace("/login");
+      console.log("❌ isAuthenticated=false → /login へリダイレクト");
+      router.replace("/login");
       return;
     }
 
     if (isAuthenticated && apiClient && !user && !isFetching) {
+      console.log("🔄 fetchUserProfile を通常実行");
       fetchUserProfile();
     }
   }, [
     isAuthLoading,
     isAuthenticated,
+    isRecovering,
+    isVerifiedSyncing,
     authUser,
     apiClient,
     user,
     isFetching,
-    isRecovering,
     router,
     fetchUserProfile,
   ]);
 
   /* ------------------------------------
-     プロフィール画像アップロード
-  ------------------------------------ */
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !apiClient) return;
-
-    setImageError("");
-    setSuccessMessage("");
-    setIsLoading(true);
-
-    const formData = new FormData();
-    formData.append("user_image", file);
-
-    try {
-      const res = await apiClient.post("/api/profile/image", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const updated = res.data.user;
-      setUser(updated);
-      setSuccessMessage("画像が更新されました！");
-    } catch (err: any) {
-      const status = err.response?.status;
-
-      if (status === 401) {
-        await logout();
-        return;
-      }
-
-      if (status === 422) {
-        setImageError(err.response.data.errors.user_image[0]);
-      } else {
-        setImageError("アップロードに失敗しました");
-      }
-    } finally {
-      setIsLoading(false);
-      if (fileInput.current) fileInput.current.value = "";
-    }
-  };
-
-  /* ------------------------------------
-     プロフィール更新
-  ------------------------------------ */
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiClient) return;
-
-    setProfileErrors({});
-    setSuccessMessage("");
-    setIsLoading(true);
-
-    try {
-      const res = await apiClient.patch("/api/profile", form);
-      initializeUserData(res.data);
-      setSuccessMessage("プロフィール情報を更新しました！");
-    } catch (err: any) {
-      const status = err?.response?.status;
-
-      if (status === 401) {
-        await logout();
-        return;
-      }
-
-      if (status === 422) {
-        setProfileErrors(err.response.data.errors);
-      } else {
-        setSuccessMessage("エラーが発生しました。再試行してください。");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /* ------------------------------------
      ローディング表示
   ------------------------------------ */
-  if (isAuthLoading || isLoading || isRecovering) {
+  if (isAuthLoading || isLoading || isRecovering || isVerifiedSyncing) {
+    console.log("⏳ ProfilePage: Loading UI 表示中...");
+
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
         <h2 className="title">プロフィール設定</h2>
@@ -259,7 +240,11 @@ export default function ProfilePage() {
     );
   }
 
+  /* ------------------------------------
+     認証エラー
+  ------------------------------------ */
   if (!isAuthenticated || !user) {
+    console.log("❌ 認証エラー → Loginへ誘導");
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
         <h2 className="title">プロフィール設定</h2>
@@ -271,17 +256,20 @@ export default function ProfilePage() {
   /* ------------------------------------
      メイン UI
   ------------------------------------ */
+  console.log("🟩 ProfilePage: メインUIレンダリング user =", user);
+
   return (
     <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
       <h2 className="title">プロフィール設定</h2>
 
       <div className="form-wrapper">
-
         {successMessage && (
           <div className="alert-success2">{successMessage}</div>
         )}
 
+        {/* =========================== */}
         {/* 画像フォーム */}
+        {/* =========================== */}
         <form className="item_sell_contents_box_line">
           <div className="image_name">
             <div className="image_button_row">
@@ -305,24 +293,75 @@ export default function ProfilePage() {
               ref={fileInput}
               style={{ display: "none" }}
               accept="image/*"
-              onChange={handleImageUpload}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !apiClient) return;
+
+                setIsLoading(true);
+                setImageError("");
+
+                const formData = new FormData();
+                formData.append("user_image", file);
+
+                try {
+                  const res = await apiClient.post(
+                    "/api/profile/image",
+                    formData,
+                    { headers: { "Content-Type": "multipart/form-data" } },
+                  );
+
+                  setUser(res.data.user);
+                  setSuccessMessage("画像が更新されました！");
+                } catch (err: any) {
+                  console.log("❌ Image upload error:", err);
+                  setImageError("アップロードに失敗しました");
+                } finally {
+                  setIsLoading(false);
+                  if (fileInput.current) fileInput.current.value = "";
+                }
+              }}
             />
           </div>
 
           <div className="user_image_error">{imageError}</div>
         </form>
 
+        {/* =========================== */}
         {/* プロフィール編集 */}
-        <form onSubmit={handleProfileUpdate}>
+        {/* =========================== */}
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!apiClient) return;
+
+            setProfileErrors({});
+            setSuccessMessage("");
+            setIsLoading(true);
+
+            try {
+              const res = await apiClient.patch("/api/profile", form);
+              initializeUserData(res.data);
+              setSuccessMessage("プロフィール情報を更新しました！");
+            } catch (err: any) {
+              console.log("❌ Profile update error", err);
+
+              if (err.response?.status === 422) {
+                setProfileErrors(err.response.data.errors);
+              } else {
+                setSuccessMessage("エラーが発生しました。再試行してください。");
+              }
+            } finally {
+              setIsLoading(false);
+            }
+          }}
+        >
           {/* 名前 */}
           <div className="form-group">
             <label>ユーザー名</label>
             <input
               type="text"
               value={form.name}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, name: e.target.value }))
-              }
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             />
             <div className="error">{profileErrors?.name?.[0]}</div>
           </div>
@@ -374,4 +413,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

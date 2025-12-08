@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\Shop;
 use Kreait\Firebase\Contract\Auth;
 
 class UsersTableSeeder extends Seeder
@@ -25,6 +26,23 @@ class UsersTableSeeder extends Seeder
      */
     public function run(): void
     {
+
+
+        // =============================================
+        // 💡 修正箇所: shop_id に使う Shop レコードを取得する
+        // =============================================
+        // $shop = Shop::first();
+
+        // ⚠️ 注意: $shop が null でないか確認するか、
+        // DatabaseSeeder.php で ShopsTableSeeder が先に実行されているか確認してください。
+
+        // if (!$shop) {
+        //     // ショップが存在しない場合はエラーを出すか、処理をスキップするなどの対応が必要です。
+        //     // ここでは一旦、続行するために処理を止めます。
+        //     \Log::error("UsersTableSeeder: Shop record not found. Cannot set shop_id.");
+        //     return;
+        // }
+
         // テストユーザーのリスト。パスワードは全ユーザー共通で 'password123' とします。
         $testUsers = [
             [
@@ -35,6 +53,9 @@ class UsersTableSeeder extends Seeder
                 'address' => '東京都港区芝公園4-2-8',
                 'building' => 'コーポA',
                 'address_country' => 'JP',
+                'shop_id' => null,
+                // 💡 修正
+                'role' => 'OWNER',
             ],
             [
                 'name' => 'テスト用のユーザ2',
@@ -44,6 +65,9 @@ class UsersTableSeeder extends Seeder
                 'address' => '千葉',
                 'building' => 'ハイツB',
                 'address_country' => 'JP',
+                'shop_id' => null,
+                // 💡 修正
+                'role' => 'OWNER',
             ],
             [
                 'name' => 'テスト用のユーザ3',
@@ -53,6 +77,9 @@ class UsersTableSeeder extends Seeder
                 'address' => '静岡',
                 'building' => 'エトワール',
                 'address_country' => 'JP',
+                'shop_id' => null,
+                // 💡 修正
+                'role' => 'OWNER',
             ],
             [
                 'name' => 'テスト用のユーザ4',
@@ -62,7 +89,11 @@ class UsersTableSeeder extends Seeder
                 'address' => '長野',
                 'building' => 'エスポワール',
                 'address_country' => 'JP',
+                'shop_id' => null,
+                // 💡 修正
+                'role' => 'OWNER',
             ],
+
         ];
 
         // 🚨 【修正ポイント１：DBからの強力なクリーンアップ】
@@ -111,6 +142,8 @@ class UsersTableSeeder extends Seeder
                         'building' => $userData['building'],
                         'address_country' => $userData['address_country'],
                         'user_image' => '', // 必要に応じて設定
+                        'shop_id' => $userData['shop_id'],
+                        'role' => $userData['role'],
                         'email_verified_at' => now(),
                     ]
                 );

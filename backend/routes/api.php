@@ -12,6 +12,10 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\CommentController;
 
+use App\Http\Controllers\ShopController;
+
+use App\Http\Controllers\ShopItemController;
+
 // ============================================
 // 🚀 1. ログ: ルートファイル読み込み確認
 // ============================================
@@ -36,12 +40,63 @@ Route::post('/register', [FirebaseAuthController::class, 'register']);
 // 🔑 認証が必要ない公開 API
 // ============================================
 
-// 商品一覧・詳細（公開）
+
+// =========================
+//                                              マルチテナント API（店舗別）
+// =========================
+
+
+Route::prefix('shops/{shop_code}')
+    ->middleware('tenant')
+    ->group(function () {
+        Route::get('/', [ShopController::class, 'show']);
+        Route::get('/items', [ShopItemController::class, 'index']);
+    });
+
+
+
+Route::prefix('shops/{shop_code}')
+    ->middleware(['tenant', 'auth:sanctum', 'role:OWNER'])
+    ->group(function () {
+        Route::post('/items', [ShopItemController::class, 'store']);
+    });
+
+
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/shops', [ShopController::class, 'store'])
+        ->middleware('role:OWNER'); // OWNERだけが作成可能
+});
+
+
+
+// OWNER 限定：店舗の商品登録
+Route::prefix('shops/{shop_code}')
+    ->middleware(['tenant', 'auth:sanctum', 'role:OWNER'])
+    ->group(function () {
+        Route::post('/items', [ShopItemController::class, 'store']);
+    });
+
+// =========================
+// フリマ（全体）API
+// =========================
+
 Route::get('/item', [ItemController::class, 'index']);
 Route::get('/item/{id}', [ItemController::class, 'show']);
 
 // コメント一覧（公開）
 Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
+
+
+
+
+
+
+
+
+
+
+
 
 
 // ============================================
@@ -98,6 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // ============================================
 // 📩 メール認証
 // ============================================
-Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-    ->middleware(['signed'])
-    ->name('verification.verify');
+
+
+// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+//     ->middleware(['signed'])
+//     ->name('verification.verify');
+

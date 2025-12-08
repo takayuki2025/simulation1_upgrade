@@ -1,32 +1,22 @@
 <?php
 
+
 namespace App\Infrastructure\Persistence;
 
-use App\Domain\Repository\UserRepository;
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Models\User;
 
-class EloquentUserRepository implements UserRepository
-{
-    public function find(int $id): ?array
-    {
-        $u = User::find($id);
-        if (!$u) {
-            return null;
-        }
 
-        return [
-            'id'              => $u->id,
-            'name'            => $u->name,
-            'email'           => $u->email,
-            'email_verified_at' => $u->email_verified_at,
-            'post_number'     => $u->post_number,
-            'address'         => $u->address,
-            'building'        => $u->building,
-        ];
+
+class EloquentUserRepository implements UserRepositoryInterface
+{
+    public function findByEmail(string $email): ?User
+    {
+        return User::whereRaw('LOWER(email) = ?', [strtolower($email)])->first();
     }
 
-    public function findModel(int $id): ?User
+    public function createUser(array $data): User
     {
-        return User::find($id);
+        return User::create($data);
     }
 }

@@ -2,14 +2,29 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Domain\Repository\ItemRepository;
+use App\Domain\Repository\ItemRepositoryInterface; 
+use App\Models\Shop; // Shop も必要なので追加
 use App\Domain\Entity\Item as ItemEntity;
 use App\Models\Item;
 use Illuminate\Support\Facades\Log;
 
 
-class EloquentItemRepository implements ItemRepository
+class EloquentItemRepository implements ItemRepositoryInterface
 {
+    public function getByShop(Shop $shop): iterable
+    {
+        return Item::where('shop_id', $shop->id)
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function create(array $data): Item
+    {
+        return Item::create($data);
+    }
+
+
+
     /** 一覧取得 */
     public function listAll()
     {
@@ -30,10 +45,10 @@ class EloquentItemRepository implements ItemRepository
     }
 
     /** 出品作成 */
-    public function create(array $data)
-    {
-        return Item::create($data);
-    }
+    // public function create(array $data)
+    // {
+    //     return Item::create($data);
+    // }
 
     /** 購入確認 */
     public function purchaseConfirm(int $id)

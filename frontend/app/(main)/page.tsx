@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { useItemsSWR } from "@/src/services/itemService";
 import { getImageUrl, onImageError } from "@/utils/utils";
@@ -12,6 +13,8 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { apiClient, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
+  const router = useRouter();
+  const shopCode = "default_shop"; // ← まずは学習用固定
   // -------------------------------
   // タブ
   // -------------------------------
@@ -55,6 +58,35 @@ export default function Home() {
           <p className="ml-4 text-lg text-gray-400">読み込み中...</p>
         </div>
       )}
+      <div className="w-full flex gap-4 justify-center my-6">
+        <button
+          onClick={() => router.push("/shops/shop_a")}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+        >
+          ショップA(テスト用リンク)
+        </button>
+
+        <button
+          onClick={() => router.push("/shops/shop_b")}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+        >
+          ショップB(テスト用リンク)
+        </button>
+
+        <button
+          onClick={() => router.push("/shops/shop_c")}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+        >
+          ショップC(テスト用リンク)
+        </button>
+
+        <button
+          onClick={() => router.push("/shops/shop_d")}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+        >
+          ショップD(テスト用リンク)
+        </button>
+      </div>
 
       {!isPageLoading && (
         <>

@@ -4,7 +4,6 @@ namespace App\Infrastructure\Auth;
 
 use App\Domain\Auth\FirebaseAuthPort;
 use Kreait\Firebase\Contract\Auth as FirebaseAuth;
-use Lcobucci\JWT\Token;
 
 class FirebaseAuthAdapter implements FirebaseAuthPort
 {
@@ -12,9 +11,15 @@ class FirebaseAuthAdapter implements FirebaseAuthPort
     {
     }
 
-    public function verifyIdToken(string $idToken, int $leeway = 300): Token
+    public function verifyIdToken(string $idToken)
     {
-        return $this->auth->verifyIdToken($idToken, false, $leeway);
+        // Kreait SDK は第3引数を受け取らない
+        return $this->auth->verifyIdToken($idToken);
+    }
+
+    public function getUser(string $uid)
+    {
+        return $this->auth->getUser($uid);
     }
 
     public function markEmailVerified(string $firebaseUid): void

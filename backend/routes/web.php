@@ -6,6 +6,10 @@ use App\Http\Controllers\Auth\FirebaseAuthController;
 
 
 
+Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+    ->middleware(['signed'])
+    ->name('verification.verify');
+
 
 
 // ========== API サーバーとしての root ==========

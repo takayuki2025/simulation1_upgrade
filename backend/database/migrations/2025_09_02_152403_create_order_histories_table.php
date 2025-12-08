@@ -15,6 +15,12 @@ class CreateOrderHistoriesTable extends Migration
     {
         Schema::create('order_histories', function (Blueprint $table) {
             $table->id();
+
+
+            $table->foreignId('shop_id')->nullable() // 💡 ここを追加
+      ->constrained()
+      ->cascadeOnDelete();
+
             $table->foreignId('item_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('payment');

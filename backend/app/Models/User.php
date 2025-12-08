@@ -8,14 +8,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 // ★追加: メール検証URL生成に必要なクラス
 // use Illuminate\Support\Carbon;
 // use Illuminate\Support\Facades\Config;
 // use Illuminate\Support\Facades\URL;
 
 use App\Notifications\CustomVerifyEmail;
-
-
 
 // use Illuminate\Auth\Notifications\VerifyEmail; // sendEmailVerificationNotificationで使用　
 
@@ -40,6 +39,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'user_image',
         'address_country',
         'firebase_uid',
+        'shop_id',
+        'role',
     ];
 
     /**
@@ -60,6 +61,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'shop_id' => 'integer',
     ];
 
     // --- リレーションシップの定義 (既存のまま) ---
@@ -98,6 +100,18 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsToMany(Item::class, 'cart_items')
                     ->withPivot('quantity') // cart_itemsテーブルのquantityカラムも取得
                     ->withTimestamps();
+    }
+
+    public function shop()
+    {
+        return $this->belongsTo(Shop::class);
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class)
+            ->withPivot('shop_id')
+            ->withTimestamps();
     }
 
 

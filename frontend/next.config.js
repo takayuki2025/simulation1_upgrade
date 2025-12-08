@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // ★ Next.js 16: PPR → cacheComponents に統合
+  // Next.js 16: PPR → cacheComponents に統合
   cacheComponents: true,
 
   env: {
@@ -17,6 +17,18 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  },
+
+  // 🔥 これが無いから画像が拒否されている！
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "localhost",
+        port: "9000",
+        pathname: "/storage/**",
+      },
+    ],
   },
 };
 

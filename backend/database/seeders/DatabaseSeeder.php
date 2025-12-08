@@ -13,7 +13,19 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        $this->call(UsersTableSeeder::class);
-        $this->call(ItemsTableSeeder::class);
+
+
+        $this->call([
+            \Database\Seeders\RoleSeeder::class,
+            // 1. 依存関係の少ないテーブルを先に作成（ユーザーテーブルが先）
+            \Database\Seeders\UsersTableSeeder::class, // shop_id=nullでユーザーを作成
+            \Database\Seeders\ShopsTableSeeder::class, // usersに依存しないショップを作成
+
+
+            // 3. 他のシーダー
+            \Database\Seeders\ItemsTableSeeder::class,
+            // ...
+        ]);
+
     }
 }
