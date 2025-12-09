@@ -61,10 +61,13 @@ export default function RegisterPage() {
 
       // 👇 useAuth.register() は「メール認証が必要かどうか」を返す
       if (result.needsEmailVerification) {
+        // メールのリンクを踏むまで待つページへ遷移
         router.push("/email/verify");
-      } else {
-        router.push("/");
+        return;
       }
+
+      // 既に検証済みのログインユーザーならプロフィールへ
+      router.push("/mypage/profile");
     } catch (e: any) {
       console.error("[RegisterPage] registration failed:", e);
       setApiError(e?.message || "登録に失敗しました。もう一度お試しください。");

@@ -37,16 +37,14 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
 // ======================================
 //  API ベースURL
 // ======================================
-const BASE = ("TURBOPACK compile-time value", "https://localhost:9000") || "https://laravel.test";
+const BASE = ("TURBOPACK compile-time value", "/api") || "https://laravel.test";
 const getImageUrl = (path, type = "other", cacheBuster)=>{
-    if (!path) {
-        return "https://placehold.co/300x300?text=No+Image";
-    }
-    // すでに http で始まる外部URLならそのまま返す
+    if (!path) return "https://placehold.co/300x300?text=No+Image";
+    // 外部 URL の場合はそのまま
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return cacheBuster ? `${path}?v=${cacheBuster}` : path;
     }
-    // 画像種類ごとのディレクトリ可変
+    // 種類に応じてパスを決定
     let prefix = "";
     switch(type){
         case "user":
@@ -58,8 +56,8 @@ const getImageUrl = (path, type = "other", cacheBuster)=>{
         default:
             prefix = "/storage/other";
     }
-    const url = `${BASE}${prefix}/${path}`;
-    // キャッシュバスター付き
+    // ✨ ここが重要：BASE を使わない（Nginx が返すため）
+    const url = `${prefix}/${path}`;
     return cacheBuster ? `${url}?v=${cacheBuster}` : url;
 };
 const onImageError = (e, name)=>{
@@ -105,10 +103,10 @@ function ShopTopPage() {
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         async function loadShopData() {
             try {
-                const shopRes = await fetch(`${("TURBOPACK compile-time value", "https://localhost:9000")}/api/shops/${shopCode}`);
+                const shopRes = await fetch(`${("TURBOPACK compile-time value", "/api")}/api/shops/${shopCode}`);
                 const shopData = await shopRes.json();
                 setShop(shopData.shop);
-                const itemsRes = await fetch(`${("TURBOPACK compile-time value", "https://localhost:9000")}/api/shops/${shopCode}/items`);
+                const itemsRes = await fetch(`${("TURBOPACK compile-time value", "/api")}/api/shops/${shopCode}/items`);
                 const itemsData = await itemsRes.json();
                 setItems(itemsData.items ?? []);
             } catch (err) {

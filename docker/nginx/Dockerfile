@@ -20,8 +20,11 @@ RUN deluser www-data 2>/dev/null || true && \
     adduser -u 82 -D -S -G www-data www-data
 
 # Nginx設定ファイルのコピー (変更なし)
-COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY default.conf /etc/nginx/conf.d/default.conf
+
+# SSL も同じディレクトリにある
+COPY ssl /etc/nginx/ssl
 
 # 🚨 Nginxが使用するディレクトリの所有者を www-data に変更 (変更なし)
 RUN mkdir -p /var/www/backend /var/www/frontend/public && \

@@ -11,41 +11,39 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\CommentController;
-
 use App\Http\Controllers\ShopController;
-
 use App\Http\Controllers\ShopItemController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 
-// ============================================
-// 🚀 1. ログ: ルートファイル読み込み確認
-// ============================================
+/* ============================================================
+   🚀 1. デバッグログ（必須）
+============================================================ */
 Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 
+Route::get('/health', fn () => ['status' => 'ok']);
 
-// ============================================
-// 🔐 Firebase → Sanctum Token 認証
-// ============================================
 
-// Firebase ID Token → Laravel Token 発行
+/* ============================================================
+   🔐 2. Firebase 認証 → Laravel Sanctum Token 発行（必須）
+============================================================ */
 Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegister']);
-
-// Firebase Login 専用
 Route::post('/login', [FirebaseAuthController::class, 'login']);
-
-// Firebase Register 専用
 Route::post('/register', [FirebaseAuthController::class, 'register']);
 
 
-// ============================================
-// 🔑 認証が必要ない公開 API
-// ============================================
+
+/* ============================================================
+   🌐 3. 公開 API（認証不要）
+============================================================ */
+// アイテム（公開）
+Route::get('/item', [ItemController::class, 'index']);
+Route::get('/item/{id}', [ItemController::class, 'show']);
+
+// コメント一覧（公開）
+Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
 
 
-// =========================
-//                                              マルチテナント API（店舗別）
-// =========================
-
-
+// 店舗公開
 Route::prefix('shops/{shop_code}')
     ->middleware('tenant')
     ->group(function () {
@@ -55,107 +53,129 @@ Route::prefix('shops/{shop_code}')
 
 
 
-Route::prefix('shops/{shop_code}')
-    ->middleware(['tenant', 'auth:sanctum', 'role:OWNER'])
-    ->group(function () {
-        Route::post('/items', [ShopItemController::class, 'store']);
-    });
-
-
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/shops', [ShopController::class, 'store'])
-        ->middleware('role:OWNER'); // OWNERだけが作成可能
-});
-
-
-
-// OWNER 限定：店舗の商品登録
-Route::prefix('shops/{shop_code}')
-    ->middleware(['tenant', 'auth:sanctum', 'role:OWNER'])
-    ->group(function () {
-        Route::post('/items', [ShopItemController::class, 'store']);
-    });
-
-// =========================
-// フリマ（全体）API
-// =========================
-
-Route::get('/item', [ItemController::class, 'index']);
-Route::get('/item/{id}', [ItemController::class, 'show']);
-
-// コメント一覧（公開）
-Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ============================================
-// 🔐 Token 認証（auth:sanctum）
-// ============================================
+/* ============================================================
+   🔐 4. 認証必須エリア（auth:sanctum）
+============================================================ */
 Route::middleware('auth:sanctum')->group(function () {
 
-    // --- User 情報 ---
-    Route::get('/user', function (Request $request) {
-        return response()->json(['user' => $request->user()]);
-    });
-
+    /* ----------------------
+       🔹 ログイン中ユーザー情報
+    -----------------------*/
     Route::get('/me', function (Request $request) {
         return response()->json(['user' => $request->user()]);
     });
 
-    // --- Logout ---
+    Route::get('/user', [FirebaseAuthController::class, 'me']); // 必須
+
+    /* ----------------------
+       🔹 Logout
+    -----------------------*/
     Route::post('/logout', [AuthController::class, 'logout']);
 
 
-    //        これにより、ItemController::index 内で $request->user() が利用可能になる。
-    // Route::get('/item', [ItemController::class, 'index']);
 
-    // --- Item（認証が必要な操作のみ） ---
-    Route::post('/item', [ItemController::class, 'store']);
-    Route::put('/item/{id}', [ItemController::class, 'update']);
-    Route::delete('/item/{id}', [ItemController::class, 'destroy']);
-
-    // --- Profile ---
+    /* ----------------------
+       🔹 Profile
+    -----------------------*/
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
 
-    // --- Mypage ---
+
+
+    /* ----------------------
+       🔹 MyPage（あなたの UseCase と連動）
+    -----------------------*/
     Route::get('/mypage/profile', [MypageController::class, 'profile']);
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
     Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
 
-    // --- Comment 作成 ---
-    Route::post('/comment', [CommentController::class, 'create']);
 
-    // --- Favorite ---
+
+    /* ----------------------
+       🔹 Item（認証が必要な操作）
+    -----------------------*/
+    Route::post('/item', [ItemController::class, 'store']);
+    Route::put('/item/{id}', [ItemController::class, 'update']);
+    Route::delete('/item/{id}', [ItemController::class, 'destroy']);
+
+
+
+    /* ----------------------
+       🔹 Purchase（購入系）
+    -----------------------*/
+    Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
+    Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
+    Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
+
+
+    /* ----------------------
+       🔹 Favorite
+    -----------------------*/
     Route::get('/items/favorite', [FavoriteController::class, 'index']);
     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
 
-    // --- Purchase ---
-    Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
-    Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
-    Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
+
+    /* ----------------------
+       🔹 Comment 作成
+    -----------------------*/
+    Route::post('/comment', [CommentController::class, 'create']);
+
+
+
+    /* ----------------------
+       🔹 店舗（OWNER 専用）
+    -----------------------*/
+    Route::post('/shops', [ShopController::class, 'store'])
+        ->middleware('role:OWNER');
+
+
+    Route::prefix('shops/{shop_code}')
+        ->middleware(['tenant', 'role:OWNER'])
+        ->group(function () {
+            Route::post('/items', [ShopItemController::class, 'store']);
+        });
 });
 
 
-// ============================================
-// 📩 メール認証
-// ============================================
+
+/* ============================================================
+   📩 5. メール認証の再送（必要）
+============================================================ */
+Route::post('/email/resend', function (Request $request) {
+    if ($request->user()->hasVerifiedEmail()) {
+        return response()->json(['message' => 'Already verified'], 400);
+    }
+    $request->user()->sendEmailVerificationNotification();
+    return response()->json(['message' => 'Verification link sent']);
+});
 
 
-// Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-//     ->middleware(['signed'])
-//     ->name('verification.verify');
 
+/* ============================================================
+   📛 6. 不要 / 重複ルート（コメント化して下に隔離）
+============================================================ */
+
+/*
+|--------------------------------------------------------------------------
+| ❌ 重複していた user ルート（必要なし）
+|--------------------------------------------------------------------------
+| 上で定義済みなので不要。残すとバグ要因になるためコメント化。
+*/
+// Route::get('/user', function (Request $request) {
+//     return response()->json(['user' => $request->user()]);
+// });
+
+
+/*
+|--------------------------------------------------------------------------
+| ❌ shops/{shop_code} の store ルートが二重
+|--------------------------------------------------------------------------
+| 上の OWNER グループと重複するためコメント化。
+*/
+// Route::prefix('shops/{shop_code}')
+//     ->middleware(['tenant', 'auth:sanctum', 'role:OWNER'])
+//     ->group(function () {
+//         Route::post('/items', [ShopItemController::class, 'store']);
+//     });

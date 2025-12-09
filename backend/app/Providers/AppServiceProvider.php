@@ -11,6 +11,7 @@ use App\Domain\Repository\OrderHistoryRepository;
 use App\Domain\Repository\CommentRepository;
 use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
+use App\Domain\Repository\MypageRepository;
 // ========== Infrastructure Persistence ==========
 // use App\Infrastructure\Persistence\EloquentItemRepository;
 use App\Infrastructure\Persistence\EloquentUserRepository;
@@ -24,6 +25,11 @@ use App\Domain\Auth\FirebaseAuthPort;
 // ========== Infrastructure Adapters ==========
 use App\Infrastructure\Payment\StripePaymentAdapter;
 use App\Infrastructure\Auth\FirebaseAuthAdapter;
+// ========== Infrastructure Repositories ==========
+use App\Infrastructure\Repository\MypageRepositoryImpl;
+// ========== Use Cases ==========
+use App\Application\UseCase\Mypage\MypageUseCase;
+use App\Application\UseCase\Mypage\MypageUseCaseImpl;
 // Firebase SDK
 use Kreait\Firebase\Contract\Auth as FirebaseSdk;
 
@@ -37,6 +43,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(OrderHistoryRepository::class, EloquentOrderHistoryRepository::class);
         $this->app->bind(CommentRepository::class, EloquentCommentRepository::class);
         $this->app->bind(FavoriteRepository::class, EloquentFavoriteRepository::class);
+
+
+        $this->app->bind(MypageUseCase::class, MypageUseCaseImpl::class);
+        $this->app->bind(MypageRepository::class, MypageRepositoryImpl::class);
+
 
         $this->app->bind(
             \App\Domain\Repository\MypageRepository::class,

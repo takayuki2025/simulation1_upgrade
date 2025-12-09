@@ -77,8 +77,11 @@ function LoginPage() {
             passLen: password.length
         });
         try {
-            // 🔥 引数の形式を修正！
-            await login(email.trim(), password);
+            // ✅ 修正後のコード: emailとpasswordを1つのオブジェクトとして渡す
+            await login({
+                email: email.trim(),
+                password: password
+            });
             console.log("[LoginPage] Login success → redirect /");
             router.push("/");
         } catch (error) {

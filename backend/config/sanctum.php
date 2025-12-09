@@ -17,7 +17,9 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost:3000,localhost:9000')),
+    'stateful' => [
+    'localhost',   // ← これだけで OK!!
+],
 
     // 'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
     //     'localhost',
@@ -86,6 +88,6 @@ return [
     |
     */
     // ★★★ 修正箇所: ここを修正し、.envの値（SESSION_SECURE_COOKIE）を参照するように変更 ★★★
-    'secure_cookies' => env('SESSION_SECURE_COOKIE', false),
+    'secure_cookies' => false,
 
 ];

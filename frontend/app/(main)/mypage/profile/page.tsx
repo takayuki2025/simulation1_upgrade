@@ -7,19 +7,20 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-
 import { useRouter, useSearchParams } from "next/navigation";
+import { AxiosError } from "axios";
+
 import { useAuth } from "@/hooks/useSanctumAuth";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
 
-/* ------------------------------------
-  型定義
------------------------------------- */
-interface User {
+/* ============================================================
+   型定義
+============================================================ */
+interface ProfileUser {
   id: number;
   name: string;
   email: string;
-  uid: string;
+  uid?: string;
   email_verified_at: string | null;
   post_number: string | null;
   address: string | null;
@@ -27,130 +28,145 @@ interface User {
   user_image?: string | null;
 }
 
-/* =============================================
-   ProfilePage
-============================================= */
+interface ProfileForm {
+  name: string;
+  post_number: string;
+  address: string;
+  building: string;
+}
+
+type ProfileErrors = {
+  [K in keyof ProfileForm]?: string[];
+} & {
+  user_image?: string[];
+};
+
+/* ============================================================
+   ProfilePage（Origin 統一版）
+============================================================ */
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  /* 認証 */
   const {
     user: authUser,
+    firebaseUser,
+    apiClient,
     isAuthenticated,
     isLoading: isAuthLoading,
-    logout,
     reloadAuthToken,
-    apiClient,
+    logout,
   } = useAuth();
 
-  console.log("🔥 ProfilePage: 初期レンダリング");
-  console.log("authUser =", authUser);
-  console.log("isAuthenticated =", isAuthenticated);
-  console.log("isAuthLoading =", isAuthLoading);
+  // ⚠️ メール認証完了後のフラグ
+  const isVerificationRedirect = useMemo(
+    () => searchParams.get("verified") === "true",
+    [searchParams],
+  );
 
-  /* 状態管理 */
-  const [user, setUser] = useState<User | null>(null);
-  const [isVerifiedSyncing, setIsVerifiedSyncing] = useState(false); // ← 認証同期中
-
-  const [form, setForm] = useState({
+  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
+  const [form, setForm] = useState<ProfileForm>({
     name: "",
     post_number: "",
     address: "",
     building: "",
   });
 
-  const [profileErrors, setProfileErrors] = useState<any>({});
-  const [imageError, setImageError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
+  const [imageError, setImageError] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isFetching, setIsFetching] = useState<boolean>(false);
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
-  const fileInput = useRef<HTMLInputElement>(null);
+  // 🚩 修正ポイント 1：メール認証後の reloadAuthToken を「確実に一度だけ実行する」
+  const verificationHandledRef = useRef<boolean>(false);
 
-  /* メール認証リダイレクト判定 */
-  const isVerificationRedirect = useMemo(
-    () => searchParams.get("verified") === "true",
-    [searchParams],
-  );
+  // 🚩 修正ポイント 2：401 の回復処理が無限に走らないように制御
+  const recoveryTriedRef = useRef<boolean>(false);
 
-  console.log("🔍 verified flag =", isVerificationRedirect);
+  console.log("🔥 ProfilePage Mounted");
+  console.log("authUser=", authUser);
+  console.log("firebaseUser=", firebaseUser);
+  console.log("isAuthenticated=", isAuthenticated);
+  console.log("isVerificationRedirect=", isVerificationRedirect);
 
-  /* プロフィール画像（キャッシュバスター付き） */
+  /* ============================================================
+     画像 URL（キャッシュバスター付き）
+  ============================================================ */
   const profileImageUrl = useMemo(() => {
-    return getImageUrl(user?.user_image ?? null, IMAGE_TYPE.USER, Date.now());
-  }, [user?.user_image]);
+    return getImageUrl(
+      profileUser?.user_image ?? null,
+      IMAGE_TYPE.USER,
+      Date.now(),
+    );
+  }, [profileUser?.user_image]);
 
-  /* ------------------------------------
-     APIデータ → state 初期化
-  ------------------------------------ */
-  const initializeUserData = useCallback((src: any) => {
-    console.log("🟦 initializeUserData:", src);
+  /* ============================================================
+     API レスポンスを state に反映
+  ============================================================ */
+  const initializeProfileFromResponse = useCallback((src: any) => {
+    const data: ProfileUser = src?.user ?? src;
 
-    const data = src?.user ?? src;
-
-    setUser(data);
+    setProfileUser(data);
     setForm({
-      name: data.name || "",
-      post_number: data.post_number || "",
-      address: data.address || "",
-      building: data.building || "",
+      name: data.name ?? "",
+      post_number: data.post_number ?? "",
+      address: data.address ?? "",
+      building: data.building ?? "",
     });
   }, []);
 
-  /* ------------------------------------
-     プロフィール読み込み
-  ------------------------------------ */
+  /* ============================================================
+     1. プロフィール取得 API
+  ============================================================ */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
-      if (!apiClient) {
-        console.log("⚠️ fetchUserProfile: apiClient が null");
-        return;
+      if (!apiClient) return;
+
+      if (!isRetry) {
+        setIsFetching(true);
+        setSuccessMessage("");
+        setProfileErrors({});
       }
 
-      if (!isRetry) setIsFetching(true);
-
-      console.log("🟦 fetchUserProfile(): START isRetry =", isRetry);
+      console.log("[Profile] fetchUserProfile 開始");
 
       try {
-        const res = await apiClient.get("/api/mypage/profile");
-        console.log("🟩 fetchUserProfile(): SUCCESS →", res.data);
-
-        initializeUserData(res.data);
-
-        if (isRetry) {
-          setIsRecovering(false);
-          setSuccessMessage("認証情報再構築 → データ再取得成功");
-        }
+        const res = await apiClient.get("/mypage/profile");
+        initializeProfileFromResponse(res.data);
 
         setIsLoading(false);
-      } catch (err: any) {
-        console.log("❌ fetchUserProfile(): ERROR", err);
+        setIsRecovering(false);
+      } catch (err) {
+        const axiosErr = err as AxiosError<any>;
+        const status = axiosErr.response?.status;
 
-        const status = err?.response?.status;
+        console.error("[Profile] fetch error:", status);
 
-        // --- 認証切れ（401）
-        if (status === 401) {
-          console.log("⚠️ 401 → reloadAuthToken 実行");
-
-          if (isRetry) {
-            console.log("❌ retry 後も 401 → logout");
-            await logout();
-            return;
-          }
-
+        if (status === 401 && !recoveryTriedRef.current) {
+          recoveryTriedRef.current = true;
           setIsRecovering(true);
-          setSuccessMessage("セッション期限切れ → 再認証中...");
 
           try {
+            console.log("[Profile] 401 → reloadAuthToken 実行");
             await reloadAuthToken();
+
+            console.log("[Profile] 401 → 回復成功 → 再フェッチ");
             await fetchUserProfile(true);
-          } catch (e) {
-            console.log("❌ reloadAuthToken エラー → logout");
+            return;
+          } catch {
+            console.error("[Profile] 401 → 回復失敗");
             await logout();
+            router.replace("/login");
+            return;
           }
+        }
+
+        if (status === 401) {
+          await logout();
+          router.replace("/login");
           return;
         }
 
@@ -159,105 +175,173 @@ export default function ProfilePage() {
         if (!isRetry) setIsFetching(false);
       }
     },
-    [apiClient, initializeUserData, logout, reloadAuthToken],
+    [apiClient, initializeProfileFromResponse, reloadAuthToken, logout, router],
   );
 
-  /* ------------------------------------
-     🔥 Step 1：新規登録直後 verified=true を検知して同期
-  ------------------------------------ */
+  /* ============================================================
+     2. メール認証完了後の「必ず reloadAuthToken()」処理
+     🚩 これがあなたの環境で動いていなかった → 今回の最大修正点
+  ============================================================ */
   useEffect(() => {
     if (!isVerificationRedirect) return;
 
-    console.log("🔥 verified=true detected → reloadAuthToken を実行");
+    // すでに実行済みならスキップ
+    if (verificationHandledRef.current) return;
 
-    setIsVerifiedSyncing(true);
+    // firebaseUser がまだ来ていない場合は待つ（ここが前回バグの原因）
+    if (!firebaseUser) {
+      console.log("[Profile] verified=true だが firebaseUser 未到達 → wait");
+      return;
+    }
 
-    (async () => {
+    // 1回だけ実行
+    verificationHandledRef.current = true;
+
+    const run = async () => {
+      console.log("🔥 verified=true → reloadAuthToken() 実行！");
+      setIsRecovering(true);
+
       try {
-        await reloadAuthToken(); // ← Laravel 側の最新ユーザー取得
-        console.log("🟩 reloadAuthToken: SUCCESS");
-
-        if (apiClient) {
-          await fetchUserProfile(true); // ← プロフィール再取得
-        }
+        await reloadAuthToken();
+        console.log("🔥 verified=true → reloadAuthToken SUCCESS");
       } catch (err) {
-        console.log("❌ verified sync error:", err);
+        console.error("reloadAuthToken 失敗:", err);
+        setSuccessMessage(
+          "メール認証後のログイン状態の復元に失敗しました。再ログインしてください。",
+        );
       } finally {
-        setIsVerifiedSyncing(false);
-        setIsLoading(false);
+        setIsRecovering(false);
       }
-    })();
-  }, [isVerificationRedirect, reloadAuthToken, fetchUserProfile, apiClient]);
+    };
 
-  /* ------------------------------------
-     初期データフェッチ（通常ルート）
-  ------------------------------------ */
+    void run();
+  }, [isVerificationRedirect, firebaseUser, reloadAuthToken]);
+
+  /* ============================================================
+     3. 初回プロフィール取得（通常 or 回復後）
+  ============================================================ */
   useEffect(() => {
-    if (isAuthLoading || isRecovering || isVerifiedSyncing) {
-      console.log(
-        "⏳ 認証ローディング中 or 再認証中 → fetchUserProfile 実行しない",
-      );
+    if (isAuthLoading || isRecovering) return;
+
+    // token 未生成 → verified=true の回復を待つ
+    if (!isAuthenticated || !apiClient) {
+      if (!firebaseUser) {
+        router.replace("/login");
+      }
       return;
     }
 
-    if (!isAuthenticated) {
-      console.log("❌ isAuthenticated=false → /login へリダイレクト");
-      router.replace("/login");
-      return;
-    }
-
-    if (isAuthenticated && apiClient && !user && !isFetching) {
-      console.log("🔄 fetchUserProfile を通常実行");
-      fetchUserProfile();
+    if (!profileUser && !isFetching) {
+      console.log("🔥 fetchUserProfile 実行");
+      void fetchUserProfile();
     }
   }, [
     isAuthLoading,
-    isAuthenticated,
     isRecovering,
-    isVerifiedSyncing,
-    authUser,
+    isAuthenticated,
     apiClient,
-    user,
+    firebaseUser,
+    profileUser,
     isFetching,
-    router,
     fetchUserProfile,
+    router,
   ]);
 
-  /* ------------------------------------
-     ローディング表示
-  ------------------------------------ */
-  if (isAuthLoading || isLoading || isRecovering || isVerifiedSyncing) {
-    console.log("⏳ ProfilePage: Loading UI 表示中...");
+  /* ============================================================
+     画像アップロード
+  ============================================================ */
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !apiClient) return;
+
+    setImageError("");
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append("user_image", file);
+
+    try {
+      const res = await apiClient.post("/profile/image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      initializeProfileFromResponse(res.data);
+      setSuccessMessage("画像を更新しました！");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.errors?.user_image?.[0] ??
+        "画像アップロードに失敗しました。";
+      setImageError(msg);
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  /* --------------------------------------------------------
+     プロフィール更新
+  -------------------------------------------------------- */
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiClient) return;
+
+    setProfileErrors({});
+    setIsLoading(true);
+
+    try {
+      const res = await apiClient.patch("/profile", form);
+      initializeProfileFromResponse(res.data);
+      setSuccessMessage("プロフィールを更新しました！");
+    } catch (err: any) {
+      const status = err.response?.status;
+
+      if (status === 422) {
+        setProfileErrors(err.response?.data?.errors ?? {});
+      } else if (status === 401) {
+        await logout();
+        router.replace("/login");
+      } else {
+        setSuccessMessage("更新時にエラーが発生しました。");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /* ============================================================
+     ローディング UI
+  ============================================================ */
+  if (isAuthLoading || isLoading || isRecovering) {
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
         <h2 className="title">プロフィール設定</h2>
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
-          <p className="text-gray-500 mt-3">ロード中...</p>
+          <p className="text-gray-500 mt-3">
+            {isRecovering ? "セッションを再同期しています..." : "読み込み中..."}
+          </p>
         </div>
       </div>
     );
   }
 
-  /* ------------------------------------
-     認証エラー
-  ------------------------------------ */
-  if (!isAuthenticated || !user) {
-    console.log("❌ 認証エラー → Loginへ誘導");
+  /* ============================================================
+     エラー
+  ============================================================ */
+  if (!isAuthenticated || !profileUser) {
     return (
       <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
         <h2 className="title">プロフィール設定</h2>
-        <p>認証エラー。ログインし直してください。</p>
+        <p>認証エラーが発生しました。ログインし直してください。</p>
       </div>
     );
   }
 
-  /* ------------------------------------
-     メイン UI
-  ------------------------------------ */
-  console.log("🟩 ProfilePage: メインUIレンダリング user =", user);
-
+  /* ============================================================
+     メイン UI（デザイン変更なし）
+  ============================================================ */
   return (
     <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
       <h2 className="title">プロフィール設定</h2>
@@ -267,14 +351,12 @@ export default function ProfilePage() {
           <div className="alert-success2">{successMessage}</div>
         )}
 
-        {/* =========================== */}
-        {/* 画像フォーム */}
-        {/* =========================== */}
+        {/* プロフィール画像 */}
         <form className="item_sell_contents_box_line">
           <div className="image_name">
             <div className="image_button_row">
               <img
-                key={user.user_image || "default"}
+                key={profileUser.user_image || "default"}
                 src={profileImageUrl}
                 alt="プロフィール画像"
                 className="user_image_css"
@@ -282,7 +364,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 className="upload_submit"
-                onClick={() => fileInput.current?.click()}
+                onClick={() => fileInputRef.current?.click()}
               >
                 画像を選択する
               </button>
@@ -290,116 +372,63 @@ export default function ProfilePage() {
 
             <input
               type="file"
-              ref={fileInput}
+              ref={fileInputRef}
               style={{ display: "none" }}
               accept="image/*"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file || !apiClient) return;
-
-                setIsLoading(true);
-                setImageError("");
-
-                const formData = new FormData();
-                formData.append("user_image", file);
-
-                try {
-                  const res = await apiClient.post(
-                    "/api/profile/image",
-                    formData,
-                    { headers: { "Content-Type": "multipart/form-data" } },
-                  );
-
-                  setUser(res.data.user);
-                  setSuccessMessage("画像が更新されました！");
-                } catch (err: any) {
-                  console.log("❌ Image upload error:", err);
-                  setImageError("アップロードに失敗しました");
-                } finally {
-                  setIsLoading(false);
-                  if (fileInput.current) fileInput.current.value = "";
-                }
-              }}
+              onChange={handleImageUpload}
             />
           </div>
 
-          <div className="user_image_error">{imageError}</div>
+          {imageError && (
+            <div className="user_image_error text-red-600">{imageError}</div>
+          )}
         </form>
 
-        {/* =========================== */}
-        {/* プロフィール編集 */}
-        {/* =========================== */}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!apiClient) return;
-
-            setProfileErrors({});
-            setSuccessMessage("");
-            setIsLoading(true);
-
-            try {
-              const res = await apiClient.patch("/api/profile", form);
-              initializeUserData(res.data);
-              setSuccessMessage("プロフィール情報を更新しました！");
-            } catch (err: any) {
-              console.log("❌ Profile update error", err);
-
-              if (err.response?.status === 422) {
-                setProfileErrors(err.response.data.errors);
-              } else {
-                setSuccessMessage("エラーが発生しました。再試行してください。");
-              }
-            } finally {
-              setIsLoading(false);
-            }
-          }}
-        >
-          {/* 名前 */}
+        {/* プロフィールフォーム */}
+        <form onSubmit={handleProfileUpdate}>
           <div className="form-group">
             <label>ユーザー名</label>
             <input
               type="text"
               value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, name: e.target.value }))
+              }
             />
             <div className="error">{profileErrors?.name?.[0]}</div>
           </div>
 
-          {/* 郵便番号 */}
           <div className="form-group">
             <label>郵便番号</label>
             <input
               type="text"
               value={form.post_number}
               onChange={(e) =>
-                setForm((p) => ({ ...p, post_number: e.target.value }))
+                setForm((prev) => ({ ...prev, post_number: e.target.value }))
               }
             />
             <div className="error">{profileErrors?.post_number?.[0]}</div>
           </div>
 
-          {/* 住所 */}
           <div className="form-group">
             <label>住所</label>
             <input
               type="text"
               value={form.address}
               onChange={(e) =>
-                setForm((p) => ({ ...p, address: e.target.value }))
+                setForm((prev) => ({ ...prev, address: e.target.value }))
               }
             />
             <div className="error">{profileErrors?.address?.[0]}</div>
           </div>
 
-          {/* 建物名 */}
           <div className="form-group">
             <label>建物名</label>
             <input
               type="text"
               value={form.building}
               onChange={(e) =>
-                setForm((p) => ({ ...p, building: e.target.value }))
+                setForm((prev) => ({ ...prev, building: e.target.value }))
               }
             />
             <div className="error">{profileErrors?.building?.[0]}</div>

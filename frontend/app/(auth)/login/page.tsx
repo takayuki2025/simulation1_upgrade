@@ -41,39 +41,39 @@ export default function LoginPage() {
   // --------------------------------------
   // 🎯 ログインボタンクリック
   // --------------------------------------
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setApiError("");
-    setIsSubmitting(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setApiError("");
+  setIsSubmitting(true);
 
-    if (!email || !password) {
-      setApiError("メールアドレスとパスワードを入力してください。");
-      setIsSubmitting(false);
-      return;
-    }
+  if (!email || !password) {
+    setApiError("メールアドレスとパスワードを入力してください。");
+    setIsSubmitting(false);
+    return;
+  }
 
-    console.log("[LoginPage] Try login:", { email, passLen: password.length });
+  console.log("[LoginPage] Try login:", { email, passLen: password.length });
 
-    try {
-      // 🔥 引数の形式を修正！
-      await login(email.trim(), password);
+  try {
+    // ✅ 修正後のコード: emailとpasswordを1つのオブジェクトとして渡す
+    await login({ email: email.trim(), password: password });
 
-      console.log("[LoginPage] Login success → redirect /");
+    console.log("[LoginPage] Login success → redirect /");
 
-      router.push("/");
-    } catch (error: any) {
-      console.error("[LoginPage] Login failed", error);
+    router.push("/");
+  } catch (error: any) {
+    console.error("[LoginPage] Login failed", error);
 
-      const message =
-        error?.message ||
-        error?.response?.data?.message ||
-        "ログインに失敗しました。もう一度お試しください。";
+    const message =
+      error?.message ||
+      error?.response?.data?.message ||
+      "ログインに失敗しました。もう一度お試しください。";
 
-      setApiError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    setApiError(message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // --------------------------------------
   // 🎨 UI（デザインはそのまま）

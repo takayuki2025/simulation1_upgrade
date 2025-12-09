@@ -5,18 +5,20 @@ type AppRoutes = "/" | "/email/verify" | "/item/[items_id]" | "/login" | "/mypag
 type PageRoutes = never
 type LayoutRoutes = "/"
 type RedirectRoutes = never
-type RewriteRoutes = never
+type RewriteRoutes = "/api/[[...path]]" | "/sanctum/[[...path]]"
 type Routes = AppRoutes | PageRoutes | LayoutRoutes | RedirectRoutes | RewriteRoutes
 
 
 interface ParamMap {
   "/": {}
+  "/api/[[...path]]": { "path"?: string[]; }
   "/email/verify": {}
   "/item/[items_id]": { "items_id": string; }
   "/login": {}
   "/mypage": {}
   "/mypage/profile": {}
   "/register": {}
+  "/sanctum/[[...path]]": { "path"?: string[]; }
   "/sell": {}
   "/shops/[shop_code]": { "shop_code": string; }
   "/shops/[shop_code]/dashboard": { "shop_code": string; }

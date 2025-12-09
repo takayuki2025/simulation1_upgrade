@@ -18,16 +18,14 @@ export const getImageUrl = (
   type: IMAGE_TYPE = IMAGE_TYPE.OTHER,
   cacheBuster?: number,
 ): string => {
-  if (!path) {
-    return "https://placehold.co/300x300?text=No+Image";
-  }
+  if (!path) return "https://placehold.co/300x300?text=No+Image";
 
-  // すでに http で始まる外部URLならそのまま返す
+  // 外部 URL の場合はそのまま
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return cacheBuster ? `${path}?v=${cacheBuster}` : path;
   }
 
-  // 画像種類ごとのディレクトリ可変
+  // 種類に応じてパスを決定
   let prefix = "";
   switch (type) {
     case IMAGE_TYPE.USER:
@@ -40,9 +38,9 @@ export const getImageUrl = (
       prefix = "/storage/other";
   }
 
-  const url = `${BASE}${prefix}/${path}`;
+  // ✨ ここが重要：BASE を使わない（Nginx が返すため）
+  const url = `${prefix}/${path}`;
 
-  // キャッシュバスター付き
   return cacheBuster ? `${url}?v=${cacheBuster}` : url;
 };
 

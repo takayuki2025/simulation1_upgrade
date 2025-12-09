@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Next.js 16: PPR → cacheComponents に統合
+  // PPR / RSC キャッシュ
   cacheComponents: true,
 
   env: {
@@ -16,10 +16,9 @@ const nextConfig = {
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:
       process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   },
 
-  // 🔥 これが無いから画像が拒否されている！
+  // Origin 統一型では、画像の取得先として backend を許可
   images: {
     remotePatterns: [
       {
@@ -30,6 +29,29 @@ const nextConfig = {
       },
     ],
   },
+
+  // 🔥🔥 これが Origin 統一の最重要ポイント（API プロキシ）
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "https://localhost:9000/api/:path*",
+      },
+      {
+        source: "/sanctum/:path*",
+        destination: "https://localhost:9000/sanctum/:path*",
+      },
+    ];
+  },
+
+  // 🔥 mkcert を使用している場合に必須
+  // Next.js dev server 自身も HTTPS として動けるようにする
+  // serverRuntimeConfig: {},
+  // experimental: {
+  //   serverActions: {
+  //     allowedOrigins: ["localhost:3000"],
+  //   },
+  // },
 };
 
 export default nextConfig;

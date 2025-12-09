@@ -6,9 +6,12 @@ use App\Http\Controllers\Auth\FirebaseAuthController;
 
 
 
-Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-    ->middleware(['signed'])
-    ->name('verification.verify');
+
+Route::get(
+    '/email/verify/{id}/{hash}',
+    [FirebaseAuthController::class, 'verifyEmail']
+)->middleware(['signed'])->name('verification.verify');
+
 
 
 
@@ -22,9 +25,9 @@ Route::get('/', function () {
 
 // ========== メール認証 ==========
 Route::middleware(['web'])->group(function () {
-    Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
-        ->middleware(['signed'])
-        ->name('verification.verify');
+    // Route::get('/email/verify/{id}/{hash}', [FirebaseAuthController::class, 'verifyEmail'])
+    //     ->middleware(['signed'])
+    //     ->name('verification.verify');
 
     Route::get('/login', function () {
         return response()->json(['message' => 'Unauthenticated'], 401);

@@ -7,14 +7,20 @@ use App\Application\UseCase\Mypage\MypageUseCase;
 
 class MypageController extends Controller
 {
-    /**
-     * プロフィール取得
-     */
-    public function profile(Request $req, MypageUseCase $useCase)
+    private MypageUseCase $mypageUseCase;
+
+    public function __construct(MypageUseCase $mypageUseCase)
     {
-        return response()->json(
-            $useCase->getProfile($req->user()->id)
-        );
+        $this->mypageUseCase = $mypageUseCase;
+    }
+
+    public function profile(Request $request)
+    {
+        $userId = $request->user()->id;
+
+        $profile = $this->mypageUseCase->getProfile($userId);
+
+        return response()->json($profile);
     }
 
     /**

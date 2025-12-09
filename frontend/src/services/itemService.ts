@@ -3,7 +3,7 @@ import axios from "axios";
 import type { AxiosInstance } from "axios";
 import type { Item } from "@/src/types/item";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!; // "/api"
 
 export function useItemsSWR(
   tab: "all" | "mylist",
@@ -11,58 +11,46 @@ export function useItemsSWR(
   apiClient: AxiosInstance | null,
 ) {
   // -----------------------------------------------------
-  // 🔥 1. URL の決定（ここが今回の修正点）
+  // 1. URL の決定（🔥 /api を付けない version）
   // -----------------------------------------------------
-  let url = "/api/item";
+  let url = "/item";
 
   if (tab === "mylist") {
-    url = "/api/items/favorite"; // ⭐ いいね一覧 API に切り替え
+    url = "/items/favorite";
   } else {
-    // all の検索
     const query = new URLSearchParams();
     if (search) query.append("search", search);
 
     const qs = query.toString();
-    url = `/api/item${qs ? `?${qs}` : ""}`;
+    url = `/item${qs ? `?${qs}` : ""}`;
   }
 
-  console.log(
-    "[useItemsSWR] URL =",
-    url,
-    "tab=",
-    tab,
-    "apiClient=",
-    !!apiClient,
-  );
+  console.log("[useItemsSWR] URL =", url);
 
   // -----------------------------------------------------
-  // 2. SWR key を mode（public/auth）で分ける
+  // 2. SWR key
   // -----------------------------------------------------
   const keyTag = apiClient ? "auth" : "public";
   const swrKey = [url, keyTag];
 
-  console.log("[useItemsSWR] swrKey =", swrKey);
-
   // -----------------------------------------------------
-  // 3. fetcher
+  // 3. Fetcher
   // -----------------------------------------------------
   const swrFetcher = async () => {
     if (apiClient) {
       const res = await apiClient.get(url);
       return res.data;
     }
+
     const res = await axios.get(`${API_BASE_URL}${url}`);
     return res.data;
   };
 
-  const swrConfig = {
+  const swr = useSWR(swrKey, swrFetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     revalidateIfStale: true,
-    refreshInterval: 0,
-  };
-
-  const swr = useSWR(swrKey, swrFetcher, swrConfig);
+  });
 
   return {
     items: (swr.data?.items ?? []) as Item[],

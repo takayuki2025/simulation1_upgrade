@@ -37,8 +37,7 @@ return [
     ],
 
     'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID'),
         'credentials' => env('FIREBASE_CREDENTIALS'),
-        // プロジェクトIDを環境変数から自動取得したい場合は以下も設定可能
-        // 'project_id' => env('FIREBASE_PROJECT_ID'),
     ],
 ];

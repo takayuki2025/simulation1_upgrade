@@ -5,111 +5,99 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AxiosError } from "axios";
 import { useAuth } from "@/hooks/useSanctumAuth";
 
-const isErrorWithMessage = (error: unknown): error is { message: string } =>
-  typeof error === "object" &&
-  error !== null &&
-  "message" in error &&
-  typeof (error as { message: unknown }).message === "string";
-
-const toErrorMessage = (error: unknown): string =>
-  isErrorWithMessage(error) ? error.message : String(error);
-
 const CHECK_INTERVAL_MS = 3000;
-const POST_VERIFY_REDIRECT_ROUTE = "/mypage/profile?verified=true";
+const AFTER_SUCCESS_REDIRECT = "/mypage/profile?verified=true";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const redirectUrl = searchParams.get("redirect");
-
-  const { user, firebaseUser, auth, isLoading, reloadAuthToken, apiClient } =
+  const { user, firebaseUser, reloadAuthToken, apiClient, isLoading } =
     useAuth();
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [isResending, setIsResending] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const intervalRef = useRef<number | null>(null);
 
-  // Step 1: Laravel verify URL にジャンプ
-  useEffect(() => {
-    if (redirectUrl) {
-      window.location.href = redirectUrl;
-    }
-  }, [redirectUrl]);
+  const verifyUrl = searchParams.get("redirect");
 
-  const beginPollingFirebase = useCallback(() => {
+  /* ============================================================
+     Step 1: Laravel verifyURL にジャンプ
+  ============================================================ */
+  useEffect(() => {
+    if (verifyUrl) {
+      window.location.href = verifyUrl;
+    }
+  }, [verifyUrl]);
+
+  /* ============================================================
+     Step 2: Firebase の emailVerified をポーリング
+  ============================================================ */
+  const beginPolling = useCallback(() => {
     if (intervalRef.current !== null) return;
 
     intervalRef.current = window.setInterval(async () => {
       try {
         await firebaseUser?.reload();
-      } catch (err) {}
+      } catch {}
     }, CHECK_INTERVAL_MS);
   }, [firebaseUser]);
 
-  const stopPollingFirebase = useCallback(() => {
+  const stopPolling = useCallback(() => {
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
   }, []);
 
-  // Step 2: 認証成功後、Laravel と同期
-  const finalizeVerification = useCallback(async () => {
+  /* ============================================================
+     Step 3: 最終確定（Laravel Token 再発行）
+  ============================================================ */
+  const finalize = useCallback(async () => {
     if (isFinalizing) return;
 
     setIsFinalizing(true);
+    setStatusMessage(null);
 
     try {
-      await reloadAuthToken();
-      router.replace(POST_VERIFY_REDIRECT_ROUTE);
+      console.log("🔥 [VerifyEmail] Finalizing → reloadAuthToken()");
+      await reloadAuthToken(); // ← 最重要（Sanctum Token 再発行 & Laravel user 更新）
+
+      router.replace(AFTER_SUCCESS_REDIRECT);
     } catch (err) {
-      setStatusMessage(
-        `認証の確定に失敗しました。ログインし直してください。(${toErrorMessage(
-          err,
-        )})`,
-      );
+      console.error("Verify finalize error:", err);
+      setStatusMessage("認証の確定に失敗しました。再ログインしてください。");
     } finally {
       setIsFinalizing(false);
     }
   }, [reloadAuthToken, router, isFinalizing]);
 
-  // Step 3: 状態監視（user === null でも redirect しない!!）
+  /* ============================================================
+     Step 4: 状態監視
+  ============================================================ */
   useEffect(() => {
     if (isLoading) return;
 
-    // Laravel verified
-    if (user && user.emailVerified) {
-      stopPollingFirebase();
-      finalizeVerification();
-      return;
-    }
-
-    // Firebase verified
-    if (firebaseUser?.emailVerified) {
-      stopPollingFirebase();
-      finalizeVerification();
+    // Firebase または Laravel のどちらか verified → OK
+    if (firebaseUser?.emailVerified || user?.emailVerified) {
+      stopPolling();
+      finalize();
       return;
     }
 
     // 未 verified → ポーリング
-    beginPollingFirebase();
+    beginPolling();
+    return () => stopPolling();
+  }, [isLoading, user, firebaseUser, beginPolling, stopPolling, finalize]);
 
-    return () => stopPollingFirebase();
-  }, [
-    isLoading,
-    user,
-    firebaseUser,
-    beginPollingFirebase,
-    stopPollingFirebase,
-    finalizeVerification,
-  ]);
-
+  /* ============================================================
+     認証メール再送 API（Laravel 標準ルート）
+  ============================================================ */
   const handleResend = async () => {
     if (!apiClient) {
-      setStatusMessage("APIクライアントが初期化されていません。");
+      setStatusMessage("API クライアントが初期化されていません。");
       return;
     }
 
@@ -117,7 +105,7 @@ export default function VerifyEmailPage() {
     setStatusMessage(null);
 
     try {
-      await apiClient.post("/api/email/verification-notification");
+      await apiClient.post("/email/verification-notification"); // ← Laravel 標準
       setStatusMessage("新しい認証メールを送信しました。");
     } catch (err: unknown) {
       let msg = "メール再送に失敗しました。";
@@ -125,7 +113,7 @@ export default function VerifyEmailPage() {
       if (err instanceof AxiosError) {
         msg = err.response?.data?.message || err.message;
       } else {
-        msg = toErrorMessage(err);
+        msg = String(err);
       }
 
       setStatusMessage(msg);

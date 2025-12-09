@@ -25,7 +25,7 @@ class CreateUsersTable extends Migration
     //   ->constrained()
     //   ->cascadeOnDelete();//->constrained()->cascadeOnDelete()
 
-            $table->string('name', 20);
+            $table->string('name', 255);
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
