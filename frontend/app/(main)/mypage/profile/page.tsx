@@ -12,6 +12,7 @@ import { AxiosError } from "axios";
 
 import { useAuth } from "@/hooks/useSanctumAuth";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
+import styles from "./ProfilePage.module.css";
 
 /* ============================================================
    型定義
@@ -42,7 +43,7 @@ type ProfileErrors = {
 };
 
 /* ============================================================
-   ProfilePage（Origin 統一版）
+   ProfilePage（CSS Modules 完全対応版）
 ============================================================ */
 export default function ProfilePage() {
   const router = useRouter();
@@ -58,7 +59,6 @@ export default function ProfilePage() {
     logout,
   } = useAuth();
 
-  // ⚠️ メール認証完了後のフラグ
   const isVerificationRedirect = useMemo(
     () => searchParams.get("verified") === "true",
     [searchParams],
@@ -80,17 +80,8 @@ export default function ProfilePage() {
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
-  // 🚩 修正ポイント 1：メール認証後の reloadAuthToken を「確実に一度だけ実行する」
   const verificationHandledRef = useRef<boolean>(false);
-
-  // 🚩 修正ポイント 2：401 の回復処理が無限に走らないように制御
   const recoveryTriedRef = useRef<boolean>(false);
-
-  console.log("🔥 ProfilePage Mounted");
-  console.log("authUser=", authUser);
-  console.log("firebaseUser=", firebaseUser);
-  console.log("isAuthenticated=", isAuthenticated);
-  console.log("isVerificationRedirect=", isVerificationRedirect);
 
   /* ============================================================
      画像 URL（キャッシュバスター付き）
@@ -104,7 +95,7 @@ export default function ProfilePage() {
   }, [profileUser?.user_image]);
 
   /* ============================================================
-     API レスポンスを state に反映
+     API レスポンス反映
   ============================================================ */
   const initializeProfileFromResponse = useCallback((src: any) => {
     const data: ProfileUser = src?.user ?? src;
@@ -119,7 +110,7 @@ export default function ProfilePage() {
   }, []);
 
   /* ============================================================
-     1. プロフィール取得 API
+     プロフィール取得
   ============================================================ */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
@@ -131,8 +122,6 @@ export default function ProfilePage() {
         setProfileErrors({});
       }
 
-      console.log("[Profile] fetchUserProfile 開始");
-
       try {
         const res = await apiClient.get("/mypage/profile");
         initializeProfileFromResponse(res.data);
@@ -143,21 +132,15 @@ export default function ProfilePage() {
         const axiosErr = err as AxiosError<any>;
         const status = axiosErr.response?.status;
 
-        console.error("[Profile] fetch error:", status);
-
         if (status === 401 && !recoveryTriedRef.current) {
           recoveryTriedRef.current = true;
           setIsRecovering(true);
 
           try {
-            console.log("[Profile] 401 → reloadAuthToken 実行");
             await reloadAuthToken();
-
-            console.log("[Profile] 401 → 回復成功 → 再フェッチ");
             await fetchUserProfile(true);
             return;
           } catch {
-            console.error("[Profile] 401 → 回復失敗");
             await logout();
             router.replace("/login");
             return;
@@ -179,61 +162,40 @@ export default function ProfilePage() {
   );
 
   /* ============================================================
-     2. メール認証完了後の「必ず reloadAuthToken()」処理
-     🚩 これがあなたの環境で動いていなかった → 今回の最大修正点
+     メール認証後 reloadAuthToken
   ============================================================ */
   useEffect(() => {
     if (!isVerificationRedirect) return;
-
-    // すでに実行済みならスキップ
     if (verificationHandledRef.current) return;
 
-    // firebaseUser がまだ来ていない場合は待つ（ここが前回バグの原因）
-    if (!firebaseUser) {
-      console.log("[Profile] verified=true だが firebaseUser 未到達 → wait");
-      return;
-    }
+    if (!firebaseUser) return;
 
-    // 1回だけ実行
     verificationHandledRef.current = true;
 
     const run = async () => {
-      console.log("🔥 verified=true → reloadAuthToken() 実行！");
-      setIsRecovering(true);
-
       try {
+        setIsRecovering(true);
         await reloadAuthToken();
-        console.log("🔥 verified=true → reloadAuthToken SUCCESS");
-      } catch (err) {
-        console.error("reloadAuthToken 失敗:", err);
-        setSuccessMessage(
-          "メール認証後のログイン状態の復元に失敗しました。再ログインしてください。",
-        );
       } finally {
         setIsRecovering(false);
       }
     };
-
-    void run();
+    run();
   }, [isVerificationRedirect, firebaseUser, reloadAuthToken]);
 
   /* ============================================================
-     3. 初回プロフィール取得（通常 or 回復後）
+     初回プロフィール取得
   ============================================================ */
   useEffect(() => {
     if (isAuthLoading || isRecovering) return;
 
-    // token 未生成 → verified=true の回復を待つ
     if (!isAuthenticated || !apiClient) {
-      if (!firebaseUser) {
-        router.replace("/login");
-      }
+      if (!firebaseUser) router.replace("/login");
       return;
     }
 
     if (!profileUser && !isFetching) {
-      console.log("🔥 fetchUserProfile 実行");
-      void fetchUserProfile();
+      fetchUserProfile();
     }
   }, [
     isAuthLoading,
@@ -280,9 +242,9 @@ export default function ProfilePage() {
     }
   };
 
-  /* --------------------------------------------------------
+  /* ============================================================
      プロフィール更新
-  -------------------------------------------------------- */
+  ============================================================ */
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiClient) return;
@@ -311,12 +273,12 @@ export default function ProfilePage() {
   };
 
   /* ============================================================
-     ローディング UI
+     ローディング
   ============================================================ */
   if (isAuthLoading || isLoading || isRecovering) {
     return (
-      <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
-        <h2 className="title">プロフィール設定</h2>
+      <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
+        <h2 className={styles.title}>プロフィール設定</h2>
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"></div>
           <p className="text-gray-500 mt-3">
@@ -328,43 +290,50 @@ export default function ProfilePage() {
   }
 
   /* ============================================================
-     エラー
+     認証エラー
   ============================================================ */
   if (!isAuthenticated || !profileUser) {
     return (
-      <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
-        <h2 className="title">プロフィール設定</h2>
+      <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
+        <h2 className={styles.title}>プロフィール設定</h2>
         <p>認証エラーが発生しました。ログインし直してください。</p>
       </div>
     );
   }
 
   /* ============================================================
-     メイン UI（デザイン変更なし）
+     メイン UI（CSS Modules 適用）
   ============================================================ */
   return (
-    <div className="login_page max-w-[1400px] mx-auto pt-5 pb-10">
-      <h2 className="title">プロフィール設定</h2>
+    <div
+      className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}
+      key={authUser?.id || "unauthenticated"}
+    >
+      <h2 className={styles.title}>プロフィール設定</h2>
 
-      <div className="form-wrapper">
+      <div className={styles["form-wrapper"]}>
         {successMessage && (
-          <div className="alert-success2">{successMessage}</div>
+          <div className={styles["alert-success2"]}>{successMessage}</div>
         )}
 
-        {/* プロフィール画像 */}
-        <form className="item_sell_contents_box_line">
-          <div className="image_name">
-            <div className="image_button_row">
+        {/* --- 画像アップロード --- */}
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          className={styles.item_sell_contents_box_line}
+        >
+          <div className={styles.image_name}>
+            <div className={styles.image_button_row}>
               <img
                 key={profileUser.user_image || "default"}
                 src={profileImageUrl}
                 alt="プロフィール画像"
-                className="user_image_css"
+                className={styles.user_image_css}
               />
               <button
                 type="button"
-                className="upload_submit"
+                className={styles.upload_submit}
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
               >
                 画像を選択する
               </button>
@@ -372,71 +341,110 @@ export default function ProfilePage() {
 
             <input
               type="file"
+              name="user_image"
               ref={fileInputRef}
               style={{ display: "none" }}
-              accept="image/*"
               onChange={handleImageUpload}
+              accept="image/*"
             />
           </div>
 
-          {imageError && (
-            <div className="user_image_error text-red-600">{imageError}</div>
-          )}
+          <div className={styles.user_image_error_message}>{imageError}</div>
         </form>
 
-        {/* プロフィールフォーム */}
+        {/* --- プロフィール更新フォーム --- */}
         <form onSubmit={handleProfileUpdate}>
-          <div className="form-group">
-            <label>ユーザー名</label>
+          {/* ユーザー名 */}
+          <div className={styles["form-group"]}>
+            <label htmlFor="name" className={styles.label_form_1}>
+              ユーザー名
+            </label>
             <input
+              id="name"
               type="text"
+              className={styles.name_form}
+              name="name"
               value={form.name}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, name: e.target.value }))
               }
             />
-            <div className="error">{profileErrors?.name?.[0]}</div>
+            <div className={styles.profile__error}>
+              {profileErrors.name ? profileErrors.name[0] : ""}
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>郵便番号</label>
+          {/* 郵便番号 */}
+          <div className={styles["form-group"]}>
+            <label htmlFor="post_number" className={styles.label_form_2}>
+              郵便番号 (8桁、ハイフンあり)
+            </label>
             <input
+              id="post_number"
               type="text"
+              className={styles.email_form}
+              name="post_number"
               value={form.post_number}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, post_number: e.target.value }))
               }
+              placeholder="例: 100-0001"
+              maxLength={8}
             />
-            <div className="error">{profileErrors?.post_number?.[0]}</div>
+            <div className={styles.profile__error}>
+              {profileErrors.post_number ? profileErrors.post_number[0] : ""}
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>住所</label>
+          {/* 住所 */}
+          <div className={styles["form-group"]}>
+            <label htmlFor="address" className={styles.label_form_3}>
+              住所
+            </label>
             <input
+              id="address"
               type="text"
+              className={styles.password_form}
+              name="address"
               value={form.address}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, address: e.target.value }))
               }
+              placeholder="手動で入力してください"
             />
-            <div className="error">{profileErrors?.address?.[0]}</div>
+            <div className={styles.profile__error}>
+              {profileErrors.address ? profileErrors.address[0] : ""}
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>建物名</label>
+          {/* 建物名 */}
+          <div className={styles["form-group"]}>
+            <label htmlFor="building" className={styles.label_form_4}>
+              建物名
+            </label>
             <input
+              id="building"
               type="text"
+              className={styles.password_form}
+              name="building"
               value={form.building}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, building: e.target.value }))
               }
             />
-            <div className="error">{profileErrors?.building?.[0]}</div>
+            <div className={styles.profile__error}>
+              {profileErrors.building ? profileErrors.building[0] : ""}
+            </div>
           </div>
 
-          <button className="submit_form" type="submit">
-            更新する
-          </button>
+          <div className={styles.submit}>
+            <input
+              type="submit"
+              className={styles.submit_form}
+              value="更新する"
+              disabled={isLoading}
+            />
+          </div>
         </form>
       </div>
     </div>

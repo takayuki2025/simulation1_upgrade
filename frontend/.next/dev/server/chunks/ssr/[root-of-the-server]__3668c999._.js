@@ -409,7 +409,7 @@ function AuthProvider({ children }) {
 ============================================================ */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         const unsub = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onIdTokenChanged"])(auth, async (u)=>{
             if (!u || isRegistering) return;
-            await u.getIdToken(); // リフレッシュのみ
+            await u.getIdToken(true); // ← 強制リフレッシュに変更！
         });
         return ()=>unsub();
     }, [
@@ -417,10 +417,11 @@ function AuthProvider({ children }) {
         isRegistering
     ]);
     /* ============================================================
-     LOGIN
+   LOGIN（強制リフレッシュ版）
 ============================================================ */ const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ email, password })=>{
         const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
-        const idToken = await cred.user.getIdToken();
+        // 🔥 修正ポイント：必ず最新 token を生成
+        const idToken = await cred.user.getIdToken(true);
         const result = await loginWithLaravel(idToken);
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["apiToken"].set(result.token);
         setToken(result.token);
@@ -431,7 +432,7 @@ function AuthProvider({ children }) {
         auth
     ]);
     /* ============================================================
-     REGISTER （メール認証は必須）
+   REGISTER（強制リフレッシュ版）
 ============================================================ */ const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ name, email, password })=>{
         setIsRegistering(true);
         try {
@@ -439,7 +440,7 @@ function AuthProvider({ children }) {
             await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
                 displayName: name
             });
-            const idToken = await cred.user.getIdToken();
+            const idToken = await cred.user.getIdToken(true);
             const result = await loginWithLaravel(idToken, name);
             __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["apiToken"].set(result.token);
             setToken(result.token);
@@ -483,7 +484,7 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 254,
+        lineNumber: 256,
         columnNumber: 5
     }, this);
 }

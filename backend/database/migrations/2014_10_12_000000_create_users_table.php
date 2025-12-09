@@ -6,58 +6,63 @@ use Illuminate\Support\Facades\Schema;
 
 class CreateUsersTable extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
 
+            /* ============================================================
+               🔐 Firebase & Laravel Auth 統合
+            ============================================================ */
+            $table->string('firebase_uid')->unique()->nullable()
+                ->comment('Firebase UID（Firebaseログイン時に必須）');
 
-            // ⭐ マルチ店舗対応のためここに shop_id を追加します
-            // $table->foreignId('shop_id')->constrained() は、
-            // 1. shop_id という名前の UNSIGNED BIGINT カラムを作成
-            // 2. shops テーブルの id カラムへの外部キー制約 (foreign key constraint) を設定
-            $table->foreignId('shop_id')->nullable(); // 💡 ここを追加
-    //   ->constrained()
-    //   ->cascadeOnDelete();//->constrained()->cascadeOnDelete()
+            /* ============================================================
+               🏪 マルチテナント（店舗紐づけ可能）
+            ============================================================ */
+            $table->foreignId('shop_id')
+                ->nullable()
+                ->comment('所属店舗。null の場合はフリマ利用者');
 
+            /* ============================================================
+               👤 基本プロフィール
+            ============================================================ */
             $table->string('name', 255);
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
+
+            // Laravel パスワード（Firebaseログイン時は使わないが必要）
             $table->string('password');
+
+            /* ============================================================
+               🏠 住所情報
+            ============================================================ */
             $table->string('post_number')->nullable();
             $table->string('address')->nullable();
             $table->string('building')->nullable();
-            $table->string('user_image')->nullable();
             $table->string('address_country')->nullable();
-            $table->string('role');
+
+            /* ============================================================
+               🖼 プロフィール画像
+            ============================================================ */
+            $table->string('user_image')->nullable();
+
+            /* ============================================================
+               ⚠️ 旧 role カラム（削除推奨）
+               → role_user テーブルで管理するので不要
+            ============================================================ */
+            // $table->string('role')->nullable(); // ❌ 今後不要 → 残すなら nullable にすべき
+
+            /* ============================================================
+               🔐 Laravel 標準
+            ============================================================ */
             $table->rememberToken();
             $table->timestamps();
-
         });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down(): void
     {
-        // Schema::table('users', function (Blueprint $table) {
-        //     $table->boolean('first_time_access')->nullable(false)->default(false)->change();
-        // });
-
-        // 🚨 注意: down() メソッドは、up() で行った変更を元に戻すために使用されます。
-        // Schema::create の場合、down() ではテーブル全体を削除するのが一般的です。
-        // ご提示の down() の内容は、このファイルで行った変更を完全に元に戻しません。
-
-        // 以下のように、テーブル削除に修正することを強く推奨します。
         Schema::dropIfExists('users');
-
     }
 }

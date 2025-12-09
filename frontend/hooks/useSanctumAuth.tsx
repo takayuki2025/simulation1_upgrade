@@ -172,19 +172,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onIdTokenChanged(auth, async (u) => {
       if (!u || isRegistering) return;
-      await u.getIdToken(); // リフレッシュのみ
+      await u.getIdToken(true); // ← 強制リフレッシュに変更！
     });
 
     return () => unsub();
   }, [auth, isRegistering]);
 
   /* ============================================================
-     LOGIN
+   LOGIN（強制リフレッシュ版）
 ============================================================ */
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await cred.user.getIdToken();
+
+      // 🔥 修正ポイント：必ず最新 token を生成
+      const idToken = await cred.user.getIdToken(true);
 
       const result = await loginWithLaravel(idToken);
 
@@ -197,8 +199,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [auth],
   );
+
   /* ============================================================
-     REGISTER （メール認証は必須）
+   REGISTER（強制リフレッシュ版）
 ============================================================ */
   const register = useCallback(
     async ({
@@ -220,7 +223,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         await updateProfile(cred.user, { displayName: name });
 
-        const idToken = await cred.user.getIdToken();
+        const idToken = await cred.user.getIdToken(true);
+
         const result = await loginWithLaravel(idToken, name);
 
         apiToken.set(result.token);
@@ -228,7 +232,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const client = createSanctumApiClient(result.token);
         const me = await client.get("/user");
-
         setUser(mapLaravelUser(me.data.user));
 
         return { needsEmailVerification: true };
@@ -238,7 +241,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [auth],
   );
-
   /* ============================================================
      LOGOUT
 ============================================================ */

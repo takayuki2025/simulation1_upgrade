@@ -13,7 +13,7 @@ body {
   /* color: white; の設定は、テキストが見えなくなる原因になるため削除しました。 */
 }
 
-/* トップページ */
+                            /* トップページ */
 .main_contents {
   margin: 0 auto;
   max-width: 1400px;
@@ -141,7 +141,7 @@ body {
   border-radius: 4px;
 }
 
-/* マイページ */
+                          /* マイページ */
 .profile_page {
   margin: 0 auto;
   max-width: 1400px;
@@ -385,7 +385,7 @@ body {
   }
 }
 
-/* プロフィールページ */
+                       /* プロフィールページ */
 .login_page {
   text-align: center;
 }

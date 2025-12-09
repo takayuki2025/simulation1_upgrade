@@ -29,7 +29,7 @@ use App\Infrastructure\Auth\FirebaseAuthAdapter;
 use App\Infrastructure\Repository\MypageRepositoryImpl;
 // ========== Use Cases ==========
 use App\Application\UseCase\Mypage\MypageUseCase;
-use App\Application\UseCase\Mypage\MypageUseCaseImpl;
+
 // Firebase SDK
 use Kreait\Firebase\Contract\Auth as FirebaseSdk;
 
@@ -45,14 +45,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(FavoriteRepository::class, EloquentFavoriteRepository::class);
 
 
-        $this->app->bind(MypageUseCase::class, MypageUseCaseImpl::class);
         $this->app->bind(MypageRepository::class, MypageRepositoryImpl::class);
-
-
-        $this->app->bind(
-            \App\Domain\Repository\MypageRepository::class,
-            \App\Infrastructure\Repository\MypageRepositoryImpl::class
-        );
 
 
 

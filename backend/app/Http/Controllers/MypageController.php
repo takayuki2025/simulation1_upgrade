@@ -7,41 +7,42 @@ use App\Application\UseCase\Mypage\MypageUseCase;
 
 class MypageController extends Controller
 {
-    private MypageUseCase $mypageUseCase;
+    private MypageUseCase $usecase;
 
-    public function __construct(MypageUseCase $mypageUseCase)
+    public function __construct(MypageUseCase $usecase)
     {
-        $this->mypageUseCase = $mypageUseCase;
+        $this->usecase = $usecase;
     }
 
+    /**
+     * プロフィール情報を返す
+     */
     public function profile(Request $request)
     {
         $userId = $request->user()->id;
 
-        $profile = $this->mypageUseCase->getProfile($userId);
+        $result = $this->usecase->getProfile($userId);
 
-        return response()->json($profile);
+        return response()->json($result);
     }
 
-    /**
-     * 出品一覧を取得
-     */
-    public function sellItems(Request $req, MypageUseCase $useCase)
+    public function sellItems(Request $request)
     {
-        return response()->json(
-            $useCase->listSellItems($req->user()->id)
-        );
+        $userId = $request->user()->id;
+        return response()->json([
+            'items' => $this->usecase->listSellItems($userId)
+        ]);
     }
 
-    /**
-     * 購入済み一覧を取得
-     */
-    public function boughtItems(Request $req, MypageUseCase $useCase)
+    public function boughtItems(Request $request)
     {
-        return response()->json(
-            $useCase->listBoughtItems($req->user()->id)
-        );
+        $userId = $request->user()->id;
+        return response()->json([
+            'items' => $this->usecase->listBoughtItems($userId)
+        ]);
     }
+
+
 
     /**
      * 購入前の配送先入力フォーム情報を取得

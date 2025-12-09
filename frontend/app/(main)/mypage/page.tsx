@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/hooks/useSanctumAuth";
 
-// 画像ヘルパー
+import { useAuth } from "@/hooks/useSanctumAuth";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
-// =======================================================
-// 型定義
-// =======================================================
+import styles from "./W-Mypage.module.css";
 
+/* ============================
+  型定義
+============================ */
 interface User {
   id: number;
   name: string;
@@ -30,7 +30,6 @@ interface RawItem {
   item_image?: string;
   remain: number;
 
-  // buy ページでは nested item の可能性あり
   item?: {
     id: number;
     name: string;
@@ -39,11 +38,6 @@ interface RawItem {
   };
 }
 
-interface ApiItemsResponse {
-  items?: RawItem[];
-}
-
-// 正規化された Item 型
 interface Item {
   id: number;
   name: string;
@@ -51,10 +45,9 @@ interface Item {
   remain: number;
 }
 
-// =======================================================
-// メインコンポーネント
-// =======================================================
-
+/* ============================
+  メインコンポーネント
+============================ */
 export default function Mypage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,18 +65,11 @@ export default function Mypage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // page=sell or page=buy
   const page = searchParams.get("page") === "buy" ? "buy" : "sell";
-
-  // メール認証後のクエリ
   const isVerificationRedirect = searchParams.get("verified") === "true";
 
-  // ------------------------------------------------------------
-  // Utility: アイテムを正規化
-  // ------------------------------------------------------------
-  const normalizeItem = (raw: RawItem): Item | null => {
+  const normalizeItem = (raw: RawItem): Item => {
     if (raw.item) {
-      // 購入した商品の場合、内部の商品データを使う
       return {
         id: raw.item.id,
         name: raw.item.name,
@@ -91,8 +77,6 @@ export default function Mypage() {
         remain: raw.item.remain,
       };
     }
-
-    // 出品した商品
     return {
       id: raw.id,
       name: raw.name,
@@ -101,24 +85,19 @@ export default function Mypage() {
     };
   };
 
-  // ------------------------------------------------------------
-  // 1. プロフィール取得（/api/mypage/profile）
-  // ------------------------------------------------------------
+  /* ============================
+    プロフィール取得
+  ============================ */
   const fetchUserProfile = useCallback(async () => {
     if (!isAuthenticated) {
       router.replace("/login");
       return;
     }
-
     if (!apiClient) return;
 
     setIsLoading(true);
     try {
-      const res = await apiClient.get("/api/mypage/profile");
-
-      if (!res.data?.user) {
-        throw new Error("Profile response missing 'user'");
-      }
+      const res = await apiClient.get("/mypage/profile");
 
       setUser(res.data.user);
 
@@ -128,63 +107,55 @@ export default function Mypage() {
       }
     } catch (e: any) {
       console.error("Failed to fetch profile:", e);
-
-      if (e.response?.status === 401) {
-        await logout();
-      }
+      if (e.response?.status === 401) await logout();
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, isVerificationRedirect, apiClient, page, logout, router]);
+  }, [
+    isAuthenticated,
+    apiClient,
+    page,
+    isVerificationRedirect,
+    logout,
+    router,
+  ]);
 
-  // ------------------------------------------------------------
-  // 2. アイテム取得（/api/mypage/sell or /api/mypage/bought）
-  // ------------------------------------------------------------
+  /* ============================
+    アイテム取得
+  ============================ */
   const fetchItems = useCallback(async () => {
     if (!user || !apiClient) return;
 
     setIsLoading(true);
     try {
       const endpoint =
-        page === "sell" ? "/api/mypage/sell" : "/api/mypage/bought";
+        page === "sell" ? "/mypage/sell" : "/api/mypage/bought";
 
       const res = await apiClient.get(endpoint);
-
       const rawItems: RawItem[] = res.data.items ?? [];
 
-      const normalized = rawItems
-        .map((raw) => normalizeItem(raw))
-        .filter((i): i is Item => i !== null);
-
-      setItems(normalized);
+      setItems(rawItems.map(normalizeItem));
     } catch (e: any) {
-      console.error("Failed to fetch items:", e);
-
-      if (e.response?.status === 401) {
-        await logout();
-      }
+      if (e.response?.status === 401) await logout();
     } finally {
       setIsLoading(false);
     }
-  }, [user, page, apiClient, logout]);
+  }, [user, apiClient, page, logout]);
 
-  // ------------------------------------------------------------
-  // useEffect: 認証 → プロフィール → アイテム
-  // ------------------------------------------------------------
+  /* ============================
+    useEffect
+  ============================ */
   useEffect(() => {
-    if (isAuthLoading) return;
-    fetchUserProfile();
+    if (!isAuthLoading) fetchUserProfile();
   }, [isAuthLoading, fetchUserProfile]);
 
   useEffect(() => {
-    if (user && apiClient) {
-      fetchItems();
-    }
-  }, [user, page, apiClient, fetchItems]);
+    if (user) fetchItems();
+  }, [user, page, fetchItems]);
 
-  // ------------------------------------------------------------
-  // UI: ローディング
-  // ------------------------------------------------------------
+  /* ============================
+    UI： ローディング
+  ============================ */
   if (isAuthLoading || isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -194,10 +165,10 @@ export default function Mypage() {
     );
   }
 
-  // ------------------------------------------------------------
-  // UI: 未認証
-  // ------------------------------------------------------------
-  if (!isAuthenticated || !user) {
+  /* ============================
+    UI： 未認証
+  ============================ */
+  if (!user) {
     return (
       <div className="text-center p-8">
         <p className="text-xl text-red-500">認証情報が確認できません。</p>
@@ -205,23 +176,27 @@ export default function Mypage() {
     );
   }
 
-  // ------------------------------------------------------------
-  // UI: メイン画面
-  // ------------------------------------------------------------
+  /* ============================
+    UI： メイン
+  ============================ */
   return (
-    <div className="profile_page max-w-[1400px] mx-auto pt-5 pb-10">
+    <div className={styles.profile_page}>
       {successMessage && (
-        <div className="alert-success2">{successMessage}</div>
+        <div className={styles.alert_success}>{successMessage}</div>
       )}
 
-      <div className="profile_header border-b-2 border-gray-400 pb-5 mb-6">
-        <div className="profile_header_1 flex items-center gap-6">
+      <div className={styles.profile_header}>
+        {/* ヘッダー1 */}
+        <div className={styles.profile_header_1}>
           <img
             src={getImageUrl(user.user_image ?? null, IMAGE_TYPE.USER)}
-            className="user_image_css w-[90px] h-[90px] rounded-full object-cover"
+            className={styles.user_image_css}
             onError={(e) => onImageError(e, user.name)}
           />
-          <h2 className="text-2xl font-bold">{user.name}</h2>
+
+          <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
+            {user.name}
+          </h2>
 
           <button
             onClick={() => router.push("/mypage/profile")}
@@ -231,20 +206,21 @@ export default function Mypage() {
           </button>
         </div>
 
-        <div className="profile_header_2 flex mt-4 gap-8 pl-4">
+        {/* タブ */}
+        <div className={styles.profile_header_2}>
           <Link
             href="/mypage?page=sell"
-            className={`font-bold ${
-              page === "sell" ? "text-red-500" : "text-gray-500"
-            }`}
+            className={
+              page === "sell" ? styles.active_tab : styles.inactive_tab
+            }
           >
             出品した商品
           </Link>
 
           <Link
             href="/mypage?page=buy"
-            className={`font-bold ${
-              page === "buy" ? "text-red-500" : "text-gray-500"
+            className={`ml-8 ${
+              page === "buy" ? styles.active_tab : styles.inactive_tab
             }`}
           >
             購入した商品
@@ -252,7 +228,8 @@ export default function Mypage() {
         </div>
       </div>
 
-      <div className="items_select grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-6">
+      {/* 商品一覧 */}
+      <div className={styles.items_select}>
         {items.length === 0 ? (
           <div className="col-span-full text-center text-gray-500">
             {page === "sell"
@@ -261,15 +238,14 @@ export default function Mypage() {
           </div>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="items_select_all">
+            <div key={item.id} className={styles.items_select_all}>
               <Link href={`/item/${item.id}`}>
                 <img
                   src={getImageUrl(item.item_image ?? null, IMAGE_TYPE.ITEM)}
                   alt={item.name}
-                  className="w-full aspect-square object-cover"
                   onError={(e) => onImageError(e, item.name)}
                 />
-                <div className="item-details flex justify-between mt-2">
+                <div className={styles.item_details}>
                   <span>{item.name}</span>
                   {item.remain === 0 && (
                     <span className="text-red-500 font-bold">sold</span>
@@ -283,4 +259,3 @@ export default function Mypage() {
     </div>
   );
 }
-

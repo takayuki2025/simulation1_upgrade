@@ -52,7 +52,7 @@ class FirebaseAuthController extends Controller
 
             $firebaseUid   = $verifiedIdToken->claims()->get('sub');
             $email         = $verifiedIdToken->claims()->get('email');
-            $emailVerified = (bool) $verifiedIdToken->claims()->get('email_verified', false);
+            // $emailVerified = (bool) $verifiedIdToken->claims()->get('email_verified', false);
             $displayName   = $verifiedIdToken->claims()->get('name'); // Firebase の displayName（ある場合）
 
             if (!$email) {
@@ -73,7 +73,7 @@ class FirebaseAuthController extends Controller
             $user = DB::transaction(function () use (
                 $firebaseUid,
                 $email,
-                $emailVerified,
+
                 $displayName,
                 $customName,
                 &$status
@@ -108,10 +108,10 @@ class FirebaseAuthController extends Controller
                     }
                 }
 
-                if ($emailVerified && is_null($user->email_verified_at)) {
-                    $user->email_verified_at = Carbon::now();
-                    $user->save();
-                }
+                // if ($emailVerified && is_null($user->email_verified_at)) {
+                //     $user->email_verified_at = Carbon::now();
+                //     $user->save();
+                // }
 
                 return $user;
             });
