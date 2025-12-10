@@ -2,22 +2,20 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import { useItemsSWR } from "@/src/services/itemService";
 import { getImageUrl, onImageError } from "@/utils/utils";
 import { useAuth } from "@/hooks/useSanctumAuth";
 
+import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css"; // ← ★ CSS Modules 読み込み
+
 export default function Home() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+
   const { apiClient, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const router = useRouter();
-  const shopCode = "default_shop"; // ← まずは学習用固定
-  // -------------------------------
-  // タブ
-  // -------------------------------
   const currentTab = useMemo(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
     [searchParams],
@@ -28,17 +26,11 @@ export default function Home() {
     [searchParams],
   );
 
-  // -------------------------------
-  // ★ 認証済みなら token クライアントを使う
-  // -------------------------------
   const effectiveApiClient = useMemo(() => {
     if (isAuthenticated && apiClient) return apiClient;
     return null;
   }, [isAuthenticated, apiClient]);
 
-  // -------------------------------
-  // SWR fetch
-  // -------------------------------
   const { items, isLoading: isItemsLoading } = useItemsSWR(
     currentTab,
     currentSearchQuery,
@@ -47,42 +39,42 @@ export default function Home() {
 
   const isPageLoading = isAuthLoading || isItemsLoading;
 
-  // -------------------------------
-  // 表示
-  // -------------------------------
   return (
-    <div className="main_contents">
+    <div className={styles.main_contents}>
+      {/* ローディング */}
       {isPageLoading && (
-        <div className="flex justify-center items-center h-48">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-t-red-500 border-red-300"></div>
-          <p className="ml-4 text-lg text-gray-400">読み込み中...</p>
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>読み込み中...</p>
         </div>
       )}
-      <div className="w-full flex gap-4 justify-center my-6">
+
+      {/* ショップボタン */}
+      <div className={styles.shopButtons}>
         <button
           onClick={() => router.push("/shops/shop_a")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+          className={styles.shopButton}
         >
           ショップA(テスト用リンク)
         </button>
 
         <button
           onClick={() => router.push("/shops/shop_b")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+          className={styles.shopButton}
         >
           ショップB(テスト用リンク)
         </button>
 
         <button
           onClick={() => router.push("/shops/shop_c")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+          className={styles.shopButton}
         >
           ショップC(テスト用リンク)
         </button>
 
         <button
           onClick={() => router.push("/shops/shop_d")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow"
+          className={styles.shopButton}
         >
           ショップD(テスト用リンク)
         </button>
@@ -91,45 +83,51 @@ export default function Home() {
       {!isPageLoading && (
         <>
           {/* タブ */}
-          <div className="main_select">
+          <div className={styles.main_select}>
             <Link
               href={{
                 pathname: "/",
                 query: { tab: "all", all_item_search: currentSearchQuery },
               }}
-              className={`recs ${currentTab === "all" ? "active" : ""}`}
+              className={`${styles.recs} ${
+                currentTab === "all" ? styles.active : ""
+              }`}
             >
               すべて
             </Link>
 
             <Link
               href={{ pathname: "/", query: { tab: "mylist" } }}
-              className={`mylists ${currentTab === "mylist" ? "active" : ""}`}
+              className={`${styles.mylists} ${
+                currentTab === "mylist" ? styles.active : ""
+              }`}
             >
               マイリスト
             </Link>
           </div>
 
           {/* 商品一覧 */}
-          <div className="items_select">
+          <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => (
-                <div key={item.id} className="items_select_all">
+                <div key={item.id} className={styles.items_select_all}>
                   <Link href={`/item/${item.id}`}>
-                    <div className="relative">
+                    <div className={styles.itemImageWrapper}>
                       <img
                         src={getImageUrl(item.item_image)}
                         alt={item.name}
                         onError={(e) => onImageError(e, item.name)}
+                        className={styles.itemImage}
                       />
+
                       {item.remain === 0 && (
-                        <div className="sold-text">SOLD</div>
+                        <div className={styles.sold_text}>SOLD</div>
                       )}
                     </div>
 
-                    <div className="item-info">
-                      <p className="item-name">{item.name}</p>
-                      <p className="item-price">
+                    <div className={styles.item_info}>
+                      <p className={styles.item_name}>{item.name}</p>
+                      <p className={styles.item_price}>
                         ¥{item.price?.toLocaleString()}
                       </p>
                     </div>
@@ -137,7 +135,7 @@ export default function Home() {
                 </div>
               ))
             ) : (
-              <div className="text-center w-full py-10 text-gray-500">
+              <div className={styles.no_items}>
                 {currentTab === "mylist" && !isAuthenticated
                   ? "マイリストを見るにはログインが必要です。"
                   : "該当する商品が見つかりませんでした。"}

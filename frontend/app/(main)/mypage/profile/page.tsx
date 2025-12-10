@@ -12,7 +12,7 @@ import { AxiosError } from "axios";
 
 import { useAuth } from "@/hooks/useSanctumAuth";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
-import styles from "./ProfilePage.module.css";
+import styles from "./W-ProfilePage.module.css";
 
 /* ============================================================
    型定義

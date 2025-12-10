@@ -11,6 +11,7 @@ import React, {
 } from "react";
 
 import axios, { AxiosInstance } from "axios";
+
 import {
   onIdTokenChanged,
   signInWithEmailAndPassword,
@@ -20,7 +21,6 @@ import {
 } from "firebase/auth";
 
 import { getFirebaseAuth } from "@/src/lib/firebase";
-import { apiToken } from "@/src/lib/api/client";
 
 /* ============================================================
    型定義
@@ -51,9 +51,6 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
 
-  auth: ReturnType<typeof getFirebaseAuth>;
-  reloadAuthToken: () => Promise<void>;
-
   login: (params: { email: string; password: string }) => Promise<void>;
   register: (params: {
     name: string;
@@ -61,16 +58,17 @@ export interface AuthContextType {
     password: string;
   }) => Promise<{ needsEmailVerification: boolean }>;
 
+  reloadAuthToken: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
 /* ============================================================
-   Context 作成
+   Context
 ============================================================ */
 const AuthContext = createContext<AuthContextType | null>(null);
 
 /* ============================================================
-   Laravel User の変換
+   helper
 ============================================================ */
 function mapLaravelUser(raw: any): LaravelUser {
   return {
@@ -79,38 +77,31 @@ function mapLaravelUser(raw: any): LaravelUser {
   };
 }
 
-/* ============================================================
-   Laravel login/register API
-============================================================ */
-async function loginWithLaravel(
-  idToken: string,
-  name?: string, // register のときだけ必要
-): Promise<LoginResponse> {
-  const { data } = await axios.post<LoginResponse>(
-    `/api/login_or_register`,
-    { id_token: idToken, name },
-    { withCredentials: true },
-  );
-
-  return data;
+function loginWithLaravel(idToken: string, name?: string) {
+  return axios
+    .post<LoginResponse>(
+      "/api/login_or_register",
+      { id_token: idToken, name },
+      { withCredentials: true },
+    )
+    .then((r) => r.data);
 }
 
-/* ============================================================
-   Sanctum API Client 生成
-============================================================ */
+/* Sanctum API client */
 function createSanctumApiClient(token: string): AxiosInstance {
-  return axios.create({
+  const instance = axios.create({
     baseURL: "/api",
     withCredentials: true,
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
     },
   });
+
+  return instance;
 }
 
 /* ============================================================
-   AuthProvider
+   AuthProvider（完全版）
 ============================================================ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = getFirebaseAuth();
@@ -118,17 +109,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<LaravelUser | null>(null);
-
   const [isLoading, setIsLoading] = useState(true);
-  const [isRegistering, setIsRegistering] = useState(false);
 
-  const sanctumApiClient = useMemo(() => {
-    if (!token) return null;
-    return createSanctumApiClient(token);
-  }, [token]);
+  /* ================================
+     localStorage 永続化復元
+  ================================= */
+  useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("user");
+
+    if (savedToken) setToken(savedToken);
+    if (savedUser) setUser(JSON.parse(savedUser));
+
+    setIsLoading(false);
+  }, []);
 
   /* ============================================================
-     メール認証後：Laravel と同期する
+     Sanctum API Client
+============================================================ */
+  const apiClient = useMemo(() => {
+    if (!token) return null;
+
+    const instance = createSanctumApiClient(token);
+
+    // -------------------------------------------------------
+    // Silent Refresh（401 を 1 度だけ自動回復）
+    // -------------------------------------------------------
+    instance.interceptors.response.use(
+      (res) => res,
+      async (error) => {
+        const original = error.config;
+
+        if (
+          error.response?.status === 401 &&
+          !original._retry &&
+          firebaseUser
+        ) {
+          original._retry = true;
+
+          try {
+            const newIdToken = await firebaseUser.getIdToken(true);
+            const result = await loginWithLaravel(newIdToken);
+
+            setToken(result.token);
+            localStorage.setItem("token", result.token);
+
+            setUser(result.user);
+            localStorage.setItem("user", JSON.stringify(result.user));
+
+            original.headers["Authorization"] = `Bearer ${result.token}`;
+
+            return instance(original);
+          } catch (e) {
+            console.warn("Silent Refresh failed:", e);
+            logout();
+          }
+        }
+
+        return Promise.reject(error);
+      },
+    );
+
+    return instance;
+  }, [token, firebaseUser]);
+
+  /* ============================================================
+     Firebase Auth State Listener
+============================================================ */
+  useEffect(() => {
+    return auth.onAuthStateChanged(async (u) => {
+      setFirebaseUser(u);
+
+      // Firebase ログインしているが Laravel には未同期
+      if (u && !token) {
+        const idToken = await u.getIdToken(true);
+        const result = await loginWithLaravel(idToken);
+
+        setToken(result.token);
+        setUser(result.user);
+
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
+      }
+    });
+  }, [auth, token]);
+
+  /* ============================================================
+     MAIL VERIFIED → Laravel と同期
 ============================================================ */
   const reloadAuthToken = useCallback(async () => {
     if (!firebaseUser) return;
@@ -136,72 +203,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const idToken = await firebaseUser.getIdToken(true);
     const result = await loginWithLaravel(idToken);
 
-    apiToken.set(result.token);
     setToken(result.token);
+    setUser(result.user);
 
-    const client = createSanctumApiClient(result.token);
-    const me = await client.get("/user");
-
-    setUser(mapLaravelUser(me.data.user));
+    localStorage.setItem("token", result.token);
+    localStorage.setItem("user", JSON.stringify(result.user));
   }, [firebaseUser]);
 
   /* ============================================================
-     Firebase auth listener
-============================================================ */
-  useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async (u) => {
-      if (!u) {
-        setFirebaseUser(null);
-        setUser(null);
-        setToken(null);
-        apiToken.clear();
-        setIsLoading(false);
-        return;
-      }
-
-      setFirebaseUser(u);
-      setIsLoading(false);
-    });
-
-    return () => unsub();
-  }, [auth]);
-
-  /* ============================================================
-     Firebase token refresh
-============================================================ */
-  useEffect(() => {
-    const unsub = onIdTokenChanged(auth, async (u) => {
-      if (!u || isRegistering) return;
-      await u.getIdToken(true); // ← 強制リフレッシュに変更！
-    });
-
-    return () => unsub();
-  }, [auth, isRegistering]);
-
-  /* ============================================================
-   LOGIN（強制リフレッシュ版）
+     LOGIN（完全版）
 ============================================================ */
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-
-      // 🔥 修正ポイント：必ず最新 token を生成
       const idToken = await cred.user.getIdToken(true);
 
       const result = await loginWithLaravel(idToken);
 
-      apiToken.set(result.token);
       setToken(result.token);
+      setUser(result.user);
 
-      const client = createSanctumApiClient(result.token);
-      const me = await client.get("/user");
-      setUser(mapLaravelUser(me.data.user));
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
     },
     [auth],
   );
 
   /* ============================================================
-   REGISTER（強制リフレッシュ版）
+     REGISTER（完全版）
 ============================================================ */
   const register = useCallback(
     async ({
@@ -213,76 +242,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
     }) => {
-      setIsRegistering(true);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-      try {
-        const cred = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password,
-        );
-        await updateProfile(cred.user, { displayName: name });
+      await updateProfile(cred.user, { displayName: name });
 
-        const idToken = await cred.user.getIdToken(true);
+      const idToken = await cred.user.getIdToken(true);
+      const result = await loginWithLaravel(idToken, name);
 
-        const result = await loginWithLaravel(idToken, name);
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
 
-        apiToken.set(result.token);
-        setToken(result.token);
+      setToken(result.token);
+      setUser(result.user);
 
-        const client = createSanctumApiClient(result.token);
-        const me = await client.get("/user");
-        setUser(mapLaravelUser(me.data.user));
-
-        return { needsEmailVerification: true };
-      } finally {
-        setIsRegistering(false);
-      }
+      return { needsEmailVerification: true };
     },
     [auth],
   );
+
   /* ============================================================
      LOGOUT
 ============================================================ */
   const logout = useCallback(async () => {
     await auth.signOut();
+
     setFirebaseUser(null);
     setUser(null);
     setToken(null);
-    apiToken.clear();
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
   }, [auth]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        firebaseUser,
-        token,
-        apiClient: sanctumApiClient,
-        isAuthenticated: !!token,
-        isLoading,
+  const value: AuthContextType = {
+    user,
+    firebaseUser,
+    token,
+    apiClient,
+    isAuthenticated: !!token,
+    isLoading,
 
-        auth,
-        reloadAuthToken,
+    login,
+    register,
+    logout,
+    reloadAuthToken,
+  };
 
-        login,
-        register,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be inside <AuthProvider>");
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
 
 export function useApiClient() {
   const { apiClient } = useAuth();
-  if (!apiClient) throw new Error("API client not ready");
+
+  if (!apiClient) {
+    throw new Error("API client is not ready. User may not be authenticated.");
+  }
+
   return apiClient;
 }
