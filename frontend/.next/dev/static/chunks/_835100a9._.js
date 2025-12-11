@@ -3,55 +3,40 @@
 "use strict";
 
 __turbopack_context__.s([
+    "useItemDetailSWR",
+    ()=>useItemDetailSWR,
     "useItemsSWR",
     ()=>useItemsSWR
 ]);
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/swr/dist/index/index.mjs [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
-var _s = __turbopack_context__.k.signature();
+var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature();
 ;
 ;
-const API_BASE_URL = ("TURBOPACK compile-time value", "/api"); // "/api"
 function useItemsSWR(tab, search, apiClient) {
     _s();
-    // -----------------------------------------------------
-    // 1. URL の決定（🔥 /api を付けない version）
-    // -----------------------------------------------------
     let url = "/item";
     if (tab === "mylist") {
         url = "/items/favorite";
     } else {
-        const query = new URLSearchParams();
-        if (search) query.append("search", search);
-        const qs = query.toString();
-        url = `/item${qs ? `?${qs}` : ""}`;
+        const params = new URLSearchParams();
+        if (search) params.append("search", search);
+        url = `/item${params.toString() ? `?${params.toString()}` : ""}`;
     }
-    console.log("[useItemsSWR] URL =", url);
-    // -----------------------------------------------------
-    // 2. SWR key
-    // -----------------------------------------------------
     const keyTag = apiClient ? "auth" : "public";
     const swrKey = [
         url,
         keyTag
     ];
-    // -----------------------------------------------------
-    // 3. Fetcher
-    // -----------------------------------------------------
     const swrFetcher = async ()=>{
         if (apiClient) {
-            const res = await apiClient.get(url);
-            return res.data;
+            const response = await apiClient.get(url);
+            return response.data;
         }
-        const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${API_BASE_URL}${url}`);
-        return res.data;
+        const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/api${url}`);
+        return response.data;
     };
-    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(swrKey, swrFetcher, {
-        revalidateOnFocus: true,
-        revalidateOnReconnect: true,
-        revalidateIfStale: true
-    });
+    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(swrKey, swrFetcher);
     return {
         items: swr.data?.items ?? [],
         isLoading: swr.isLoading,
@@ -64,6 +49,40 @@ _s(useItemsSWR, "iifyDOo5TKakSKM5VQzDMutzZgc=", false, function() {
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"]
     ];
 });
+function useItemDetailSWR(itemId, apiClient) {
+    _s1();
+    const url = itemId ? `/item/${itemId}` : null;
+    const keyTag = apiClient ? "auth" : "public";
+    const swrKey = url ? [
+        url,
+        keyTag
+    ] : null;
+    const swrFetcher = async ()=>{
+        if (!url) return null;
+        if (apiClient) {
+            const response = await apiClient.get(url);
+            return response.data;
+        }
+        const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/api${url}`);
+        return response.data;
+    };
+    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(swrKey, swrFetcher);
+    return {
+        data: swr.data,
+        item: swr.data?.item ?? null,
+        comments: swr.data?.comments ?? [],
+        isFavorited: swr.data?.is_favorited ?? false,
+        favoritesCount: swr.data?.favorites_count ?? 0,
+        isLoading: swr.isLoading,
+        isError: swr.error,
+        mutate: swr.mutate
+    };
+}
+_s1(useItemDetailSWR, "iifyDOo5TKakSKM5VQzDMutzZgc=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"]
+    ];
+});
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }
@@ -71,7 +90,12 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 "[project]/utils/utils.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
+// ======================================
+// 画像タイプ Enum
+// ======================================
 __turbopack_context__.s([
+    "BASE",
+    ()=>BASE,
     "IMAGE_TYPE",
     ()=>IMAGE_TYPE,
     "getImageUrl",
@@ -86,17 +110,14 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     IMAGE_TYPE["OTHER"] = "other";
     return IMAGE_TYPE;
 }({});
-// ======================================
-//  API ベースURL
-// ======================================
-const BASE = ("TURBOPACK compile-time value", "/api") || "https://laravel.test";
+const BASE = ("TURBOPACK compile-time value", "https://laravel.test") || "https://laravel.test";
 const getImageUrl = (path, type = "other", cacheBuster)=>{
     if (!path) return "https://placehold.co/300x300?text=No+Image";
-    // 外部 URL の場合はそのまま
+    // 外部 URL ならそのまま返す
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return cacheBuster ? `${path}?v=${cacheBuster}` : path;
     }
-    // 種類に応じてパスを決定
+    // 種類別の prefix
     let prefix = "";
     switch(type){
         case "user":
@@ -108,7 +129,6 @@ const getImageUrl = (path, type = "other", cacheBuster)=>{
         default:
             prefix = "/storage/other";
     }
-    // ✨ ここが重要：BASE を使わない（Nginx が返すため）
     const url = `${prefix}/${path}`;
     return cacheBuster ? `${url}?v=${cacheBuster}` : url;
 };

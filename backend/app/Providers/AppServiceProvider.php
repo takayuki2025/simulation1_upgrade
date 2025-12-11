@@ -9,6 +9,8 @@ use App\Domain\Repository\OrderHistoryRepository;
 use App\Domain\Repository\CommentRepository;
 use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
+use App\Modules\Item\Presentation\Domain\Repository\ItemRepository;//⚪️
+use App\Modules\Item\Presentation\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
 // ✅ User モジュール内の Repository Interface を追加
 use App\Modules\User\Presentation\Domain\Repository\ProfileRepository;//⚫️
 use App\Modules\User\Presentation\Domain\Repository\MypageRepository; // ⚫️MypageRepositoryは共通で残す
@@ -18,7 +20,7 @@ use App\Modules\User\Presentation\Infrastructure\Persistence\Repository\Eloquent
 use App\Infrastructure\Persistence\EloquentOrderHistoryRepository;
 use App\Infrastructure\Persistence\EloquentCommentRepository;
 use App\Infrastructure\Persistence\EloquentFavoriteRepository;
-use App\Infrastructure\Persistence\EloquentItemRepository;
+// use App\Infrastructure\Persistence\EloquentItemRepository;
 // ✅ User モジュール内の Repository 実装クラスのパスを修正
 use App\Modules\User\Presentation\Infrastructure\Persistence\Repository\EloquentMypageRepository;// ⚫️MypageRepositoryは共通で残す
 // use App\Modules\User\Infrastructure\Persistence\Repository\EloquentProfileRepository;
@@ -34,11 +36,16 @@ class AppServiceProvider extends ServiceProvider
     public function register()
     {
         // Repository binding
-        $this->app->bind(ItemRepositoryInterface::class, EloquentItemRepository::class);
+        // $this->app->bind(ItemRepositoryInterface::class, EloquentItemRepository::class);
         // $this->app->bind(UserRepositoryInterface::class, EloquentUserRepository::class); // 仮にコメントアウト
         $this->app->bind(OrderHistoryRepository::class, EloquentOrderHistoryRepository::class);
         $this->app->bind(CommentRepository::class, EloquentCommentRepository::class);
         $this->app->bind(FavoriteRepository::class, EloquentFavoriteRepository::class);
+
+        // ✅ ItemRepository は Item モジュール内の Eloquent 版を採用
+        $this->app->bind(ItemRepository::class, EloquentItemRepository::class);
+
+
 
         // ✅ Mypage は User モジュール内の Eloquent 版を採用
         $this->app->bind(MypageRepository::class, EloquentMypageRepository::class);

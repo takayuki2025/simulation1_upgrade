@@ -32,8 +32,8 @@ services:
     env_file:
     - ./backend/.env
     volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
+      # - /etc/localtime:/etc/localtime:ro
+      # - /etc/timezone:/etc/timezone:ro
       - ./backend:/var/www/backend
       - ./backend/public:/var/www/backend/public
       - ./docker/php/conf.d/mailhog.ini:/usr/local/etc/php/conf.d/mailhog.ini
@@ -45,6 +45,7 @@ services:
       "chmod -R 777 /var/www/backend/storage /var/www/backend/bootstrap/cache || true &&
       /usr/bin/supervisord -c /etc/supervisord.conf"
     environment:
+      - TZ=Asia/Tokyo # 🔥 追加: 明示的にタイムゾーンを設定
       - APP_URL=https://localhost:9000
     depends_on:
       - mysql
@@ -124,8 +125,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: "/api"
+    # environment:
+      # NEXT_PUBLIC_API_BASE_URL: "/api"
 
     # ★ Next.js は HTTP 3000 で動く（重要）
     command: sh -c "npm install && npm run dev -- --port 3000"

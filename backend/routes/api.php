@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\FirebaseAuthController;
-use App\Http\Controllers\ItemController;
+// use App\Http\Controllers\ItemController;
 // use App\Http\Controllers\MypageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
@@ -14,6 +14,8 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\ShopItemController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
+use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
 
 /* ============================================================
@@ -36,12 +38,21 @@ Route::post('/register', [FirebaseAuthController::class, 'register']);
 /* ============================================================
    🌐 3. 公開 API（認証不要）
 ============================================================ */
-// アイテム（公開）
-Route::get('/item', [ItemController::class, 'index']);
-Route::get('/item/{id}', [ItemController::class, 'show']);
 
-// コメント一覧（公開）
+// ★★★ 新しい UseCase 版 ItemQueryController に置き換え
+Route::get('/item', [ItemQueryController::class, 'index']);    // 全アイテム
+Route::get('/item/{id}', [ItemQueryController::class, 'show']); // 商品詳細
+
+// 🔍 カテゴリ検索
+Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
+
+// 🔍 ブランド検索
+Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
+
+
+// コメント一覧（公開） ← これは他サービスなので現状維持
 Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
+
 
 
 // 店舗公開
@@ -96,9 +107,16 @@ Route::middleware('auth:sanctum')->group(function () {
     /* ----------------------
        🔹 Item（認証が必要な操作）
     -----------------------*/
-    Route::post('/item', [ItemController::class, 'store']);
-    Route::put('/item/{id}', [ItemController::class, 'update']);
-    Route::delete('/item/{id}', [ItemController::class, 'destroy']);
+
+
+    // ★★★ 新しい CommandController を使用
+    Route::post('/item', [ItemCommandController::class, 'store']);     // 作成
+    Route::put('/item/{id}', [ItemCommandController::class, 'update']); // 更新
+    Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']); // 削除
+
+    //  Route::post('/item', [ItemController::class, 'store']);
+    //  Route::put('/item/{id}', [ItemController::class, 'update']);
+    //  Route::delete('/item/{id}', [ItemController::class, 'destroy']);
 
 
 

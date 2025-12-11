@@ -1,3 +1,6 @@
+// ======================================
+// 画像タイプ Enum
+// ======================================
 export enum IMAGE_TYPE {
   USER = "user",
   ITEM = "item",
@@ -5,13 +8,13 @@ export enum IMAGE_TYPE {
 }
 
 // ======================================
-//  API ベースURL
+//  API ベースURL（使わないが一応保持）
 // ======================================
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://laravel.test";
+export const BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://laravel.test";
 
 // ======================================
-// 🔥 3 引数対応版 getImageUrl
-//  getImageUrl(path, type, bust)
+//  getImageUrl(path, type, cacheBuster)
 // ======================================
 export const getImageUrl = (
   path: string | null,
@@ -20,12 +23,12 @@ export const getImageUrl = (
 ): string => {
   if (!path) return "https://placehold.co/300x300?text=No+Image";
 
-  // 外部 URL の場合はそのまま
+  // 外部 URL ならそのまま返す
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return cacheBuster ? `${path}?v=${cacheBuster}` : path;
   }
 
-  // 種類に応じてパスを決定
+  // 種類別の prefix
   let prefix = "";
   switch (type) {
     case IMAGE_TYPE.USER:
@@ -38,14 +41,12 @@ export const getImageUrl = (
       prefix = "/storage/other";
   }
 
-  // ✨ ここが重要：BASE を使わない（Nginx が返すため）
   const url = `${prefix}/${path}`;
-
   return cacheBuster ? `${url}?v=${cacheBuster}` : url;
 };
 
 // ======================================
-// エラー時の画像差し替え
+// 画像エラー時の差し替え
 // ======================================
 export const onImageError = (
   e: React.SyntheticEvent<HTMLImageElement, Event>,

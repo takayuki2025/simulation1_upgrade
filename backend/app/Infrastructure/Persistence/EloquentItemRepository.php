@@ -2,7 +2,7 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Domain\Repository\ItemRepositoryInterface; 
+use App\Domain\Repository\ItemRepositoryInterface;
 use App\Models\Shop; // Shop も必要なので追加
 use App\Domain\Entity\Item as ItemEntity;
 use App\Models\Item;

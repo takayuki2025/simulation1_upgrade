@@ -19,7 +19,7 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
 // ======================================
 //  API ベースURL
 // ======================================
-const BASE = ("TURBOPACK compile-time value", "/api") || "https://laravel.test";
+const BASE = ("TURBOPACK compile-time value", "https://laravel.test") || "https://laravel.test";
 const getImageUrl = (path, type = "other", cacheBuster)=>{
     if (!path) return "https://placehold.co/300x300?text=No+Image";
     // 外部 URL の場合はそのまま
@@ -77,7 +77,7 @@ console.log("DIAGNOSTICS: ItemDetailPage RE-RENDERED.");
 // =======================================================
 // グローバル設定 & ユーティリティ
 // =======================================================
-const API_BASE_URL = ("TURBOPACK compile-time value", "/api");
+const API_BASE_URL = ("TURBOPACK compile-time value", "https://laravel.test");
 // 認証情報付きリクエストをaxios全体で許可
 __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].defaults.withCredentials = true;
 // ----------------------------------------------------------------

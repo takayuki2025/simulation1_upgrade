@@ -2,7 +2,12 @@
 "[project]/utils/utils.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
+// ======================================
+// 画像タイプ Enum
+// ======================================
 __turbopack_context__.s([
+    "BASE",
+    ()=>BASE,
     "IMAGE_TYPE",
     ()=>IMAGE_TYPE,
     "getImageUrl",
@@ -17,17 +22,14 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     IMAGE_TYPE["OTHER"] = "other";
     return IMAGE_TYPE;
 }({});
-// ======================================
-//  API ベースURL
-// ======================================
-const BASE = ("TURBOPACK compile-time value", "/api") || "https://laravel.test";
+const BASE = ("TURBOPACK compile-time value", "https://laravel.test") || "https://laravel.test";
 const getImageUrl = (path, type = "other", cacheBuster)=>{
     if (!path) return "https://placehold.co/300x300?text=No+Image";
-    // 外部 URL の場合はそのまま
+    // 外部 URL ならそのまま返す
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return cacheBuster ? `${path}?v=${cacheBuster}` : path;
     }
-    // 種類に応じてパスを決定
+    // 種類別の prefix
     let prefix = "";
     switch(type){
         case "user":
@@ -39,7 +41,6 @@ const getImageUrl = (path, type = "other", cacheBuster)=>{
         default:
             prefix = "/storage/other";
     }
-    // ✨ ここが重要：BASE を使わない（Nginx が返すため）
     const url = `${prefix}/${path}`;
     return cacheBuster ? `${url}?v=${cacheBuster}` : url;
 };
