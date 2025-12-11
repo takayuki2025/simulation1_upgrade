@@ -49,15 +49,11 @@ function RegisterPage() {
     // -------------------------------
     // すでに認証済みならトップへ
     // -------------------------------
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        if (!isLoading && isAuthenticated) {
-            router.replace("/");
-        }
-    }, [
-        isLoading,
-        isAuthenticated,
-        router
-    ]);
+    // useEffect(() => {
+    //   if (!isLoading && isAuthenticated) {
+    //     router.replace("/");
+    //   }
+    // }, [isLoading, isAuthenticated, router]);
     if (isLoading) return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
         children: "認証状態を確認中..."
     }, void 0, false, {
@@ -90,11 +86,15 @@ function RegisterPage() {
                 email,
                 password
             });
+            console.log("REGISTER result:", result);
             // 👇 useAuth.register() は「メール認証が必要かどうか」を返す
             if (result.needsEmailVerification) {
-                // メールのリンクを踏むまで待つページへ遷移
+                // Firebase側がメール送信済 → 確認待ちページへ
                 router.push("/email/verify");
                 return;
+            } else {
+                // すでに認証済みのメールアドレスなら即プロフィールへ
+                router.push("/mypage/profile");
             }
             // 既に検証済みのログインユーザーならプロフィールへ
             router.push("/mypage/profile");
@@ -116,7 +116,7 @@ function RegisterPage() {
                 children: "会員登録"
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 84,
+                lineNumber: 89,
                 columnNumber: 7
             }, this),
             apiError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -124,7 +124,7 @@ function RegisterPage() {
                 children: apiError
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 89,
+                lineNumber: 94,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -139,7 +139,7 @@ function RegisterPage() {
                                 children: "ユーザー名"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 97,
+                                lineNumber: 102,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -152,13 +152,13 @@ function RegisterPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 103,
+                                lineNumber: 108,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 96,
+                        lineNumber: 101,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -169,7 +169,7 @@ function RegisterPage() {
                                 children: "メールアドレス"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 116,
+                                lineNumber: 121,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -182,13 +182,13 @@ function RegisterPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 122,
+                                lineNumber: 127,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 115,
+                        lineNumber: 120,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -199,7 +199,7 @@ function RegisterPage() {
                                 children: "パスワード"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 135,
+                                lineNumber: 140,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -212,13 +212,13 @@ function RegisterPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 141,
+                                lineNumber: 146,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 134,
+                        lineNumber: 139,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -229,7 +229,7 @@ function RegisterPage() {
                                 children: "確認用パスワード"
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 154,
+                                lineNumber: 159,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -242,13 +242,13 @@ function RegisterPage() {
                                 disabled: isSubmitting
                             }, void 0, false, {
                                 fileName: "[project]/app/(auth)/register/page.tsx",
-                                lineNumber: 160,
+                                lineNumber: 165,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 153,
+                        lineNumber: 158,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -260,18 +260,18 @@ function RegisterPage() {
                             children: isSubmitting ? "登録中..." : "登録する"
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/register/page.tsx",
-                            lineNumber: 173,
+                            lineNumber: 178,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/register/page.tsx",
-                        lineNumber: 172,
+                        lineNumber: 177,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 94,
+                lineNumber: 99,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -282,18 +282,18 @@ function RegisterPage() {
                     children: "ログインはこちら"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/register/page.tsx",
-                    lineNumber: 184,
+                    lineNumber: 189,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(auth)/register/page.tsx",
-                lineNumber: 183,
+                lineNumber: 188,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(auth)/register/page.tsx",
-        lineNumber: 83,
+        lineNumber: 88,
         columnNumber: 5
     }, this);
 }

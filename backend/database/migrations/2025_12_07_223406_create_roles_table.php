@@ -11,11 +11,14 @@ return new class () extends Migration {
     public function up(): void
     {
 
+
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique(); // OWNER / MANAGER / STAFF / BUYER
+            $table->string('name')->unique();
+            $table->string('slug')->unique(); // 👈 この行を追加！
             $table->timestamps();
         });
+
 
     }
 

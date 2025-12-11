@@ -100,6 +100,8 @@ function AuthProvider({ children }) {
     const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    // 🔥 修正: 競合を防ぐための新しいフラグ
+    const [isRegistering, setIsRegistering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     /* ================================
      localStorage 永続化復元
   ================================= */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
@@ -154,12 +156,18 @@ function AuthProvider({ children }) {
      Firebase Auth State Listener
 ============================================================ */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthProvider.useEffect": ()=>{
+            // onAuthStateChanged は必ず token より先に実行されます。
             return auth.onAuthStateChanged({
                 "AuthProvider.useEffect": async (u)=>{
                     setFirebaseUser(u);
-                    // Firebase ログインしているが Laravel には未同期
+                    // 🔥 修正: 登録処理中(isRegistering)の場合は、リスナーによる自動ログインをスキップ
+                    if (isRegistering) return;
+                    // u があり、トークンがまだ設定されていない（つまり、リスナーが先に走った）場合のみ
+                    // または、uがあり、かつ Laravelユーザー情報がない場合（トークン切れ）に実行
                     if (u && !token) {
+                        // 新規登録の直後など、tokenがまだセットされていない状態
                         const idToken = await u.getIdToken(true);
+                        // 🚨 リスナーによる自動ログイン (これがリクエスト #2になるのを防ぐ)
                         const result = await loginWithLaravel(idToken);
                         setToken(result.token);
                         setUser(result.user);
@@ -171,8 +179,9 @@ function AuthProvider({ children }) {
         }
     }["AuthProvider.useEffect"], [
         auth,
-        token
-    ]);
+        token,
+        isRegistering
+    ]); // isRegistering を依存配列に追加
     /* ============================================================
      MAIL VERIFIED → Laravel と同期
 ============================================================ */ const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
@@ -204,22 +213,31 @@ function AuthProvider({ children }) {
         auth
     ]);
     /* ============================================================
-     REGISTER（完全版）
+     REGISTER（修正版）
 ============================================================ */ const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[register]": async ({ name, email, password })=>{
-            const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
-            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
-                displayName: name
-            });
-            const idToken = await cred.user.getIdToken(true);
-            const result = await loginWithLaravel(idToken, name);
-            localStorage.setItem("token", result.token);
-            localStorage.setItem("user", JSON.stringify(result.user));
-            setToken(result.token);
-            setUser(result.user);
-            return {
-                needsEmailVerification: true
-            };
+            setIsRegistering(true);
+            try {
+                // Firebase アカウント作成
+                const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
+                await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$esm2017$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
+                    displayName: name
+                });
+                const idToken = await cred.user.getIdToken(true);
+                // Laravel 側に login_or_register を送る
+                const result = await loginWithLaravel(idToken, name);
+                // トークン保存
+                setToken(result.token);
+                setUser(result.user);
+                localStorage.setItem("token", result.token);
+                localStorage.setItem("user", JSON.stringify(result.user));
+                // ← ここが重要！！
+                return {
+                    needsEmailVerification: result.needsEmailVerification
+                };
+            } finally{
+                setIsRegistering(false);
+            }
         }
     }["AuthProvider.useCallback[register]"], [
         auth
@@ -255,11 +273,11 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 291,
+        lineNumber: 318,
         columnNumber: 10
     }, this);
 }
-_s(AuthProvider, "rzd814Xn1avAZyVxwo+EShxk9QA=");
+_s(AuthProvider, "6EarWPUYPFyKRyAYyYCcQs2oDns=");
 _c = AuthProvider;
 function useAuth() {
     _s1();

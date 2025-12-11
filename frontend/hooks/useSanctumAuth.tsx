@@ -40,6 +40,7 @@ interface LoginResponse {
   token: string;
   user: LaravelUser;
   status: "login" | "register";
+  needsEmailVerification: boolean; // ← これを追加
 }
 
 export interface AuthContextType {
@@ -101,7 +102,7 @@ function createSanctumApiClient(token: string): AxiosInstance {
 }
 
 /* ============================================================
-   AuthProvider（完全版）
+   AuthProvider（修正版）
 ============================================================ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = getFirebaseAuth();
@@ -110,6 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<LaravelUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔥 修正: 競合を防ぐための新しいフラグ
+  const [isRegistering, setIsRegistering] = useState(false);
 
   /* ================================
      localStorage 永続化復元
@@ -177,12 +181,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      Firebase Auth State Listener
 ============================================================ */
   useEffect(() => {
+    // onAuthStateChanged は必ず token より先に実行されます。
     return auth.onAuthStateChanged(async (u) => {
       setFirebaseUser(u);
 
-      // Firebase ログインしているが Laravel には未同期
+      // 🔥 修正: 登録処理中(isRegistering)の場合は、リスナーによる自動ログインをスキップ
+      if (isRegistering) return;
+
+      // u があり、トークンがまだ設定されていない（つまり、リスナーが先に走った）場合のみ
+      // または、uがあり、かつ Laravelユーザー情報がない場合（トークン切れ）に実行
       if (u && !token) {
+        // 新規登録の直後など、tokenがまだセットされていない状態
+
         const idToken = await u.getIdToken(true);
+        // 🚨 リスナーによる自動ログイン (これがリクエスト #2になるのを防ぐ)
         const result = await loginWithLaravel(idToken);
 
         setToken(result.token);
@@ -192,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("user", JSON.stringify(result.user));
       }
     });
-  }, [auth, token]);
+  }, [auth, token, isRegistering]); // isRegistering を依存配列に追加
 
   /* ============================================================
      MAIL VERIFIED → Laravel と同期
@@ -230,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   /* ============================================================
-     REGISTER（完全版）
+     REGISTER（修正版）
 ============================================================ */
   const register = useCallback(
     async ({
@@ -242,20 +254,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
     }) => {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      setIsRegistering(true);
 
-      await updateProfile(cred.user, { displayName: name });
+      try {
+        // Firebase アカウント作成
+        const cred = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+        await updateProfile(cred.user, { displayName: name });
 
-      const idToken = await cred.user.getIdToken(true);
-      const result = await loginWithLaravel(idToken, name);
+        const idToken = await cred.user.getIdToken(true);
 
-      localStorage.setItem("token", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
+        // Laravel 側に login_or_register を送る
+        const result = await loginWithLaravel(idToken, name);
 
-      setToken(result.token);
-      setUser(result.user);
+        // トークン保存
+        setToken(result.token);
+        setUser(result.user);
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
 
-      return { needsEmailVerification: true };
+        // ← ここが重要！！
+        return {
+          needsEmailVerification: result.needsEmailVerification,
+        };
+      } finally {
+        setIsRegistering(false);
+      }
     },
     [auth],
   );

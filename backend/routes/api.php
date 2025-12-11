@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\FirebaseAuthController;
 use App\Http\Controllers\ItemController;
-use App\Http\Controllers\MypageController;
+// use App\Http\Controllers\MypageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\FavoriteController;
@@ -14,6 +14,7 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\ShopItemController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Modules\User\Presentation\Http\Controllers\MypageController;
 
 /* ============================================================
    🚀 1. デバッグログ（必須）

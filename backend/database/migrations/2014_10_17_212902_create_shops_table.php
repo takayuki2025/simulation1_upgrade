@@ -17,16 +17,16 @@ return new class () extends Migration {
             $table->string('shop_code', 30)->unique();
 
             // 店舗のオーナーとなるユーザー
-            $table->foreignId('owner_user_id')->nullable();
-            // ->constrained('users');
-            // ->constrained('users')->cascadeOnDelete();
+            // ★ 修正: foreignId を使用しているため、constrained('users') を有効化し、外部キー制約を設定
+            $table->foreignId('owner_user_id')
+                  ->nullable()
+                  ->constrained('users') // 外部キー制約を有効化
+                  ->cascadeOnDelete();   // 関連ユーザー削除時にショップも削除されるように設定
 
             // 店舗ステータス
             $table->enum('status', ['active', 'inactive'])->default('active');
 
-
             $table->string('banner_url')->nullable();
-
 
             // 任意の説明文
             $table->string('description')->nullable();
@@ -34,13 +34,17 @@ return new class () extends Migration {
             // 店舗ロゴ
             $table->string('logo')->nullable();
 
-
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
+        // 外部キー制約を削除してからテーブルをドロップするのが安全
+        Schema::table('shops', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('owner_user_id');
+        });
+
         Schema::dropIfExists('shops');
     }
 };

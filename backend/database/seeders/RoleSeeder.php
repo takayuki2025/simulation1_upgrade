@@ -8,24 +8,19 @@ use Illuminate\Support\Facades\DB;
 
 class RoleSeeder extends Seeder
 {
-    /**
-         * Database seedsを実行します。
-         *
-         * @return void
-         */
     public function run()
     {
         $roles = [
-            ['name' => 'customer'],
-            ['name' => 'owner'],
-            ['name' => 'manager'],
-            ['name' => 'staff'],
+            ['name' => 'Customer', 'slug' => 'customer'], // 👈 name を読みやすい名前に、slug をキーに変更
+            ['name' => 'Shop Owner', 'slug' => 'owner'],
+            ['name' => 'Shop Manager', 'slug' => 'manager'],
+            ['name' => 'Shop Staff', 'slug' => 'staff'],
 
-            ['name' => 'top_shop_admin'],
-            ['name' => 'manager_admin'],
-            ['name' => 'admin'],
+            ['name' => 'Top Shop Admin', 'slug' => 'top_shop_admin'],
+            ['name' => 'Manager Admin', 'slug' => 'manager_admin'],
+            ['name' => 'System Admin', 'slug' => 'admin'],
 
-            ['name' => 'developer'],
+            ['name' => 'Developer', 'slug' => 'developer'],
         ];
 
         // タイムスタンプを追加

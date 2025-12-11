@@ -11,32 +11,32 @@ return new class () extends Migration {
     {
         // 1. users テーブルに shop_id の外部キーを追加
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreign('shop_id')
-                  ->references('id')
-                  ->on('shops')
-                  ->cascadeOnDelete();
-        });
+    //     Schema::table('users', function (Blueprint $table) {
+    //         $table->foreign('shop_id')
+    //               ->references('id')
+    //               ->on('shops')
+    //               ->cascadeOnDelete();
+    //     });
 
-        // shops テーブルへの制約追加
-        Schema::table('shops', function (Blueprint $table) {
-            $table->foreign('owner_user_id')
-                  ->references('id')
-                  ->on('users')
-                  ->cascadeOnDelete();
-        });
+    //     // shops テーブルへの制約追加
+    //     Schema::table('shops', function (Blueprint $table) {
+    //         $table->foreign('owner_user_id')
+    //               ->references('id')
+    //               ->on('users')
+    //               ->cascadeOnDelete();
+    //     });
 
-    }
+    // }
 
-    public function down(): void
-    {
-        // down() メソッドでは外部キーを削除します
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('shop_id');
-        });
+    // public function down(): void
+    // {
+    //     // down() メソッドでは外部キーを削除します
+    //     Schema::table('users', function (Blueprint $table) {
+    //         $table->dropConstrainedForeignId('shop_id');
+    //     });
 
-        Schema::table('shops', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('owner_user_id');
-        });
+    //     Schema::table('shops', function (Blueprint $table) {
+    //         $table->dropConstrainedForeignId('owner_user_id');
+    //     });
     }
 };

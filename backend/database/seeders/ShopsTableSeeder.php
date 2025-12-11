@@ -2,56 +2,87 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Shop;
 use App\Models\User;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ShopsTableSeeder extends Seeder
 {
-    public function run(): void
+    /**
+     * Database seeds を実行します。
+     *
+     * @return void
+     */
+    public function run()
     {
-        // 1. OWNERユーザー一覧をID順に取得
-        $owners = User::where('role', 'OWNER')
-            ->orderBy('id')
-            ->get();
+        // データの重複を防ぐために、既存データを削除
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('shops')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        if ($owners->count() === 0) {
-            \Log::error("ShopsTableSeeder: OWNER user not found.");
+        // 1. オーナーユーザーを検索するための準備
+        $ownerRole = Role::where('slug', 'owner')->first();
+
+        // UsersTableSeeder で作成した最も確実なオーナーユーザー（テスト用のユーザ１）をメールアドレスで取得
+        $ownerUser = User::where('email', 'valid.email@example.com')->first();
+
+        // フォールバック: ロールリレーションシップによる検索
+        if (!$ownerUser && $ownerRole) {
+            $ownerUser = User::whereHas('roles', function ($query) use ($ownerRole) {
+                $query->where('role_id', $ownerRole->id);
+            })->first();
+        }
+
+        if (!$ownerUser) {
+            // ここで失敗した場合、UsersTableSeeder が失敗している
+            Log::error("ShopsTableSeeder: Critical owner user not found. Shop seeding failed.");
             return;
         }
 
-        // 2. 作成したいショップ一覧
-        $shopTemplates = [
-            ['name' => 'ショップA', 'shop_code' => 'shop_a'],
-            ['name' => 'ショップB', 'shop_code' => 'shop_b'],
-            ['name' => 'ショップC', 'shop_code' => 'shop_c'],
-            ['name' => 'ショップD', 'shop_code' => 'shop_d'],
+        // 2. 取得したオーナーユーザーに紐づけてショップを作成
+        // ★ 修正ポイント: 外部キー名を 'owner_user_id' に修正し、4つのショップを作成
+        $shopsData = [
+            // ID 1: ItemsTableSeeder が参照する最初のショップ
+            [
+                'owner_user_id' => $ownerUser->id, // ✅ カラム名を 'owner_user_id' に修正
+                'name' => 'テストショップ A',
+                'shop_code' => 'shop-a',
+                'description' => '最新のフリマアイテムを取り扱う旗艦店です。',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            // ID 2
+            [
+                'owner_user_id' => $ownerUser->id, // ✅ カラム名を 'owner_user_id' に修正
+                'name' => 'テストショップ B',
+                'shop_code' => 'shop-b',
+                'description' => '家電・ガジェット専門店です。',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            // ID 3
+            [
+                'owner_user_id' => $ownerUser->id, // ✅ カラム名を 'owner_user_id' に修正
+                'name' => 'テストショップ C',
+                'shop_code' => 'shop-c',
+                'description' => 'ファッション・アクセサリーを専門に取り扱います。',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            // ID 4
+            [
+                'owner_user_id' => $ownerUser->id, // ✅ カラム名を 'owner_user_id' に修正
+                'name' => 'テストショップ D',
+                'shop_code' => 'shop-d',
+                'description' => '生活雑貨・キッチン用品の店です。',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ];
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-
-        foreach ($shopTemplates as $index => $tpl) {
-            $owner = $owners[$index] ?? $owners[0]; // OWNER が足りなければ最初の人を使う
-
-            $shopData = [
-                'id' => $index + 1,
-                'name' => $tpl['name'],
-                'shop_code' => $tpl['shop_code'],
-                'owner_user_id' => $owner->id,
-                'status' => 'active',
-                'description' => "{$tpl['name']} のデフォルト店舗",
-                'created_at' => now(),
-                'updated_at' => now()
-            ];
-
-            // ショップを作成/更新
-            $shop = Shop::updateOrCreate(['id' => $shopData['id']], $shopData);
-
-            // その OWNER に shop_id を付ける（重要🔥）
-            $owner->update(['shop_id' => $shop->id]);
-        }
-
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        DB::table('shops')->insert($shopsData);
     }
 }

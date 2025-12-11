@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -9,8 +9,8 @@ import { useAuth } from "@/hooks/useSanctumAuth";
 export default function RegisterPage() {
   const router = useRouter();
 
-  // 🔥 Hexagonal Service
-  const { register, isAuthenticated, isLoading } = useAuth();
+  // 🔥 Auth Service（Sanctum + Firebase）
+  const { register } = useAuth();
 
   // UI 状態
   const [name, setName] = useState("");
@@ -21,18 +21,6 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // -------------------------------
-  // すでに認証済みならトップへ
-  // -------------------------------
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace("/");
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  if (isLoading) return <p>認証状態を確認中...</p>;
-  if (isAuthenticated) return null;
-
-  // -------------------------------
   // 🎯 登録ボタン押下
   // -------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +28,7 @@ export default function RegisterPage() {
     setApiError("");
     setIsSubmitting(true);
 
+    // 入力バリデーション
     if (!email || !password || !name) {
       setApiError("すべての必須項目を入力してください。");
       setIsSubmitting(false);
@@ -52,21 +41,22 @@ export default function RegisterPage() {
     }
 
     try {
-      // 🔥 useAuth().register を呼ぶだけ！（サービス層）
+      // Firebase → Laravel 両方に登録
       const result = await register({
         name,
         email,
         password,
       });
 
-      // 👇 useAuth.register() は「メール認証が必要かどうか」を返す
+      console.log("REGISTER result:", result);
+
+      // 🔥 needsEmailVerification = true → メール認証ページへ
       if (result.needsEmailVerification) {
-        // メールのリンクを踏むまで待つページへ遷移
         router.push("/email/verify");
         return;
       }
 
-      // 既に検証済みのログインユーザーならプロフィールへ
+      // 🔥 すでにメール認証済みユーザーの場合
       router.push("/mypage/profile");
     } catch (e: any) {
       console.error("[RegisterPage] registration failed:", e);
@@ -77,7 +67,7 @@ export default function RegisterPage() {
   };
 
   // -------------------------------
-  // 🎨 UI（デザインは変更なし）
+  // 🎨 UI
   // -------------------------------
   return (
     <div className="w-full max-w-xl p-8 bg-white rounded-xl shadow-2xl mx-auto z-10 mt-10 mb-8">
@@ -94,16 +84,12 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ユーザー名 */}
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             ユーザー名
           </label>
           <input
-            id="name"
             type="text"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -113,16 +99,12 @@ export default function RegisterPage() {
 
         {/* メール */}
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             メールアドレス
           </label>
           <input
-            id="email"
             type="email"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -132,16 +114,12 @@ export default function RegisterPage() {
 
         {/* パスワード */}
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             パスワード
           </label>
           <input
-            id="password"
             type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -149,18 +127,14 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* 確認パスワード */}
+        {/* 確認用パスワード */}
         <div>
-          <label
-            htmlFor="password_confirmation"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             確認用パスワード
           </label>
           <input
-            id="password_confirmation"
             type="password"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
             value={passwordConfirmation}
             onChange={(e) => setPasswordConfirmation(e.target.value)}
             required
@@ -168,12 +142,12 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* ボタン */}
+        {/* 登録ボタン */}
         <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition duration-150 shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition shadow-lg disabled:bg-gray-400"
           >
             {isSubmitting ? "登録中..." : "登録する"}
           </button>

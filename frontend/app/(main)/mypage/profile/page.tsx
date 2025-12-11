@@ -43,14 +43,14 @@ type ProfileErrors = {
 };
 
 /* ============================================================
-   ProfilePage（CSS Modules 完全対応版）
+   ProfilePage（修正版）
 ============================================================ */
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const {
-    user: authUser,
+    user: authUser, // AuthProviderから渡される最新のユーザー情報
     firebaseUser,
     apiClient,
     isAuthenticated,
@@ -162,6 +162,33 @@ export default function ProfilePage() {
   );
 
   /* ============================================================
+     🔥 修正: 認証ユーザー変更時のリセットと再フェッチ
+  ============================================================ */
+  useEffect(() => {
+    // 認証ユーザー(authUser)が存在し、かつローカルのプロフィール(profileUser)が存在する
+    // さらに、両者のIDが異なる場合（= ユーザーが切り替わった場合）
+    if (authUser && profileUser && authUser.id !== profileUser.id) {
+      console.log("🔥 User switch detected. Resetting local state...");
+
+      // ローカルステートをリセット
+      setProfileUser(null);
+      setForm({
+        name: authUser.name, // 新しいユーザーの名前で初期化
+        post_number: "",
+        address: "",
+        building: "",
+      });
+      setIsLoading(true);
+      // この後、下の「初回プロフィール取得」useEffectがprofileUser=nullを検知して再フェッチをトリガーする
+    }
+
+    // ログアウトした場合は即座にリダイレクト
+    if (!authUser && profileUser) {
+      router.replace("/login");
+    }
+  }, [authUser, profileUser, router]);
+
+  /* ============================================================
      メール認証後 reloadAuthToken
   ============================================================ */
   useEffect(() => {
@@ -194,7 +221,8 @@ export default function ProfilePage() {
       return;
     }
 
-    if (!profileUser && !isFetching) {
+    // 🔥 修正: 認証済みで、かつプロフィールデータがない場合にフェッチ
+    if (isAuthenticated && !profileUser && !isFetching) {
       fetchUserProfile();
     }
   }, [

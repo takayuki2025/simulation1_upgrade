@@ -89,17 +89,18 @@ export default function Mypage() {
     プロフィール取得
   ============================ */
   const fetchUserProfile = useCallback(async () => {
-    if (!isAuthenticated) {
-      router.replace("/login");
-      return;
-    }
+    // ... 認証チェックは省略 ...
     if (!apiClient) return;
 
     setIsLoading(true);
     try {
       const res = await apiClient.get("/mypage/profile");
 
-      setUser(res.data.user);
+      // ★★★ 修正箇所 ★★★
+      // APIが { user: {...} } 形式でなければ res.data を直接使用
+      const profileData = res.data.user || res.data;
+
+      setUser(profileData);
 
       if (isVerificationRedirect) {
         setSuccessMessage("メール認証が完了しました！");

@@ -269,179 +269,190 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts
 ;
 ;
 ;
-/* =====================================
+/* ============================================================
    Context
-===================================== */ const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"])(null);
-const API_BASE_URL = ("TURBOPACK compile-time value", "https://localhost:9000");
-/* =====================================
-   ユーザー変換（Laravel → Next.js）
-===================================== */ function mapLaravelUser(raw) {
+============================================================ */ const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createContext"])(null);
+/* ============================================================
+   helper
+============================================================ */ function mapLaravelUser(raw) {
     return {
         ...raw,
         emailVerified: raw.email_verified_at !== null
     };
 }
-/* =====================================
-   Laravel Token 発行
-===================================== */ async function loginWithLaravel(idToken) {
-    const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`${API_BASE_URL}/api/login_or_register`, {
-        id_token: idToken
+function loginWithLaravel(idToken, name) {
+    return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post("/api/login_or_register", {
+        id_token: idToken,
+        name
     }, {
         withCredentials: true
-    });
-    return data;
+    }).then((r)=>r.data);
 }
-/* =====================================
-   Axios Client
-===================================== */ function createApiClient(token) {
-    return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].create({
-        baseURL: API_BASE_URL,
+/* Sanctum API client */ function createSanctumApiClient(token) {
+    const instance = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].create({
+        baseURL: "/api",
         withCredentials: true,
         headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
+            Authorization: `Bearer ${token}`
         }
     });
+    return instance;
 }
 function AuthProvider({ children }) {
     const auth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getFirebaseAuth"])();
     const [firebaseUser, setFirebaseUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
-    const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
-    const [isRegistering, setIsRegistering] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
-    /* Axios Client */ const apiClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
+    /* ================================
+     localStorage 永続化復元
+  ================================= */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        const savedToken = localStorage.getItem("token");
+        const savedUser = localStorage.getItem("user");
+        if (savedToken) setToken(savedToken);
+        if (savedUser) setUser(JSON.parse(savedUser));
+        setIsLoading(false);
+    }, []);
+    /* ============================================================
+     Sanctum API Client
+============================================================ */ const apiClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         if (!token) return null;
-        return createApiClient(token);
+        const instance = createSanctumApiClient(token);
+        // -------------------------------------------------------
+        // Silent Refresh（401 を 1 度だけ自動回復）
+        // -------------------------------------------------------
+        instance.interceptors.response.use((res)=>res, async (error)=>{
+            const original = error.config;
+            if (error.response?.status === 401 && !original._retry && firebaseUser) {
+                original._retry = true;
+                try {
+                    const newIdToken = await firebaseUser.getIdToken(true);
+                    const result = await loginWithLaravel(newIdToken);
+                    setToken(result.token);
+                    localStorage.setItem("token", result.token);
+                    setUser(result.user);
+                    localStorage.setItem("user", JSON.stringify(result.user));
+                    original.headers["Authorization"] = `Bearer ${result.token}`;
+                    return instance(original);
+                } catch (e) {
+                    console.warn("Silent Refresh failed:", e);
+                    logout();
+                }
+            }
+            return Promise.reject(error);
+        });
+        return instance;
     }, [
+        token,
+        firebaseUser
+    ]);
+    /* ============================================================
+     Firebase Auth State Listener
+============================================================ */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        return auth.onAuthStateChanged(async (u)=>{
+            setFirebaseUser(u);
+            // Firebase ログインしているが Laravel には未同期
+            if (u && !token) {
+                const idToken = await u.getIdToken(true);
+                const result = await loginWithLaravel(idToken);
+                setToken(result.token);
+                setUser(result.user);
+                localStorage.setItem("token", result.token);
+                localStorage.setItem("user", JSON.stringify(result.user));
+            }
+        });
+    }, [
+        auth,
         token
     ]);
-    /* =====================================
-     reloadAuthToken（メール認証後の重要処理）
-  ====================================== */ const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
+    /* ============================================================
+     MAIL VERIFIED → Laravel と同期
+============================================================ */ const reloadAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         if (!firebaseUser) return;
-        const idToken = await firebaseUser.getIdToken(true); // force refresh
+        const idToken = await firebaseUser.getIdToken(true);
         const result = await loginWithLaravel(idToken);
         setToken(result.token);
-        const client = createApiClient(result.token);
-        const me = await client.get("/api/user");
-        setUser(mapLaravelUser(me.data.user));
+        setUser(result.user);
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
     }, [
         firebaseUser
     ]);
-    /* =====================================
-     Firebase の状態監視（login / logout）
-  ====================================== */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        const unsub = auth.onAuthStateChanged(async (u)=>{
-            if (!u) {
-                setFirebaseUser(null);
-                setUser(null);
-                setToken(null);
-                setIsLoading(false);
-                return;
-            }
-            setFirebaseUser(u);
-            // ここでは絶対に loginWithLaravel を呼ばない！
-            // メール認証後の同期は reloadAuthToken() が担当する。
-            setIsLoading(false);
-        });
-        return ()=>unsub();
-    }, [
-        auth
-    ]);
-    // =========================
-    // Token Refresh（Laravel へ送らない）
-    // =========================
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        const unsub = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onIdTokenChanged"])(auth, async (u)=>{
-            if (!u || isRegistering) return;
-            // Firebase 内部の token 更新だけ行う（Laravel へは送らない）
-            await u.getIdToken();
-        });
-        return ()=>unsub();
-    }, [
-        auth,
-        isRegistering
-    ]);
-    /* =====================================
-     login
-  ====================================== */ const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ email, password })=>{
+    /* ============================================================
+     LOGIN（完全版）
+============================================================ */ const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ email, password })=>{
         const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(auth, email, password);
-        const idToken = await cred.user.getIdToken();
+        const idToken = await cred.user.getIdToken(true);
         const result = await loginWithLaravel(idToken);
         setToken(result.token);
-        const client = createApiClient(result.token);
-        const me = await client.get("/api/user");
-        setUser(mapLaravelUser(me.data.user));
+        setUser(result.user);
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
     }, [
         auth
     ]);
-    /* =====================================
-     register
-  ====================================== */ const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ name, email, password })=>{
-        setIsRegistering(true);
-        try {
-            const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
-            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
-                displayName: name
-            });
-            const idToken = await cred.user.getIdToken();
-            const result = await loginWithLaravel(idToken);
-            setToken(result.token);
-            const client = createApiClient(result.token);
-            const me = await client.get("/api/user");
-            setUser(mapLaravelUser(me.data.user));
-            return {
-                needsEmailVerification: true
-            };
-        } finally{
-            setIsRegistering(false);
-        }
+    /* ============================================================
+     REGISTER（完全版）
+============================================================ */ const register = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ({ name, email, password })=>{
+        const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createUserWithEmailAndPassword"])(auth, email, password);
+        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(cred.user, {
+            displayName: name
+        });
+        const idToken = await cred.user.getIdToken(true);
+        const result = await loginWithLaravel(idToken, name); // result は { status: 'login' | 'register', ... }
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
+        setToken(result.token);
+        setUser(result.user);
+        // ✅ サーバーのレスポンスの status に基づいて値を返すように修正
+        return {
+            needsEmailVerification: result.status === "register"
+        };
     }, [
         auth
     ]);
-    /* =====================================
-     logout
-  ====================================== */ const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
+    /* ============================================================
+     LOGOUT
+============================================================ */ const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         await auth.signOut();
         setFirebaseUser(null);
         setUser(null);
         setToken(null);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
     }, [
         auth
     ]);
-    /* =====================================
-     Context 提供
-  ====================================== */ return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
-        value: {
-            user,
-            firebaseUser,
-            apiClient,
-            token,
-            isAuthenticated: !!token,
-            isLoading,
-            auth,
-            reloadAuthToken,
-            login,
-            register,
-            logout
-        },
+    const value = {
+        user,
+        firebaseUser,
+        token,
+        apiClient,
+        isAuthenticated: !!token,
+        isLoading,
+        login,
+        register,
+        logout,
+        reloadAuthToken
+    };
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
+        value: value,
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 259,
-        columnNumber: 5
+        lineNumber: 292,
+        columnNumber: 10
     }, this);
 }
 function useAuth() {
     const ctx = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useContext"])(AuthContext);
-    if (!ctx) throw new Error("useAuth must be inside <AuthProvider>");
+    if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
     return ctx;
 }
 function useApiClient() {
     const { apiClient } = useAuth();
     if (!apiClient) {
-        throw new Error("API client is not ready yet. (token not issued)");
+        throw new Error("API client is not ready. User may not be authenticated.");
     }
     return apiClient;
 }

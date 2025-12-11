@@ -18,117 +18,119 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
-const isErrorWithMessage = (error)=>typeof error === "object" && error !== null && "message" in error && typeof error.message === "string";
-const toErrorMessage = (error)=>isErrorWithMessage(error) ? error.message : String(error);
 const CHECK_INTERVAL_MS = 3000;
-const POST_VERIFY_REDIRECT_ROUTE = "/mypage/profile?verified=true";
+const AFTER_SUCCESS_REDIRECT = "/mypage/profile?verified=true";
 function VerifyEmailPage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const searchParams = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"])();
-    const redirectUrl = searchParams.get("redirect");
-    const { user, firebaseUser, auth, isLoading, reloadAuthToken, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { user, firebaseUser, reloadAuthToken, apiClient, isLoading } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$hooks$2f$useSanctumAuth$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     const [statusMessage, setStatusMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
-    const [isResending, setIsResending] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [isFinalizing, setIsFinalizing] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [isResending, setIsResending] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const intervalRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
-    // Step 1: Laravel verify URL にジャンプ
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+    const verifyUrl = searchParams.get("redirect");
+    /* ============================================================
+     Step 1: Laravel verifyURL にジャンプ
+  ============================================================ */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "VerifyEmailPage.useEffect": ()=>{
-            if (redirectUrl) {
-                window.location.href = redirectUrl;
+            if (verifyUrl) {
+                window.location.href = verifyUrl;
             }
         }
     }["VerifyEmailPage.useEffect"], [
-        redirectUrl
+        verifyUrl
     ]);
-    const beginPollingFirebase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "VerifyEmailPage.useCallback[beginPollingFirebase]": ()=>{
+    /* ============================================================
+     Step 2: Firebase の emailVerified をポーリング
+  ============================================================ */ const beginPolling = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "VerifyEmailPage.useCallback[beginPolling]": ()=>{
             if (intervalRef.current !== null) return;
             intervalRef.current = window.setInterval({
-                "VerifyEmailPage.useCallback[beginPollingFirebase]": async ()=>{
+                "VerifyEmailPage.useCallback[beginPolling]": async ()=>{
                     try {
                         await firebaseUser?.reload();
-                    } catch (err) {}
+                    } catch  {}
                 }
-            }["VerifyEmailPage.useCallback[beginPollingFirebase]"], CHECK_INTERVAL_MS);
+            }["VerifyEmailPage.useCallback[beginPolling]"], CHECK_INTERVAL_MS);
         }
-    }["VerifyEmailPage.useCallback[beginPollingFirebase]"], [
+    }["VerifyEmailPage.useCallback[beginPolling]"], [
         firebaseUser
     ]);
-    const stopPollingFirebase = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "VerifyEmailPage.useCallback[stopPollingFirebase]": ()=>{
+    const stopPolling = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "VerifyEmailPage.useCallback[stopPolling]": ()=>{
             if (intervalRef.current !== null) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
             }
         }
-    }["VerifyEmailPage.useCallback[stopPollingFirebase]"], []);
-    // Step 2: 認証成功後、Laravel と同期
-    const finalizeVerification = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "VerifyEmailPage.useCallback[finalizeVerification]": async ()=>{
+    }["VerifyEmailPage.useCallback[stopPolling]"], []);
+    /* ============================================================
+     Step 3: 最終確定（Laravel Token 再発行）
+  ============================================================ */ const finalize = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "VerifyEmailPage.useCallback[finalize]": async ()=>{
             if (isFinalizing) return;
             setIsFinalizing(true);
+            setStatusMessage(null);
             try {
-                await reloadAuthToken();
-                router.replace(POST_VERIFY_REDIRECT_ROUTE);
+                console.log("🔥 [VerifyEmail] Finalizing → reloadAuthToken()");
+                await reloadAuthToken(); // ← 最重要（Sanctum Token 再発行 & Laravel user 更新）
+                router.replace(AFTER_SUCCESS_REDIRECT);
             } catch (err) {
-                setStatusMessage(`認証の確定に失敗しました。ログインし直してください。(${toErrorMessage(err)})`);
+                console.error("Verify finalize error:", err);
+                setStatusMessage("認証の確定に失敗しました。再ログインしてください。");
             } finally{
                 setIsFinalizing(false);
             }
         }
-    }["VerifyEmailPage.useCallback[finalizeVerification]"], [
+    }["VerifyEmailPage.useCallback[finalize]"], [
         reloadAuthToken,
         router,
         isFinalizing
     ]);
-    // Step 3: 状態監視（user === null でも redirect しない!!）
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+    /* ============================================================
+     Step 4: 状態監視
+  ============================================================ */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "VerifyEmailPage.useEffect": ()=>{
             if (isLoading) return;
-            // Laravel verified
-            if (user && user.emailVerified) {
-                stopPollingFirebase();
-                finalizeVerification();
-                return;
-            }
-            // Firebase verified
-            if (firebaseUser?.emailVerified) {
-                stopPollingFirebase();
-                finalizeVerification();
+            // Firebase または Laravel のどちらか verified → OK
+            if (firebaseUser?.emailVerified || user?.emailVerified) {
+                stopPolling();
+                finalize();
                 return;
             }
             // 未 verified → ポーリング
-            beginPollingFirebase();
+            beginPolling();
             return ({
-                "VerifyEmailPage.useEffect": ()=>stopPollingFirebase()
+                "VerifyEmailPage.useEffect": ()=>stopPolling()
             })["VerifyEmailPage.useEffect"];
         }
     }["VerifyEmailPage.useEffect"], [
         isLoading,
         user,
         firebaseUser,
-        beginPollingFirebase,
-        stopPollingFirebase,
-        finalizeVerification
+        beginPolling,
+        stopPolling,
+        finalize
     ]);
-    const handleResend = async ()=>{
+    /* ============================================================
+     認証メール再送 API（Laravel 標準ルート）
+  ============================================================ */ const handleResend = async ()=>{
         if (!apiClient) {
-            setStatusMessage("APIクライアントが初期化されていません。");
+            setStatusMessage("API クライアントが初期化されていません。");
             return;
         }
         setIsResending(true);
         setStatusMessage(null);
         try {
-            await apiClient.post("/api/email/verification-notification");
+            await apiClient.post("/email/verification-notification"); // ← Laravel 標準
             setStatusMessage("新しい認証メールを送信しました。");
         } catch (err) {
             let msg = "メール再送に失敗しました。";
             if (err instanceof __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["AxiosError"]) {
                 msg = err.response?.data?.message || err.message;
             } else {
-                msg = toErrorMessage(err);
+                msg = String(err);
             }
             setStatusMessage(msg);
         } finally{
@@ -143,7 +145,7 @@ function VerifyEmailPage() {
                     className: "animate-spin h-10 w-10 rounded-full border-t-2 border-b-2 border-blue-600"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 140,
+                    lineNumber: 128,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -151,13 +153,13 @@ function VerifyEmailPage() {
                     children: isFinalizing ? "認証を確定しています..." : "読み込み中..."
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 141,
+                    lineNumber: 129,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-            lineNumber: 139,
+            lineNumber: 127,
             columnNumber: 7
         }, this);
     }
@@ -171,7 +173,7 @@ function VerifyEmailPage() {
                     children: "💌 メール認証のお願い"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 151,
+                    lineNumber: 139,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -179,7 +181,7 @@ function VerifyEmailPage() {
                     children: "ご登録ありがとうございます！"
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 155,
+                    lineNumber: 143,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -190,7 +192,7 @@ function VerifyEmailPage() {
                             children: user?.email
                         }, void 0, false, {
                             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                            lineNumber: 160,
+                            lineNumber: 148,
                             columnNumber: 11
                         }, this),
                         " ",
@@ -198,7 +200,7 @@ function VerifyEmailPage() {
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 159,
+                    lineNumber: 147,
                     columnNumber: 9
                 }, this),
                 statusMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -206,7 +208,7 @@ function VerifyEmailPage() {
                     children: statusMessage
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 165,
+                    lineNumber: 153,
                     columnNumber: 11
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -219,12 +221,12 @@ function VerifyEmailPage() {
                         children: "開発用: MailHog を開く"
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                        lineNumber: 171,
+                        lineNumber: 159,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 170,
+                    lineNumber: 158,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -240,27 +242,27 @@ function VerifyEmailPage() {
                         children: isResending ? "送信中..." : "認証メールを再送する"
                     }, void 0, false, {
                         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                        lineNumber: 188,
+                        lineNumber: 176,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/app/(auth)/email/verify/page.tsx",
-                    lineNumber: 181,
+                    lineNumber: 169,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/app/(auth)/email/verify/page.tsx",
-            lineNumber: 150,
+            lineNumber: 138,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/app/(auth)/email/verify/page.tsx",
-        lineNumber: 149,
+        lineNumber: 137,
         columnNumber: 5
     }, this);
 }
-_s(VerifyEmailPage, "rC/UCrQbgo4xIWrJKkbsnheEe5M=", false, function() {
+_s(VerifyEmailPage, "L1gwAm3CmYXGML1e33nRQu2UROM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSearchParams"],
