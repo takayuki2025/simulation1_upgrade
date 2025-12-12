@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///app/app/%28main%29/layout.tsx"],"sourcesContent":["\"use client\";\n\nimport { AuthProvider } from \"@/hooks/useSanctumAuth\";\nimport React, { ReactNode } from \"react\";\n\nexport default function MainLayout({ children }: { children: ReactNode }) {\n  return <>{children}</>;\n}\n"],"names":[],"mappings":";;;;;AAAA;;AAKe,SAAS,WAAW,EAAE,QAAQ,EAA2B;IACtE,qBAAO;kBAAG;;AACZ;KAFwB","debugId":null}}]
+}

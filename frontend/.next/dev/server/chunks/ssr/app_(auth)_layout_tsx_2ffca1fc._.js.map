@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///app/app/%28auth%29/layout.tsx"],"sourcesContent":["export default function AuthLayout({ children }) {\n  return <>{children}</>;\n}"],"names":[],"mappings":";;;;;;AAAe,SAAS,WAAW,EAAE,QAAQ,EAAE;IAC7C,qBAAO;kBAAG;;AACZ","debugId":null}}]
+}

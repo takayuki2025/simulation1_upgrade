@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Auth\FirebaseAuthController;
+// use App\Http\Controllers\Auth\FirebaseAuthController;
 // use App\Http\Controllers\ItemController;
 // use App\Http\Controllers\MypageController;
 // use App\Http\Controllers\ProfileController;
@@ -14,6 +14,7 @@ use App\Http\Controllers\Auth\FirebaseAuthController;
 // use App\Http\Controllers\ShopController;
 // use App\Http\Controllers\ShopItemController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Modules\Auth\Presentation\Http\Controllers\FirebaseAuthController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemDetailController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
@@ -67,7 +68,7 @@ Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
 
 
 
-
+//各ショップの公開ページ
 Route::prefix('shops/{shop_code}')
     ->middleware('tenant')
     ->group(function () {
@@ -75,14 +76,6 @@ Route::prefix('shops/{shop_code}')
         Route::get('/items', ShopItemListController::class);  // ← 正しい
     });
 
-
-// 店舗公開
-// Route::prefix('shops/{shop_code}')
-//     ->middleware('tenant')
-//     ->group(function () {
-//         Route::get('/', [ShopController::class, 'show']);
-//         Route::get('/items', [ShopItemController::class, 'index']);
-//     });
 
 
 
@@ -108,11 +101,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     /* ----------------------
-       🔹 Profile
+       🔹 Profile（マイページで作ったからいらない）
     -----------------------*/
-   //  Route::get('/profile', [ProfileController::class, 'show']);
-   //  Route::patch('/profile', [ProfileController::class, 'update']);
-   //  Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
+    //  Route::get('/profile', [ProfileController::class, 'show']);
+    //  Route::patch('/profile', [ProfileController::class, 'update']);
+    //  Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
 
 
 
@@ -135,18 +128,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/item/{id}', [ItemCommandController::class, 'update']); // 更新
     Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']); // 削除
 
-    //  Route::post('/item', [ItemController::class, 'store']);
-    //  Route::put('/item/{id}', [ItemController::class, 'update']);
-    //  Route::delete('/item/{id}', [ItemController::class, 'destroy']);
-
 
 
     /* ----------------------
        🔹 Purchase（購入系）
     -----------------------*/
-   //  Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
-   //  Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
-   //  Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
+    //  Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
+    //  Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
+    //  Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
 
 
     /* ----------------------

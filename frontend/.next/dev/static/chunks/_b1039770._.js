@@ -1,9 +1,121 @@
 (globalThis.TURBOPACK || (globalThis.TURBOPACK = [])).push([typeof document === "object" ? document.currentScript : undefined,
-"[project]/src/services/itemService.ts [app-client] (ecmascript)", ((__turbopack_context__, module, exports) => {
+"[project]/src/services/itemService.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
+"use strict";
 
-const e = new Error("Could not parse module '[project]/src/services/itemService.ts'\n\n'import', and 'export' cannot be used outside of module code");
-e.code = 'MODULE_UNPARSABLE';
-throw e;
+__turbopack_context__.s([
+    "useItemDetailSWR",
+    ()=>useItemDetailSWR,
+    "useItemsSWR",
+    ()=>useItemsSWR,
+    "useShopItemsSWR",
+    ()=>useShopItemsSWR
+]);
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/swr/dist/index/index.mjs [app-client] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
+var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature();
+;
+;
+function useItemsSWR(tab, search, apiClient) {
+    _s();
+    let url = "/item";
+    if (tab === "mylist") {
+        url = "/items/favorite";
+    } else {
+        const params = new URLSearchParams();
+        if (search) params.append("search", search);
+        url = `/item${params.toString() ? `?${params.toString()}` : ""}`;
+    }
+    const keyTag = apiClient ? "auth" : "public";
+    const swrKey = [
+        url,
+        keyTag
+    ];
+    const swrFetcher = async ()=>{
+        if (apiClient) {
+            const response = await apiClient.get(url);
+            return response.data;
+        }
+        const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/api${url}`);
+        return response.data;
+    };
+    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(swrKey, swrFetcher);
+    return {
+        items: swr.data?.items ?? [],
+        isLoading: swr.isLoading,
+        isError: swr.error,
+        mutate: swr.mutate
+    };
+}
+_s(useItemsSWR, "iifyDOo5TKakSKM5VQzDMutzZgc=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"]
+    ];
+});
+function useItemDetailSWR(itemId, apiClient) {
+    _s1();
+    const url = itemId ? `/item/${itemId}` : null;
+    const keyTag = apiClient ? "auth" : "public";
+    const swrKey = url ? [
+        url,
+        keyTag
+    ] : null;
+    const swrFetcher = async ()=>{
+        if (!url) return null;
+        if (apiClient) {
+            const response = await apiClient.get(url);
+            return response.data;
+        }
+        const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/api${url}`);
+        return response.data;
+    };
+    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(swrKey, swrFetcher);
+    return {
+        data: swr.data,
+        item: swr.data?.item ?? null,
+        comments: swr.data?.comments ?? [],
+        isFavorited: swr.data?.is_favorited ?? false,
+        favoritesCount: swr.data?.favorites_count ?? 0,
+        isLoading: swr.isLoading,
+        isError: swr.error,
+        mutate: swr.mutate
+    };
+}
+_s1(useItemDetailSWR, "iifyDOo5TKakSKM5VQzDMutzZgc=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"]
+    ];
+});
+const useShopItemsSWR = (shopId, apiClient)=>{
+    _s2();
+    const url = shopId ? `/shops/${shopId}/items` : null;
+    const key = url ? [
+        url,
+        apiClient ? "auth" : "public"
+    ] : null;
+    const fetcher = async ()=>{
+        if (!url) return null;
+        if (apiClient) {
+            const res = await apiClient.get(url);
+            return res.data;
+        }
+        const res = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/api${url}`);
+        return res.data;
+    };
+    const swr = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"])(key, fetcher);
+    return {
+        items: swr.data?.items ?? [],
+        isLoading: swr.isLoading,
+        isError: swr.error
+    };
+};
+_s2(useShopItemsSWR, "iifyDOo5TKakSKM5VQzDMutzZgc=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$swr$2f$dist$2f$index$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["default"]
+    ];
+});
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
+}
 }),
 "[project]/utils/utils.ts [app-client] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
@@ -166,7 +278,7 @@ function Home() {
                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].shopButtons,
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push("/shops/shop_a"),
+                        onClick: ()=>router.push("/shops/shop-a"),
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].shopButton,
                         children: "ショップA(テスト用リンク)"
                     }, void 0, false, {
@@ -175,7 +287,7 @@ function Home() {
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push("/shops/shop_b"),
+                        onClick: ()=>router.push("/shops/shop-b"),
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].shopButton,
                         children: "ショップB(テスト用リンク)"
                     }, void 0, false, {
@@ -184,7 +296,7 @@ function Home() {
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push("/shops/shop_c"),
+                        onClick: ()=>router.push("/shops/shop-c"),
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].shopButton,
                         children: "ショップC(テスト用リンク)"
                     }, void 0, false, {
@@ -193,7 +305,7 @@ function Home() {
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push("/shops/shop_d"),
+                        onClick: ()=>router.push("/shops/shop-d"),
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].shopButton,
                         children: "ショップD(テスト用リンク)"
                     }, void 0, false, {

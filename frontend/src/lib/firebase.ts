@@ -1,9 +1,15 @@
+"use client";
+
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 
 let firebaseAuth: Auth | null = null;
 
 export function getFirebaseApp() {
+  if (typeof window === "undefined") {
+    throw new Error("Firebase must be used in client-side only");
+  }
+
   const config = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,

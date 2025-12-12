@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
 
   // PPR / RSC キャッシュ
-  cacheComponents: true,
+  cacheComponents: false,
 
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
