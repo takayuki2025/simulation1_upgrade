@@ -5,12 +5,18 @@ namespace App\Modules\Item\Presentation\Domain\ValueObject;
 class CategoryList
 {
     public function __construct(
-        private array $values
+        private array $categories = [],
     ) {
     }
 
-    public function getValues(): array
+    public function value(): array
     {
-        return $this->values;
+        return $this->categories;
+    }
+
+    // ★★★ 追加：toArray() を公開 API にする
+    public function toArray(): array
+    {
+        return $this->categories;
     }
 }

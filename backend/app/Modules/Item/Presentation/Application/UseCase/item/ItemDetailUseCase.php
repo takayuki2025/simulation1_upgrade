@@ -4,8 +4,8 @@ namespace App\Modules\Item\Presentation\Application\UseCase\Item;
 
 use App\Modules\Item\Presentation\Application\Dto\Item\ItemDetailOutputDto;
 use App\Modules\Item\Presentation\Domain\Repository\ItemRepository;
-use RuntimeException;
 use Illuminate\Support\Facades\Auth;
+use RuntimeException;
 
 class ItemDetailUseCase
 {
@@ -25,7 +25,7 @@ class ItemDetailUseCase
         $userId = Auth::id();
 
         // ★ コメント一覧
-        $comments = $this->itemRepository->findComments($id);
+        $comments = $this->itemRepository->listComments($id);
 
         // ★ お気に入り判定
         $isFavorited = $userId

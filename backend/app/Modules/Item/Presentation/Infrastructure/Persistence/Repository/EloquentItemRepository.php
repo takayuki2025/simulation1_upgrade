@@ -19,17 +19,12 @@ class EloquentItemRepository implements ItemRepository
     {
         return new Item(
             id: $model->id ? new ItemId($model->id) : null,
-
-            // ★ ここは「元のままの int」を渡す
             userId: $model->user_id,
             shopId: $model->shop_id,
             name: $model->name,
             price: new Price($model->price),
             explain: $model->explain,
             condition: $model->condition,
-
-            // ★ ここも、最初に動いていた形に戻す
-            //   CategoryList 側で string / array をうまく扱っている想定
             category: new CategoryList($model->category ?? []),
             brand: $model->brand,
             itemImage: new ItemImagePath($model->item_image),
@@ -106,6 +101,9 @@ class EloquentItemRepository implements ItemRepository
         return EloquentItem::whereKey($itemId)->value('remain');
     }
 
+    /* =======================
+       いいね（マイリスト）
+    ======================== */
     public function toggleMylist(int $userId, int $itemId): bool
     {
         $exists = Good::where('user_id', $userId)
@@ -125,32 +123,43 @@ class EloquentItemRepository implements ItemRepository
         return true; // ON
     }
 
-    public function getFavoriteCount(int $itemId): int//⚫️
+    public function getFavoriteCount(int $itemId): int
     {
         return Good::where('item_id', $itemId)->count();
     }
 
-    public function findComments(int $itemId): array
+    // ★ 追加：詳細画面用 favoritesCount
+    public function favoritesCount(int $itemId): int
     {
-        // listComments() を使えばOK
-        return $this->listComments($itemId)->toArray();
+        return Good::where('item_id', $itemId)->count();
     }
 
+    // ★ 追加：ユーザーがいいね済みか？
     public function isFavorited(int $itemId, int $userId): bool
     {
-        return \App\Models\Good::where('item_id', $itemId)
+        return Good::where('item_id', $itemId)
             ->where('user_id', $userId)
             ->exists();
     }
 
-    public function favoritesCount(int $itemId): int
+    /* =======================
+       コメント一覧
+    ======================== */
+
+    /** コメント一覧を返す */
+    public function findComments(int $itemId): array
     {
-        return \App\Models\Good::where('item_id', $itemId)->count();
+        return Comment::with('user')
+            ->where('item_id', $itemId)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->toArray();
     }
 
-    public function listComments(int $itemId): iterable//⚫️
+    public function listComments(int $itemId): iterable
     {
         return Comment::where('item_id', $itemId)
+            ->with('user')  // ← フロントで user.name / user.user_image を使うので
             ->orderByDesc('id')
             ->get();
     }
@@ -174,5 +183,16 @@ class EloquentItemRepository implements ItemRepository
             ->orderByDesc('id')
             ->get()
             ->map(fn (EloquentItem $m) => $this->toDomain($m));
+    }
+
+    public function createComment(int $userId, int $itemId, string $comment): array
+    {
+        $model = \App\Models\Comment::create([
+            'user_id' => $userId,
+            'item_id' => $itemId,
+            'comment' => $comment,
+        ]);
+
+        return $model->toArray();
     }
 }

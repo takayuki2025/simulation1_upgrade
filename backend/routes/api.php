@@ -7,16 +7,22 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\FirebaseAuthController;
 // use App\Http\Controllers\ItemController;
 // use App\Http\Controllers\MypageController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\PurchaseController;
-use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\CommentController;
-use App\Http\Controllers\ShopController;
-use App\Http\Controllers\ShopItemController;
+// use App\Http\Controllers\ProfileController;
+// use App\Http\Controllers\PurchaseController;
+// use App\Http\Controllers\FavoriteController;
+// use App\Http\Controllers\CommentController;
+// use App\Http\Controllers\ShopController;
+// use App\Http\Controllers\ShopItemController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Modules\Item\Presentation\Http\Controllers\ItemDetailController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
+// use App\Modules\Item\Presentation\Http\Controllers\CommentCreateController;
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
+use App\Modules\Item\Presentation\Http\Controllers\ShopShowController;
+use App\Modules\Item\Presentation\Http\Controllers\ShopItemListController;
+use App\Modules\Item\Presentation\Http\Controllers\CommentController;
+use App\Modules\Item\Presentation\Http\Controllers\FavoriteController;
 
 /* ============================================================
    🚀 1. デバッグログ（必須）
@@ -41,7 +47,10 @@ Route::post('/register', [FirebaseAuthController::class, 'register']);
 
 // ★★★ 新しい UseCase 版 ItemQueryController に置き換え
 Route::get('/item', [ItemQueryController::class, 'index']);    // 全アイテム
-Route::get('/item/{id}', [ItemQueryController::class, 'show']); // 商品詳細
+
+Route::get('/item/{id}', ItemDetailController::class);
+
+// Route::get('/item/{id}', [ItemQueryController::class, 'show']); //もう使わない
 
 // 🔍 カテゴリ検索
 Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
@@ -55,13 +64,25 @@ Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
 
 
 
-// 店舗公開
+
+
+
+
 Route::prefix('shops/{shop_code}')
     ->middleware('tenant')
     ->group(function () {
-        Route::get('/', [ShopController::class, 'show']);
-        Route::get('/items', [ShopItemController::class, 'index']);
+        Route::get('/', ShopShowController::class);           // ← 正しい
+        Route::get('/items', ShopItemListController::class);  // ← 正しい
     });
+
+
+// 店舗公開
+// Route::prefix('shops/{shop_code}')
+//     ->middleware('tenant')
+//     ->group(function () {
+//         Route::get('/', [ShopController::class, 'show']);
+//         Route::get('/items', [ShopItemController::class, 'index']);
+//     });
 
 
 
@@ -89,9 +110,9 @@ Route::middleware('auth:sanctum')->group(function () {
     /* ----------------------
        🔹 Profile
     -----------------------*/
-    Route::get('/profile', [ProfileController::class, 'show']);
-    Route::patch('/profile', [ProfileController::class, 'update']);
-    Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
+   //  Route::get('/profile', [ProfileController::class, 'show']);
+   //  Route::patch('/profile', [ProfileController::class, 'update']);
+   //  Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
 
 
 
@@ -123,9 +144,9 @@ Route::middleware('auth:sanctum')->group(function () {
     /* ----------------------
        🔹 Purchase（購入系）
     -----------------------*/
-    Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
-    Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
-    Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
+   //  Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
+   //  Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
+   //  Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
 
 
     /* ----------------------
@@ -139,23 +160,35 @@ Route::middleware('auth:sanctum')->group(function () {
     /* ----------------------
        🔹 Comment 作成
     -----------------------*/
-    Route::post('/comment', [CommentController::class, 'create']);
+
+    Route::post('/comment', CommentController::class);
 
 
 
-    /* ----------------------
-       🔹 店舗（OWNER 専用）
-    -----------------------*/
-    Route::post('/shops', [ShopController::class, 'store'])
-        ->middleware('role:OWNER');
 
 
-    Route::prefix('shops/{shop_code}')
-        ->middleware(['tenant', 'role:OWNER'])
-        ->group(function () {
-            Route::post('/items', [ShopItemController::class, 'store']);
-        });
+
+
+    //  /* ----------------------
+    //     🔹 店舗（OWNER 専用）
+    //  -----------------------*/
+    //  Route::post('/shops', [ShopController::class, 'store'])
+    //      ->middleware('role:OWNER');
+
+
+    //  Route::prefix('shops/{shop_code}')
+    //      ->middleware(['tenant', 'role:OWNER'])
+    //      ->group(function () {
+    //          Route::post('/items', [ShopItemController::class, 'store']);
+    //      });
+
+
+
+    //  Route::get('/shops/{shopId}/items', ShopItemListController::class);
+
 });
+
+
 
 
 

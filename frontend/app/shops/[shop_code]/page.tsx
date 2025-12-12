@@ -45,13 +45,25 @@ export default function ShopTopPage() {
       try {
         const shopRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/shops/${shopCode}`,
+          {
+            method: "GET",
+            credentials: "include",
+            mode: "cors",
+          },
         );
+
         const shopData = await shopRes.json();
         setShop(shopData.shop);
 
         const itemsRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/shops/${shopCode}/items`,
+          {
+            method: "GET",
+            credentials: "include",
+            mode: "cors",
+          },
         );
+
         const itemsData = await itemsRes.json();
         setItems(itemsData.items ?? []);
       } catch (err) {

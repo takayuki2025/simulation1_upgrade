@@ -36,7 +36,7 @@ class ItemQueryController
                 'price'      => $item->getPrice()->getValue(),
                 'explain'    => $item->getExplain(),
                 'condition'  => $item->getCondition(),
-                'category'   => $item->getCategory()->getValues(),
+                'category'   => $item->getCategory()->toArray(),
                 'brand'      => $item->getBrand(),
                 'item_image' => $item->getItemImage()->getPath(),
                 'remain'     => $item->getRemain()->getValue(),

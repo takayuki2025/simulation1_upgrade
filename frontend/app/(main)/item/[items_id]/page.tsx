@@ -120,6 +120,56 @@ export default function ItemDetailPage() {
         }
       })();
 
+      /* お気に入り登録/解除 -------------------------------- */
+      const submitFavorite = async () => {
+        if (!item) return;
+        if (!isAuthenticated) return router.push("/login");
+
+        const endpoint = `/items/${item.id}/favorite`;
+
+        try {
+          await apiClient?.request({
+            method: isFavorited ? "DELETE" : "POST",
+            url: endpoint,
+          });
+
+          await mutate(); // 再取得
+        } catch (e) {
+          console.error("Favorite toggle failed:", e);
+        }
+      };
+
+      /* コメント投稿 -------------------------------- */
+      const submitComment = async () => {
+        if (!item) return;
+        if (!newComment.trim()) {
+          setCommentErrors(["コメントを入力してください"]);
+          return;
+        }
+
+        if (!isAuthenticated) return router.push("/login");
+
+        setIsSubmittingComment(true);
+        setCommentErrors([]);
+
+        try {
+          const res = await apiClient?.post("/comment", {
+            item_id: item.id,
+            comment: newComment,
+          });
+
+          if (res?.data?.comment) {
+            mutate(); // コメントリストを再取得
+            setNewComment("");
+          }
+        } catch (e) {
+          console.error("Comment failed:", e);
+          setCommentErrors(["コメント投稿に失敗しました"]);
+        } finally {
+          setIsSubmittingComment(false);
+        }
+      };
+
   /* JSX ----------------------------------------- */
   return (
     <div className={styles.item_detail_wrapper}>
@@ -164,7 +214,7 @@ export default function ItemDetailPage() {
               <div className={styles.favoriteBlock}>
                 {canInteract ? (
                   <button
-                    onClick={() => mutate()}
+                    onClick={submitFavorite}
                     className={styles.favoriteBtn}
                   >
                     <span
@@ -313,7 +363,7 @@ export default function ItemDetailPage() {
 
                   <button
                     className={styles.submitBtn}
-                    onClick={() => mutate()}
+                    onClick={submitComment}
                     disabled={isSubmittingComment}
                   >
                     {isSubmittingComment ? "投稿中..." : "コメントを送信する"}

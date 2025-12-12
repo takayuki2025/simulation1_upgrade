@@ -89,3 +89,29 @@ export function useItemDetailSWR(
     mutate: swr.mutate,
   };
 }
+
+export const useShopItemsSWR = (
+  shopId: number | null,
+  apiClient: AxiosInstance | null,
+) => {
+  const url = shopId ? `/shops/${shopId}/items` : null;
+  const key = url ? [url, apiClient ? "auth" : "public"] : null;
+
+  const fetcher = async () => {
+    if (!url) return null;
+    if (apiClient) {
+      const res = await apiClient.get(url);
+      return res.data;
+    }
+    const res = await axios.get(`/api${url}`);
+    return res.data;
+  };
+
+  const swr = useSWR(key, fetcher);
+
+  return {
+    items: (swr.data?.items ?? []) as Item[],
+    isLoading: swr.isLoading,
+    isError: swr.error,
+  };
+};

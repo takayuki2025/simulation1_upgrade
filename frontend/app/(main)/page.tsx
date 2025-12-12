@@ -52,28 +52,28 @@ export default function Home() {
       {/* ショップボタン */}
       <div className={styles.shopButtons}>
         <button
-          onClick={() => router.push("/shops/shop_a")}
+          onClick={() => router.push("/shops/shop-a")}
           className={styles.shopButton}
         >
           ショップA(テスト用リンク)
         </button>
 
         <button
-          onClick={() => router.push("/shops/shop_b")}
+          onClick={() => router.push("/shops/shop-b")}
           className={styles.shopButton}
         >
           ショップB(テスト用リンク)
         </button>
 
         <button
-          onClick={() => router.push("/shops/shop_c")}
+          onClick={() => router.push("/shops/shop-c")}
           className={styles.shopButton}
         >
           ショップC(テスト用リンク)
         </button>
 
         <button
-          onClick={() => router.push("/shops/shop_d")}
+          onClick={() => router.push("/shops/shop-d")}
           className={styles.shopButton}
         >
           ショップD(テスト用リンク)

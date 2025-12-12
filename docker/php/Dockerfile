@@ -16,5 +16,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY ./conf.d/mailhog.ini /usr/local/etc/php/conf.d/mailhog.ini
 COPY ./www.conf /usr/local/etc/php-fpm.d/www.conf
 
+
 # ワークディレクトリの設定
 WORKDIR /var/www

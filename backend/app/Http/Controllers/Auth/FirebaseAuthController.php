@@ -32,6 +32,13 @@ class FirebaseAuthController extends Controller
     }
 
 
+    // public function loginOrRegister(Request $request): JsonResponse
+    // {
+    //     return response()->json([
+    //         'message' => 'Firebase auth disabled temporarily'
+    //     ], 200);
+    // }
+
     /**
      * POST /api/login_or_register
      * Firebaseログイン・登録兼用エンドポイント

@@ -70,14 +70,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // --- APIミドルウェアグループの定義 ---
         $middleware->api(
             // NginxでCORSを処理するため、HandleCorsは削除した状態を維持
-            prepend: [],
+            prepend: [
+                // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+                \Illuminate\Routing\Middleware\SubstituteBindings::class, // これを先頭に
+            ],
             // 最後にルーティングバインディングを追加
             append: [
                 'throttle:api',
-                \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-                \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
-                \Illuminate\Routing\Middleware\SubstituteBindings::class,
-                // \App\Http\Middleware\SetCurrentShop::class, // ←これもOK
+                // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+                // \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             ]
         );
 
