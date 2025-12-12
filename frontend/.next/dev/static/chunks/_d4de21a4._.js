@@ -86,7 +86,6 @@ function ShopTopPage() {
     const [shop, setShop] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [items, setItems] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
-    const isOwner = user && shop && user.role === "OWNER" && user.id === shop.owner_user_id;
     // ---------------------------------------
     // 店舗データのロード
     // ---------------------------------------
@@ -128,7 +127,7 @@ function ShopTopPage() {
             children: "読み込み中..."
         }, void 0, false, {
             fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-            lineNumber: 83,
+            lineNumber: 80,
             columnNumber: 12
         }, this);
     }
@@ -137,9 +136,58 @@ function ShopTopPage() {
         children: "店舗が見つかりません"
     }, void 0, false, {
         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-        lineNumber: 86,
+        lineNumber: 83,
         columnNumber: 21
     }, this);
+    // 1) ローディング中
+    if (authLoading || loading) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "p-6",
+            children: "読み込み中..."
+        }, void 0, false, {
+            fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
+            lineNumber: 87,
+            columnNumber: 12
+        }, this);
+    }
+    // 2) shop が null ならここで return
+    if (!shop) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "p-6",
+            children: "店舗が見つかりません"
+        }, void 0, false, {
+            fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
+            lineNumber: 92,
+            columnNumber: 12
+        }, this);
+    }
+    const isShopMember = user?.roles?.some((r)=>{
+        const slug = r.slug?.toLowerCase();
+        const validRole = [
+            "owner",
+            "manager",
+            "staff"
+        ].includes(slug);
+        // shop_id の型揺れに対応（number か string）
+        const rShopId = Number(r.shop_id);
+        const pageShopId = Number(shop.id);
+        return validRole && rShopId === pageShopId;
+    }) ?? false;
+    // ここまで来たら、TypeScript 的に `shop` は non-null になる
+    const isDashboardMember = !!user && user.roles?.some((r)=>[
+            "owner",
+            "manager",
+            "staff"
+        ].includes(r.slug) && r.shop_id === shop.id) === true;
+    // ★ デバッグログ（本番では削除推奨）
+    console.log("DEBUG shop:", shop);
+    console.log("DEBUG user:", user);
+    console.log("DEBUG user.roles:", user?.roles);
+    console.log("DEBUG 判定:", user?.roles?.some((r)=>[
+            "owner",
+            "manager",
+            "staff"
+        ].includes(r.slug) && r.shop_id === shop.id));
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "w-full",
         children: [
@@ -151,15 +199,15 @@ function ShopTopPage() {
                     children: "← フリマトップへ戻る"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                    lineNumber: 92,
+                    lineNumber: 131,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                lineNumber: 91,
+                lineNumber: 130,
                 columnNumber: 7
             }, this),
-            isOwner && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            isShopMember && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "px-6 mt-2 flex justify-end",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                     href: `/shops/${shopCode}/dashboard`,
@@ -167,12 +215,12 @@ function ShopTopPage() {
                     children: "店舗ダッシュボードへ"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                    lineNumber: 100,
+                    lineNumber: 139,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                lineNumber: 99,
+                lineNumber: 138,
                 columnNumber: 9
             }, this),
             shop.banner_url && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -184,12 +232,12 @@ function ShopTopPage() {
                     className: "object-cover"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                    lineNumber: 112,
+                    lineNumber: 151,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                lineNumber: 111,
+                lineNumber: 150,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -200,7 +248,7 @@ function ShopTopPage() {
                         children: shop.name
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                        lineNumber: 123,
+                        lineNumber: 162,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -208,13 +256,13 @@ function ShopTopPage() {
                         children: shop.description
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                        lineNumber: 124,
+                        lineNumber: 163,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                lineNumber: 122,
+                lineNumber: 161,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -225,7 +273,7 @@ function ShopTopPage() {
                         children: "商品一覧"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                        lineNumber: 129,
+                        lineNumber: 168,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -239,7 +287,7 @@ function ShopTopPage() {
                                         onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"])(e, item.name)
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                                        lineNumber: 137,
+                                        lineNumber: 176,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -247,7 +295,7 @@ function ShopTopPage() {
                                         children: item.name
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                                        lineNumber: 143,
+                                        lineNumber: 182,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -258,30 +306,30 @@ function ShopTopPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                                        lineNumber: 144,
+                                        lineNumber: 183,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, item.id, true, {
                                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                                lineNumber: 133,
+                                lineNumber: 172,
                                 columnNumber: 13
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                        lineNumber: 131,
+                        lineNumber: 170,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-                lineNumber: 128,
+                lineNumber: 167,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/shops/[shop_code]/page.tsx",
-        lineNumber: 89,
+        lineNumber: 128,
         columnNumber: 5
     }, this);
 }

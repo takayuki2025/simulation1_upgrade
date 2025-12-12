@@ -262,7 +262,7 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/hooks/useSanctumAuth.tsx",
-        lineNumber: 295,
+        lineNumber: 304,
         columnNumber: 10
     }, this);
 }

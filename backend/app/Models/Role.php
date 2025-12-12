@@ -7,13 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
 
+
 class Role extends Model
 {
-    protected $fillable = ['name'];
+    use HasFactory;
+
+    protected $fillable = ['name', 'slug'];
 
     public function users()
     {
         return $this->belongsToMany(User::class)
+            ->using(RoleUser::class)
             ->withPivot('shop_id')
             ->withTimestamps();
     }

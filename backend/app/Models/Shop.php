@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\RoleUser;
+use App\Models\User;
 
 class Shop extends Model
 {
@@ -33,5 +35,18 @@ class Shop extends Model
     public function items(): HasMany
     {
         return $this->hasMany(Item::class);
+    }
+
+    public function roleUsers()
+    {
+        return $this->hasMany(RoleUser::class);
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'role_user')
+            ->using(RoleUser::class)
+            ->withPivot('role_id')
+            ->withTimestamps();
     }
 }

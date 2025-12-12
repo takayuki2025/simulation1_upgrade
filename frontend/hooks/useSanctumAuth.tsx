@@ -24,12 +24,21 @@ import { getFirebaseAuth } from "@/src/lib/firebase";
 /* ============================================================
    型定義
 ============================================================ */
+export interface UserRole {
+  id: number;
+  name: string;
+  slug: string;
+  shop_id: number | null;
+}
+
 export interface LaravelUser {
   id: number;
   name: string;
   email: string;
-  role: string;
-  shop_id?: number | null;
+  // ★ ここを「単体の role」ではなく「roles 配列」に変更
+  roles: UserRole[];
+
+  // すでにあればそのまま
   user_image?: string | null;
   email_verified_at?: string | null;
   emailVerified: boolean;

@@ -9,11 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-// ★追加: メール検証URL生成に必要なクラス
-// use Illuminate\Support\Carbon;
-// use Illuminate\Support\Facades\Config;
-// use Illuminate\Support\Facades\URL;
-
+use App\Models\RoleUser;
 use App\Notifications\CustomVerifyEmail;
 
 // use Illuminate\Auth\Notifications\VerifyEmail; // sendEmailVerificationNotificationで使用　
@@ -40,7 +36,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'address_country',
         'firebase_uid',
         'shop_id',
-        // 'role',
     ];
 
     /**
@@ -107,15 +102,52 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsTo(Shop::class);
     }
 
+    public function formattedRoles(): array
+    {
+        return $this->roles()->get()->map(function ($role) {
+            return [
+                'id'      => $role->id,
+                'name'    => $role->name,
+                'slug'    => $role->slug,
+                'shop_id' => $role->pivot->shop_id,
+            ];
+        })->toArray();
+    }
+
     public function roles()
     {
         return $this->belongsToMany(Role::class)
+            ->using(RoleUser::class)
             ->withPivot('shop_id')
             ->withTimestamps();
     }
 
+    public function rolesForShop(?int $shopId)
+    {
+        return $this->roles()
+            ->when($shopId, fn ($q) => $q->wherePivot('shop_id', $shopId))
+            ->get();
+    }
 
+    public function hasRole(string $slug, ?int $shopId = null): bool
+    {
+        return $this->roles()
+            ->where('slug', $slug)
+            ->when($shopId, fn ($q) => $q->wherePivot('shop_id', $shopId))
+            ->exists();
+    }
 
+    public function assignRole(int $roleId, ?int $shopId = null)
+    {
+        $this->roles()->attach($roleId, ['shop_id' => $shopId]);
+    }
+
+    public function removeRole(int $roleId, ?int $shopId = null)
+    {
+        $this->roles()
+            ->wherePivot('shop_id', $shopId)
+            ->detach($roleId);
+    }
 
     /**
      * メール検証通知をユーザーに送信します。

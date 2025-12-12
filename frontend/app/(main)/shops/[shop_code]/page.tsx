@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { getImageUrl, onImageError } from "@/utils/utils";
-import { useAuth } from "@/hooks/useSanctumAuth";
+import { useAuth, type UserRole } from "@/hooks/useSanctumAuth";
 
 interface Shop {
   id: number;
@@ -33,9 +33,6 @@ export default function ShopTopPage() {
   const [shop, setShop] = useState<Shop | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const isOwner =
-    user && shop && user.role === "OWNER" && user.id === shop.owner_user_id;
 
   // ---------------------------------------
   // 店舗データのロード
@@ -85,6 +82,48 @@ export default function ShopTopPage() {
 
   if (!shop) return <div className="p-6">店舗が見つかりません</div>;
 
+  // 1) ローディング中
+  if (authLoading || loading) {
+    return <div className="p-6">読み込み中...</div>;
+  }
+
+  // 2) shop が null ならここで return
+  if (!shop) {
+    return <div className="p-6">店舗が見つかりません</div>;
+  }
+
+  const isShopMember =
+    user?.roles?.some((r: UserRole) => {
+      const slug = r.slug?.toLowerCase();
+      const validRole = ["owner", "manager", "staff"].includes(slug);
+
+      // shop_id の型揺れに対応（number か string）
+      const rShopId = Number(r.shop_id);
+      const pageShopId = Number(shop.id);
+
+      return validRole && rShopId === pageShopId;
+    }) ?? false;
+
+  // ここまで来たら、TypeScript 的に `shop` は non-null になる
+  const isDashboardMember =
+    !!user &&
+    user.roles?.some(
+      (r: UserRole) =>
+        ["owner", "manager", "staff"].includes(r.slug) && r.shop_id === shop.id,
+    ) === true;
+
+  // ★ デバッグログ（本番では削除推奨）
+  console.log("DEBUG shop:", shop);
+  console.log("DEBUG user:", user);
+  console.log("DEBUG user.roles:", user?.roles);
+  console.log(
+    "DEBUG 判定:",
+    user?.roles?.some(
+      (r) =>
+        ["owner", "manager", "staff"].includes(r.slug) && r.shop_id === shop.id,
+    ),
+  );
+
   return (
     <div className="w-full">
       {/* 🔙 フリマトップへ戻る */}
@@ -95,7 +134,7 @@ export default function ShopTopPage() {
       </div>
 
       {/* OWNER 専用リンク */}
-      {isOwner && (
+      {isShopMember && (
         <div className="px-6 mt-2 flex justify-end">
           <Link
             href={`/shops/${shopCode}/dashboard`}
@@ -135,10 +174,10 @@ export default function ShopTopPage() {
               className="border rounded-lg p-4 shadow hover:shadow-lg transition"
             >
               <img
-                                      src={getImageUrl(item.item_image)}
-                                      alt={item.name}
-                                      onError={(e) => onImageError(e, item.name)}
-                                    />
+                src={getImageUrl(item.item_image)}
+                alt={item.name}
+                onError={(e) => onImageError(e, item.name)}
+              />
 
               <div className="font-bold">{item.name}</div>
               <div className="text-lg text-red-600 font-semibold">

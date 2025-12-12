@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Modules\Auth\Application\UseCase;
 
 use App\Modules\Auth\Application\Dto\LoginOrRegisterInput;
@@ -7,6 +8,7 @@ use App\Modules\Auth\Application\Dto\LoginOrRegisterOutput;
 use App\Modules\Auth\Infrastructure\External\FirebaseProvider;
 use App\Modules\Auth\Domain\Repository\AuthUserRepositoryInterface;
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Auth\Events\Registered;
 
 class LoginOrRegisterUseCase
@@ -24,7 +26,6 @@ class LoginOrRegisterUseCase
 
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
-        // ★ ここが重要：Providerのメソッド verifyToken() を使う
         $verified = $this->firebase->verifyToken($input->firebaseIdToken);
 
         $firebaseUid   = $verified['sub'];
@@ -41,6 +42,7 @@ class LoginOrRegisterUseCase
             ?? $this->users->findByEmail($email);
 
         if (!$user) {
+            // 新規登録
             $user = User::create([
                 'email'        => $email,
                 'name'         => $displayName ?? $email,
@@ -51,6 +53,12 @@ class LoginOrRegisterUseCase
             event(new Registered($user));
             $status = 'register';
             $wasCreated = true;
+
+            // ★ 新規登録時に customer ロール付与
+            $customerRoleId = Role::where('slug', 'customer')->value('id');
+            if ($customerRoleId) {
+                $user->roles()->attach($customerRoleId, ['shop_id' => null]);
+            }
         }
 
         // メール認証同期
@@ -63,6 +71,9 @@ class LoginOrRegisterUseCase
         // トークン発行
         $token = $user->createToken('firebase-login')->plainTextToken;
 
+        // ★ ここでロール情報をレスポンスに含める
+        $roles = $user->formattedRoles();
+
         return new LoginOrRegisterOutput(
             token: $token,
             user: [
@@ -70,6 +81,7 @@ class LoginOrRegisterUseCase
                 'name'              => $user->name,
                 'email'             => $user->email,
                 'email_verified_at' => $user->email_verified_at,
+                'roles'             => $roles, // ← ★追加
             ],
             status: $status,
             needsEmailVerification: $wasCreated && !$user->email_verified_at
