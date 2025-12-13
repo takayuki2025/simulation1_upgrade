@@ -21,7 +21,7 @@ return [
 
         // ← これが無いと必ず「api guard not defined」が発生します
         'api' => [
-            'driver' => 'sanctum',
+            'driver' => 'jwt',
             'provider' => 'users',
         ],
     ],

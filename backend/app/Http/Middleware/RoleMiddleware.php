@@ -4,24 +4,30 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-
+use Illuminate\Http\JsonResponse;
 
 class RoleMiddleware
 {
     /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * 使用例：
+     *  Route::middleware(['auth.jwt', 'role:admin'])->get(...);
      */
-    public function handle($request, Closure $next, $role)
-{
-    $user = $request->user();
+    public function handle(Request $request, Closure $next, string $roleSlug): JsonResponse|\Symfony\Component\HttpFoundation\Response
+    {
+        $user = $request->user();
 
-    if (!$user || $user->role !== $role) {
-        return response()->json(['error' => 'Forbidden'], 403);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
+
+        if (! $user->hasRole($roleSlug)) {
+            return response()->json([
+                'message' => 'Forbidden: role ' . $roleSlug . ' is required',
+            ], 403);
+        }
+
+        return $next($request);
     }
-
-    return $next($request);
-}
 }

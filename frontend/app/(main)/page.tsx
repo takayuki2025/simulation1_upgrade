@@ -4,17 +4,17 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 
-import { useItemsSWR } from "@/src/services/itemService";
+import { useItemsSWR } from "@/services/itemService";
 import { getImageUrl, onImageError } from "@/utils/utils";
-import { useAuth } from "@/hooks/useSanctumAuth";
+import { useAuth } from "@/ui/auth/useAuth";
 
-import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css"; // ← ★ CSS Modules 読み込み
+import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
 export default function Home() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const { apiClient, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
 
   const currentTab = useMemo(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
@@ -26,15 +26,17 @@ export default function Home() {
     [searchParams],
   );
 
+  // 認証状態が分かるまでは apiClient を使わない
   const effectiveApiClient = useMemo(() => {
+    if (isAuthLoading) return null;
     if (isAuthenticated && apiClient) return apiClient;
     return null;
-  }, [isAuthenticated, apiClient]);
+  }, [isAuthLoading, isAuthenticated, apiClient]);
 
   const { items, isLoading: isItemsLoading } = useItemsSWR(
     currentTab,
     currentSearchQuery,
-    isAuthLoading ? null : effectiveApiClient,
+    effectiveApiClient,
   );
 
   const isPageLoading = isAuthLoading || isItemsLoading;

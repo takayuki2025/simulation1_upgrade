@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Modules\Auth\Application\Dto;
 
 class LoginOrRegisterOutput
@@ -9,16 +8,18 @@ class LoginOrRegisterOutput
         public string $token,
         public array $user,
         public string $status,
-        public bool $needsEmailVerification
+        public bool $needsEmailVerification,
+        public string $refreshToken,
     ) {
     }
 
     public function toArray(): array
     {
         return [
-            'token'  => $this->token,
-            'user'   => $this->user,
-            'status' => $this->status,
+            'token'                 => $this->token,
+            'refresh_token'         => $this->refreshToken,
+            'user'                  => $this->user,
+            'status'                => $this->status,
             'needsEmailVerification' => $this->needsEmailVerification,
         ];
     }

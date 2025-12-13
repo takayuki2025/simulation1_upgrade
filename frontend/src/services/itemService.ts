@@ -1,7 +1,7 @@
 import useSWR from "swr";
 import axios from "axios";
 import type { AxiosInstance } from "axios";
-import type { Item, ItemComment } from "@/src/types/item";
+import type { Item, ItemComment } from "@/types/item";
 
 /* ============================================================
    商品一覧

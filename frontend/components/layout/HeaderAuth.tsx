@@ -27,7 +27,7 @@ export default function HeaderAuth() {
 
           <Link
             href="/login"
-            className="text-white text-base py-1 px-3 border border-black hover:bg白 hover:text-black"
+            className="text-white text-base py-1 px-3 border border-black hover:bg-white hover:text-black"
           >
             ログイン
           </Link>

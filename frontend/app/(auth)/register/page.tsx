@@ -3,16 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-import { useAuth } from "@/hooks/useSanctumAuth";
+import { useAuth } from "@/ui/auth/useAuth";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register, isLoading } = useAuth();
 
-  // 🔥 Auth Service（Sanctum + Firebase）
-  const { register } = useAuth();
-
-  // UI 状態
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,15 +16,11 @@ export default function RegisterPage() {
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // -------------------------------
-  // 🎯 登録ボタン押下
-  // -------------------------------
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setApiError("");
     setIsSubmitting(true);
 
-    // 入力バリデーション
     if (!email || !password || !name) {
       setApiError("すべての必須項目を入力してください。");
       setIsSubmitting(false);
@@ -41,22 +33,21 @@ export default function RegisterPage() {
     }
 
     try {
-      // Firebase → Laravel 両方に登録
       const result = await register({
         name,
         email,
         password,
       });
 
-      console.log("REGISTER result:", result);
+      console.log("[RegisterPage] REGISTER result:", result);
 
-      // 🔥 needsEmailVerification = true → メール認証ページへ
-      if (result.needsEmailVerification) {
+      // AuthService.register は { needsEmailVerification: true } を返す設計
+      if (result?.needsEmailVerification) {
         router.push("/email/verify");
         return;
       }
 
-      // 🔥 すでにメール認証済みユーザーの場合
+      // 既にメール認証済みの場合など
       router.push("/mypage/profile");
     } catch (e: any) {
       console.error("[RegisterPage] registration failed:", e);
@@ -66,9 +57,6 @@ export default function RegisterPage() {
     }
   };
 
-  // -------------------------------
-  // 🎨 UI
-  // -------------------------------
   return (
     <div className="w-full max-w-xl p-8 bg-white rounded-xl shadow-2xl mx-auto z-10 mt-10 mb-8">
       <h2 className="text-center text-3xl font-bold text-gray-800 mb-6 border-b pb-3">
@@ -93,7 +81,7 @@ export default function RegisterPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
@@ -108,7 +96,7 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
@@ -123,7 +111,7 @@ export default function RegisterPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
@@ -138,7 +126,7 @@ export default function RegisterPage() {
             value={passwordConfirmation}
             onChange={(e) => setPasswordConfirmation(e.target.value)}
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
           />
         </div>
 
@@ -146,7 +134,7 @@ export default function RegisterPage() {
         <div className="pt-2">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
             className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition shadow-lg disabled:bg-gray-400"
           >
             {isSubmitting ? "登録中..." : "登録する"}

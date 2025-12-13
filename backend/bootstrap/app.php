@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
 
 
+        $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
+
         $middleware->append(\App\Http\Middleware\AddTenantInfoToLogs::class);
 
 
@@ -57,7 +59,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // 既存の古い名前空間のミドルウェアのエイリアスはLaravel 11では不要なため、削除
             // ⭐ ここに 'tenant' ミドルウェアのエイリアスを追加 ⭐
             'tenant' => \App\Http\Middleware\SetCurrentShop::class,
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'auth.jwt'   => \App\Http\Middleware\JwtAuthenticate::class,
+            'role'       => \App\Http\Middleware\RoleMiddleware::class,
+            'shop.role'  => \App\Http\Middleware\ShopScopedRoleMiddleware::class,
         ]);
         // ★★★ 修正箇所ここまで ★★★
 

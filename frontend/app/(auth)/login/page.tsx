@@ -3,13 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-// 🔥 Hexagonal: ここがアプリケーションサービス（useAuth）
-import { useAuth } from "@/hooks/useSanctumAuth";
+import { useAuth } from "@/ui/auth/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-
   const { login, isAuthenticated, isLoading } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -17,121 +14,103 @@ export default function LoginPage() {
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // -------------------------
-  // 👀 認証済みならトップへリダイレクト
-  // -------------------------
+  // ================================
+  // 認証済みならホームへ
+  // ================================
   useEffect(() => {
+    console.log(
+      "[LoginPage] isLoading=",
+      isLoading,
+      "isAuthenticated=",
+      isAuthenticated,
+    );
     if (!isLoading && isAuthenticated) {
+      console.log("[LoginPage] redirect fired");
       router.replace("/");
     }
   }, [isLoading, isAuthenticated, router]);
 
-  // 🔄 読み込み表示
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        <p>認証状態を確認中...</p>
+      <div className="min-h-screen flex items-center justify-center text-white bg-gray-900">
+        認証状態を確認中...
       </div>
     );
   }
 
-  // 🔄 認証済みなら画面を空にする
   if (isAuthenticated) return null;
 
-  // --------------------------------------
-  // 🎯 ログインボタンクリック
-  // --------------------------------------
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setApiError("");
-  setIsSubmitting(true);
+  // ================================
+  // ログイン送信処理
+  // ================================
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setApiError("");
+    setIsSubmitting(true);
 
-  if (!email || !password) {
-    setApiError("メールアドレスとパスワードを入力してください。");
-    setIsSubmitting(false);
-    return;
+    try {
+      await login({ email, password });
+      // AuthProvider が user をセットする。
+      // isAuthenticated が true になると上の useEffect が router.replace("/") を実行
+    } catch {
+      setApiError("ログインに失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  console.log("[LoginPage] Try login:", { email, passLen: password.length });
-
-  try {
-    // ✅ 修正後のコード: emailとpasswordを1つのオブジェクトとして渡す
-    await login({ email: email.trim(), password: password });
-
-    console.log("[LoginPage] Login success → redirect /");
-
-    router.push("/");
-  } catch (error: any) {
-    console.error("[LoginPage] Login failed", error);
-
-    const message =
-      error?.message ||
-      error?.response?.data?.message ||
-      "ログインに失敗しました。もう一度お試しください。";
-
-    setApiError(message);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-  // --------------------------------------
-  // 🎨 UI（デザインはそのまま）
-  // --------------------------------------
   return (
-    <div className="w-full max-w-xl p-8 bg-white rounded-xl shadow-2xl mx-auto z-10 mt-20 mb-8">
-      <h2 className="text-center text-3xl font-bold text-gray-800 mb-6 border-b pb-3">
+    <div className="w-full max-w-xl p-8 mx-auto mt-20 mb-8 bg-white rounded-xl shadow-xl">
+      <h2 className="mb-6 text-3xl font-bold text-center border-b pb-3">
         ログイン
       </h2>
 
       {apiError && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm font-medium">
+        <div className="p-3 mb-4 text-sm font-medium text-red-700 bg-red-100 rounded">
           {apiError}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* メールアドレス */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block mb-1 text-sm font-medium text-gray-700">
             メールアドレス
           </label>
           <input
             id="email"
             type="email"
+            autoComplete="username"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             required
             disabled={isSubmitting}
           />
         </div>
 
-        {/* パスワード */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block mb-1 text-sm font-medium text-gray-700">
             パスワード
           </label>
           <input
             id="password"
             type="password"
+            autoComplete="current-password"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             required
             disabled={isSubmitting}
           />
         </div>
 
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg"
-          >
-            {isSubmitting ? "ログイン中..." : "ログインする"}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full py-3 text-lg font-semibold text-white bg-red-600 rounded-lg"
+        >
+          {isSubmitting ? "ログイン中..." : "ログインする"}
+        </button>
       </form>
 
       <div className="mt-6 text-center">

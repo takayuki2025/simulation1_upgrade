@@ -19,13 +19,20 @@ class FirebaseAuthController extends Controller
 
     public function loginOrRegister(Request $request): JsonResponse
     {
-        // DTO を作る（ここが重要）
+        // フロントから来るキーの差異を吸収
+        $rawIdToken = $request->input('id_token') ?? $request->input('firebase_token');
+
+        if (! $rawIdToken) {
+            return response()->json([
+                'message' => 'id_token (or firebase_token) is required',
+            ], 422);
+        }
+
         $input = new LoginOrRegisterInput(
-            firebaseIdToken: $request->input('id_token'),
+            firebaseIdToken: $rawIdToken,
             displayName: $request->input('name')
         );
 
-        // UseCase 実行
         $output = $this->useCase->handle($input);
 
         return response()->json($output->toArray(), 200);

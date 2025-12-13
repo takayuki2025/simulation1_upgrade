@@ -149,6 +149,11 @@ class User extends Authenticatable implements MustVerifyEmail
             ->detach($roleId);
     }
 
+    public function refreshTokens()
+    {
+        return $this->hasMany(\App\Models\RefreshToken::class);
+    }
+
     /**
      * メール検証通知をユーザーに送信します。
      *

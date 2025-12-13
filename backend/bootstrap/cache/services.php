@@ -50,9 +50,10 @@
     46 => 'App\\Providers\\EventServiceProvider',
     47 => 'App\\Providers\\RouteServiceProvider',
     48 => 'App\\Providers\\AuthModuleServiceProvider',
-    49 => 'App\\Providers\\AppServiceProvider',
-    50 => 'App\\Providers\\AuthServiceProvider',
-    51 => 'App\\Providers\\AppServiceProvider',
+    49 => 'App\\Providers\\JwtAuthProvider',
+    50 => 'App\\Providers\\AppServiceProvider',
+    51 => 'App\\Providers\\AuthServiceProvider',
+    52 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -91,9 +92,10 @@
     32 => 'App\\Providers\\EventServiceProvider',
     33 => 'App\\Providers\\RouteServiceProvider',
     34 => 'App\\Providers\\AuthModuleServiceProvider',
-    35 => 'App\\Providers\\AppServiceProvider',
-    36 => 'App\\Providers\\AuthServiceProvider',
-    37 => 'App\\Providers\\AppServiceProvider',
+    35 => 'App\\Providers\\JwtAuthProvider',
+    36 => 'App\\Providers\\AppServiceProvider',
+    37 => 'App\\Providers\\AuthServiceProvider',
+    38 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (

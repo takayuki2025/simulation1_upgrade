@@ -3,165 +3,101 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
-
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-
 use App\Modules\Auth\Presentation\Http\Controllers\FirebaseAuthController;
+use App\Modules\Auth\Presentation\Http\Controllers\TokenController;
+use App\Modules\Auth\Presentation\Http\Controllers\MeController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemDetailController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
 use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
-
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
 use App\Modules\Item\Presentation\Http\Controllers\ShopShowController;
 use App\Modules\Item\Presentation\Http\Controllers\ShopItemListController;
 use App\Modules\Item\Presentation\Http\Controllers\CommentController;
 use App\Modules\Item\Presentation\Http\Controllers\FavoriteController;
 
-/* ============================================================
-   🚀 1. デバッグログ（必須）
-============================================================ */
 Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
 
 Route::get('/health', fn () => ['status' => 'ok']);
 
 
 /* ============================================================
-   🔐 2. Firebase 認証 → Laravel Sanctum Token 発行（必須）
+   🔐 Firebase → Laravel JWT 認証
 ============================================================ */
+
+
+// Firebase → JWT
 Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegister']);
-Route::post('/login', [FirebaseAuthController::class, 'login']);
-Route::post('/register', [FirebaseAuthController::class, 'register']);
 
+// Refresh
+Route::post('/auth/refresh', [TokenController::class, 'refresh']);
 
-Route::post('/email/verification-notification', [FirebaseAuthController::class, 'resend']);
-
-
-/* ============================================================
-   🌐 3. 公開 API（認証不要）
-============================================================ */
-
-// ★★★ 新しい UseCase 版 ItemQueryController に置き換え
-Route::get('/item', [ItemQueryController::class, 'index']);    // 全アイテム
-
-Route::get('/item/{id}', ItemDetailController::class);
-
-// Route::get('/item/{id}', [ItemQueryController::class, 'show']); //もう使わない
-
-// 🔍 カテゴリ検索
-Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
-
-// 🔍 ブランド検索
-Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
-
-
-// コメント一覧（公開） ← これは他サービスなので現状維持
-Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
-
-
-
-
-
-
-//各ショップの公開ページ
-Route::prefix('shops/{shop_code}')
-   ->middleware('tenant')
-   ->group(function () {
-        Route::get('/', ShopShowController::class);           // ← 正しい
-        Route::get('/items', ShopItemListController::class);  // ← 正しい
-   });
-
-
-
-
-/* ============================================================
-   🔐 4. 認証必須エリア（auth:sanctum）
-============================================================ */
-Route::middleware('auth:sanctum')->group(function () {
-
-   /* ----------------------
-      🔹 ログイン中ユーザー情報
-   -----------------------*/
-   Route::get('/me', function (Request $request) {
-      return response()->json(['user' => $request->user()]);
-   });
-
-    Route::get('/user', [FirebaseAuthController::class, 'me']); // 必須
-
-   /* ----------------------
-      🔹 Logout
-   -----------------------*/
-   Route::post('/logout', [FirebaseAuthController::class, 'logout']);
-
-
-
-
-   /* ----------------------
-      🔹 MyPage＋ProfilePage（あなたの UseCase と連動）
-   -----------------------*/
-   Route::get('/mypage/profile', [MypageController::class, 'profile']);
-   Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
-   Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
-
-
-
-   /* ----------------------
-      🔹 Item（認証が必要な操作）
-   -----------------------*/
-
-
-    // ★★★ 新しい CommandController を使用
-    Route::post('/item', [ItemCommandController::class, 'store']);     // 作成
-    Route::put('/item/{id}', [ItemCommandController::class, 'update']); // 更新
-    Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']); // 削除
-
-
-
-   /* ----------------------
-      🔹 Purchase（購入系）
-   -----------------------*/
-    //  Route::get('/purchase/{itemId}', [PurchaseController::class, 'check']);
-    //  Route::patch('/purchase/{itemId}/address', [PurchaseController::class, 'updateAddress']);
-    //  Route::post('/purchase/{itemId}', [PurchaseController::class, 'purchase']);
-
-
-   /* ----------------------
-      🔹 Favorite
-   -----------------------*/
-   Route::get('/items/favorite', [FavoriteController::class, 'index']);
-   Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
-   Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
-
-
-   /* ----------------------
-      🔹 Comment 作成
-   -----------------------*/
-
-   Route::post('/comment', CommentController::class);
-
-
-
-
-
-
-
-    //  /* ----------------------
-    //     🔹 店舗（OWNER 専用）
-    //  -----------------------*/
-    //  Route::post('/shops', [ShopController::class, 'store'])
-    //      ->middleware('role:OWNER');
-
-
-    //  Route::prefix('shops/{shop_code}')
-    //      ->middleware(['tenant', 'role:OWNER'])
-    //      ->group(function () {
-    //          Route::post('/items', [ShopItemController::class, 'store']);
-    //      });
-
-
-
-    //  Route::get('/shops/{shopId}/items', ShopItemListController::class);
-
+// JWT 保護エリア
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get('/me', MeController::class);
+    Route::post('/logout', [FirebaseAuthController::class, 'logout']);
+    // ...
 });
 
 
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get('/auth/sessions', [DeviceSessionsController::class, 'list']);
+});
 
+
+// Email verify
+Route::post('/email/verification-notification', [FirebaseAuthController::class, 'resend']);
+
+// JWT Refresh Token
+Route::post('/auth/refresh', [TokenController::class, 'refresh']);
+
+
+/* ============================================================
+   🌐 公開エリア（認証不要）
+============================================================ */
+
+Route::get('/item', [ItemQueryController::class, 'index']);
+Route::get('/item/{id}', ItemDetailController::class);
+
+Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
+Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
+
+Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
+
+Route::prefix('shops/{shop_code}')
+    ->middleware('tenant')
+    ->group(function () {
+        Route::get('/', ShopShowController::class);
+        Route::get('/items', ShopItemListController::class);
+    });
+
+
+/* ============================================================
+   🔐 認証エリア（JWT ONLY）
+============================================================ */
+
+Route::middleware(['auth.jwt'])->group(function () {
+
+    // 自分自身の取得
+    Route::get('/me', MeController::class);
+
+    // Logout
+    Route::post('/logout', [FirebaseAuthController::class, 'logout']);
+
+    // MyPage
+    Route::get('/mypage/profile', [MypageController::class, 'profile']);
+    Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
+    Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
+
+    // Item Command
+    Route::post('/item', [ItemCommandController::class, 'store']);
+    Route::put('/item/{id}', [ItemCommandController::class, 'update']);
+    Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']);
+
+    // Favorite
+    Route::get('/items/favorite', [FavoriteController::class, 'index']);
+    Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
+    Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
+
+    // Comment
+    Route::post('/comment', CommentController::class);
+});

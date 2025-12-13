@@ -10,23 +10,18 @@ import React, {
 import { useRouter, useSearchParams } from "next/navigation";
 import { AxiosError } from "axios";
 
-import { useAuth } from "@/hooks/useSanctumAuth";
+import { useAuth } from "@/ui/auth/useAuth";
 import { getImageUrl, IMAGE_TYPE } from "@/utils/utils";
 import styles from "./W-ProfilePage.module.css";
 
-/* ============================================================
-   型定義
-============================================================ */
 interface ProfileUser {
   id: number;
   name: string;
   email: string;
-  uid?: string;
-  email_verified_at: string | null;
   post_number: string | null;
   address: string | null;
   building: string | null;
-  user_image?: string | null;
+  user_image: string | null;
 }
 
 interface ProfileForm {
@@ -42,21 +37,17 @@ type ProfileErrors = {
   user_image?: string[];
 };
 
-/* ============================================================
-   ProfilePage（修正版）
-============================================================ */
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const {
-    user: authUser, // AuthProviderから渡される最新のユーザー情報
-    firebaseUser,
+    user: authUser,
     apiClient,
     isAuthenticated,
     isLoading: isAuthLoading,
-    reloadAuthToken,
     logout,
+    reloadUser,
   } = useAuth();
 
   const isVerificationRedirect = useMemo(
@@ -81,11 +72,8 @@ export default function ProfilePage() {
   const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
   const verificationHandledRef = useRef<boolean>(false);
-  const recoveryTriedRef = useRef<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  /* ============================================================
-     画像 URL（キャッシュバスター付き）
-  ============================================================ */
   const profileImageUrl = useMemo(() => {
     return getImageUrl(
       profileUser?.user_image ?? null,
@@ -94,9 +82,6 @@ export default function ProfilePage() {
     );
   }, [profileUser?.user_image]);
 
-  /* ============================================================
-     API レスポンス反映
-  ============================================================ */
   const initializeProfileFromResponse = useCallback((src: any) => {
     const data: ProfileUser = src?.user ?? src;
 
@@ -109,9 +94,6 @@ export default function ProfilePage() {
     });
   }, []);
 
-  /* ============================================================
-     プロフィール取得
-  ============================================================ */
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
       if (!apiClient) return;
@@ -132,22 +114,8 @@ export default function ProfilePage() {
         const axiosErr = err as AxiosError<any>;
         const status = axiosErr.response?.status;
 
-        if (status === 401 && !recoveryTriedRef.current) {
-          recoveryTriedRef.current = true;
-          setIsRecovering(true);
-
-          try {
-            await reloadAuthToken();
-            await fetchUserProfile(true);
-            return;
-          } catch {
-            await logout();
-            router.replace("/login");
-            return;
-          }
-        }
-
         if (status === 401) {
+          // 認証切れ → ログアウトしてログインページへ
           await logout();
           router.replace("/login");
           return;
@@ -158,71 +126,37 @@ export default function ProfilePage() {
         if (!isRetry) setIsFetching(false);
       }
     },
-    [apiClient, initializeProfileFromResponse, reloadAuthToken, logout, router],
+    [apiClient, initializeProfileFromResponse, logout, router],
   );
 
-  /* ============================================================
-     🔥 修正: 認証ユーザー変更時のリセットと再フェッチ
-  ============================================================ */
-  useEffect(() => {
-    // 認証ユーザー(authUser)が存在し、かつローカルのプロフィール(profileUser)が存在する
-    // さらに、両者のIDが異なる場合（= ユーザーが切り替わった場合）
-    if (authUser && profileUser && authUser.id !== profileUser.id) {
-      console.log("🔥 User switch detected. Resetting local state...");
-
-      // ローカルステートをリセット
-      setProfileUser(null);
-      setForm({
-        name: authUser.name, // 新しいユーザーの名前で初期化
-        post_number: "",
-        address: "",
-        building: "",
-      });
-      setIsLoading(true);
-      // この後、下の「初回プロフィール取得」useEffectがprofileUser=nullを検知して再フェッチをトリガーする
-    }
-
-    // ログアウトした場合は即座にリダイレクト
-    if (!authUser && profileUser) {
-      router.replace("/login");
-    }
-  }, [authUser, profileUser, router]);
-
-  /* ============================================================
-     メール認証後 reloadAuthToken
-  ============================================================ */
+  // メール認証完了後の再同期（verified=true で遷移してきた場合）
   useEffect(() => {
     if (!isVerificationRedirect) return;
     if (verificationHandledRef.current) return;
-
-    if (!firebaseUser) return;
 
     verificationHandledRef.current = true;
 
     const run = async () => {
       try {
         setIsRecovering(true);
-        await reloadAuthToken();
+        await reloadUser();
       } finally {
         setIsRecovering(false);
       }
     };
     run();
-  }, [isVerificationRedirect, firebaseUser, reloadAuthToken]);
+  }, [isVerificationRedirect, reloadUser]);
 
-  /* ============================================================
-     初回プロフィール取得
-  ============================================================ */
+  // 認証状態 & apiClient が揃ったらプロフィール取得
   useEffect(() => {
     if (isAuthLoading || isRecovering) return;
 
     if (!isAuthenticated || !apiClient) {
-      if (!firebaseUser) router.replace("/login");
+      router.replace("/login");
       return;
     }
 
-    // 🔥 修正: 認証済みで、かつプロフィールデータがない場合にフェッチ
-    if (isAuthenticated && !profileUser && !isFetching) {
+    if (!profileUser && !isFetching) {
       fetchUserProfile();
     }
   }, [
@@ -230,18 +164,13 @@ export default function ProfilePage() {
     isRecovering,
     isAuthenticated,
     apiClient,
-    firebaseUser,
     profileUser,
     isFetching,
     fetchUserProfile,
     router,
   ]);
 
-  /* ============================================================
-     画像アップロード
-  ============================================================ */
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
+  // プロフィール画像アップロード
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !apiClient) return;
@@ -270,10 +199,8 @@ export default function ProfilePage() {
     }
   };
 
-  /* ============================================================
-     プロフィール更新
-  ============================================================ */
-  const handleProfileUpdate = async (e: React.FormEvent) => {
+  // プロフィール更新
+  const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!apiClient) return;
 
@@ -300,9 +227,7 @@ export default function ProfilePage() {
     }
   };
 
-  /* ============================================================
-     ローディング
-  ============================================================ */
+  // ローディング状態
   if (isAuthLoading || isLoading || isRecovering) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
@@ -317,9 +242,7 @@ export default function ProfilePage() {
     );
   }
 
-  /* ============================================================
-     認証エラー
-  ============================================================ */
+  // 認証エラー
   if (!isAuthenticated || !profileUser) {
     return (
       <div className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}>
@@ -329,9 +252,6 @@ export default function ProfilePage() {
     );
   }
 
-  /* ============================================================
-     メイン UI（CSS Modules 適用）
-  ============================================================ */
   return (
     <div
       className={`${styles.login_page} max-w-[1400px] mx-auto pt-5 pb-10`}
@@ -344,7 +264,7 @@ export default function ProfilePage() {
           <div className={styles["alert-success2"]}>{successMessage}</div>
         )}
 
-        {/* --- 画像アップロード --- */}
+        {/* 画像アップロード */}
         <form
           onSubmit={(e) => e.preventDefault()}
           className={styles.item_sell_contents_box_line}
@@ -380,7 +300,7 @@ export default function ProfilePage() {
           <div className={styles.user_image_error_message}>{imageError}</div>
         </form>
 
-        {/* --- プロフィール更新フォーム --- */}
+        {/* プロフィール更新フォーム */}
         <form onSubmit={handleProfileUpdate}>
           {/* ユーザー名 */}
           <div className={styles["form-group"]}>
