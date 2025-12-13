@@ -39,4 +39,27 @@ class FirebaseAuthController extends Controller
             'message' => 'Logged out',
         ], 200);
     }
+
+    public function resend(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
+        if ($user->email_verified_at) {
+            return response()->json([
+                'message' => 'Email already verified.',
+            ], 400);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'message' => 'Verification email resent.',
+        ], 200);
+    }
 }

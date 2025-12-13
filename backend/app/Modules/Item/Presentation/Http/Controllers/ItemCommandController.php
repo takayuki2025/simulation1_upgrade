@@ -2,11 +2,11 @@
 
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
-use App\Modules\Item\Presentation\Application\UseCase\Item\RegisterItemUseCase;
-use App\Modules\Item\Presentation\Application\UseCase\Item\UpdateItemUseCase;
-use App\Modules\Item\Presentation\Application\UseCase\Item\DeleteItemUseCase;
-use App\Modules\Item\Presentation\Application\Dto\Item\RegisterItemInputDto;
-use App\Modules\Item\Presentation\Application\Dto\Item\UpdateItemInputDto;
+use App\Modules\Item\Application\UseCase\Item\RegisterItemUseCase;
+use App\Modules\Item\Application\UseCase\Item\UpdateItemUseCase;
+use App\Modules\Item\Application\UseCase\Item\DeleteItemUseCase;
+use App\Modules\Item\Application\Dto\Item\RegisterItemInputDto;
+use App\Modules\Item\Application\Dto\Item\UpdateItemInputDto;
 use App\Modules\Item\Presentation\Http\Requests\RegisterItemRequest;
 use App\Modules\Item\Presentation\Http\Requests\UpdateItemRequest;
 

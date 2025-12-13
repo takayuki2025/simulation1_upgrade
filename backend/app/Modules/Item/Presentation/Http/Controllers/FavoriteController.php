@@ -4,8 +4,8 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Presentation\Application\UseCase\Favorite\ToggleFavoriteUseCase;
-use App\Modules\Item\Presentation\Application\UseCase\Favorite\ListFavoriteUseCase;
+use App\Modules\Item\Application\UseCase\Favorite\ToggleFavoriteUseCase;
+use App\Modules\Item\Application\UseCase\Favorite\ListFavoriteUseCase;
 
 class FavoriteController extends Controller
 {

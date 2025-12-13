@@ -2,11 +2,11 @@
 
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
-use App\Modules\Item\Presentation\Application\UseCase\Item\ListItemsUseCase;
-use App\Modules\Item\Presentation\Application\UseCase\Item\ItemDetailUseCase;
-use App\Modules\Item\Presentation\Application\Dto\Item\ListItemsInputDto;
-use App\Modules\Item\Presentation\Application\UseCase\Search\CategorySearchUseCase;
-use App\Modules\Item\Presentation\Application\UseCase\Search\BrandSearchUseCase;
+use App\Modules\Item\Application\UseCase\Item\ListItemsUseCase;
+use App\Modules\Item\Application\UseCase\Item\ItemDetailUseCase;
+use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
+use App\Modules\Item\Application\UseCase\Search\CategorySearchUseCase;
+use App\Modules\Item\Application\UseCase\Search\BrandSearchUseCase;
 use Illuminate\Http\Request;
 
 class ItemQueryController

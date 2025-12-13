@@ -3,7 +3,7 @@
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Item\Presentation\Application\UseCase\Item\ItemDetailUseCase;
+use App\Modules\Item\Application\UseCase\Item\ItemDetailUseCase;
 use Illuminate\Http\JsonResponse;
 
 class ItemDetailController extends Controller

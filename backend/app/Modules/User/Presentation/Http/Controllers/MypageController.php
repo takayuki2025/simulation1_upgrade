@@ -4,8 +4,8 @@ namespace App\Modules\User\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\User\Presentation\Application\UseCase\MypageUseCase;
-use App\Modules\User\Presentation\Application\UseCase\ProfileUseCase;
+use App\Modules\User\Application\UseCase\MypageUseCase;
+use App\Modules\User\Application\UseCase\ProfileUseCase;
 
 class MypageController extends Controller
 {

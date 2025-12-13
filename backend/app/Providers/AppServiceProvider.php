@@ -9,20 +9,20 @@ use App\Domain\Repository\OrderHistoryRepository;
 use App\Domain\Repository\CommentRepository;
 use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
-use App\Modules\Item\Presentation\Domain\Repository\ItemRepository;//⚪️
-use App\Modules\Item\Presentation\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
+use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
 // ✅ User モジュール内の Repository Interface を追加
-use App\Modules\User\Presentation\Domain\Repository\ProfileRepository;//⚫️
-use App\Modules\User\Presentation\Domain\Repository\MypageRepository; // ⚫️MypageRepositoryは共通で残す
+use App\Modules\User\Domain\Repository\ProfileRepository;//⚫️
+use App\Modules\User\Domain\Repository\MypageRepository; // ⚫️MypageRepositoryは共通で残す
 // Infrastructure Persistence
 use App\Infrastructure\Persistence\EloquentUserRepository; // 既存のUserRepository
-use App\Modules\User\Presentation\Infrastructure\Persistence\Repository\EloquentProfileRepository;//⚫️
+use App\Modules\User\Infrastructure\Persistence\Repository\EloquentProfileRepository;//⚫️
 use App\Infrastructure\Persistence\EloquentOrderHistoryRepository;
 use App\Infrastructure\Persistence\EloquentCommentRepository;
 use App\Infrastructure\Persistence\EloquentFavoriteRepository;
 // use App\Infrastructure\Persistence\EloquentItemRepository;
 // ✅ User モジュール内の Repository 実装クラスのパスを修正
-use App\Modules\User\Presentation\Infrastructure\Persistence\Repository\EloquentMypageRepository;// ⚫️MypageRepositoryは共通で残す
+use App\Modules\User\Infrastructure\Persistence\Repository\EloquentMypageRepository;// ⚫️MypageRepositoryは共通で残す
 // use App\Modules\User\Infrastructure\Persistence\Repository\EloquentProfileRepository;
 // Ports
 use App\Domain\Payment\StripePaymentPort;

@@ -4,7 +4,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Presentation\Application\UseCase\Item\CreateCommentUseCase;
+use App\Modules\Item\Application\UseCase\Item\CreateCommentUseCase;
 
 class CommentController extends Controller
 {
