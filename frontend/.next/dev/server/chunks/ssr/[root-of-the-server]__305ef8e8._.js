@@ -202,11 +202,20 @@ function Mypage() {
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$mypage$2f$W$2d$Mypage$2e$module$2e$css__$5b$app$2d$ssr$5d$__$28$css__module$29$__["default"].user_name_large_shift,
+                                className: `text-2xl font-bold ${__TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$mypage$2f$W$2d$Mypage$2e$module$2e$css__$5b$app$2d$ssr$5d$__$28$css__module$29$__["default"].user_name_large_shift}`,
                                 children: user.name
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
                                 lineNumber: 94,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                onClick: ()=>router.push("/mypage/profile"),
+                                className: "ml-auto px-4 py-2 border border-red-500 text-red-500 rounded",
+                                children: "プロフィールを編集"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/mypage/page.tsx",
+                                lineNumber: 98,
                                 columnNumber: 11
                             }, this)
                         ]
@@ -224,7 +233,7 @@ function Mypage() {
                                 children: "出品した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 98,
+                                lineNumber: 107,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -233,13 +242,13 @@ function Mypage() {
                                 children: "購入した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 107,
+                                lineNumber: 116,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 97,
+                        lineNumber: 106,
                         columnNumber: 9
                     }, this)
                 ]
@@ -255,7 +264,7 @@ function Mypage() {
                     children: page === "sell" ? "出品した商品はありません" : "購入した商品はありません"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                    lineNumber: 118,
+                    lineNumber: 127,
                     columnNumber: 11
                 }, this) : items.map((item)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                         href: `/item/${item.id}`,
@@ -266,25 +275,25 @@ function Mypage() {
                                 onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onImageError"])(e, item.name)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 130,
+                                lineNumber: 139,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 children: item.name
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 134,
+                                lineNumber: 143,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, item.id, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 125,
+                        lineNumber: 134,
                         columnNumber: 13
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 116,
+                lineNumber: 125,
                 columnNumber: 7
             }, this)
         ]

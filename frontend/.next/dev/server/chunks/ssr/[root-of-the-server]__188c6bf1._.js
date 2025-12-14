@@ -193,34 +193,34 @@ class AuthService {
         await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(user, {
             displayName: name
         });
-        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["sendEmailVerification"])(user);
+        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["sendEmailVerification"])(user, {
+            url: "https://localhost/login?verified=1",
+            handleCodeInApp: false
+        });
         return {
             needsEmailVerification: true
         };
     }
     async login({ email, password }) {
-        console.log("[AuthService.login] START", email);
         const firebaseUser = await this.firebase.login(email, password);
-        console.log("[AuthService.login] firebaseUser.uid =", firebaseUser?.uid);
         const result = await this.issueLaravelTokens(firebaseUser);
-        console.log("[AuthService.login] RESULT FROM issueLaravelTokens:", result);
-        return result;
+        return {
+            user: result.user,
+            isFirstLogin: result.isFirstLogin
+        };
     }
     async issueLaravelTokens(firebaseUser) {
         const firebaseToken = await this.firebase.getIdToken(firebaseUser);
         const deviceId = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$deviceId$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getDeviceId"])();
-        const { tokens, user } = await this.laravel.loginWithFirebaseToken(firebaseToken, deviceId);
+        const { tokens, user, isFirstLogin } = await this.laravel.loginWithFirebaseToken(firebaseToken, deviceId);
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].save(tokens);
-        // ★ /me を呼ばない
-        return user;
-    // const me = await this.laravel.me();
-    // console.log("[AuthService.issue] laravel.me() returned:", me);
-    // return me;
+        return {
+            user,
+            isFirstLogin
+        };
     }
     async logout() {
-        if (typeof this.firebase.logout === "function") {
-            await this.firebase.logout();
-        }
+        await this.firebase.logout?.();
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].clear();
     }
 }
@@ -292,8 +292,12 @@ class FirebaseAuthClient {
         return result.user;
     }
     async login(email, password) {
-        const result = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(this.auth, email, password);
-        return result.user;
+        try {
+            return (await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["signInWithEmailAndPassword"])(this.auth, email, password)).user;
+        } catch (e) {
+            console.error("[Firebase login error]", e);
+            throw e;
+        }
     }
     async getIdToken(user) {
         return user.getIdToken(true);
@@ -316,7 +320,6 @@ class LaravelAuthApi {
     constructor(_client){
         this._client = _client;
     }
-    // ★ これを追加（private を外から読み取れるようにする）
     get client() {
         return this._client;
     }
@@ -328,11 +331,10 @@ class LaravelAuthApi {
         return {
             tokens: {
                 accessToken: res.data.token,
-                refreshToken: res.data.refresh_token,
-                tokenType: "Bearer",
-                expiresIn: res.data.expires_in
+                refreshToken: res.data.refreshToken
             },
-            user: res.data.user
+            user: res.data.user,
+            isFirstLogin: res.data.isFirstLogin
         };
     }
     async refresh(refreshToken, deviceId) {
@@ -342,9 +344,7 @@ class LaravelAuthApi {
         });
         return {
             accessToken: res.data.access_token,
-            refreshToken: res.data.refresh_token,
-            tokenType: "Bearer",
-            expiresIn: res.data.expires_in
+            refreshToken: res.data.refresh_token
         };
     }
     async me() {
@@ -535,19 +535,13 @@ function AuthProvider({ children }) {
     const [refreshService, setRefreshService] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
-    // ======================================================
-    // 初期化フェーズ
-    // ======================================================
+    // 初期化
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         const firebase = new __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$FirebaseAuthClient$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["FirebaseAuthClient"]();
-        // callback が stale state を参照しないよう、
-        // callback 内で "常に最新の state" を参照する書き方にする。
         const httpClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$HttpClient$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["createHttpClient"])(async ()=>{
-            console.log("[AuthProvider] Refresh callback fired");
-            // この時点で最新 state を参照
-            const currentRefresh = refreshService;
             const currentApi = laravelApi;
-            if (!currentRefresh || !currentApi) return;
+            const currentRefresh = refreshService;
+            if (!currentApi || !currentRefresh) return;
             const tokens = await currentRefresh.refresh();
             if (!tokens) {
                 __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].clear();
@@ -561,20 +555,24 @@ function AuthProvider({ children }) {
         const api = new __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$LaravelAuthApi$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["LaravelAuthApi"](httpClient);
         const auth = new __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$application$2f$auth$2f$AuthService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AuthService"](firebase, api);
         const refresh = new __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$application$2f$auth$2f$TokenRefreshService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenRefreshService"](api);
-        setAuthService(auth);
         setLaravelApi(api);
+        setAuthService(auth);
         setRefreshService(refresh);
     }, []);
-    // ======================================================
-    // /me を実行（services が揃ったら 1 回だけ実行）
-    // ======================================================
+    // 起動時 /me
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!laravelApi) return;
+        const { accessToken } = __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].load();
+        if (!accessToken) {
+            setIsLoading(false);
+            return;
+        }
         (async ()=>{
             try {
                 const u = await laravelApi.me();
                 setUser(u);
             } catch  {
+                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].clear();
                 setUser(null);
             } finally{
                 setIsLoading(false);
@@ -583,23 +581,25 @@ function AuthProvider({ children }) {
     }, [
         laravelApi
     ]);
-    // ======================================================
-    // 認証メソッド
-    // ======================================================
+    // 🔑 ここが超重要
     async function login({ email, password }) {
-        if (!authService) return;
+        if (!authService) {
+            throw new Error("AuthService not ready");
+        }
         setIsLoading(true);
-        const u = await authService.login({
+        const result = await authService.login({
             email,
             password
         });
-        console.log("[AuthProvider] login() returned user:", u);
-        setUser(u);
+        setUser(result.user);
         setIsLoading(false);
+        return result; // ★ ここが最重要
     }
-    async function register({ name, email, password }) {
-        if (!authService) return;
-        return await authService.register(name, email, password);
+    async function register(args) {
+        if (!authService) return {
+            needsEmailVerification: true
+        };
+        return authService.register(args.name, args.email, args.password);
     }
     async function logout() {
         if (!authService) return;
@@ -615,6 +615,12 @@ function AuthProvider({ children }) {
             setUser(null);
         }
     }
+    async function reloginWithFirebaseToken(idToken) {
+        if (!laravelApi) throw new Error("Laravel API not ready");
+        const { tokens, user } = await laravelApi.loginWithFirebaseToken(idToken, "email-verify");
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].save(tokens);
+        setUser(user);
+    }
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
         value: {
             user,
@@ -624,12 +630,13 @@ function AuthProvider({ children }) {
             register,
             logout,
             reloadUser,
+            reloginWithFirebaseToken,
             apiClient: laravelApi?.client ?? null
         },
         children: children
     }, void 0, false, {
         fileName: "[project]/src/ui/auth/AuthProvider.tsx",
-        lineNumber: 137,
+        lineNumber: 142,
         columnNumber: 5
     }, this);
 }

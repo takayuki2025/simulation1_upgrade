@@ -1,11 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
+// use App\Modules\Auth\Presentation\Http\Controllers\VerifyEmailController;
 
 //メール認証送信
-Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-->middleware(['signed'])->name('verification.verify');
+// Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
+// ->middleware(['signed'])->name('verification.verify');
 
 
 // ========== API サーバーとしての root ==========

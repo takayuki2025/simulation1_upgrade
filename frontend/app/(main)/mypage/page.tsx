@@ -91,7 +91,16 @@ export default function Mypage() {
             onError={(e) => onImageError(e, user.name)}
             className={styles.user_image_css}
           />
-          <h2 className={styles.user_name_large_shift}>{user.name}</h2>
+          <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
+            {user.name}
+          </h2>
+
+          <button
+            onClick={() => router.push("/mypage/profile")}
+            className="ml-auto px-4 py-2 border border-red-500 text-red-500 rounded"
+          >
+            プロフィールを編集
+          </button>
         </div>
 
         <div className={styles.profile_header_2}>

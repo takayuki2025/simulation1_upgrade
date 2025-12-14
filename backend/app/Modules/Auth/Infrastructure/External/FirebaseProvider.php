@@ -19,14 +19,20 @@ class FirebaseProvider
     }
 
     public function verifyToken(string $idToken): array
-    {
-        $verified = $this->auth->verifyIdToken($idToken);
+{
+    $verifiedToken = $this->auth->verifyIdToken($idToken);
 
-        return [
-            'sub'            => $verified->claims()->get('sub'),
-            'email'          => $verified->claims()->get('email'),
-            'name'           => $verified->claims()->get('name'),
-            'email_verified' => $verified->claims()->get('email_verified') ?? false,
-        ];
-    }
+    $uid = $verifiedToken->claims()->get('sub');
+
+    // ★ ここが決定的に重要
+    $userRecord = $this->auth->getUser($uid);
+
+    return [
+        'sub'            => $uid,
+        'email'          => $userRecord->email,
+        'name'           => $userRecord->displayName,
+        'email_verified' => $userRecord->emailVerified, // ← これが真実
+    ];
+}
+
 }

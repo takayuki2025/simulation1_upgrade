@@ -16,17 +16,17 @@ function useAuth() {
     if (!ctx) {
         throw new Error("useAuth must be used inside <AuthProvider>");
     }
-    return {
-        user: ctx.user,
-        isAuthenticated: ctx.isAuthenticated,
-        isLoading: ctx.isLoading,
-        register: ctx.register,
-        login: ctx.login,
-        logout: ctx.logout,
-        reloadUser: ctx.reloadUser,
-        apiClient: ctx.apiClient
-    };
-}
+    return ctx;
+} // return {
+ //   user: ctx.user,
+ //   isAuthenticated: ctx.isAuthenticated,
+ //   isLoading: ctx.isLoading,
+ //   register: ctx.register,
+ //   login: ctx.login,
+ //   logout: ctx.logout,
+ //   reloadUser: ctx.reloadUser,
+ //   apiClient: ctx.apiClient,
+ // };
 }),
 "[project]/components/layout/HeaderMain.tsx [app-ssr] (ecmascript)", ((__turbopack_context__) => {
 "use strict";

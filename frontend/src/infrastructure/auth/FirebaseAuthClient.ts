@@ -31,8 +31,13 @@ export class FirebaseAuthClient {
   }
 
   async login(email: string, password: string): Promise<User> {
-    const result = await signInWithEmailAndPassword(this.auth, email, password);
-    return result.user;
+    try {
+      return (await signInWithEmailAndPassword(this.auth, email, password))
+        .user;
+    } catch (e) {
+      console.error("[Firebase login error]", e);
+      throw e;
+    }
   }
 
   async getIdToken(user: User): Promise<string> {

@@ -33,11 +33,13 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await register({
-        name,
-        email,
-        password,
-      });
+      const result = await register({ name, email, password });
+
+      if (result.needsEmailVerification) {
+        router.push("/email/verify?from=register");
+      } else {
+        router.replace("/");
+      }
 
       console.log("[RegisterPage] REGISTER result:", result);
 

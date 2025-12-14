@@ -2,10 +2,18 @@ import type { AxiosInstance } from "axios";
 import type { AuthTokens } from "@/domain/auth/AuthTokens";
 import type { AuthUser } from "@/domain/auth/AuthUser";
 
+/**
+ * ★ クラスの外で export type
+ */
+export type LoginWithFirebaseResult = {
+  tokens: AuthTokens;
+  user: AuthUser;
+  isFirstLogin: boolean;
+};
+
 export class LaravelAuthApi {
   constructor(private _client: AxiosInstance) {}
 
-  // ★ これを追加（private を外から読み取れるようにする）
   public get client(): AxiosInstance {
     return this._client;
   }
@@ -13,7 +21,7 @@ export class LaravelAuthApi {
   async loginWithFirebaseToken(
     firebaseToken: string,
     deviceId: string,
-  ): Promise<{ tokens: AuthTokens; user: AuthUser }> {
+  ): Promise<LoginWithFirebaseResult> {
     const res = await this._client.post("/login_or_register", {
       firebase_token: firebaseToken,
       device_id: deviceId,
@@ -22,11 +30,10 @@ export class LaravelAuthApi {
     return {
       tokens: {
         accessToken: res.data.token,
-        refreshToken: res.data.refresh_token,
-        tokenType: "Bearer",
-        expiresIn: res.data.expires_in,
+        refreshToken: res.data.refreshToken,
       },
       user: res.data.user,
+      isFirstLogin: res.data.isFirstLogin, // ← Laravel の値
     };
   }
 
@@ -39,8 +46,6 @@ export class LaravelAuthApi {
     return {
       accessToken: res.data.access_token,
       refreshToken: res.data.refresh_token,
-      tokenType: "Bearer",
-      expiresIn: res.data.expires_in,
     };
   }
 

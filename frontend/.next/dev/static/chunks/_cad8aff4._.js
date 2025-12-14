@@ -18,17 +18,17 @@ function useAuth() {
     if (!ctx) {
         throw new Error("useAuth must be used inside <AuthProvider>");
     }
-    return {
-        user: ctx.user,
-        isAuthenticated: ctx.isAuthenticated,
-        isLoading: ctx.isLoading,
-        register: ctx.register,
-        login: ctx.login,
-        logout: ctx.logout,
-        reloadUser: ctx.reloadUser,
-        apiClient: ctx.apiClient
-    };
-}
+    return ctx;
+} // return {
+ //   user: ctx.user,
+ //   isAuthenticated: ctx.isAuthenticated,
+ //   isLoading: ctx.isLoading,
+ //   register: ctx.register,
+ //   login: ctx.login,
+ //   logout: ctx.logout,
+ //   reloadUser: ctx.reloadUser,
+ //   apiClient: ctx.apiClient,
+ // };
 _s(useAuth, "/dMy7t63NXD4eYACoT93CePwGrg=");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);

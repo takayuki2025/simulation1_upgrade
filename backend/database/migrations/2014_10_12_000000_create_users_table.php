@@ -31,6 +31,11 @@ class CreateUsersTable extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
 
+            $table->timestamp('first_login_at')->nullable();
+
+
+
+
             // Laravel パスワード（Firebaseログイン時は使わないが必要）
             $table->string('password');
 

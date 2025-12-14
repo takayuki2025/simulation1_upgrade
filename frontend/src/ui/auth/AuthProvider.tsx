@@ -6,7 +6,6 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-
 import { AuthService } from "@/application/auth/AuthService";
 import { FirebaseAuthClient } from "@/infrastructure/auth/FirebaseAuthClient";
 import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
@@ -14,8 +13,10 @@ import { createHttpClient } from "@/infrastructure/auth/HttpClient";
 import { TokenRefreshService } from "@/application/auth/TokenRefreshService";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
 import type { AuthUser } from "@/domain/auth/AuthUser";
+import type { AuthContextType, RegisterResult } from "./AuthContextType";
+import type { LoginResult } from "./AuthContextType";
 
-export const AuthContext = createContext<any>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authService, setAuthService] = useState<AuthService | null>(null);
@@ -26,22 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ======================================================
-  // 初期化フェーズ
-  // ======================================================
+  // 初期化
   useEffect(() => {
     const firebase = new FirebaseAuthClient();
 
-    // callback が stale state を参照しないよう、
-    // callback 内で "常に最新の state" を参照する書き方にする。
     const httpClient = createHttpClient(async () => {
-      console.log("[AuthProvider] Refresh callback fired");
-
-      // この時点で最新 state を参照
-      const currentRefresh = refreshService;
       const currentApi = laravelApi;
-
-      if (!currentRefresh || !currentApi) return;
+      const currentRefresh = refreshService;
+      if (!currentApi || !currentRefresh) return;
 
       const tokens = await currentRefresh.refresh();
       if (!tokens) {
@@ -59,22 +52,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = new AuthService(firebase, api);
     const refresh = new TokenRefreshService(api);
 
-    setAuthService(auth);
     setLaravelApi(api);
+    setAuthService(auth);
     setRefreshService(refresh);
   }, []);
 
-  // ======================================================
-  // /me を実行（services が揃ったら 1 回だけ実行）
-  // ======================================================
+  // 起動時 /me
   useEffect(() => {
     if (!laravelApi) return;
+
+    const { accessToken } = TokenStorage.load();
+    if (!accessToken) {
+      setIsLoading(false);
+      return;
+    }
 
     (async () => {
       try {
         const u = await laravelApi.me();
         setUser(u);
       } catch {
+        TokenStorage.clear();
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -82,39 +80,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, [laravelApi]);
 
-  // ======================================================
-  // 認証メソッド
-  // ======================================================
-  async function login({
-    email,
-    password,
-  }: {
-    email: string;
-    password: string;
-  }) {
-    if (!authService) return;
-    setIsLoading(true);
-
-    const u = await authService.login({ email, password });
-
-    console.log("[AuthProvider] login() returned user:", u);
-    
-    setUser(u);
-
-    setIsLoading(false);
+  // 🔑 ここが超重要
+  
+async function login({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}): Promise<LoginResult> {
+  if (!authService) {
+    throw new Error("AuthService not ready");
   }
 
-  async function register({
-    name,
-    email,
-    password,
-  }: {
+  setIsLoading(true);
+
+  const result = await authService.login({ email, password });
+
+  setUser(result.user);
+  setIsLoading(false);
+
+  return result; // ★ ここが最重要
+}
+
+  async function register(args: {
     name: string;
     email: string;
     password: string;
-  }) {
-    if (!authService) return;
-    return await authService.register(name, email, password);
+  }): Promise<RegisterResult> {
+    if (!authService) return { needsEmailVerification: true };
+    return authService.register(args.name, args.email, args.password);
   }
 
   async function logout() {
@@ -133,6 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function reloginWithFirebaseToken(idToken: string) {
+    if (!laravelApi) throw new Error("Laravel API not ready");
+    const { tokens, user } = await laravelApi.loginWithFirebaseToken(
+      idToken,
+      "email-verify",
+    );
+    TokenStorage.save(tokens);
+    setUser(user);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -143,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         reloadUser,
+        reloginWithFirebaseToken,
         apiClient: laravelApi?.client ?? null,
       }}
     >

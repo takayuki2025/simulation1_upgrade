@@ -193,7 +193,11 @@ class AuthService {
         await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateProfile"])(user, {
             displayName: name
         });
-        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["sendEmailVerification"])(user);
+        // ★ Continue URL を必ず指定する
+        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$index$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["sendEmailVerification"])(user, {
+            url: "https://localhost/login?verified=1",
+            handleCodeInApp: false
+        });
         return {
             needsEmailVerification: true
         };
@@ -316,7 +320,6 @@ class LaravelAuthApi {
     constructor(_client){
         this._client = _client;
     }
-    // ★ これを追加（private を外から読み取れるようにする）
     get client() {
         return this._client;
     }
@@ -328,9 +331,7 @@ class LaravelAuthApi {
         return {
             tokens: {
                 accessToken: res.data.token,
-                refreshToken: res.data.refresh_token,
-                tokenType: "Bearer",
-                expiresIn: res.data.expires_in
+                refreshToken: res.data.refreshToken
             },
             user: res.data.user
         };
@@ -342,9 +343,7 @@ class LaravelAuthApi {
         });
         return {
             accessToken: res.data.access_token,
-            refreshToken: res.data.refresh_token,
-            tokenType: "Bearer",
-            expiresIn: res.data.expires_in
+            refreshToken: res.data.refresh_token
         };
     }
     async me() {
@@ -570,11 +569,17 @@ function AuthProvider({ children }) {
     // ======================================================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!laravelApi) return;
+        const { accessToken } = __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].load();
+        if (!accessToken) {
+            setIsLoading(false);
+            return;
+        }
         (async ()=>{
             try {
                 const u = await laravelApi.me();
                 setUser(u);
             } catch  {
+                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].clear();
                 setUser(null);
             } finally{
                 setIsLoading(false);
@@ -583,6 +588,12 @@ function AuthProvider({ children }) {
     }, [
         laravelApi
     ]);
+    async function reloginWithFirebaseToken(idToken) {
+        if (!laravelApi) throw new Error("Laravel API not ready");
+        const { tokens, user } = await laravelApi.loginWithFirebaseToken(idToken, "email-verify");
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$infrastructure$2f$auth$2f$TokenStorage$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["TokenStorage"].save(tokens);
+        setUser(user);
+    }
     // ======================================================
     // 認証メソッド
     // ======================================================
@@ -598,7 +609,12 @@ function AuthProvider({ children }) {
         setIsLoading(false);
     }
     async function register({ name, email, password }) {
-        if (!authService) return;
+        if (!authService) {
+            // init前に呼ばれた時の安全策（設計上ここはthrowでもOK）
+            return {
+                needsEmailVerification: true
+            };
+        }
         return await authService.register(name, email, password);
     }
     async function logout() {
@@ -624,12 +640,13 @@ function AuthProvider({ children }) {
             register,
             logout,
             reloadUser,
+            reloginWithFirebaseToken,
             apiClient: laravelApi?.client ?? null
         },
         children: children
     }, void 0, false, {
         fileName: "[project]/src/ui/auth/AuthProvider.tsx",
-        lineNumber: 137,
+        lineNumber: 161,
         columnNumber: 5
     }, this);
 }

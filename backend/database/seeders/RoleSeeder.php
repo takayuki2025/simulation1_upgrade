@@ -16,10 +16,12 @@ class RoleSeeder extends Seeder
             ['name' => 'Shop Manager', 'slug' => 'manager'],
             ['name' => 'Shop Staff', 'slug' => 'staff'],
 
-            ['name' => 'Top Shop Admin', 'slug' => 'top_shop_admin'],
-            ['name' => 'Manager Admin', 'slug' => 'manager_admin'],
-            ['name' => 'System Admin', 'slug' => 'admin'],
+            ['name' => 'Domain Lead Admin', 'slug' => 'domain_lead_admin'],
+            ['name' => 'Supervisor Admin', 'slug' => 'supervisor_admin'],
+            ['name' => 'System Manager Admin', 'slug' => 'system_manager_admin'],
 
+            ['name' => 'Top Developer', 'slug' => 'top_developer'],
+            ['name' => 'Principle Developer', 'slug' => 'principle_developer'],
             ['name' => 'Developer', 'slug' => 'developer'],
         ];
 

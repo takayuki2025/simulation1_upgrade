@@ -8,6 +8,7 @@ export interface AuthUser {
   name: string;
   email: string;
   shop_id?: number | null;
-  email_verified_at?: string | null;
+  email_verified_at: string | null;
+  first_login_at: string | null;
   roles?: UserRole[];
 }

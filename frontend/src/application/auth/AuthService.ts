@@ -6,6 +6,11 @@ import type { User } from "firebase/auth";
 import type { AuthUser } from "@/domain/auth/AuthUser";
 import { sendEmailVerification, updateProfile } from "firebase/auth";
 
+export type LoginResult = {
+  user: AuthUser;
+  isFirstLogin: boolean;
+};
+
 export class AuthService {
   constructor(
     private firebase: FirebaseAuthClient,
@@ -14,8 +19,14 @@ export class AuthService {
 
   async register(name: string, email: string, password: string) {
     const user = await this.firebase.register(email, password);
+
     await updateProfile(user, { displayName: name });
-    await sendEmailVerification(user);
+
+    await sendEmailVerification(user, {
+      url: "https://localhost/login?verified=1",
+      handleCodeInApp: false,
+    });
+
     return { needsEmailVerification: true };
   }
 
@@ -25,45 +36,34 @@ export class AuthService {
   }: {
     email: string;
     password: string;
-  }): Promise<AuthUser> {
-    console.log("[AuthService.login] START", email);
-
+  }): Promise<LoginResult> {
     const firebaseUser = await this.firebase.login(email, password);
-
-    console.log("[AuthService.login] firebaseUser.uid =", firebaseUser?.uid);
 
     const result = await this.issueLaravelTokens(firebaseUser);
 
-    console.log("[AuthService.login] RESULT FROM issueLaravelTokens:", result);
-
-    return result;
+    return {
+      user: result.user,
+      isFirstLogin: result.isFirstLogin,
+    };
   }
 
-  private async issueLaravelTokens(firebaseUser: User): Promise<AuthUser> {
+  private async issueLaravelTokens(firebaseUser: User): Promise<{
+    user: AuthUser;
+    isFirstLogin: boolean;
+  }> {
     const firebaseToken = await this.firebase.getIdToken(firebaseUser);
     const deviceId = getDeviceId();
 
-    const { tokens, user } = await this.laravel.loginWithFirebaseToken(
-      firebaseToken,
-      deviceId,
-    );
+    const { tokens, user, isFirstLogin } =
+      await this.laravel.loginWithFirebaseToken(firebaseToken, deviceId);
 
     TokenStorage.save(tokens);
 
-    // ★ /me を呼ばない
-    return user;
-
-    // const me = await this.laravel.me();
-
-    // console.log("[AuthService.issue] laravel.me() returned:", me);
-
-    // return me;
+    return { user, isFirstLogin };
   }
 
   async logout() {
-    if (typeof this.firebase.logout === "function") {
-      await this.firebase.logout();
-    }
+    await this.firebase.logout?.();
     TokenStorage.clear();
   }
 }

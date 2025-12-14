@@ -27,6 +27,7 @@ class MeController extends Controller
             'shop_id'           => $user->shop_id,
             'email_verified_at' => $user->email_verified_at,
             'roles'             => $roles,
+            'first_login_at' => $user->first_login_at,
         ]);
     }
 }

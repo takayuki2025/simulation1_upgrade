@@ -10,6 +10,7 @@ class LoginOrRegisterOutput
         public string $status,
         public bool $needsEmailVerification,
         public string $refreshToken,
+        public readonly bool $isFirstLogin,
     ) {
     }
 
@@ -21,6 +22,7 @@ class LoginOrRegisterOutput
             'user'                  => $this->user,
             'status'                => $this->status,
             'needsEmailVerification' => $this->needsEmailVerification,
+            'isFirstLogin'           => $this->isFirstLogin,
         ];
     }
 }

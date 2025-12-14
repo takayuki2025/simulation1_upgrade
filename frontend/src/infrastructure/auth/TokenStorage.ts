@@ -9,7 +9,7 @@ export const TokenStorage = {
     localStorage.setItem(REFRESH, tokens.refreshToken);
   },
 
-  load() {
+  load(): AuthTokens {
     return {
       accessToken: localStorage.getItem(ACCESS) ?? "",
       refreshToken: localStorage.getItem(REFRESH) ?? "",

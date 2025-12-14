@@ -62,6 +62,16 @@ class UsersTableSeeder extends Seeder
                 'address_country' => 'JP',
                 'shop_id' => null,
             ],
+            [
+                'name' => '川田隆之',
+                'email' => 't.principle.k2024@gmail.com',
+                'password' => 'takayuki',
+                'post_number' => '326-0000',
+                'address' => '栃木県',
+                'building' => '足利 FacilityCenter',
+                'address_country' => 'JP',
+                'shop_id' => null,
+            ],
         ];
 
         // ★ 既存ユーザー削除
@@ -100,6 +110,7 @@ class UsersTableSeeder extends Seeder
                         'address_country' => $userData['address_country'],
                         'shop_id' => $userData['shop_id'],
                         'email_verified_at' => now(),
+                        'first_login_at' => now(),
                     ]
                 );
 
