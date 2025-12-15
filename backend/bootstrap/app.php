@@ -55,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
             // Firebaseカスタムミドルウェアのエイリアス（auth:firebaseで使用）
-            'firebase.verify' => VerifyFirebaseToken::class,
+            // 'firebase.verify' => VerifyFirebaseToken::class,
             // 既存の古い名前空間のミドルウェアのエイリアスはLaravel 11では不要なため、削除
             // ⭐ ここに 'tenant' ミドルウェアのエイリアスを追加 ⭐
             'tenant' => \App\Http\Middleware\SetCurrentShop::class,

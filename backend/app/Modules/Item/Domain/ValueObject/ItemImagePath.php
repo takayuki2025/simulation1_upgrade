@@ -1,16 +1,22 @@
 <?php
 
+
+
 namespace App\Modules\Item\Domain\ValueObject;
 
-class ItemImagePath
+final class ItemImagePath
 {
     public function __construct(
-        private string $path
+        private string $value
     ) {
+        if ($value === '') {
+            throw new \InvalidArgumentException('ItemImagePath cannot be empty');
+        }
     }
 
-    public function getPath(): string
+    public function getValue(): string
     {
-        return $this->path;
+        return $this->value;
     }
 }
+

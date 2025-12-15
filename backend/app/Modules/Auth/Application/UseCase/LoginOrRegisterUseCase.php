@@ -5,17 +5,16 @@ namespace App\Modules\Auth\Application\UseCase;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterInput;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterOutput;
 use App\Modules\Auth\Infrastructure\External\FirebaseProvider;
-use App\Modules\Auth\Domain\Repository\AuthUserRepositoryInterface;
 use App\Modules\Auth\Domain\Service\TokenIssuerService;
 use App\Modules\Auth\Domain\Service\RefreshTokenService;
-use App\Models\User;
-use App\Models\Role;
+use App\Modules\Auth\Domain\Port\UserProvisioningPort;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
-class LoginOrRegisterUseCase
+final class LoginOrRegisterUseCase
 {
     public function __construct(
         private FirebaseProvider $firebase,
-        private AuthUserRepositoryInterface $users,
+        private UserProvisioningPort $userProvisioning,
         private TokenIssuerService $tokenIssuer,
         private RefreshTokenService $refreshTokens,
     ) {
@@ -23,108 +22,52 @@ class LoginOrRegisterUseCase
 
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
-        /* ============================================================
-         * ① Firebase ID Token 検証（唯一の真実）
-         * ============================================================ */
+        // ① Firebase 検証（SSOT）
         $verified = $this->firebase->verifyToken($input->firebaseIdToken);
 
-        $firebaseUid   = $verified['sub'];
-        $email         = $verified['email'];
-        $displayName   = $input->displayName ?? ($verified['name'] ?? $email);
-        $emailVerified = (bool) ($verified['email_verified'] ?? false);
 
-        $status     = 'login';
-        $wasCreated = false;
 
-        /* ============================================================
-         * ② ユーザー検索（Firebase UID 優先）
-         * ============================================================ */
-        $user =
-            $this->users->findByFirebaseUid($firebaseUid)
-            ?? $this->users->findByEmail($email);
-
-        /* ============================================================
-         * ③ 新規登録
-         * ============================================================ */
-        if (! $user) {
-            $user = new User([
-                'email'        => $email,
-                'name'         => $displayName,
-                'firebase_uid' => $firebaseUid,
-                'password'     => bcrypt(str()->random(32)), // Firebase 管理なのでダミー
-                'shop_id'      => null, // マルチテナント初期値
-            ]);
-
-            // ★ 新規登録時点で Firebase が verified=true なら即保存
-            if ($emailVerified) {
-                $user->email_verified_at = now();
-            }
-
-            $user = $this->users->save($user);
-
-            // customer ロール付与
-            $customerRoleId = Role::where('slug', 'customer')->value('id');
-            if ($customerRoleId) {
-                $user->roles()->attach($customerRoleId, ['shop_id' => null]);
-            }
-
-            $status     = 'register';
-            $wasCreated = true;
-        }
+        $principal = new AuthPrincipal(
+            provider: 'firebase',
+            providerUid: $verified['sub'],
+            email: $verified['email'] ?? null,
+            emailVerified: (bool) ($verified['email_verified'] ?? false),
+            displayName: $input->displayName
+                ?? ($verified['name'] ?? $verified['email'] ?? null),
+        );
 
 
 
-        $isFirstLogin = is_null($user->first_login_at);
+        // ② User側で provision（作成/初回ログイン/初期ロール/メール同期はUser責務）
+        $provisioned = $this->userProvisioning->provision($principal);
 
-        // ★ 初回だけ保存
-        if ($isFirstLogin) {
-            $user->first_login_at = now();
-            $this->users->save($user);
-        }
+        // ③ Access Token（JWT）発行（User/Eloquentに依存しない）
+        $accessToken = $this->tokenIssuer->issue($provisioned);
 
-
-
-
-        /* ============================================================
-         * ④ メール認証同期（再ログイン / VerifyEmailPage 用）
-         * ============================================================ */
-        if (! $user->email_verified_at && $emailVerified) {
-            $user->email_verified_at = now();
-            $user = $this->users->save($user);
-        }
-
-        /* ============================================================
-         * ⑤ Access Token（JWT）発行
-         * ============================================================ */
-        $accessToken = $this->tokenIssuer->issue($user);
-
-        /* ============================================================
-         * ⑥ Refresh Token 発行（DB 永続）
-         * ============================================================ */
-        $refresh = $this->refreshTokens->issue(
-            $user,
+        // ④ Refresh Token 発行（DB 永続はAuth責務でOK：ただしUserはDTOで渡すのが理想）
+        //    今は既存Serviceが User(Eloquent) 前提なので、次の段階でRefreshTokenServiceもDTO対応へ寄せる。
+        //    ここでは最小改修として refreshTokens->issueByUserId を追加するのがベスト。
+        $refresh = $this->refreshTokens->issueByUserId(
+            $provisioned->userId,
             request()->ip(),
             request()->userAgent()
         );
 
-        /* ============================================================
-         * ⑦ レスポンス生成
-         * ============================================================ */
         return new LoginOrRegisterOutput(
             token: $accessToken,
             user: [
-                'id'                => $user->id,
-                'name'              => $user->name,
-                'email'             => $user->email,
-                'shop_id'           => $user->shop_id,
-                'email_verified_at' => $user->email_verified_at,
-                'first_login_at' => $user->first_login_at,
-                'roles'             => $user->formattedRoles(),
+                'id'                => $provisioned->userId,
+                'name'              => $principal->displayName,
+                'email'             => $provisioned->email,
+                'shop_id'           => $provisioned->tenantId,
+                'email_verified_at' => $principal->emailVerified ? now() : null,
+                'first_login_at'    => $provisioned->isFirstLogin ? now() : null,
+                'roles'             => $provisioned->roles,
             ],
-            status: $status,
-            needsEmailVerification: $wasCreated && ! $user->email_verified_at,
+            status: 'login_or_register',
+            needsEmailVerification: ! $principal->emailVerified,
             refreshToken: $refresh,
-            isFirstLogin: $isFirstLogin,
+            isFirstLogin: $provisioned->isFirstLogin,
         );
     }
 }

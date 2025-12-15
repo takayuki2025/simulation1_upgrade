@@ -35,9 +35,15 @@ class FirebaseAuthController extends Controller
     }
 
     public function logout(Request $request): JsonResponse
-    {
-        $request->user()?->currentAccessToken()?->delete();
-
-        return response()->json(['message' => 'Logged out']);
+{
+    $user = $request->user();
+    if (! $user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
+
+    // JWTはstateless。サーバ側で止める対象は RefreshToken。
+    (new \App\Modules\Auth\Domain\Service\RefreshTokenService())->revokeAllForUser($user);
+
+    return response()->json(['message' => 'Logged out']);
+}
 }

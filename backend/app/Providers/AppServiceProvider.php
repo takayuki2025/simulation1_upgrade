@@ -11,6 +11,10 @@ use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
 use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
+use App\Modules\Auth\Domain\Port\TokenVerifierPort;
+use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
+use App\Modules\Auth\Domain\Port\UserProvisioningPort;
+use App\Modules\User\Application\Service\UserProvisioningService;
 // ✅ User モジュール内の Repository Interface を追加
 use App\Modules\User\Domain\Repository\ProfileRepository;//⚫️
 use App\Modules\User\Domain\Repository\MypageRepository; // ⚫️MypageRepositoryは共通で残す
@@ -35,6 +39,12 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
+
+
+        $this->app->bind(TokenVerifierPort::class, JwtTokenVerifier::class);
+
+        $this->app->bind(UserProvisioningPort::class, UserProvisioningService::class);
+
         // Repository binding
         // $this->app->bind(ItemRepositoryInterface::class, EloquentItemRepository::class);
         // $this->app->bind(UserRepositoryInterface::class, EloquentUserRepository::class); // 仮にコメントアウト

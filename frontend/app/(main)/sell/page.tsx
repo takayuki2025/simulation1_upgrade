@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useSanctumAuth";
+// import { useAuth } from "@/hooks/useSanctumAuth";
 // getImageUrl は、utils.ts などで定義されているものと仮定
 import { getImageUrl } from "@/utils/utils";
 import Image from "next/image";

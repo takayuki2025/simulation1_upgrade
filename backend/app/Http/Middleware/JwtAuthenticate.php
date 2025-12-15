@@ -3,54 +3,71 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
-use App\Modules\Auth\Domain\Service\TokenIssuerService;
+use App\Modules\Auth\Domain\Port\TokenVerifierPort;
 use Closure;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class JwtAuthenticate
 {
-    private TokenIssuerService $issuer;
-
-    public function __construct(TokenIssuerService $issuer)
-    {
-        $this->issuer = $issuer;
+    public function __construct(
+        private TokenVerifierPort $verifier
+    ) {
     }
 
     public function handle(Request $request, Closure $next)
     {
         $token = $this->getBearerToken($request);
 
-        if (!$token) {
-            return $this->unauthorized("Token not provided");
+        if (! $token) {
+            return $this->unauthorized('Token not provided');
         }
 
         try {
-            $decoded = $this->issuer->decode($token);
+            $decoded = $this->verifier->decode($token);
         } catch (Exception $e) {
             Log::warning('JWT decode failed', ['error' => $e->getMessage()]);
-            return $this->unauthorized("Invalid token");
+            return $this->unauthorized('Invalid token');
         }
 
         // exp チェック（念のため手動チェック）
-        if (property_exists($decoded, 'exp') && time() >= $decoded->exp) {
-            return $this->unauthorized("Token expired");
+        if (property_exists($decoded, 'exp') && time() >= (int)$decoded->exp) {
+            return $this->unauthorized('Token expired');
         }
 
-        // DB のユーザーを確認
-        $user = User::find($decoded->sub);
-
-        if (!$user) {
-            return $this->unauthorized("User not found");
+        // sub は user_id を前提（あなたのJWT発行で sub=user->id）
+        $userId = property_exists($decoded, 'sub') ? (int)$decoded->sub : 0;
+        if ($userId <= 0) {
+            return $this->unauthorized('Invalid token subject');
         }
 
-        // ★ UserContext をリクエストにバインド
+        $user = User::find($userId);
+        if (! $user) {
+            // JWTは通ってるがDBにユーザーがない＝整合性事故。ここでJIT作成はしない（User基盤が崩れるため）
+            return $this->unauthorized('User not found');
+        }
+
+        // request()->user() を確定
         $request->setUserResolver(fn () => $user);
 
-        // ★ Multi-Tenant スコープをセット
-        $request->attributes->set('tenant_id', $decoded->shop_id ?? null);
+        // Auth ファサード側も確定（$request->user() と Auth::user() のズレ事故を防止）
+        Auth::setUser($user);
+
+        // tenant_id を統一（claim: tenant or shop_id）
+        $tenantId = null;
+        if (property_exists($decoded, 'tenant') && $decoded->tenant !== null) {
+            $tenantId = (int)$decoded->tenant;
+        } elseif (property_exists($decoded, 'shop_id') && $decoded->shop_id !== null) {
+            $tenantId = (int)$decoded->shop_id;
+        }
+
+        $request->attributes->set('tenant_id', $tenantId);
+
+        // 追加：必要なら roles も attributes に（認可でclaim参照したい場合）
+        // $request->attributes->set('roles', property_exists($decoded, 'roles') ? (array)$decoded->roles : []);
 
         return $next($request);
     }
@@ -58,11 +75,9 @@ class JwtAuthenticate
     private function getBearerToken(Request $request): ?string
     {
         $header = $request->header('Authorization');
-
-        if (!$header || !str_starts_with($header, 'Bearer ')) {
+        if (! $header || ! str_starts_with($header, 'Bearer ')) {
             return null;
         }
-
         return substr($header, 7);
     }
 
@@ -70,7 +85,7 @@ class JwtAuthenticate
     {
         return response()->json([
             'message' => $message,
-            'status'  => 'unauthorized'
+            'status'  => 'unauthorized',
         ], 401);
     }
 }

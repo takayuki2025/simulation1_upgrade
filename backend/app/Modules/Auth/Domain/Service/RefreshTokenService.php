@@ -11,7 +11,8 @@ class RefreshTokenService
 {
     public function __construct(
         private int $ttlDays = 30
-    ) {}
+    ) {
+    }
 
     /**
      * 新しい RefreshToken を発行し、【生トークン文字列】を戻り値として返す。
@@ -93,5 +94,30 @@ class RefreshTokenService
     {
         RefreshToken::where('user_id', $user->id)
             ->update(['revoked' => true]);
+    }
+
+    public function issueByUserId(
+        int $userId,
+        ?string $ip = null,
+        ?string $ua = null,
+        ?string $deviceId = null,
+        ?string $deviceName = null,
+    ): string {
+        // 生トークンを生成
+        $rawToken = \Illuminate\Support\Str::random(64);
+        $hash = hash('sha256', $rawToken);
+
+        \App\Models\RefreshToken::create([
+            'user_id'     => $userId,
+            'token_hash'  => $hash,
+            'revoked'     => false,
+            'expires_at'  => \Carbon\Carbon::now()->addDays($this->ttlDays),
+            'device_id'   => $deviceId,
+            'device_name' => $deviceName,
+            'ip_address'  => $ip,
+            'user_agent'  => $ua,
+        ]);
+
+        return $rawToken;
     }
 }

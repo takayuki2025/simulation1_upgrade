@@ -10,40 +10,53 @@ export enum IMAGE_TYPE {
 // ======================================
 //  API ベースURL（使わないが一応保持）
 // ======================================
-export const BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://laravel.test";
+const STORAGE_BASE_URL =
+  process.env.NEXT_PUBLIC_IMAGE_BASE_URL ?? "https://localhost/storage";
+
+
+
+// export const BASE =
+//   process.env.NEXT_PUBLIC_API_BASE_URL || "https://laravel.test";
 
 // ======================================
 //  getImageUrl(path, type, cacheBuster)
 // ======================================
-export const getImageUrl = (
-  path: string | null,
-  type: IMAGE_TYPE = IMAGE_TYPE.OTHER,
-  cacheBuster?: number,
-): string => {
-  if (!path) return "https://placehold.co/300x300?text=No+Image";
+export function getImageUrl(path?: string | null): string {
+  if (!path) {
+    return "/images/no-image.png";
+  }
 
-  // 外部 URL ならそのまま返す
+  // すでに完全URLならそのまま返す（移行期対応）
   if (path.startsWith("http://") || path.startsWith("https://")) {
-    return cacheBuster ? `${path}?v=${cacheBuster}` : path;
+    return path;
   }
 
-  // 種類別の prefix
-  let prefix = "";
-  switch (type) {
-    case IMAGE_TYPE.USER:
-      prefix = "/storage/user_images";
-      break;
-    case IMAGE_TYPE.ITEM:
-      prefix = "/storage/item_images";
-      break;
-    default:
-      prefix = "/storage/other";
-  }
+  return `${STORAGE_BASE_URL}/${path}`;
+}
 
-  const url = `${prefix}/${path}`;
-  return cacheBuster ? `${url}?v=${cacheBuster}` : url;
-};
+
+
+
+
+// export const getImageUrl = (
+//   path: string | null,
+//   _type?: IMAGE_TYPE,
+//   cacheBuster?: number,
+// ): string => {
+//   if (!path) return "https://placehold.co/300x300?text=No+Image";
+
+//   // Laravel が返した public URL / public path はそのまま使う
+//   if (
+//     path.startsWith("/") ||
+//     path.startsWith("http://") ||
+//     path.startsWith("https://")
+//   ) {
+//     return cacheBuster ? `${path}?v=${cacheBuster}` : path;
+//   }
+
+//   // 想定外（保険）
+//   return cacheBuster ? `/${path}?v=${cacheBuster}` : `/${path}`;
+// };
 
 // ======================================
 // 画像エラー時の差し替え

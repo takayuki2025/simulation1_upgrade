@@ -1,13 +1,16 @@
 <?php
 
-// ListItemsOutputDto.php
-
 namespace App\Modules\Item\Application\Dto\Item;
 
-class ListItemsOutputDto
+use App\Modules\Item\Domain\Collection\Items;
+
+final class ItemDetailOutputDto
 {
     public function __construct(
-        public readonly iterable $items,
+        public readonly Item $item,
+        public readonly iterable $comments,
+        public readonly bool $isFavorited,
+        public readonly int $favoritesCount,
     ) {
     }
 }

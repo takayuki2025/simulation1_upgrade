@@ -1,68 +1,104 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Log;
-use App\Modules\Auth\Presentation\Http\Controllers\FirebaseAuthController;
-use App\Modules\Auth\Presentation\Http\Controllers\TokenController;
-use App\Modules\Auth\Presentation\Http\Controllers\MeController;
-use App\Modules\Item\Presentation\Http\Controllers\ItemDetailController;
-use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
-use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
-use App\Modules\User\Presentation\Http\Controllers\MypageController;
-use App\Modules\Item\Presentation\Http\Controllers\ShopShowController;
-use App\Modules\Item\Presentation\Http\Controllers\ShopItemListController;
-use App\Modules\Item\Presentation\Http\Controllers\CommentController;
-use App\Modules\Item\Presentation\Http\Controllers\FavoriteController;
 
-Log::info("ROUTE_FILE_LOAD_CHECK: routes/api.php loaded.");
-
+/*
+|--------------------------------------------------------------------------
+| Health Check
+|--------------------------------------------------------------------------
+*/
 Route::get('/health', fn () => ['status' => 'ok']);
 
+/*
+|--------------------------------------------------------------------------
+| 🔐 Auth : Firebase → JWT（実装済・検証対象）
+|--------------------------------------------------------------------------
+*/
+use App\Modules\Auth\Presentation\Http\Controllers\{
+    FirebaseAuthController,
+    TokenController,
+    MeController,
+    DeviceSessionsController
+};
 
-/* ============================================================
-   🔐 Firebase → Laravel JWT 認証
-============================================================ */
-
-
-// Firebase → JWT
+// Login / Register
 Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegister']);
 
-// Refresh
+// Refresh Token
 Route::post('/auth/refresh', [TokenController::class, 'refresh']);
 
-// JWT 保護エリア
+/*
+|--------------------------------------------------------------------------
+| 🔐 JWT Protected（最低限）
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/me', MeController::class);
     Route::post('/logout', [FirebaseAuthController::class, 'logout']);
-    // ...
-});
 
-
-Route::middleware(['auth.jwt'])->group(function () {
+    // セッション確認（実装済）
     Route::get('/auth/sessions', [DeviceSessionsController::class, 'list']);
 });
 
+/*
+|--------------------------------------------------------------------------
+| 🌐 Public Item API（今回の検証メイン）
+|--------------------------------------------------------------------------
+*/
+use App\Modules\Item\Presentation\Http\Controllers\{
+    ItemListController,
+    ItemSearchController,
+    ItemDetailController
+};
 
-// Email verify
-Route::post('/email/verification-notification', [FirebaseAuthController::class, 'resend']);
+// ✅ 新：一覧 / 検索（DDD 分離済）
+Route::prefix('items')->group(function () {
+    Route::get('/', ItemListController::class);          // 一覧
+    Route::get('/search', ItemSearchController::class);  // 検索
+});
 
-// JWT Refresh Token
-Route::post('/auth/refresh', [TokenController::class, 'refresh']);
-
-
-/* ============================================================
-   🌐 公開エリア（認証不要）
-============================================================ */
-
-Route::get('/item', [ItemQueryController::class, 'index']);
+// ✅ 詳細（単体）
 Route::get('/item/{id}', ItemDetailController::class);
 
-Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
-Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
+/*
+|--------------------------------------------------------------------------
+| 🧊 以下は未検証・未使用（削除せずコメント化）
+|--------------------------------------------------------------------------
+*/
 
+
+// === 旧 Item Query（廃止予定） ===
+// use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
+// Route::get('/item', [ItemQueryController::class, 'index']);
+// Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
+// Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
+
+// === Item Command（登録・更新・削除）===
+// use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
+// Route::middleware(['auth.jwt'])->group(function () {
+//     Route::post('/item', [ItemCommandController::class, 'store']);
+//     Route::put('/item/{id}', [ItemCommandController::class, 'update']);
+//     Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']);
+// });
+
+// === Favorite / Comment ===
+use App\Modules\Item\Presentation\Http\Controllers\{
+    FavoriteController,
+    CommentController
+};
 Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get('/items/favorite', [FavoriteController::class, 'index']);
+    Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
+    Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
+    Route::post('/comment', CommentController::class);
+});
 
+// === Shop / Tenant ===
+use App\Modules\Item\Presentation\Http\Controllers\{
+    ShopShowController,
+    ShopItemListController
+};
 Route::prefix('shops/{shop_code}')
     ->middleware('tenant')
     ->group(function () {
@@ -70,34 +106,11 @@ Route::prefix('shops/{shop_code}')
         Route::get('/items', ShopItemListController::class);
     });
 
-
-/* ============================================================
-   🔐 認証エリア（JWT ONLY）
-============================================================ */
-
+// === MyPage / User ===
+use App\Modules\User\Presentation\Http\Controllers\MypageController;
 Route::middleware(['auth.jwt'])->group(function () {
-
-    // 自分自身の取得
-    Route::get('/me', MeController::class);
-
-    // Logout
-    Route::post('/logout', [FirebaseAuthController::class, 'logout']);
-
-    // MyPage
     Route::get('/mypage/profile', [MypageController::class, 'profile']);
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
     Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
-
-    // Item Command
-    Route::post('/item', [ItemCommandController::class, 'store']);
-    Route::put('/item/{id}', [ItemCommandController::class, 'update']);
-    Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']);
-
-    // Favorite
-    Route::get('/items/favorite', [FavoriteController::class, 'index']);
-    Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
-    Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
-
-    // Comment
-    Route::post('/comment', CommentController::class);
 });
+

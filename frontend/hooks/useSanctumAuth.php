@@ -19,7 +19,7 @@ import {
   onIdTokenChanged,
 } from "firebase/auth";
 
-import { getFirebaseAuth } from "@/src/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 /* ============================================================
    型定義

@@ -89,6 +89,7 @@
 
 .W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__items_select_all {
   flex: 0 0 calc(25% - 30px);
+  width: calc(25% - 30px);
 }
 
 @media (max-width: 1024px) {
@@ -110,17 +111,33 @@
 }
 
 .W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__itemImageWrapper {
+  aspect-ratio: 1;
+  background: #f5f5f5;
+  border-radius: 8px;
+  width: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 .W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__itemImage {
-  aspect-ratio: 1;
   -o-object-fit: cover;
   object-fit: cover;
-  border-radius: 8px;
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__cardLink {
   width: 100%;
   display: block;
-  box-shadow: 0 4px 6px #0000001a;
+}
+
+.W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__itemLink {
+  color: inherit;
+  text-decoration: none;
+  display: block;
 }
 
 .W-Resource-Rich-Simulation-Center-Home-module__Ua7JVG__sold_text {

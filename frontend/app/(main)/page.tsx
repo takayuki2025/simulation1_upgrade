@@ -4,7 +4,9 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 
-import { useItemsSWR } from "@/services/itemService";
+import { useItemListSWR } from "@/services/useItemListSWR";
+import { useItemSearchSWR } from "@/services/useItemSearchSWR";
+
 import { getImageUrl, onImageError } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
@@ -14,7 +16,7 @@ export default function Home() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const currentTab = useMemo(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
@@ -26,20 +28,27 @@ export default function Home() {
     [searchParams],
   );
 
-  // 認証状態が分かるまでは apiClient を使わない
-  const effectiveApiClient = useMemo(() => {
-    if (isAuthLoading) return null;
-    if (isAuthenticated && apiClient) return apiClient;
-    return null;
-  }, [isAuthLoading, isAuthenticated, apiClient]);
+  /* =========================
+     🔑 一覧 / 検索 切り替え
+  ========================= */
+  const isSearch = currentSearchQuery.trim().length > 0;
 
-  const { items, isLoading: isItemsLoading } = useItemsSWR(
-    currentTab,
-    currentSearchQuery,
-    effectiveApiClient,
-  );
+  const {
+    items,
+    isLoading: isItemsLoading,
+    error,
+  } = isSearch ? useItemSearchSWR(currentSearchQuery) : useItemListSWR();
 
   const isPageLoading = isAuthLoading || isItemsLoading;
+
+  /* ========================= */
+  console.log("RENDER CHECK:", {
+    isAuthLoading,
+    isItemsLoading,
+    isPageLoading,
+    items,
+    itemsLength: Array.isArray(items) ? items.length : "not array",
+  });
 
   return (
     <div className={styles.main_contents}>
@@ -57,28 +66,25 @@ export default function Home() {
           onClick={() => router.push("/shops/shop-a")}
           className={styles.shopButton}
         >
-          ショップA(テスト用リンク)
+          ショップA
         </button>
-
         <button
           onClick={() => router.push("/shops/shop-b")}
           className={styles.shopButton}
         >
-          ショップB(テスト用リンク)
+          ショップB
         </button>
-
         <button
           onClick={() => router.push("/shops/shop-c")}
           className={styles.shopButton}
         >
-          ショップC(テスト用リンク)
+          ショップC
         </button>
-
         <button
           onClick={() => router.push("/shops/shop-d")}
           className={styles.shopButton}
         >
-          ショップD(テスト用リンク)
+          ショップD
         </button>
       </div>
 
@@ -91,18 +97,14 @@ export default function Home() {
                 pathname: "/",
                 query: { tab: "all", all_item_search: currentSearchQuery },
               }}
-              className={`${styles.recs} ${
-                currentTab === "all" ? styles.active : ""
-              }`}
+              className={`${styles.recs} ${currentTab === "all" ? styles.active : ""}`}
             >
               すべて
             </Link>
 
             <Link
               href={{ pathname: "/", query: { tab: "mylist" } }}
-              className={`${styles.mylists} ${
-                currentTab === "mylist" ? styles.active : ""
-              }`}
+              className={`${styles.mylists} ${currentTab === "mylist" ? styles.active : ""}`}
             >
               マイリスト
             </Link>
@@ -113,15 +115,13 @@ export default function Home() {
             {items.length > 0 ? (
               items.map((item) => (
                 <div key={item.id} className={styles.items_select_all}>
-                  <Link href={`/item/${item.id}`}>
+                  <Link href={`/item/${item.id}`} className={styles.cardLink}>
                     <div className={styles.itemImageWrapper}>
                       <img
                         src={getImageUrl(item.item_image)}
                         alt={item.name}
-                        onError={(e) => onImageError(e, item.name)}
                         className={styles.itemImage}
                       />
-
                       {item.remain === 0 && (
                         <div className={styles.sold_text}>SOLD</div>
                       )}

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class Item extends Model
 {
@@ -32,19 +33,9 @@ class Item extends Model
     /** 画像URLアクセサ（既存コードそのまま） */
     public function getItemImageAttribute($value): string
     {
-        if (!$value) {
-            return '';
-        }
-
-        if (Str::startsWith($value, ['http://','https://'])) {
-            return $value;
-        }
-
-        $value = ltrim(str_replace('storage/', '', $value), '/');
-        $encoded = implode('/', array_map('rawurlencode', explode('/', $value)));
-
-        return config('app.url') . '/storage/' . $encoded;
+        return $value ?? '';
     }
+
 
     /** 出品者 */
     public function user(): BelongsTo

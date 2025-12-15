@@ -23,26 +23,14 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     return IMAGE_TYPE;
 }({});
 const BASE = ("TURBOPACK compile-time value", "") || "https://laravel.test";
-const getImageUrl = (path, type = "other", cacheBuster)=>{
+const getImageUrl = (path, _type, cacheBuster)=>{
     if (!path) return "https://placehold.co/300x300?text=No+Image";
-    // 外部 URL ならそのまま返す
-    if (path.startsWith("http://") || path.startsWith("https://")) {
+    // Laravel が返した public URL / public path はそのまま使う
+    if (path.startsWith("/") || path.startsWith("http://") || path.startsWith("https://")) {
         return cacheBuster ? `${path}?v=${cacheBuster}` : path;
     }
-    // 種類別の prefix
-    let prefix = "";
-    switch(type){
-        case "user":
-            prefix = "/storage/user_images";
-            break;
-        case "item":
-            prefix = "/storage/item_images";
-            break;
-        default:
-            prefix = "/storage/other";
-    }
-    const url = `${prefix}/${path}`;
-    return cacheBuster ? `${url}?v=${cacheBuster}` : url;
+    // 想定外（保険）
+    return cacheBuster ? `/${path}?v=${cacheBuster}` : `/${path}`;
 };
 const onImageError = (e, name)=>{
     const img = e.target;

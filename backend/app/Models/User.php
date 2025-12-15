@@ -36,6 +36,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'address_country',
         'firebase_uid',
         'shop_id',
+        'first_login_at',
     ];
 
     /**

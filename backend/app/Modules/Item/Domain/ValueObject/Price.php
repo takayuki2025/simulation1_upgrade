@@ -2,7 +2,8 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
-class Price
+
+final class Price
 {
     public function __construct(
         private int $value
