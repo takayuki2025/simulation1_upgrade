@@ -21,18 +21,27 @@ const STORAGE_BASE_URL =
 // ======================================
 //  getImageUrl(path, type, cacheBuster)
 // ======================================
+/**
+ * getImageUrl
+ *
+ * Backend から返る画像パス（相対 or 完全URL）を
+ * 「ブラウザでそのまま使えるURL」に正規化する。
+ *
+ * - Domain / API は「生パス」しか知らない
+ * - CDN / S3 切り替えはここだけを変更する
+ */
 export function getImageUrl(path?: string | null): string {
   if (!path) {
     return "/images/no-image.png";
   }
 
-  // すでに完全URLならそのまま返す（移行期対応）
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
   return `${STORAGE_BASE_URL}/${path}`;
 }
+
 
 
 

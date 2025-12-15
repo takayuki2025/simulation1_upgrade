@@ -14,35 +14,29 @@ final class ItemDetailUseCase
     ) {
     }
 
-    public function execute(int $id, ?int $userId): ItemDetailOutputDto
+    public function execute(int $itemId): ItemDetailOutputDto
     {
-        $item = $this->itemRepository->findById($id);
+        $item = $this->itemRepository->findById($itemId);
 
-        if (! $item) {
+        if (!$item) {
             throw new RuntimeException('Item not found');
         }
 
-
-        $comments = [];
-        $isFavorited = [];
-        $favoritesCount = [];
-
         return new ItemDetailOutputDto(
-            item: new ItemDetailViewDto(
-                id: $item->getId()->getValue(),
-                name: $item->getName(),
-                price: $item->getPrice()->getValue(),
-                brand: $item->getBrand(),
-                explain: $item->getExplain(),
-                condition: $item->getCondition(),
-                category: $item->getCategory()->toArray(),
-                item_image: $item->getItemImage()?->getValue(),
-                remain: $item->getRemain()->getValue(),
-                user_id: $item->getUserId(),
-            ),
-            comments: $comments,
-            isFavorited: $isFavorited,
-            favoritesCount: $favoritesCount,
+            item: $item,
+            // id: $item->getId()->getValue(),
+            // name: $item->getName(),
+            // price: $item->getPrice()->getValue(),
+            // brand: $item->getBrand(),
+            // explain: $item->getExplain(),
+            // condition: $item->getCondition(),
+            // category: $item->getCategory()->toArray(),
+            // item_image: $item->getItemImage()?->getValue(),
+            // remain: $item->getRemain()->getValue(),
+            // user_id: $item->getUserId(),
+            comments: [],
+            isFavorited: false,
+            favoritesCount: 0,
         );
     }
 }

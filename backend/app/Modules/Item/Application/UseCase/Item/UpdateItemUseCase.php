@@ -52,7 +52,9 @@ class UpdateItemUseCase
             condition: $input->condition,
             category: new CategoryList($input->category),
             brand: $input->brand,
-            itemImage: new ItemImagePath($input->itemImagePath ?? $item->getItemImage()->getPath()),
+            itemImage: ItemImagePath::fromRaw(
+                $input->itemImagePath ?? $item->getItemImage()?->value()
+            ),
             remain: new StockCount($input->remain),
         );
 

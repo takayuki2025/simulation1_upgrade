@@ -536,6 +536,10 @@ img, video {
   animation: 1s linear infinite spin;
 }
 
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
 .resize-y {
   resize: vertical;
 }
@@ -696,6 +700,11 @@ img, video {
 .bg-blue-600 {
   --tw-bg-opacity: 1;
   background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
+}
+
+.bg-gray-400 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(156 163 175 / var(--tw-bg-opacity, 1));
 }
 
 .bg-gray-50 {
@@ -860,6 +869,10 @@ img, video {
 
 .pt-20 {
   padding-top: 5rem;
+}
+
+.pt-4 {
+  padding-top: 1rem;
 }
 
 .pt-5 {
@@ -1168,6 +1181,11 @@ body {
 
 .focus\:ring-opacity-50:focus {
   --tw-ring-opacity: .5;
+}
+
+.active\:bg-red-800:active {
+  --tw-bg-opacity: 1;
+  background-color: rgb(153 27 27 / var(--tw-bg-opacity, 1));
 }
 
 .disabled\:cursor-not-allowed:disabled {

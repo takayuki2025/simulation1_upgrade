@@ -24,7 +24,7 @@ class ItemMapper
             condition: $model->condition,
             category: new CategoryList($model->category ?? []),
             brand: $model->brand,
-            itemImage: new ItemImagePath($model->item_image),
+            itemImage: ItemImagePath::fromRaw($model->item_image),
             remain: new StockCount($model->remain),
         );
     }

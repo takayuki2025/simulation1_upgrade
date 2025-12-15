@@ -6,8 +6,6 @@
 // 画像タイプ Enum
 // ======================================
 __turbopack_context__.s([
-    "BASE",
-    ()=>BASE,
     "IMAGE_TYPE",
     ()=>IMAGE_TYPE,
     "getImageUrl",
@@ -22,16 +20,19 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     IMAGE_TYPE["OTHER"] = "other";
     return IMAGE_TYPE;
 }({});
-const BASE = ("TURBOPACK compile-time value", "") || "https://laravel.test";
-const getImageUrl = (path, _type, cacheBuster)=>{
-    if (!path) return "https://placehold.co/300x300?text=No+Image";
-    // Laravel が返した public URL / public path はそのまま使う
-    if (path.startsWith("/") || path.startsWith("http://") || path.startsWith("https://")) {
-        return cacheBuster ? `${path}?v=${cacheBuster}` : path;
+// ======================================
+//  API ベースURL（使わないが一応保持）
+// ======================================
+const STORAGE_BASE_URL = ("TURBOPACK compile-time value", "https://localhost/storage") ?? "https://localhost/storage";
+function getImageUrl(path) {
+    if (!path) {
+        return "/images/no-image.png";
     }
-    // 想定外（保険）
-    return cacheBuster ? `/${path}?v=${cacheBuster}` : `/${path}`;
-};
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path;
+    }
+    return `${STORAGE_BASE_URL}/${path}`;
+}
 const onImageError = (e, name)=>{
     const img = e.target;
     img.onerror = null;

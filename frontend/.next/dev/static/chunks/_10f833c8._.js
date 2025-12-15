@@ -84,7 +84,6 @@ function getImageUrl(path) {
     if (!path) {
         return "/images/no-image.png";
     }
-    // すでに完全URLならそのまま返す（移行期対応）
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return path;
     }

@@ -6,7 +6,6 @@ use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-
 final class ItemResource
 {
     public static function fromDomain(Item $item): array
@@ -24,8 +23,8 @@ final class ItemResource
 
             // ★ 正しい画像変換
             'item_image' => $item->getItemImage()
-                ? asset($item->getItemImage()->getValue())
-                : null,
+            ? $item->getItemImage()->value()
+            : null,
         ];
     }
 }

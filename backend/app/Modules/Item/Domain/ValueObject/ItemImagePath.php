@@ -4,19 +4,32 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
+
 final class ItemImagePath
 {
-    public function __construct(
-        private string $value
-    ) {
-        if ($value === '') {
-            throw new \InvalidArgumentException('ItemImagePath cannot be empty');
-        }
+    private string $path;
+
+    private function __construct(string $path)
+    {
+        $this->path = $path;
     }
 
-    public function getValue(): string
+    public static function fromRaw(?string $raw): ?self
     {
-        return $this->value;
+        if (!$raw) {
+            return null;
+        }
+
+        $path = preg_replace('#^/?storage/#', '', $raw);
+        $path = ltrim($path, '/');
+
+        return new self($path);
+    }
+
+    public function value(): string
+    {
+        return $this->path;
     }
 }
+
 

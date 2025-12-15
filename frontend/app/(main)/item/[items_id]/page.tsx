@@ -2,17 +2,17 @@
 
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/ui/auth/useAuth";
 
+import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
-import { getImageUrl, onImageError, IMAGE_TYPE } from "@/utils/utils";
+import { getImageUrl, onImageError } from "@/utils/utils";
 
 import styles from "./W-ItemDetailView.module.css";
 
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated, user, token } = useAuth();
+  const auth = useAuth();
 
   /* =========================
      itemId 解決
@@ -39,32 +39,32 @@ export default function ItemDetailPage() {
   } = useItemDetailSWR(itemId);
 
   /* =========================
-     状態
+     Local State
   ========================= */
   const [newComment, setNewComment] = useState("");
   const [commentErrors, setCommentErrors] = useState<string[]>([]);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  const isAuthenticated = auth.isAuthenticated;
+  const user = auth.user;
+
   const isOwner = isAuthenticated && user?.id === item?.user_id;
   const canInteract = isAuthenticated && !isOwner;
   const isSoldOut = item?.remain === 0;
-  const totalLoading = isLoading;
 
   /* =========================
      Favorite Command
   ========================= */
   const submitFavorite = async () => {
     if (!item) return;
+
     if (!isAuthenticated) {
       router.push("/login");
       return;
     }
 
-    await fetch(`/api/items/${item.id}/favorite`, {
+    await auth.apiClient.fetch(`/items/${item.id}/favorite`, {
       method: isFavorited ? "DELETE" : "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     });
 
     mutate();
@@ -75,6 +75,7 @@ export default function ItemDetailPage() {
   ========================= */
   const submitComment = async () => {
     if (!item) return;
+
     if (!newComment.trim()) {
       setCommentErrors(["コメントを入力してください"]);
       return;
@@ -89,16 +90,12 @@ export default function ItemDetailPage() {
     setCommentErrors([]);
 
     try {
-      await fetch("/api/comment", {
+      await auth.apiClient.fetch("/comment", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        body: {
           item_id: item.id,
           comment: newComment,
-        }),
+        },
       });
 
       setNewComment("");
@@ -116,9 +113,9 @@ export default function ItemDetailPage() {
   };
 
   /* =========================
-     ガード
+     Guard
   ========================= */
-  if (totalLoading) {
+  if (isLoading) {
     return <p className={styles.loadingText}>商品情報を読み込み中...</p>;
   }
 
@@ -129,31 +126,34 @@ export default function ItemDetailPage() {
   const itemCategories = Array.isArray(item.category) ? item.category : [];
 
   /* =========================
-     JSX（デザインそのまま）
+     JSX（完全版・省略なし）
   ========================= */
   return (
     <div className={styles.item_detail_wrapper}>
       <div className={styles.item_detail_contents}>
         <div className={styles.card}>
-          {/* 商品画像 */}
+          {/* 商品画像エリア */}
           <div className={styles.imageArea}>
             <img
-              src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
+              src={getImageUrl(item.item_image)}
               onError={(e) => onImageError(e, item.name)}
               alt="商品写真"
               className={styles.image}
             />
           </div>
 
-          {/* 商品情報 */}
+          {/* 商品情報エリア */}
           <div className={styles.infoArea}>
+            {/* 商品名 */}
             <h2 className={styles.itemTitle}>{item.name}</h2>
 
+            {/* ブランド */}
             <div className={styles.brandBlock}>
               <p className={styles.brandLabel}>ブランド名</p>
               <p className={styles.brandValue}>{item.brand || "未登録"}</p>
             </div>
 
+            {/* 価格 */}
             <div className={styles.priceBlock}>
               {isSoldOut ? (
                 <h2 className={styles.priceSoldOut}>SOLD OUT</h2>
@@ -166,7 +166,7 @@ export default function ItemDetailPage() {
               )}
             </div>
 
-            {/* Favorite / Comment */}
+            {/* お気に入り + コメント */}
             <div className={styles.reactionRow}>
               <div className={styles.favoriteBlock}>
                 {canInteract ? (
@@ -185,6 +185,7 @@ export default function ItemDetailPage() {
                 ) : (
                   <span className={styles.disabledHeart}>🤍</span>
                 )}
+
                 <p className={styles.favoriteCount}>{favoritesCount}</p>
               </div>
 
@@ -194,27 +195,141 @@ export default function ItemDetailPage() {
               </div>
             </div>
 
-            {/* 購入 */}
-            <button
-              onClick={() => {
-                if (isOwner) router.push("/mypage");
-                else if (!isAuthenticated) router.push("/login");
-                else navigateToPurchase();
-              }}
-              disabled={(isSoldOut && !isOwner) || totalLoading}
-              className={styles.purchaseBtn}
-            >
-              {isOwner
-                ? "マイページへ移動する"
-                : !isAuthenticated
-                  ? "ログインして購入"
-                  : isSoldOut
-                    ? "SOLD OUT"
-                    : "カートへ"}
-            </button>
+            {/* 購入ボタン */}
+            <div className="item_detail_form pt-4">
+              <button
+                onClick={() => {
+                  if (isOwner) {
+                    router.push("/mypage");
+                  } else if (!isAuthenticated) {
+                    router.push("/login");
+                  } else {
+                    navigateToPurchase();
+                  }
+                }}
+                disabled={(isSoldOut && !isOwner) || isLoading}
+                className={`w-full py-3 text-lg font-bold rounded-lg transition duration-200 shadow-lg ${
+                  !isSoldOut
+                    ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
+                    : "bg-gray-400 text-gray-700 cursor-not-allowed"
+                }`}
+              >
+                {isOwner
+                  ? "マイページへ移動する"
+                  : !isAuthenticated
+                    ? "ログインして購入"
+                    : isSoldOut
+                      ? "SOLD OUT"
+                      : "カートへ"}
+              </button>
+            </div>
 
-            {/* 説明・コメント（以下 JSX そのまま） */}
-            {/* …… ここは提示してくれた JSX と完全同一 …… */}
+            {/* 商品説明 */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>商品説明</h2>
+              <p className={styles.explainText}>{item.explain}</p>
+            </div>
+
+            {/* 商品情報 */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>商品情報</h2>
+
+              <div className={styles.categoryRow}>
+                <p className={styles.categoryLabel}>カテゴリー</p>
+                <ul className={styles.categoryList}>
+                  {itemCategories.map((category, index) => (
+                    <li key={index} className={styles.categoryTag}>
+                      {category}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className={styles.conditionRow}>
+                <p className={styles.conditionLabel}>商品の状態</p>
+                <p className={styles.conditionValue}>
+                  {item.condition || "未登録"}
+                </p>
+              </div>
+            </div>
+
+            {/* コメント一覧 */}
+            <div className={styles.section}>
+              <div className={styles.commentHeader}>
+                <h2 className={styles.sectionTitle}>コメント</h2>
+                <span className={styles.commentCountText}>
+                  ({comments.length})
+                </span>
+              </div>
+
+              {comments.length > 0 ? (
+                <div className={styles.commentList}>
+                  {comments.map((comment) => (
+                    <div key={comment.id} className={styles.commentItem}>
+                      <div className={styles.commentUserRow}>
+                        <img
+                          src={getImageUrl(comment.user.user_image)}
+                          className={styles.commentUserImage}
+                          onError={(e) => onImageError(e, comment.user.name)}
+                        />
+                        <p className={styles.commentUserName}>
+                          {comment.user.name}
+                        </p>
+                      </div>
+
+                      <p className={styles.commentText}>{comment.comment}</p>
+
+                      <small className={styles.commentDate}>
+                        投稿日時:{" "}
+                        {new Date(comment.created_at).toLocaleString()}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.noComments}>まだコメントはありません。</p>
+              )}
+            </div>
+
+            {/* コメント投稿 */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>商品へのコメント</h2>
+
+              {commentErrors.length > 0 && (
+                <div className={styles.errorBoxSmall}>
+                  {commentErrors.map((err, index) => (
+                    <p key={index}>{err}</p>
+                  ))}
+                </div>
+              )}
+
+              {isAuthenticated ? (
+                <>
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={5}
+                    className={styles.textarea}
+                  />
+
+                  <button
+                    className={styles.submitBtn}
+                    onClick={submitComment}
+                    disabled={isSubmittingComment}
+                  >
+                    {isSubmittingComment ? "投稿中..." : "コメントを送信する"}
+                  </button>
+                </>
+              ) : (
+                <p
+                  className={styles.submitBtn}
+                  onClick={() => router.push("/login")}
+                  style={{ cursor: "pointer" }}
+                >
+                  ログインしてコメントする
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
