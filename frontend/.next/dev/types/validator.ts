@@ -108,6 +108,24 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
   type __Unused = __Check
 }
 
+// Validate ../../../app/(main)/shops/[shop_code]/dashboard/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/shops/[shop_code]/dashboard">> = Specific
+  const handler = {} as typeof import("../../../app/(main)/shops/[shop_code]/dashboard/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/(main)/shops/[shop_code]/items/new/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/shops/[shop_code]/items/new">> = Specific
+  const handler = {} as typeof import("../../../app/(main)/shops/[shop_code]/items/new/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/(main)/shops/[shop_code]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/shops/[shop_code]">> = Specific
@@ -144,30 +162,6 @@ type LayoutConfig<Route extends LayoutRoutes = LayoutRoutes> = {
 // Validate ../../../app/(auth)/layout.tsx
 {
   type __IsExpected<Specific extends LayoutConfig<"/">> = Specific
-  const handler = {} as typeof import("../../../app/(auth)/layout.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../../app/(main)/layout.tsx
-{
-  type __IsExpected<Specific extends LayoutConfig<"/">> = Specific
-  const handler = {} as typeof import("../../../app/(main)/layout.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../../app/layout.tsx
-{
-  type __IsExpected<Specific extends LayoutConfig<"/">> = Specific
-  const handler = {} as typeof import("../../../app/layout.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-> = Specific
   const handler = {} as typeof import("../../../app/(auth)/layout.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore

@@ -52,9 +52,10 @@
     48 => 'App\\Providers\\AuthModuleServiceProvider',
     49 => 'App\\Providers\\JwtAuthProvider',
     50 => 'App\\Modules\\Reaction\\Infrastructure\\ReactionServiceProvider',
-    51 => 'App\\Providers\\AppServiceProvider',
-    52 => 'App\\Providers\\AuthServiceProvider',
-    53 => 'App\\Providers\\AppServiceProvider',
+    51 => 'App\\Modules\\Comment\\Infrastructure\\CommentServiceProvider',
+    52 => 'App\\Providers\\AppServiceProvider',
+    53 => 'App\\Providers\\AuthServiceProvider',
+    54 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -95,9 +96,10 @@
     34 => 'App\\Providers\\AuthModuleServiceProvider',
     35 => 'App\\Providers\\JwtAuthProvider',
     36 => 'App\\Modules\\Reaction\\Infrastructure\\ReactionServiceProvider',
-    37 => 'App\\Providers\\AppServiceProvider',
-    38 => 'App\\Providers\\AuthServiceProvider',
-    39 => 'App\\Providers\\AppServiceProvider',
+    37 => 'App\\Modules\\Comment\\Infrastructure\\CommentServiceProvider',
+    38 => 'App\\Providers\\AppServiceProvider',
+    39 => 'App\\Providers\\AuthServiceProvider',
+    40 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (

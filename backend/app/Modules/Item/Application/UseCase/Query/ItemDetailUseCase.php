@@ -8,7 +8,7 @@ use RuntimeException;
 use App\Modules\Item\Application\Dto\Item\ItemDetailViewDto;
 use App\Modules\Reaction\Application\UseCase\Favorite\IsFavoritedUseCase;
 use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
-// use App\Modules\Comment\Application\UseCase\ListItemCommentsUseCase;
+use App\Modules\Comment\Application\UseCase\ListItemCommentsUseCase;
 
 
 final class ItemDetailUseCase
@@ -17,6 +17,7 @@ final class ItemDetailUseCase
         private readonly ItemRepository $itemRepository,
         private readonly IsFavoritedUseCase $isFavorited,
         private readonly CountFavoritesUseCase $countFavorites,
+        private readonly ListItemCommentsUseCase $listComments,
     ) {
     }
 
@@ -32,7 +33,7 @@ final class ItemDetailUseCase
 
     return new ItemDetailOutputDto(
         item: $item,
-        comments: [],
+        comments: $this->listComments->execute($itemId),
         isFavorited: $viewerUserId
             ? $this->isFavorited->execute($viewerUserId, $itemId)
             : false,

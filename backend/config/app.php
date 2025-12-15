@@ -188,6 +188,7 @@ return [
         App\Providers\AuthModuleServiceProvider::class,
         App\Providers\JwtAuthProvider::class,
         App\Modules\Reaction\Infrastructure\ReactionServiceProvider::class,
+        App\Modules\Comment\Infrastructure\CommentServiceProvider::class,
     ],
 
     /*
