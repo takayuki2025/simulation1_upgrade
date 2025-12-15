@@ -14,8 +14,8 @@ export const useItemDetailSWR = (itemId: number | null) => {
   return {
     item: data?.item ?? null,
     comments: data?.comments ?? [],
-    isFavorited: data?.is_favorited ?? false,
-    favoritesCount: data?.favorites_count ?? 0,
+    isFavorited: data?.isFavorited ?? false,
+    favoritesCount: data?.favoritesCount ?? 0,
     isLoading,
     isError: error,
     mutate,

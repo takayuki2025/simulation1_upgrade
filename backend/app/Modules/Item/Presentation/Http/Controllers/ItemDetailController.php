@@ -6,27 +6,28 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Query\ItemDetailUseCase;
 use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
-
 use App\Modules\Item\Application\Dto\Item\ItemDetailViewDto;
-
 
 final class ItemDetailController extends Controller
 {
-    public function __invoke(int $id, ItemDetailUseCase $useCase)
-    {
-        
-$output = $useCase->execute($id);
+    public function __invoke(
+        int $id,
+        Request $request,
+        ItemDetailUseCase $useCase
+    ) {
+        $viewerUserId = $request->user()?->id;
 
-return response()->json([
-    'item' => ItemDetailViewDto::fromDomain($output->item)->toArray(),
+        $output = $useCase->execute($id, $viewerUserId);
 
-    'comments' => $output->comments,
-    'isFavorited' => $output->isFavorited,
-    'favoritesCount' => $output->favoritesCount,
-]);
-
+        return response()->json([
+            'item' => ItemDetailViewDto::fromDomain($output->item)->toArray(),
+            'comments' => $output->comments,
+            'isFavorited' => $output->isFavorited,
+            'favoritesCount' => $output->favoritesCount,
+        ]);
+    }
 }
-}
+
 
 
 

@@ -82,17 +82,16 @@ Route::get('/item/{id}', ItemDetailController::class);
 // });
 
 // === Favorite / Comment ===
-use App\Modules\Item\Presentation\Http\Controllers\{
-    FavoriteController,
-    CommentController
-};
-Route::get('/items/{itemId}/comments', [CommentController::class, 'list']);
+
+use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
+
+
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/items/favorite', [FavoriteController::class, 'index']);
     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
-    Route::post('/comment', CommentController::class);
 });
+
 
 // === Shop / Tenant ===
 use App\Modules\Item\Presentation\Http\Controllers\{

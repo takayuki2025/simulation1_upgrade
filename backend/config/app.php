@@ -187,6 +187,7 @@ return [
         // App\Providers\FortifyServiceProvider::class,
         App\Providers\AuthModuleServiceProvider::class,
         App\Providers\JwtAuthProvider::class,
+        App\Modules\Reaction\Infrastructure\ReactionServiceProvider::class,
     ],
 
     /*

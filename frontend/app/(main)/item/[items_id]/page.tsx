@@ -39,7 +39,13 @@ export default function ItemDetailPage() {
   } = useItemDetailSWR(itemId);
 
   /* =========================
-     Local State
+     Optimistic UI State
+  ========================= */
+  const [localFavorited, setLocalFavorited] = useState<boolean | null>(null);
+  const [localCount, setLocalCount] = useState<number | null>(null);
+
+  /* =========================
+     Comment Local State
   ========================= */
   const [newComment, setNewComment] = useState("");
   const [commentErrors, setCommentErrors] = useState<string[]>([]);
@@ -53,6 +59,14 @@ export default function ItemDetailPage() {
   const isSoldOut = item?.remain === 0;
 
   /* =========================
+     表示用 Reaction 状態
+  ========================= */
+  const displayedFavorited =
+    localFavorited !== null ? localFavorited : isFavorited;
+
+  const displayedCount = localCount !== null ? localCount : favoritesCount;
+
+  /* =========================
      Favorite Command
   ========================= */
   const submitFavorite = async () => {
@@ -63,11 +77,23 @@ export default function ItemDetailPage() {
       return;
     }
 
-    await auth.apiClient.fetch(`/items/${item.id}/favorite`, {
-      method: isFavorited ? "DELETE" : "POST",
-    });
+    const next = !displayedFavorited;
 
-    mutate();
+    // optimistic update
+    setLocalFavorited(next);
+    setLocalCount((prev) => (prev ?? favoritesCount) + (next ? 1 : -1));
+
+    try {
+      await auth.apiClient(`/items/${item.id}/favorite`, {
+        method: next ? "POST" : "DELETE",
+      });
+
+      mutate(); // server sync
+    } catch {
+      // rollback
+      setLocalFavorited(isFavorited);
+      setLocalCount(favoritesCount);
+    }
   };
 
   /* =========================
@@ -90,12 +116,9 @@ export default function ItemDetailPage() {
     setCommentErrors([]);
 
     try {
-      await auth.apiClient.fetch("/comment", {
-        method: "POST",
-        body: {
-          item_id: item.id,
-          comment: newComment,
-        },
+      await auth.apiClient.post("/comment", {
+        item_id: item.id,
+        comment: newComment,
       });
 
       setNewComment("");
@@ -126,7 +149,7 @@ export default function ItemDetailPage() {
   const itemCategories = Array.isArray(item.category) ? item.category : [];
 
   /* =========================
-     JSX（完全版・省略なし）
+     JSX（省略なし）
   ========================= */
   return (
     <div className={styles.item_detail_wrapper}>
@@ -176,17 +199,17 @@ export default function ItemDetailPage() {
                   >
                     <span
                       className={`${styles.favoriteIcon} ${
-                        isFavorited ? styles.favoriteActive : ""
+                        displayedFavorited ? styles.favoriteActive : ""
                       }`}
                     >
-                      {isFavorited ? "❤️" : "🤍"}
+                      {displayedFavorited ? "❤️" : "🤍"}
                     </span>
                   </button>
                 ) : (
                   <span className={styles.disabledHeart}>🤍</span>
                 )}
 
-                <p className={styles.favoriteCount}>{favoritesCount}</p>
+                <p className={styles.favoriteCount}>{displayedCount}</p>
               </div>
 
               <div className={styles.commentIconBlock}>

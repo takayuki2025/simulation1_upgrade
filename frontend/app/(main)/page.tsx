@@ -66,25 +66,25 @@ export default function Home() {
           onClick={() => router.push("/shops/shop-a")}
           className={styles.shopButton}
         >
-          ショップA
+          テストリンク　ショップA
         </button>
         <button
           onClick={() => router.push("/shops/shop-b")}
           className={styles.shopButton}
         >
-          ショップB
+          テストリンク　ショップB
         </button>
         <button
           onClick={() => router.push("/shops/shop-c")}
           className={styles.shopButton}
         >
-          ショップC
+          テストリンク　ショップC
         </button>
         <button
           onClick={() => router.push("/shops/shop-d")}
           className={styles.shopButton}
         >
-          ショップD
+          テストリンク　ショップD
         </button>
       </div>
 

@@ -6,37 +6,37 @@ use App\Modules\Item\Domain\Repository\ItemRepository;
 use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
 use RuntimeException;
 use App\Modules\Item\Application\Dto\Item\ItemDetailViewDto;
+use App\Modules\Reaction\Application\UseCase\Favorite\IsFavoritedUseCase;
+use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
+// use App\Modules\Comment\Application\UseCase\ListItemCommentsUseCase;
+
 
 final class ItemDetailUseCase
 {
     public function __construct(
         private readonly ItemRepository $itemRepository,
+        private readonly IsFavoritedUseCase $isFavorited,
+        private readonly CountFavoritesUseCase $countFavorites,
     ) {
     }
 
-    public function execute(int $itemId): ItemDetailOutputDto
-    {
-        $item = $this->itemRepository->findById($itemId);
+    public function execute(
+    int $itemId,
+    ?int $viewerUserId
+): ItemDetailOutputDto {
+    $item = $this->itemRepository->findById($itemId);
 
-        if (!$item) {
-            throw new RuntimeException('Item not found');
-        }
-
-        return new ItemDetailOutputDto(
-            item: $item,
-            // id: $item->getId()->getValue(),
-            // name: $item->getName(),
-            // price: $item->getPrice()->getValue(),
-            // brand: $item->getBrand(),
-            // explain: $item->getExplain(),
-            // condition: $item->getCondition(),
-            // category: $item->getCategory()->toArray(),
-            // item_image: $item->getItemImage()?->getValue(),
-            // remain: $item->getRemain()->getValue(),
-            // user_id: $item->getUserId(),
-            comments: [],
-            isFavorited: false,
-            favoritesCount: 0,
-        );
+    if (!$item) {
+        throw new RuntimeException('Item not found');
     }
+
+    return new ItemDetailOutputDto(
+        item: $item,
+        comments: [],
+        isFavorited: $viewerUserId
+            ? $this->isFavorited->execute($viewerUserId, $itemId)
+            : false,
+        favoritesCount: $this->countFavorites->execute($itemId),
+    );
+}
 }
