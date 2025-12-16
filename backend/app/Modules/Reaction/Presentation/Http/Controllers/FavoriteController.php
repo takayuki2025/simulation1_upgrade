@@ -16,7 +16,10 @@ final class FavoriteController extends Controller
         $userId = $request->user()->id;
         $favorites = $useCase->execute($userId);
 
-        return response()->json(['favorites' => $favorites]);
+
+        return response()->json([
+            'items' => $favorites,
+        ]);
     }
 
     public function add(AddFavoriteUseCase $add, CountFavoritesUseCase $count, Request $request, int $itemId)

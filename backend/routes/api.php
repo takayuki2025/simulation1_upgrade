@@ -77,8 +77,12 @@ Route::middleware('auth.jwt.optional')->group(function () {
 
 
 
+
+Route::middleware('auth.jwt.optional')
+    ->get('/item/{id}', ItemDetailController::class);
+
 // ✅ 詳細（単体）
-Route::get('/item/{id}', ItemDetailController::class);
+// Route::get('/item/{id}', ItemDetailController::class);
 
 /*
 |--------------------------------------------------------------------------

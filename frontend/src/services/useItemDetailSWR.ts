@@ -1,10 +1,23 @@
 import useSWR from "swr";
 import axios from "axios";
-
-const fetcher = (url: string) => axios.get(url).then((res) => res.data);
+import { useAuth } from "@/ui/auth/useAuth";
 
 export const useItemDetailSWR = (itemId: number | null) => {
-  const shouldFetch = typeof itemId === "number";
+  const { apiClient, isLoading: authLoading } = useAuth();
+
+  const shouldFetch = typeof itemId === "number" && !authLoading;
+
+  const fetcher = async (url: string) => {
+    // 🔐 ログイン済み → apiClient（Bearer 付き）
+    if (apiClient) {
+      const res = await apiClient.get(url.replace("/api", ""));
+      return res.data;
+    }
+
+    // 👤 未ログイン → 通常 axios
+    const res = await axios.get(url);
+    return res.data;
+  };
 
   const { data, error, isLoading, mutate } = useSWR(
     shouldFetch ? `/api/item/${itemId}` : null,
@@ -16,7 +29,7 @@ export const useItemDetailSWR = (itemId: number | null) => {
     comments: data?.comments ?? [],
     isFavorited: data?.isFavorited ?? false,
     favoritesCount: data?.favoritesCount ?? 0,
-    isLoading,
+    isLoading: isLoading || authLoading,
     isError: error,
     mutate,
   };

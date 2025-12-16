@@ -7,8 +7,9 @@ use Illuminate\Support\ServiceProvider;
 // NOTE: UserRepositoryInterface は App\Domain\Repository\UserRepository に置き換えられていると想定
 use App\Domain\Repository\OrderHistoryRepository;
 use App\Domain\Repository\CommentRepository;
-use App\Domain\Repository\FavoriteRepository;
+// use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
+use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
 use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
 use App\Modules\Search\Domain\Repository\ItemSearchRepository;
@@ -25,7 +26,8 @@ use App\Infrastructure\Persistence\EloquentUserRepository; // 既存のUserRepos
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentProfileRepository;//⚫️
 use App\Infrastructure\Persistence\EloquentOrderHistoryRepository;
 use App\Infrastructure\Persistence\EloquentCommentRepository;
-use App\Infrastructure\Persistence\EloquentFavoriteRepository;
+use App\Modules\Reaction\Infrastructure\Persistence\EloquentFavoriteRepository;
+// use App\Infrastructure\Persistence\EloquentFavoriteRepository;
 // use App\Infrastructure\Persistence\EloquentItemRepository;
 // ✅ User モジュール内の Repository 実装クラスのパスを修正
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentMypageRepository;// ⚫️MypageRepositoryは共通で残す
@@ -52,7 +54,12 @@ class AppServiceProvider extends ServiceProvider
         // $this->app->bind(UserRepositoryInterface::class, EloquentUserRepository::class); // 仮にコメントアウト
         $this->app->bind(OrderHistoryRepository::class, EloquentOrderHistoryRepository::class);
         $this->app->bind(CommentRepository::class, EloquentCommentRepository::class);
-        $this->app->bind(FavoriteRepository::class, EloquentFavoriteRepository::class);
+
+        $this->app->bind(
+            FavoriteRepository::class,
+            EloquentFavoriteRepository::class
+        );
+
 
         // ✅ ItemRepository は Item モジュール内の Eloquent 版を採用
         $this->app->bind(ItemRepository::class, EloquentItemRepository::class);

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { getImageUrl, onImageError } from "@/utils/utils";
+import { mutate as globalMutate } from "swr";
 
 import styles from "./W-ItemDetailView.module.css";
 
@@ -88,9 +89,10 @@ export default function ItemDetailPage() {
         method: next ? "POST" : "DELETE",
       });
 
-      mutate(); // server sync
+      // 🔥 両方同期
+      mutate(); // item detail
+      globalMutate((key) => Array.isArray(key) && key[0] === "favorite-items");
     } catch {
-      // rollback
       setLocalFavorited(isFavorited);
       setLocalCount(favoritesCount);
     }

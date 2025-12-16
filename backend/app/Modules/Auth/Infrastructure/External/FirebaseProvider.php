@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Modules\Auth\Infrastructure\External;
 
 use Kreait\Firebase\Factory;
@@ -7,32 +8,44 @@ use Illuminate\Support\Facades\Log;
 
 class FirebaseProvider
 {
-    private $auth;
+    private $auth = null;
 
-    public function __construct()
+    private function getAuth()
     {
+        if ($this->auth !== null) {
+            return $this->auth;
+        }
+
+        $credentials = config('services.firebase.credentials');
+
+        if (!$credentials || !file_exists($credentials)) {
+            throw new \RuntimeException(
+                'Firebase service account credentials not found: ' . $credentials
+            );
+        }
+
         $factory = (new Factory())
-            ->withServiceAccount(config('services.firebase.credentials'))
+            ->withServiceAccount($credentials)
             ->withProjectId(config('services.firebase.project_id'));
 
         $this->auth = $factory->createAuth();
+
+        return $this->auth;
     }
 
     public function verifyToken(string $idToken): array
-{
-    $verifiedToken = $this->auth->verifyIdToken($idToken);
+    {
+        $auth = $this->getAuth();
 
-    $uid = $verifiedToken->claims()->get('sub');
+        $verifiedToken = $auth->verifyIdToken($idToken);
+        $uid = $verifiedToken->claims()->get('sub');
+        $userRecord = $auth->getUser($uid);
 
-    // ★ ここが決定的に重要
-    $userRecord = $this->auth->getUser($uid);
-
-    return [
-        'sub'            => $uid,
-        'email'          => $userRecord->email,
-        'name'           => $userRecord->displayName,
-        'email_verified' => $userRecord->emailVerified, // ← これが真実
-    ];
-}
-
+        return [
+            'sub'            => $uid,
+            'email'          => $userRecord->email,
+            'name'           => $userRecord->displayName,
+            'email_verified' => $userRecord->emailVerified,
+        ];
+    }
 }
