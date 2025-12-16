@@ -25,6 +25,13 @@ interface ItemRepository
 
     /** コメント一覧（ユーザー込み） */
     public function listComments(int $itemId): array;
+
+    public function findPublicItems(
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $excludeUserId
+    ): Items;
 }
 
 

@@ -51,11 +51,22 @@ use App\Modules\Item\Presentation\Http\Controllers\{
     ItemDetailController
 };
 
+use App\Modules\Item\Presentation\Http\Controllers\PublicItemListController;
+
+
 // ✅ 新：一覧 / 検索（DDD 分離済）
 Route::prefix('items')->group(function () {
     Route::get('/', ItemListController::class);          // 一覧
     Route::get('/search', ItemSearchController::class);  // 検索
 });
+
+
+
+Route::middleware('auth.jwt.optional')->group(function () {
+    Route::get('/items/public', PublicItemListController::class);
+});
+
+
 
 // ✅ 詳細（単体）
 Route::get('/item/{id}', ItemDetailController::class);

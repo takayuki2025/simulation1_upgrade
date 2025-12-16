@@ -60,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // ⭐ ここに 'tenant' ミドルウェアのエイリアスを追加 ⭐
             'tenant' => \App\Http\Middleware\SetCurrentShop::class,
             'auth.jwt'   => \App\Http\Middleware\JwtAuthenticate::class,
+            'auth.jwt.optional' => \App\Http\Middleware\OptionalJwtAuth::class,
             'role'       => \App\Http\Middleware\RoleMiddleware::class,
             'shop.role'  => \App\Http\Middleware\ShopScopedRoleMiddleware::class,
         ]);

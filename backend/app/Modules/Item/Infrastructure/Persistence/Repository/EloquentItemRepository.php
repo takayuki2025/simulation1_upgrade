@@ -58,6 +58,30 @@ final class EloquentItemRepository implements ItemRepository
         );
     }
 
+    public function findPublicItems(
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $excludeUserId
+    ): Items {
+        $query = EloquentItem::query();
+
+        if ($keyword) {
+            $query->where('name', 'LIKE', "%{$keyword}%");
+        }
+
+        if ($excludeUserId) {
+            $query->where('user_id', '!=', $excludeUserId);
+        }
+
+        return Items::fromEloquent(
+            $query
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->offset(($page - 1) * $limit)
+                ->get()
+        );
+    }
     /**
      * キーワード検索
      */

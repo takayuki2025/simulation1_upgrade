@@ -72,6 +72,33 @@ class JwtAuthenticate
         return $next($request);
     }
 
+    public function resolveUserFromRequest(Request $request): ?User
+{
+    $token = $this->getBearerToken($request);
+    if (! $token) {
+        return null;
+    }
+
+    try {
+        // ✅ handle() と同じ verifier を使う
+        $decoded = $this->verifier->decode($token);
+    } catch (\Throwable $e) {
+        Log::warning('[resolveUserFromRequest] decode failed', [
+            'error' => $e->getMessage(),
+        ]);
+        return null;
+    }
+
+    if (
+        !property_exists($decoded, 'sub')
+        || (int)$decoded->sub <= 0
+    ) {
+        return null;
+    }
+
+    return User::find((int)$decoded->sub);
+}
+
     private function getBearerToken(Request $request): ?string
     {
         $header = $request->header('Authorization');

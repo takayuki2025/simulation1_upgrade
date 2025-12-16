@@ -39,6 +39,15 @@ export default function Home() {
     error,
   } = isSearch ? useItemSearchSWR(currentSearchQuery) : useItemListSWR();
 
+  console.log("[Home] items fetched", {
+  itemsLength: items?.length,
+  sample: items?.slice(0, 5).map((item) => ({
+    id: item.id,
+    user_id: (item as any).user_id,
+    name: item.name,
+  })),
+});
+
   const isPageLoading = isAuthLoading || isItemsLoading;
 
   /* ========================= */

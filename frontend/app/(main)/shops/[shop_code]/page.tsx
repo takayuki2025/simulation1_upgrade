@@ -1,191 +1,149 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import React, { useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { getImageUrl, onImageError } from "@/utils/utils";
-import { useAuth, type UserRole } from "@/hooks/useSanctumAuth";
+import { useSearchParams, useRouter } from "next/navigation";
 
-interface Shop {
-  id: number;
-  shop_code: string;
-  name: string;
-  description: string;
-  banner_url?: string | null;
-  owner_user_id: number;
-}
+import { useItemListSWR } from "@/services/useItemListSWR";
+import { useItemSearchSWR } from "@/services/useItemSearchSWR";
+import { useAuth } from "@/ui/auth/useAuth";
 
-interface Item {
-  id: number;
-  name: string;
-  price: number;
-  item_image: string;
-}
+import { getImageUrl } from "@/utils/utils";
+import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
-export default function ShopTopPage() {
-  const params = useParams();
-  const shopCode = params.shop_code as string;
+export default function Home() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  // 🔥 正しい Auth の取り方
-  const { isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // ---------------------------------------
-  // 店舗データのロード
-  // ---------------------------------------
-  useEffect(() => {
-    async function loadShopData() {
-      try {
-        const shopRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/shops/${shopCode}`,
-          {
-            method: "GET",
-            credentials: "include",
-            mode: "cors",
-          },
-        );
-
-        const shopData = await shopRes.json();
-        setShop(shopData.shop);
-
-        const itemsRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/shops/${shopCode}/items`,
-          {
-            method: "GET",
-            credentials: "include",
-            mode: "cors",
-          },
-        );
-
-        const itemsData = await itemsRes.json();
-        setItems(itemsData.items ?? []);
-      } catch (err) {
-        console.error("Error loading shop page:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadShopData();
-  }, [shopCode]);
-
-  // ---------------------------------------
-  // 🔥 グローバル (Auth) と ローカル (Page) の両方のローディングを見る！
-  // ---------------------------------------
-  if (authLoading || loading) {
-    return <div className="p-6">読み込み中...</div>;
-  }
-
-  if (!shop) return <div className="p-6">店舗が見つかりません</div>;
-
-  // 1) ローディング中
-  if (authLoading || loading) {
-    return <div className="p-6">読み込み中...</div>;
-  }
-
-  // 2) shop が null ならここで return
-  if (!shop) {
-    return <div className="p-6">店舗が見つかりません</div>;
-  }
-
-  const isShopMember =
-    user?.roles?.some((r: UserRole) => {
-      const slug = r.slug?.toLowerCase();
-      const validRole = ["owner", "manager", "staff"].includes(slug);
-
-      // shop_id の型揺れに対応（number か string）
-      const rShopId = Number(r.shop_id);
-      const pageShopId = Number(shop.id);
-
-      return validRole && rShopId === pageShopId;
-    }) ?? false;
-
-  // ここまで来たら、TypeScript 的に `shop` は non-null になる
-  const isDashboardMember =
-    !!user &&
-    user.roles?.some(
-      (r: UserRole) =>
-        ["owner", "manager", "staff"].includes(r.slug) && r.shop_id === shop.id,
-    ) === true;
-
-  // ★ デバッグログ（本番では削除推奨）
-  console.log("DEBUG shop:", shop);
-  console.log("DEBUG user:", user);
-  console.log("DEBUG user.roles:", user?.roles);
-  console.log(
-    "DEBUG 判定:",
-    user?.roles?.some(
-      (r) =>
-        ["owner", "manager", "staff"].includes(r.slug) && r.shop_id === shop.id,
-    ),
+  /* =========================
+     🔑 タブ / 検索状態
+  ========================= */
+  const currentTab = useMemo(
+    () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
+    [searchParams],
   );
 
+  const currentSearchQuery = useMemo(
+    () => searchParams.get("all_item_search") || "",
+    [searchParams],
+  );
+
+  const isSearch = currentSearchQuery.trim().length > 0;
+
+  /* =========================
+     🔑 一覧取得
+     - auth 確定後に fetch
+     - ログイン中は /items/public
+  ========================= */
+  const {
+    items,
+    isLoading: itemsLoading,
+    error,
+  } = isSearch ? useItemSearchSWR(currentSearchQuery) : useItemListSWR();
+
+  const isPageLoading = authLoading || itemsLoading;
+
+  /* =========================
+     🔍 確認用ログ（最低限）
+  ========================= */
+  console.log("[Home][CHECK]", {
+    authLoading,
+    isAuthenticated,
+    userId: user?.id ?? null,
+    itemsCount: items.length,
+    sample: items.slice(0, 5).map((i) => ({
+      id: i.id,
+      name: i.name,
+      user_id: (i as any).user_id ?? null,
+    })),
+  });
+
+  /* =========================
+     ⏳ ローディング
+  ========================= */
+  if (isPageLoading) {
+    return (
+      <div className={styles.loadingBox}>
+        <div className={styles.spinner}></div>
+        <p className={styles.loadingText}>読み込み中...</p>
+      </div>
+    );
+  }
+
+  /* =========================
+     🧱 表示
+  ========================= */
   return (
-    <div className="w-full">
-      {/* 🔙 フリマトップへ戻る */}
-      <div className="px-6 mt-4">
-        <Link href="/" className="text-blue-600 underline">
-          ← フリマトップへ戻る
+    <div className={styles.main_contents}>
+      {/* ショップリンク（確認用） */}
+      <div className={styles.shopButtons}>
+        {["a", "b", "c", "d"].map((s) => (
+          <button
+            key={s}
+            onClick={() => router.push(`/shops/shop-${s}`)}
+            className={styles.shopButton}
+          >
+            テストリンク ショップ{s.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* タブ */}
+      <div className={styles.main_select}>
+        <Link
+          href={{ pathname: "/", query: { tab: "all" } }}
+          className={`${styles.recs} ${
+            currentTab === "all" ? styles.active : ""
+          }`}
+        >
+          すべて
+        </Link>
+
+        <Link
+          href={{ pathname: "/", query: { tab: "mylist" } }}
+          className={`${styles.mylists} ${
+            currentTab === "mylist" ? styles.active : ""
+          }`}
+        >
+          マイリスト
         </Link>
       </div>
 
-      {/* OWNER 専用リンク */}
-      {isShopMember && (
-        <div className="px-6 mt-2 flex justify-end">
-          <Link
-            href={`/shops/${shopCode}/dashboard`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
-          >
-            店舗ダッシュボードへ
-          </Link>
-        </div>
-      )}
-
-      {/* バナー */}
-      {shop.banner_url && (
-        <div className="w-full h-60 relative mt-2">
-          <Image
-            src={shop.banner_url}
-            alt="banner"
-            fill
-            className="object-cover"
-          />
-        </div>
-      )}
-
-      {/* Shop 情報 */}
-      <div className="px-6 py-8">
-        <h1 className="text-3xl font-bold mb-2">{shop.name}</h1>
-        <p className="text-gray-700">{shop.description}</p>
-      </div>
-
       {/* 商品一覧 */}
-      <div className="px-6">
-        <h2 className="text-2xl font-semibold mb-4">商品一覧</h2>
+      <div className={styles.items_select}>
+        {items.length > 0 ? (
+          items.map((item) => (
+            <div key={item.id} className={styles.items_select_all}>
+              <Link href={`/item/${item.id}`} className={styles.cardLink}>
+                <div className={styles.itemImageWrapper}>
+                  <img
+                    src={getImageUrl(item.item_image)}
+                    alt={item.name}
+                    className={styles.itemImage}
+                  />
+                  {item.remain === 0 && (
+                    <div className={styles.sold_text}>SOLD</div>
+                  )}
+                </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="border rounded-lg p-4 shadow hover:shadow-lg transition"
-            >
-              <img
-                src={getImageUrl(item.item_image)}
-                alt={item.name}
-                onError={(e) => onImageError(e, item.name)}
-              />
-
-              <div className="font-bold">{item.name}</div>
-              <div className="text-lg text-red-600 font-semibold">
-                ¥{item.price.toLocaleString()}
-              </div>
+                <div className={styles.item_info}>
+                  <p className={styles.item_name}>{item.name}</p>
+                  <p className={styles.item_price}>
+                    ¥{item.price?.toLocaleString()}
+                  </p>
+                </div>
+              </Link>
             </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <div className={styles.no_items}>
+            {currentTab === "mylist" && !isAuthenticated
+              ? "マイリストを見るにはログインが必要です。"
+              : "該当する商品が見つかりませんでした。"}
+          </div>
+        )}
       </div>
     </div>
   );
