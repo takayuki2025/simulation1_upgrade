@@ -1,0 +1,96 @@
+/* [project]/app/(main)/sell/W-Item-Sell.module.css [app-client] (css) */
+.W-Item-Sell-module__E2Da0W__wrapper {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 40px;
+}
+
+.W-Item-Sell-module__E2Da0W__title {
+  margin-bottom: 32px;
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.W-Item-Sell-module__E2Da0W__form {
+  flex-direction: column;
+  gap: 24px;
+  display: flex;
+}
+
+.W-Item-Sell-module__E2Da0W__imageBox {
+  flex-direction: column;
+  gap: 12px;
+  display: flex;
+}
+
+.W-Item-Sell-module__E2Da0W__imagePlaceholder {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 120px;
+  height: 120px;
+  font-size: .9rem;
+  display: flex;
+}
+
+.W-Item-Sell-module__E2Da0W__preview {
+  -o-object-fit: cover;
+  object-fit: cover;
+  border-radius: 6px;
+  width: 120px;
+  height: 120px;
+}
+
+.W-Item-Sell-module__E2Da0W__imageButton {
+  background: #e5e7eb;
+  border-radius: 6px;
+  width: fit-content;
+  padding: 6px 12px;
+  font-size: .85rem;
+}
+
+.W-Item-Sell-module__E2Da0W__formGroup {
+  flex-direction: column;
+  gap: 6px;
+  display: flex;
+}
+
+.W-Item-Sell-module__E2Da0W__formGroup label {
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.W-Item-Sell-module__E2Da0W__formGroup input, .W-Item-Sell-module__E2Da0W__formGroup textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: .95rem;
+}
+
+.W-Item-Sell-module__E2Da0W__actions {
+  margin-top: 24px;
+}
+
+.W-Item-Sell-module__E2Da0W__actions button {
+  color: #fff;
+  background: #ef4444;
+  border-radius: 6px;
+  width: 100%;
+  padding: 14px;
+  font-weight: bold;
+}
+
+.W-Item-Sell-module__E2Da0W__actions button:disabled {
+  background: #9ca3af;
+}
+
+.W-Item-Sell-module__E2Da0W__error {
+  color: #dc2626;
+  font-size: .9rem;
+}
+
+/*# sourceMappingURL=app_%28main%29_sell_W-Item-Sell_module_9bf17218.css.map*/

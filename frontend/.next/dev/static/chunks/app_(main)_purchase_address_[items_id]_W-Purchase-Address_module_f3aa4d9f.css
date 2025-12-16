@@ -1,0 +1,76 @@
+/* [project]/app/(main)/purchase/address/[items_id]/W-Purchase-Address.module.css [app-client] (css) */
+.W-Purchase-Address-module__FL1kNq__wrapper {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 720px;
+  margin: 56px auto;
+  padding: 40px;
+}
+
+.W-Purchase-Address-module__FL1kNq__title {
+  margin-bottom: 32px;
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.W-Purchase-Address-module__FL1kNq__form {
+  flex-direction: column;
+  gap: 24px;
+  display: flex;
+}
+
+.W-Purchase-Address-module__FL1kNq__formGroup {
+  flex-direction: column;
+  gap: 6px;
+  display: flex;
+}
+
+.W-Purchase-Address-module__FL1kNq__formGroup label {
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.W-Purchase-Address-module__FL1kNq__formGroup input {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: .95rem;
+}
+
+.W-Purchase-Address-module__FL1kNq__actions {
+  justify-content: space-between;
+  margin-top: 32px;
+  display: flex;
+}
+
+.W-Purchase-Address-module__FL1kNq__cancel {
+  color: #2563eb;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: .9rem;
+}
+
+.W-Purchase-Address-module__FL1kNq__submit {
+  color: #fff;
+  background: #ef4444;
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-weight: bold;
+}
+
+.W-Purchase-Address-module__FL1kNq__submit:disabled {
+  background: #9ca3af;
+}
+
+.W-Purchase-Address-module__FL1kNq__error {
+  color: #dc2626;
+  font-size: .9rem;
+}
+
+.W-Purchase-Address-module__FL1kNq__loading {
+  text-align: center;
+  padding: 80px 0;
+}
+
+/*# sourceMappingURL=app_%28main%29_purchase_address_%5Bitems_id%5D_W-Purchase-Address_module_f3aa4d9f.css.map*/

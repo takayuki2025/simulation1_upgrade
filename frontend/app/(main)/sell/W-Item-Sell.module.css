@@ -1,0 +1,97 @@
+.wrapper {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-bottom: 32px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 画像 */
+.imageBox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imagePlaceholder {
+  width: 120px;
+  height: 120px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.preview {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.imageButton {
+  width: fit-content;
+  background: #e5e7eb;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+/* フォーム */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroup label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.formGroup input,
+.formGroup textarea {
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+/* Actions */
+.actions {
+  margin-top: 24px;
+}
+
+.actions button {
+  width: 100%;
+  background: #ef4444;
+  color: white;
+  padding: 14px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.actions button:disabled {
+  background: #9ca3af;
+}
+
+/* Error */
+.error {
+  color: #dc2626;
+  font-size: 0.9rem;
+}
