@@ -1,8 +1,8 @@
 (globalThis.TURBOPACK_CHUNK_LISTS || (globalThis.TURBOPACK_CHUNK_LISTS = [])).push({
     script: typeof document === "object" ? document.currentScript : undefined,
     chunks: [
-  "static/chunks/node_modules_next_5716053f._.js",
-  "static/chunks/_cad8aff4._.js"
+  "static/chunks/_fdbfc086._.js",
+  "static/chunks/app_(main)_W-Resource-Rich-Simulation-Center-Home_module_1404e877.css"
 ],
     source: "dynamic"
 });

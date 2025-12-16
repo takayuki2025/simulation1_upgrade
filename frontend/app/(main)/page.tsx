@@ -7,61 +7,55 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 
-import { getImageUrl, onImageError } from "@/utils/utils";
+import { getImageUrl } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
 import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 
 export default function Home() {
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isLoading: isAuthLoading } = useAuth();
 
-  const currentTab = useMemo(
-    () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
-    [searchParams],
-  );
-
+  /* =========================
+     🔍 URLベース検索状態
+  ========================= */
   const currentSearchQuery = useMemo(
     () => searchParams.get("all_item_search") || "",
     [searchParams],
   );
 
-  /* =========================
-     🔑 一覧 / 検索 切り替え
-  ========================= */
   const isSearch = currentSearchQuery.trim().length > 0;
 
-  const {
-    items,
-    isLoading: isItemsLoading,
-    error,
-  } = isSearch ? useItemSearchSWR(currentSearchQuery) : useItemListSWR();
+  /* =========================
+     📦 Hooks は必ず両方呼ぶ（重要）
+  ========================= */
+  const listResult = useItemListSWR();
+  const searchResult = useItemSearchSWR(currentSearchQuery);
 
-  console.log("[Home] items fetched", {
-  itemsLength: items?.length,
-  sample: items?.slice(0, 5).map((item) => ({
-    id: item.id,
-    user_id: (item as any).user_id,
-    name: item.name,
-  })),
-});
+  const items = isSearch ? searchResult.items : listResult.items;
+  const isItemsLoading = isSearch
+    ? searchResult.isLoading
+    : listResult.isLoading;
 
   const isPageLoading = isAuthLoading || isItemsLoading;
 
-  /* ========================= */
-  console.log("RENDER CHECK:", {
-    isAuthLoading,
-    isItemsLoading,
-    isPageLoading,
-    items,
-    itemsLength: Array.isArray(items) ? items.length : "not array",
+  /* =========================
+     🧪 デバッグ
+  ========================= */
+  console.log("[Home][Search]", {
+    currentSearchQuery,
+    isSearch,
+    itemsLength: items.length,
   });
 
+  /* =========================
+     🎨 UI
+  ========================= */
   return (
     <div className={styles.main_contents}>
-      {/* ローディング */}
+      {/* 🔄 ローディング */}
       {isPageLoading && (
         <div className={styles.loadingBox}>
           <div className={styles.spinner}></div>
@@ -69,91 +63,53 @@ export default function Home() {
         </div>
       )}
 
-      {/* ショップボタン */}
+      {/* 🏬 ショップリンク（そのまま） */}
       <div className={styles.shopButtons}>
-        <button
-          onClick={() => router.push("/shops/shop-a")}
-          className={styles.shopButton}
-        >
-          テストリンク　ショップA
-        </button>
-        <button
-          onClick={() => router.push("/shops/shop-b")}
-          className={styles.shopButton}
-        >
-          テストリンク　ショップB
-        </button>
-        <button
-          onClick={() => router.push("/shops/shop-c")}
-          className={styles.shopButton}
-        >
-          テストリンク　ショップC
-        </button>
-        <button
-          onClick={() => router.push("/shops/shop-d")}
-          className={styles.shopButton}
-        >
-          テストリンク　ショップD
-        </button>
+        {["a", "b", "c", "d"].map((code) => (
+          <button
+            key={code}
+            onClick={() => router.push(`/shops/shop-${code}`)}
+            className={styles.shopButton}
+          >
+            テストリンク ショップ UseCase DDD 構築中{code.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       {!isPageLoading && (
-        <>
-          {/* タブ */}
-          <div className={styles.main_select}>
-            <Link
-              href={{
-                pathname: "/",
-                query: { tab: "all", all_item_search: currentSearchQuery },
-              }}
-              className={`${styles.recs} ${currentTab === "all" ? styles.active : ""}`}
-            >
-              すべて
-            </Link>
+        <div className={styles.items_select}>
+          {items.length > 0 ? (
+            items.map((item) => (
+              <div key={item.id} className={styles.items_select_all}>
+                <Link href={`/item/${item.id}`} className={styles.cardLink}>
+                  <div className={styles.itemImageWrapper}>
+                    <img
+                      src={getImageUrl(item.item_image)}
+                      alt={item.name}
+                      className={styles.itemImage}
+                    />
+                    {item.remain === 0 && (
+                      <div className={styles.sold_text}>SOLD</div>
+                    )}
+                  </div>
 
-            <Link
-              href={{ pathname: "/", query: { tab: "mylist" } }}
-              className={`${styles.mylists} ${currentTab === "mylist" ? styles.active : ""}`}
-            >
-              マイリスト
-            </Link>
-          </div>
-
-          {/* 商品一覧 */}
-          <div className={styles.items_select}>
-            {items.length > 0 ? (
-              items.map((item) => (
-                <div key={item.id} className={styles.items_select_all}>
-                  <Link href={`/item/${item.id}`} className={styles.cardLink}>
-                    <div className={styles.itemImageWrapper}>
-                      <img
-                        src={getImageUrl(item.item_image)}
-                        alt={item.name}
-                        className={styles.itemImage}
-                      />
-                      {item.remain === 0 && (
-                        <div className={styles.sold_text}>SOLD</div>
-                      )}
-                    </div>
-
-                    <div className={styles.item_info}>
-                      <p className={styles.item_name}>{item.name}</p>
-                      <p className={styles.item_price}>
-                        ¥{item.price?.toLocaleString()}
-                      </p>
-                    </div>
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className={styles.no_items}>
-                {currentTab === "mylist" && !isAuthenticated
-                  ? "マイリストを見るにはログインが必要です。"
-                  : "該当する商品が見つかりませんでした。"}
+                  <div className={styles.item_info}>
+                    <p className={styles.item_name}>{item.name}</p>
+                    <p className={styles.item_price}>
+                      ¥{item.price?.toLocaleString()}
+                    </p>
+                  </div>
+                </Link>
               </div>
-            )}
-          </div>
-        </>
+            ))
+          ) : (
+            <div className={styles.no_items}>
+              {isSearch
+                ? "該当する商品が見つかりませんでした。"
+                : "商品がありません。"}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

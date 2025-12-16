@@ -11,6 +11,8 @@ use App\Domain\Repository\FavoriteRepository;
 use App\Domain\Repository\ItemRepositoryInterface;
 use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemRepository;//⚪️
+use App\Modules\Search\Domain\Repository\ItemSearchRepository;
+use App\Modules\Search\Infrastructure\Persistence\Repository\EloquentItemSearchRepository;
 use App\Modules\Auth\Domain\Port\TokenVerifierPort;
 use App\Modules\Auth\Infrastructure\Security\JwtTokenVerifier;
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
@@ -54,6 +56,15 @@ class AppServiceProvider extends ServiceProvider
 
         // ✅ ItemRepository は Item モジュール内の Eloquent 版を採用
         $this->app->bind(ItemRepository::class, EloquentItemRepository::class);
+
+
+
+        $this->app->bind(
+            ItemSearchRepository::class,
+            EloquentItemSearchRepository::class
+        );
+
+
 
 
 
