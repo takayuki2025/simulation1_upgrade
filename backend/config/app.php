@@ -189,6 +189,7 @@ return [
         App\Providers\JwtAuthProvider::class,
         App\Modules\Reaction\Infrastructure\ReactionServiceProvider::class,
         App\Modules\Comment\Infrastructure\CommentServiceProvider::class,
+        App\Modules\Item\Infrastructure\Providers\ItemModuleServiceProvider::class,
     ],
 
     /*

@@ -1,11 +1,11 @@
+from typing import List, Dict
+
 from atlaskernel.services.normalize import normalize
 from atlaskernel.services.similarity import similarity
-from atlaskernel.services.decision_rules import decide
 from atlaskernel.adapters.assets_loader import load_assets
 from atlaskernel.domain.candidate import Candidate
 from atlaskernel.domain.result import AnalysisResult
 from atlaskernel.version import VERSION
-from typing import List, Dict
 
 
 def analyze_brand(request, policy_engine):
@@ -17,7 +17,6 @@ def analyze_brand(request, policy_engine):
         score = similarity(norm, normalize(a))
         candidates.append(Candidate(value=a, score=score))
 
-    # ★ 本番・CI向けガード
     if not candidates:
         raise RuntimeError(
             "No brand assets loaded. "
@@ -27,19 +26,25 @@ def analyze_brand(request, policy_engine):
     candidates.sort(key=lambda c: c.score, reverse=True)
     top = candidates[0]
 
-    # ★ Pylance / 型チェッカー対策：明示的に初期化
-    decision: str
-    explanation: List[Dict[str, str]]
+    decision, reason, trace = policy_engine.evaluate(
+        policy_engine.load("brand"),
+        {"score": top.score},
+    )
 
-    policy = policy_engine.load("brand")
-    decision, reason = policy_engine.evaluate(
-        policy,
-        {"score": top.score}
-        )
     explanation = [
         {"rule": "similarity", "detail": f"top={top.score}"},
-        {"rule": "policy", "detail": reason}
-        ]
+        {"rule": "policy", "detail": reason or "n/a"},
+    ]
+
+    extensions = {
+        "policy_trace": trace,
+    }
+
+    if decision in ("needs_review", "rejected"):
+        extensions["escalation"] = {
+            "action": "human_review",
+            "queue": "entity_review.brand",
+        }
 
     return AnalysisResult(
         entity_type=request.entity_type,
@@ -49,5 +54,6 @@ def analyze_brand(request, policy_engine):
         decision=decision,
         explanation=explanation,
         candidates=candidates[:5],
-        engine_version=VERSION
+        engine_version=VERSION,
+        extensions=extensions,
     )

@@ -1,6 +1,7 @@
 import yaml
 from importlib import resources
 
+
 class PolicyEngine:
     def load(self, entity_type: str) -> dict:
         resource = f"{entity_type}.yaml"
@@ -20,7 +21,16 @@ class PolicyEngine:
         for rule in policy.get("rules", []):
             when = rule.get("when", {})
             if self._match(when, context):
-                return rule["decision"], rule.get("reason")
+                return (
+                    rule["decision"],
+                    rule.get("reason"),
+                    {
+                        "policy_schema": policy.get("schema"),
+                        "entity_type": policy.get("entity_type"),
+                        "rule_id": rule.get("id"),
+                        "score": score,
+                    },
+                )
 
         actions = (
             policy.get("overrides", {}).get("actions")
@@ -28,10 +38,19 @@ class PolicyEngine:
         )
 
         if score >= actions["auto_accept"]["min_score"]:
-            return "auto_accept", "threshold"
+            return "auto_accept", "threshold", {
+                "rule_id": "threshold_auto_accept",
+                "score": score,
+            }
         if score >= actions["needs_review"]["min_score"]:
-            return "needs_review", "threshold"
-        return "rejected", "threshold"
+            return "needs_review", "threshold", {
+                "rule_id": "threshold_needs_review",
+                "score": score,
+            }
+        return "rejected", "threshold", {
+            "rule_id": "threshold_rejected",
+            "score": score,
+        }
 
     def _match(self, when: dict, context: dict) -> bool:
         score = context["score"]

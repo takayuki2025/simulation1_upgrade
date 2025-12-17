@@ -47,34 +47,25 @@ Route::middleware(['auth.jwt'])->group(function () {
 */
 use App\Modules\Item\Presentation\Http\Controllers\{
     ItemListController,
-   //  ItemSearchController,
+    //  ItemSearchController,
     ItemDetailController
 };
-
 use App\Modules\Item\Presentation\Http\Controllers\PublicItemListController;
-
 use App\Modules\Search\Presentation\Http\Controllers\PublicItemSearchController;
-
 
 // ✅ 新：一覧 / 検索（DDD 分離済）
 Route::prefix('items')->group(function () {
     Route::get('/', ItemListController::class);          // 一覧
-   //  Route::get('/search', ItemSearchController::class);  // 検索
+    //  Route::get('/search', ItemSearchController::class);  // 検索
 });
-
 
 Route::prefix('search')->group(function () {
     Route::get('/items', PublicItemSearchController::class);
 });
 
-
-
-
-
 Route::middleware('auth.jwt.optional')->group(function () {
     Route::get('/items/public', PublicItemListController::class);
 });
-
 
 
 
@@ -83,6 +74,27 @@ Route::middleware('auth.jwt.optional')
 
 // ✅ 詳細（単体）
 // Route::get('/item/{id}', ItemDetailController::class);
+
+
+
+
+use App\Http\Controllers\ItemEntityReviewController;
+use App\Http\Controllers\ItemEntityAuditController;
+use App\Http\Controllers\EntityKpiController;
+
+//データー加工保管処理
+Route::get('/entity-reviews', [ItemEntityReviewController::class, 'index']);
+Route::post('/entity-reviews/{id}/approve', [ItemEntityReviewController::class, 'approve']);
+Route::post('/entity-reviews/{id}/reject', [ItemEntityReviewController::class, 'reject']);
+
+Route::get(
+    '/item-entities/{id}/audits',
+    [ItemEntityAuditController::class, 'index']
+);
+
+
+Route::get('/entity-kpis', EntityKpiController::class);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -108,9 +120,7 @@ Route::middleware('auth.jwt.optional')
 // === Favorite / Comment ===
 
 use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
-
 use App\Modules\Comment\Presentation\Http\Controllers\PostCommentController;
-
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/items/favorite', [FavoriteController::class, 'index']);
@@ -129,6 +139,7 @@ use App\Modules\Item\Presentation\Http\Controllers\{
     ShopShowController,
     ShopItemListController
 };
+
 Route::prefix('shops/{shop_code}')
     ->middleware('tenant')
     ->group(function () {
@@ -138,9 +149,9 @@ Route::prefix('shops/{shop_code}')
 
 // === MyPage / User ===
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
+
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/mypage/profile', [MypageController::class, 'profile']);
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
     Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
 });
-

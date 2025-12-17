@@ -23,6 +23,7 @@ src/atlaskernel/domain/result.py
 src/atlaskernel/policies/_base.yaml
 src/atlaskernel/policies/brand.yaml
 src/atlaskernel/policies/document_term.yaml
+src/atlaskernel/services/audit_logger.py
 src/atlaskernel/services/decision_rules.py
 src/atlaskernel/services/normalize.py
 src/atlaskernel/services/policy_engine.py
