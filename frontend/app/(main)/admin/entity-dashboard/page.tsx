@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://laravel.test:4430";
+import { AdminNav } from "@/components/layout/AdminNav";
 
 type KPI = {
   total: number;
@@ -12,6 +10,9 @@ type KPI = {
   rejected: number;
   approval_rate: number;
 };
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://laravel.test:4430";
 
 export default function DashboardPage() {
   const [kpi, setKpi] = useState<KPI | null>(null);
@@ -26,6 +27,8 @@ export default function DashboardPage() {
 
   return (
     <div style={{ padding: 24 }}>
+      <AdminNav />
+
       <h1>AI Operation Dashboard</h1>
 
       <ul style={{ marginTop: 16 }}>

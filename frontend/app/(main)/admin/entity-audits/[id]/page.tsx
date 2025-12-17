@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { AdminNav } from "@/components/layout/AdminNav";
 
 type Audit = {
   id: number;
@@ -28,6 +29,8 @@ export default function EntityAuditPage() {
 
   return (
     <div style={{ padding: 24 }}>
+      <AdminNav />
+
       <h1>Entity Audit History</h1>
 
       {rows.map((a) => (

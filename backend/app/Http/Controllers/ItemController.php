@@ -4,7 +4,7 @@ App\Http\Controllers;
 
 use App\Services\Item\ItemAnalysisService;
 
-class Controller extends Controller
+class ItemController extends Controller
 {
     public function store(Request $request, ItemAnalysisService $analysis)
     {
