@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+
 class ItemEntity extends Model
 {
     protected $fillable = [
@@ -17,10 +18,13 @@ class ItemEntity extends Model
         'schema_version',
         'engine_version',
         'extensions',
+        'is_latest',
     ];
 
     protected $casts = [
         'extensions' => 'array',
         'confidence' => 'float',
+        'is_latest' => 'boolean',
     ];
 }
+

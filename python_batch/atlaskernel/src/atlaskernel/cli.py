@@ -43,3 +43,6 @@ def main():
             write_result(result, sys.stdout)
 
             _audit.log(payload)   # ★ Phase D：監査ログ
+
+if __name__ == "__main__":
+    main()

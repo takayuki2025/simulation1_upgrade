@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # ============================================================
@@ -30,7 +30,7 @@ services:
     build: ./docker/php
     working_dir: /var/www/backend
     env_file:
-    - ./backend/.env
+      - ./backend/.env
     volumes:
       # - /etc/localtime:/etc/localtime:ro
       # - /etc/timezone:/etc/timezone:ro
@@ -40,6 +40,7 @@ services:
       - ./docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf
       - ./docker/supervisor/laravel-worker.conf:/etc/supervisor/conf.d/laravel-worker.conf:ro
       - ./docker/supervisor/supervisord.conf:/etc/supervisord.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     entrypoint: /bin/sh -c
     command: >
       "chmod -R 777 /var/www/backend/storage /var/www/backend/bootstrap/cache || true &&
@@ -126,7 +127,7 @@ services:
       - /app/node_modules
 
     # environment:
-      # NEXT_PUBLIC_API_BASE_URL: "/api"
+    # NEXT_PUBLIC_API_BASE_URL: "/api"
 
     # ★ Next.js は HTTP 3000 で動く（重要）
     command: sh -c "npm install && npm run dev -- --port 3000"
@@ -135,6 +136,20 @@ services:
       simulation1_network:
         ipv4_address: 172.22.0.7
 
+  # ============================================================
+  # 7) Python
+  # ============================================================
+  python_atlaskernel:
+    build: ./python_batch/atlaskernel
+    container_name: python_atlaskernel
+    ports:
+      - "8000:8000"
+    working_dir: /app
+    volumes:
+      - ./python_batch/atlaskernel:/app
+    networks:
+      simulation1_network:
+        ipv4_address: 172.22.0.8
 
 # ============================================================
 # Networks

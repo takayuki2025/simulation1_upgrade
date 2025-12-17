@@ -73,8 +73,3 @@ declare global {
     [K in LayoutSlotMap[LayoutRoute]]: React.ReactNode
   }
 }
-ldren: React.ReactNode
-  } & {
-    [K in LayoutSlotMap[LayoutRoute]]: React.ReactNode
-  }
-}

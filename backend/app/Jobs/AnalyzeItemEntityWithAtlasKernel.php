@@ -9,7 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Http;
 
 class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
 {
@@ -23,7 +23,7 @@ class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
         public string $entityType,
         public string $rawValue,
         public ?string $knownAssetsRef = null,
-        public string $reason = 'manual_reanalyze', // ★追加
+        public string $reason = 'manual_reanalyze',
         public array $context = []
     ) {
     }
@@ -34,56 +34,50 @@ class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
 
     public function handle(): void
     {
+        // ① FastAPI へ送る payload
         $input = [
             'entity_type' => $this->entityType,
             'raw_value' => $this->rawValue,
+            'known_assets_ref' => $this->knownAssetsRef,
         ];
 
-        if ($this->knownAssetsRef) {
-            $input['known_assets_ref'] = $this->knownAssetsRef;
-        }
-
-        $jsonLine = json_encode($input, JSON_UNESCAPED_UNICODE);
-
-
-
-        $run = Process::run(
-            ['bash', '-lc', 'atlaskernel'],
-            null,
-            $jsonLine . "\n"
+        // ② HTTP 呼び出し（docker / process 完全排除）
+        $response = Http::timeout(30)->post(
+            'http://python_atlaskernel:8000/analyze',
+            $input
         );
 
-
-
-        if (!$run->successful()) {
-            throw new \RuntimeException("atlaskernel failed: " . $run->errorOutput());
+        if (!$response->successful()) {
+            throw new \RuntimeException(
+                'AtlasKernel HTTP failed: ' . $response->body()
+            );
         }
 
-        $payload = json_decode(trim($run->output()), true);
+        $payload = $response->json();
 
         if (!is_array($payload)) {
-            throw new \RuntimeException("atlaskernel output is not JSON");
+            throw new \RuntimeException('AtlasKernel response is not JSON');
         }
 
-        // ★① 先に「過去を false」にする（重要）
+        // ③ 過去をすべて latest=false
         ItemEntity::where('item_id', $this->itemId)
             ->where('entity_type', $this->entityType)
             ->update(['is_latest' => false]);
 
-        // extensions 構築
+        // ④ extensions に reanalyze 情報を付加
         $extensions = $payload['extensions'] ?? [];
         $extensions['reanalyze'] = [
             'reason' => $this->reason,
             'at' => now()->toISOString(),
         ];
 
-        // ★② 最新として保存
+        // ⑤ 最新として保存
         $entity = ItemEntity::create([
             'item_id' => $this->itemId,
             'entity_type' => $payload['entity_type'],
             'raw_value' => $payload['raw_value'],
             'canonical_value' => $payload['canonical_value'],
-            'confidence' => (float) $payload['confidence'],
+            'confidence' => (float)$payload['confidence'],
             'decision' => $payload['decision'],
             'policy_version' => data_get($payload, 'extensions.policy_trace.policy_schema'),
             'schema_version' => $payload['schema_version'],
@@ -92,7 +86,7 @@ class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
             'is_latest' => true,
         ]);
 
-        // ★③ audit は不変ログとして保存
+        // ⑥ 監査ログ（不変）
         ItemEntityAudit::create([
             'item_entity_id' => $entity->id,
             'decision' => $entity->decision,
