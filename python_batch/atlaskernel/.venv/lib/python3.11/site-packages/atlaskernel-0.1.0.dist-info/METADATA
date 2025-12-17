@@ -5,3 +5,4 @@ Summary: AtlasKernel - Entity Analysis Engine (MVP)
 Requires-Python: >=3.10
 Requires-Dist: pydantic>=2.6
 Requires-Dist: rapidfuzz>=3.6
+Requires-Dist: jsonschema>=4.23

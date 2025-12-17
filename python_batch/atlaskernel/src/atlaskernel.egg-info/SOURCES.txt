@@ -22,4 +22,5 @@ src/atlaskernel/domain/request.py
 src/atlaskernel/domain/result.py
 src/atlaskernel/services/decision_rules.py
 src/atlaskernel/services/normalize.py
+src/atlaskernel/services/schema_validate.py
 src/atlaskernel/services/similarity.py

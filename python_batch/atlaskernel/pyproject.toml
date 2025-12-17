@@ -5,7 +5,8 @@ description = "AtlasKernel - Entity Analysis Engine (MVP)"
 requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.6",
-  "rapidfuzz>=3.6"
+  "rapidfuzz>=3.6",
+  "jsonschema>=4.23"
 ]
 
 [project.scripts]

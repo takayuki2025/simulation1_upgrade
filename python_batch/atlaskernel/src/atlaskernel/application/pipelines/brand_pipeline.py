@@ -42,5 +42,5 @@ def analyze_brand(request):
         decision=decision,
         explanation=explanation,
         candidates=candidates[:5],
-        version=VERSION
+        engine_version=VERSION
     )

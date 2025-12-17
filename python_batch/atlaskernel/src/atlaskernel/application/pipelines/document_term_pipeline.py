@@ -62,5 +62,5 @@ def analyze_document_term(request) -> AnalysisResult:
         decision=decision,
         explanation=explanation,
         candidates=top5,
-        version=VERSION,
+        engine_version=VERSION
     )
