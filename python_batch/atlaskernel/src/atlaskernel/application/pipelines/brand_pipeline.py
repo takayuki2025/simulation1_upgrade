@@ -8,7 +8,7 @@ from atlaskernel.version import VERSION
 from typing import List, Dict
 
 
-def analyze_brand(request):
+def analyze_brand(request, policy_engine):
     norm = normalize(request.raw_value)
     assets = load_assets(request.known_assets_ref or "brands_v1")
 
@@ -31,8 +31,15 @@ def analyze_brand(request):
     decision: str
     explanation: List[Dict[str, str]]
 
-    decision, explanation = decide(top.score)
-    explanation.insert(0, {"rule": "similarity", "detail": f"top={top.score}"})
+    policy = policy_engine.load("brand")
+    decision, reason = policy_engine.evaluate(
+        policy,
+        {"score": top.score}
+        )
+    explanation = [
+        {"rule": "similarity", "detail": f"top={top.score}"},
+        {"rule": "policy", "detail": reason}
+        ]
 
     return AnalysisResult(
         entity_type=request.entity_type,

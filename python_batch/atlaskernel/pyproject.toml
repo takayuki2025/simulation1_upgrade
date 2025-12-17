@@ -6,11 +6,15 @@ requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.6",
   "rapidfuzz>=3.6",
-  "jsonschema>=4.23"
+  "jsonschema>=4.23",
+  "PyYAML>=6.0"
 ]
 
 [project.scripts]
 atlaskernel = "atlaskernel.cli:main"
 
 [tool.setuptools.package-data]
-atlaskernel = ["assets/*.txt"]
+atlaskernel = [
+  "assets/*.txt",
+  "policies/*.yaml"
+]
