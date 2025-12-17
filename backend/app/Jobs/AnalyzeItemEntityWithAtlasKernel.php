@@ -43,32 +43,41 @@ class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
             $input['known_assets_ref'] = $this->knownAssetsRef;
         }
 
-        // 必要なら context を stdin JSON に含める設計も可能（今は最小）
         $jsonLine = json_encode($input, JSON_UNESCAPED_UNICODE);
 
-        // 重要: 実行環境で atlaskernel が PATH にいること
-        // 例: docker / supervisor / .venv のラッパースクリプト等
-        $run = Process::run(['atlaskernel'], input: $jsonLine . "\n");
+
+
+        $run = Process::run(
+            ['bash', '-lc', 'atlaskernel'],
+            null,
+            $jsonLine . "\n"
+        );
+
+
 
         if (!$run->successful()) {
             throw new \RuntimeException("atlaskernel failed: " . $run->errorOutput());
         }
 
-        $out = trim($run->output());
-        $payload = json_decode($out, true);
+        $payload = json_decode(trim($run->output()), true);
 
         if (!is_array($payload)) {
-            throw new \RuntimeException("atlaskernel output is not JSON: " . $out);
+            throw new \RuntimeException("atlaskernel output is not JSON");
         }
 
+        // ★① 先に「過去を false」にする（重要）
+        ItemEntity::where('item_id', $this->itemId)
+            ->where('entity_type', $this->entityType)
+            ->update(['is_latest' => false]);
 
+        // extensions 構築
         $extensions = $payload['extensions'] ?? [];
-
         $extensions['reanalyze'] = [
             'reason' => $this->reason,
             'at' => now()->toISOString(),
         ];
 
+        // ★② 最新として保存
         $entity = ItemEntity::create([
             'item_id' => $this->itemId,
             'entity_type' => $payload['entity_type'],
@@ -83,22 +92,13 @@ class AnalyzeItemEntityWithAtlasKernel implements ShouldQueue
             'is_latest' => true,
         ]);
 
-
-        // audits（不変ログ）保存
+        // ★③ audit は不変ログとして保存
         ItemEntityAudit::create([
             'item_entity_id' => $entity->id,
             'decision' => $entity->decision,
             'confidence' => $entity->confidence,
             'payload' => $payload,
             'extensions' => $extensions,
-            'is_latest' => true,
         ]);
-
-
-        // ★ 過去をすべて false にする
-        ItemEntity::where('item_id', $this->itemId)
-            ->where('entity_type', $this->entityType)
-            ->update(['is_latest' => false]);
-
     }
 }

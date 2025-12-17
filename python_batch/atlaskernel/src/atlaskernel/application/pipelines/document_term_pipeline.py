@@ -11,7 +11,7 @@ from atlaskernel.version import VERSION
 
 def analyze_document_term(request) -> AnalysisResult:
     raw = request.raw_value
-    context: Dict[str, str] = request.context or {}
+    context: Dict[str, str] = getattr(request, "context", {}) or {}
 
     # 1) 別名抽出（括弧・スラッシュ等）
     aliases = extract_aliases(raw)
