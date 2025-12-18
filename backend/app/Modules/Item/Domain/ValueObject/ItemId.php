@@ -2,6 +2,8 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
+use Ramsey\Uuid\Uuid;
+
 class ItemId
 {
     public function __construct(

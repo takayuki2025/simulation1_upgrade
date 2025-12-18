@@ -4,10 +4,12 @@ namespace App\Modules\Item\Domain\Entity;
 
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
-    Price,
-    StockCount,
+    SellerId,
+    ItemName,
+    Money,
     CategoryList,
-    ItemImagePath
+    ItemImagePath,
+    StockCount
 };
 
 final class Item
@@ -16,7 +18,7 @@ final class Item
     private int $userId;
     private int $shopId;
     private string $name;
-    private Price $price;
+    private Money $price;
     private string $explain;
     private string $condition;
     private CategoryList $category;
@@ -24,12 +26,13 @@ final class Item
     private ItemImagePath $itemImage;
     private StockCount $remain;
 
+
     public function __construct(
         ?ItemId $id,
         int $userId,
         int $shopId,
         string $name,
-        Price $price,
+        Money $price,
         string $explain,
         string $condition,
         CategoryList $category,
@@ -74,9 +77,9 @@ final class Item
         return $this->name;
     }
 
-    public function getPrice(): Price
+    public function getPrice(): Money
     {
-        return $this->price;
+    return $this->price;
     }
 
     public function getExplain(): string

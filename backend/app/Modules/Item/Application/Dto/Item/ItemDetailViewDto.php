@@ -30,7 +30,7 @@ final class ItemDetailViewDto
         return new self(
             id: $item->getId()->getValue(),
             name: $item->getName(),
-            price: $item->getPrice()->getValue(),
+            price: $item->getPrice()->amount(),
             brand: $item->getBrand(),
             explain: $item->getExplain(),
             condition: $item->getCondition(),

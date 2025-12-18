@@ -76,6 +76,18 @@ Route::middleware('auth.jwt.optional')
 // Route::get('/item/{id}', ItemDetailController::class);
 
 
+use App\Modules\Item\Presentation\Http\Controllers\CreateItemDraftController;
+use App\Modules\Item\Presentation\Http\Controllers\UploadItemDraftImageController;
+use App\Modules\Item\Presentation\Http\Controllers\PublishItemController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::post('/items/drafts', CreateItemDraftController::class);
+    Route::post('/items/drafts/{draftId}/image', UploadItemDraftImageController::class);
+    Route::post('/items/drafts/{draftId}/publish', PublishItemController::class);
+});
+
+
+
 
 
 use App\Http\Controllers\ItemEntityReviewController;

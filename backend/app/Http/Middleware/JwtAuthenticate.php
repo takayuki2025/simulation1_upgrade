@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
 class JwtAuthenticate
 {
@@ -55,6 +56,20 @@ class JwtAuthenticate
 
         // Auth ファサード側も確定（$request->user() と Auth::user() のズレ事故を防止）
         Auth::setUser($user);
+
+        // ==============================
+// AuthPrincipal を生成（DDD Auth 用）
+// ==============================
+$principal = new AuthPrincipal(
+    provider: 'jwt', // TokenIssuer に合わせて将来切替可
+    providerUid: (string) $decoded->sub,
+    email: $user->email,
+    emailVerified: (bool) ($user->email_verified_at !== null),
+    displayName: $user->name ?? null,
+);
+
+// Request attributes に inject（UseCase 用）
+$request->attributes->set('auth_principal', $principal);
 
         // tenant_id を統一（claim: tenant or shop_id）
         $tenantId = null;

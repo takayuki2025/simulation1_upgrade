@@ -95,34 +95,52 @@ export default function ItemSellPage() {
   };
 
   /* =========================
-     Submit
+     Submit（DDD 正式フロー）
+     1. Draft 作成
+     2. Image Upload
+     3. Publish
   ========================= */
   const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiClient) return;
+    if (!apiClient || !imageFile) {
+      setError("画像を選択してください");
+      return;
+    }
 
     setIsSubmitting(true);
     setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("name", form.name);
-      formData.append("price", form.price);
-      formData.append("explain", form.explain);
-      formData.append("brand", form.brand);
-      formData.append("condition", form.condition);
-      formData.append("categories", JSON.stringify(form.categories));
+      /* =========================
+         1. Draft 作成
+      ========================= */
+      const draftRes = await apiClient.post("/items/drafts", {
+        seller_id: "individual:2", // v1: 仮固定
+        name: form.name,
+        price_amount: Number(form.price),
+        price_currency: "JPY",
+        brand: form.brand || null,
+      });
 
-      if (imageFile) {
-        formData.append("item_image", imageFile);
-      }
+      const draftId: string = draftRes.data.draft_id;
 
-      await apiClient.post("/item", formData, {
+      /* =========================
+         2. Image Upload
+      ========================= */
+      const imageData = new FormData();
+      imageData.append("image", imageFile);
+
+      await apiClient.post(`/items/drafts/${draftId}/image`, imageData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
+      /* =========================
+         3. Publish
+      ========================= */
+      await apiClient.post(`/items/drafts/${draftId}/publish`);
+
       router.push("/mypage/sell");
-    } catch {
+    } catch (e) {
       setError("商品の出品に失敗しました");
     } finally {
       setIsSubmitting(false);
@@ -160,7 +178,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* カテゴリー */}
+        {/* カテゴリー（※ v1 では未送信） */}
         <div className={styles.formGroup}>
           <label>カテゴリー（複数選択）</label>
           <div className={styles.categoryButtons}>
@@ -181,7 +199,7 @@ export default function ItemSellPage() {
           </div>
         </div>
 
-        {/* 状態 */}
+        {/* 状態（※ v1 では未送信） */}
         <div className={styles.formGroup}>
           <label>商品の状態</label>
           <select
@@ -189,7 +207,6 @@ export default function ItemSellPage() {
             onChange={(e) =>
               setForm((v) => ({ ...v, condition: e.target.value }))
             }
-            required
           >
             <option value="">選択してください</option>
             {CONDITION_LIST.map((c) => (
@@ -205,12 +222,12 @@ export default function ItemSellPage() {
           <label>ブランド（手動入力）</label>
           <input
             type="text"
-            placeholder="例：Apple / SONY など."
+            placeholder="例：Apple / SONY など"
             value={form.brand}
             onChange={(e) => setForm((v) => ({ ...v, brand: e.target.value }))}
           />
           <small className={styles.hint}>
-            ※ 入力値は AI により正規化されます
+            ※ 入力値は将来 AI により正規化されます
           </small>
         </div>
 
@@ -237,7 +254,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* 説明 */}
+        {/* 説明（※ v1 では未送信） */}
         <div className={styles.formGroup}>
           <label>商品説明</label>
           <textarea

@@ -5,6 +5,8 @@ namespace App\Modules\Item\Domain\Collection;
 use App\Modules\Item\Domain\Entity\Item;
 use App\Models\Item as EloquentItem;
 use Illuminate\Support\Collection;
+use App\Modules\Item\Domain\ValueObject\Money;
+
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
     Price,
@@ -84,7 +86,7 @@ final class Items
             userId: $model->user_id,
             shopId: $model->shop_id,
             name: $model->name,
-            price: new Price($model->price),
+            price: new Money($model->price, 'JPY'),
             explain: $model->explain,
             condition: $model->condition,
             category: new CategoryList($model->category ?? []),

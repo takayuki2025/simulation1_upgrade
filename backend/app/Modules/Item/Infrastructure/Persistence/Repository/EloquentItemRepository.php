@@ -11,30 +11,31 @@ use App\Modules\Item\Infrastructure\Eloquent\Models\Item as ItemModel;
 use App\Modules\Item\Domain\Repository\ItemRepository;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
-    Price,
+    Money,
     StockCount,
     CategoryList,
-    ItemImagePath
+    ItemImagePath,
+    SellerType
 };
 
 final class EloquentItemRepository implements ItemRepository
 {
     private function toDomain(EloquentItem $model): Item
-    {
-        return new Item(
-            id: new ItemId($model->id),
-            userId: $model->user_id,
-            shopId: $model->shop_id,
-            name: $model->name,
-            price: new Price($model->price),
-            explain: $model->explain,
-            condition: $model->condition,
-            category: new CategoryList($model->category ?? []),
-            brand: $model->brand,
-            itemImage: ItemImagePath::fromRaw($model->item_image),
-            remain: new StockCount($model->remain),
-        );
-    }
+{
+    return new Item(
+        id: new ItemId($model->id),
+        userId: $model->user_id,
+        shopId: $model->shop_id,
+        name: $model->name,
+        price: new Money($model->price, 'JPY'),
+        explain: $model->explain,
+        condition: $model->condition,
+        category: new CategoryList($model->category ?? []),
+        brand: $model->brand,
+        itemImage: ItemImagePath::fromRaw($model->item_image),
+        remain: new StockCount($model->remain),
+    );
+}
 
 
     public function findPublicItems(
@@ -174,5 +175,37 @@ final class EloquentItemRepository implements ItemRepository
             ->where('user_id', $userId)
             ->exists();
     }
+
+    public function save(Item $item): void
+{
+    $model = new EloquentItem();
+
+    // seller 分岐
+    if ($item->sellerId()->type() === SellerType::SHOP) {
+        $model->shop_id = $item->sellerId()->id();
+        $model->user_id = auth()->id(); // 出品者（owner / staff）
+    } else {
+        $model->shop_id = null;
+        $model->user_id = $item->sellerId()->id();
+    }
+
+    // 必須カラム（migration と完全一致）
+    $model->name = $item->name()->value();
+    $model->price = $item->price()->amount();
+    $model->brand = $item->brand()?->canonical();
+    $model->explain = $item->explain();
+    $model->condition = $item->condition();
+    $model->category = $item->category()->toArray();
+    $model->item_image = $item->imagePath()->raw();
+    $model->remain = $item->remain()->value();
+
+    $model->save();
+}
+
+public function nextIdentity(): ItemId
+{
+    // 仮 ID（DB insert 後に実 ID が確定する設計）
+    return new ItemId(0);
+}
 }
 
