@@ -4,7 +4,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Application\UseCase\Query\PublicItemListUseCase;
+use App\Modules\Item\Application\UseCase\Item\Query\ListCatalogItemsUseCase;
 use App\Modules\Item\Presentation\Http\Resources\ItemResource;
 
 /**
@@ -15,7 +15,7 @@ final class PublicItemListController extends Controller
 {
     public function __invoke(
         Request $request,
-        PublicItemListUseCase $useCase
+        ListCatalogItemsUseCase $useCase
     ) {
         $viewerUserId = $request->user()?->id;
 

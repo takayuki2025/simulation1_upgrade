@@ -4,7 +4,7 @@ namespace App\Modules\Item\Presentation\Http\Resources;
 
 use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Domain\ValueObject\ItemImagePath;
-use Illuminate\Http\Resources\Json\JsonResource;
+// use Illuminate\Http\Resources\Json\JsonResource;
 
 final class ItemResource
 {

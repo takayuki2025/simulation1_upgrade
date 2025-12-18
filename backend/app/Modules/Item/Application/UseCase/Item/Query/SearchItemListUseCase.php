@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Item\Application\UseCase\Query;
+namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Domain\Repository\ItemRepository;
 
@@ -13,7 +13,7 @@ use App\Modules\Item\Application\Dto\Item\{
 
 
 
-final class ItemListUseCase
+final class SearchItemListUseCase
 {
     public function __construct(
         private ItemRepository $itemRepository,
@@ -21,13 +21,13 @@ final class ItemListUseCase
     }
 
     public function execute(ListItemsInputDto $input): Items
-    {
-        // ❗ named parameter を使わない
-        return $this->itemRepository->findAll(
-            $input->limit,
-            $input->page,
-            $input->keyword,
-        );
-    }
+{
+    return $this->itemRepository->searchPublic(
+        limit: $input->limit,
+        page: $input->page,
+        keyword: $input->keyword,
+        viewerUserId: $input->viewerUserId,
+    );
+}
 }
 

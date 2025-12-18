@@ -1,5 +1,7 @@
 {
+  "/(auth)/email/verify/page": "app/(auth)/email/verify/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(auth)/register/page": "app/(auth)/register/page.js",
   "/(main)/item/[items_id]/page": "app/(main)/item/[items_id]/page.js",
   "/(main)/mypage/page": "app/(main)/mypage/page.js",
   "/(main)/mypage/profile/page": "app/(main)/mypage/profile/page.js",

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Item\Application\UseCase\Query;
+namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Domain\Repository\ItemRepository;
 use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
@@ -11,7 +11,7 @@ use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
 use App\Modules\Comment\Application\UseCase\ListItemCommentsUseCase;
 
 
-final class ItemDetailUseCase
+final class GetItemDetailUseCase
 {
     public function __construct(
         private readonly ItemRepository $itemRepository,

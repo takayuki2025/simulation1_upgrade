@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Item\Application\UseCase\Query;
+namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Domain\Repository\ItemRepository;
 use App\Modules\Item\Domain\Collection\Items;
@@ -10,7 +10,7 @@ use App\Modules\Item\Domain\Collection\Items;
  * - ログインユーザー自身が出品した商品を除外する
  * - 未ログイン時は全件表示
  */
-final class PublicItemListUseCase
+final class ListCatalogItemsUseCase
 {
     public function __construct(
         private readonly ItemRepository $itemRepository
@@ -27,7 +27,7 @@ final class PublicItemListUseCase
             limit: $limit,
             page: $page,
             keyword: $keyword,
-            excludeUserId: $viewerUserId
+            viewerUserId: $viewerUserId
         );
     }
 }

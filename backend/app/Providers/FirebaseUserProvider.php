@@ -37,7 +37,8 @@ class FirebaseUserProvider implements UserProvider
 
         try {
             // 2. Firebaseでトークンを検証 (ここでAPIコールが発生)
-            $verifiedIdToken = $this->firebaseAuth->verifyIdToken($idToken);
+            $verifiedIdToken = $this->firebaseProvider->verify($idToken); // ★ 必須（5〜30）
+);
 
             // 3. 検証されたトークンからユーザーID (uid) を取得
             $uid = $verifiedIdToken->claims()->get('sub');

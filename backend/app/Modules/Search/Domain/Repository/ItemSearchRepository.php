@@ -12,4 +12,5 @@ interface ItemSearchRepository
         int $limit,
         int $page
     ): SearchItems;
+
 }

@@ -26,12 +26,20 @@ interface ItemRepository
     /** コメント一覧（ユーザー込み） */
     public function listComments(int $itemId): array;
 
-    public function findPublicItems(
+    public function searchPublic(
         int $limit,
         int $page,
         ?string $keyword,
-        ?int $excludeUserId
+        ?int $viewerUserId,
     ): Items;
+
+    public function findPublicItems(
+    int $limit,
+    int $page,
+    ?string $keyword,
+    ?int $viewerUserId
+): Items;
+
 }
 
 

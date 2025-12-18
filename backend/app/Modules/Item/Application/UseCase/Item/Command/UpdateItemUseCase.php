@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Item\Application\UseCase\Item;
+namespace App\Modules\Item\Application\UseCase\Item\Command;
 
 use App\Modules\Item\Application\Dto\Item\UpdateItemInputDto;
 use App\Modules\Item\Domain\Repository\ItemRepository;

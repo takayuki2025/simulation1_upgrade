@@ -67,7 +67,7 @@ class VerifyFirebaseToken
             Log::info("VerifyFirebaseToken: Token Status: PRESENT (Verification started)");
 
             // トークン検証 (300秒の猶予)
-            $decodedToken = $this->firebaseAuth->verifyIdToken($idToken, false, 300); // 抽出した $idToken を使用
+            $decodedToken = $this->firebaseProvider->verify($idToken); // 抽出した $idToken を使用
 
             Log::info("VerifyFirebaseToken: TOKEN VERIFIED. Proceeding to DB lookup.");
 

@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Models\Item as EloquentItem;
 use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
+use App\Modules\Item\Infrastructure\Eloquent\Models\Item as ItemModel;
 use App\Modules\Item\Domain\Repository\ItemRepository;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
@@ -35,8 +36,35 @@ final class EloquentItemRepository implements ItemRepository
         );
     }
 
+
+    public function findPublicItems(
+    int $limit,
+    int $page,
+    ?string $keyword,
+    ?int $viewerUserId
+): Items {
+    $query = EloquentItem::query();
+
+    if ($keyword) {
+        $query->where('name', 'like', "%{$keyword}%");
+    }
+
+    if ($viewerUserId) {
+        $query->where('user_id', '!=', $viewerUserId);
+    }
+
+    $models = $query
+        ->orderByDesc('created_at')
+        ->limit($limit)
+        ->offset(($page - 1) * $limit)
+        ->get();
+
+    return Items::fromEloquent($models);
+}
+
+
     /**
-     * 一覧取得
+     * 一覧取得統合
      */
     public function findAll(
         int $limit,
@@ -58,30 +86,32 @@ final class EloquentItemRepository implements ItemRepository
         );
     }
 
-    public function findPublicItems(
-        int $limit,
-        int $page,
-        ?string $keyword,
-        ?int $excludeUserId
-    ): Items {
-        $query = EloquentItem::query();
+    public function searchPublic(
+    int $limit,
+    int $page,
+    ?string $keyword,
+    ?int $viewerUserId,
+): Items {
+    $query = EloquentItem::query();
 
-        if ($keyword) {
-            $query->where('name', 'LIKE', "%{$keyword}%");
-        }
-
-        if ($excludeUserId) {
-            $query->where('user_id', '!=', $excludeUserId);
-        }
-
-        return Items::fromEloquent(
-            $query
-                ->orderByDesc('id')
-                ->limit($limit)
-                ->offset(($page - 1) * $limit)
-                ->get()
-        );
+    if ($keyword) {
+        $query->where('name', 'like', "%{$keyword}%");
     }
+
+    if ($viewerUserId) {
+        $query->where('user_id', '!=', $viewerUserId);
+    }
+
+    $paginator = $query
+        ->orderByDesc('created_at')
+        ->paginate($limit, ['*'], 'page', $page);
+
+    return Items::fromEloquent(
+        collect($paginator->items())
+    );
+}
+
+
     /**
      * キーワード検索
      */
@@ -146,162 +176,3 @@ final class EloquentItemRepository implements ItemRepository
     }
 }
 
-
-//     public function findById(int $id): ?Item
-//     {
-//         $model = EloquentItem::with('user')->find($id);
-//         if (!$model) {
-//             return null;
-//         }
-//         return $this->toDomain($model);
-//     }
-
-//     public function save(Item $item): Item
-//     {
-//         $id = $item->getId()?->getValue();
-
-//         $model = $id ? EloquentItem::findOrFail($id) : new EloquentItem();
-//         $model = (new \App\Modules\Item\Infrastructure\Mapper\ItemMapper())->toEloquent($item, $model);
-//         $model->save();
-
-//         return $this->toDomain($model);
-//     }
-
-//     public function delete(int $id): void
-//     {
-//         EloquentItem::destroy($id);
-//     }
-
-//     public function listByShop(int $shopId): iterable
-//     {
-//         return EloquentItem::where('shop_id', $shopId)
-//             ->orderByDesc('id')
-//             ->get()
-//             ->map(fn (EloquentItem $m) => $this->toDomain($m));
-//     }
-
-//     public function listByCartUser(int $userId): iterable
-//     {
-//         return EloquentItem::whereHas('usersInCart', function ($q) use ($userId) {
-//             $q->where('users.id', $userId);
-//         })
-//             ->get()
-//             ->map(fn (EloquentItem $m) => $this->toDomain($m));
-//     }
-
-//     public function updateStock(int $itemId, int $newRemain): void
-//     {
-//         EloquentItem::whereKey($itemId)->update(['remain' => $newRemain]);
-//     }
-
-//     public function getStock(int $itemId): ?int
-//     {
-//         return EloquentItem::whereKey($itemId)->value('remain');
-//     }
-
-//     /* =======================
-//        いいね（マイリスト）
-//     ======================== */
-//     public function toggleMylist(int $userId, int $itemId): bool
-//     {
-//         $exists = Good::where('user_id', $userId)
-//             ->where('item_id', $itemId)
-//             ->first();
-
-//         if ($exists) {
-//             $exists->delete();
-//             return false; // OFF
-//         }
-
-//         Good::create([
-//             'user_id' => $userId,
-//             'item_id' => $itemId,
-//         ]);
-
-//         return true; // ON
-//     }
-
-//     public function getFavoriteCount(int $itemId): int
-//     {
-//         return Good::where('item_id', $itemId)->count();
-//     }
-
-//     // ★ 追加：詳細画面用 favoritesCount
-//     public function favoritesCount(int $itemId): int
-//     {
-//         return Good::where('item_id', $itemId)->count();
-//     }
-
-//     // ★ 追加：ユーザーがいいね済みか？
-//     public function isFavorited(int $itemId, int $userId): bool
-//     {
-//         return Good::where('item_id', $itemId)
-//             ->where('user_id', $userId)
-//             ->exists();
-//     }
-
-//     /* =======================
-//        コメント一覧
-//     ======================== */
-
-//     /** コメント一覧を返す */
-//     public function findComments(int $itemId): array
-//     {
-//         return Comment::with('user')
-//             ->where('item_id', $itemId)
-//             ->orderBy('created_at', 'desc')
-//             ->get()
-//             ->toArray();
-//     }
-
-//     public function listComments(int $itemId): iterable
-//     {
-//         return Comment::where('item_id', $itemId)
-//             ->with('user')  // ← フロントで user.name / user.user_image を使うので
-//             ->orderByDesc('id')
-//             ->get();
-//     }
-
-//     public function searchByCategory(array $categories): iterable
-//     {
-//         $query = EloquentItem::query();
-
-//         foreach ($categories as $category) {
-//             $query->whereJsonContains('category', $category);
-//         }
-
-//         return $query->orderByDesc('id')
-//             ->get()
-//             ->map(fn (EloquentItem $m) => $this->toDomain($m));
-//     }
-
-//     public function searchByBrand(string $brand): iterable
-//     {
-//         return EloquentItem::where('brand', 'LIKE', "%{$brand}%")
-//             ->orderByDesc('id')
-//             ->get()
-//             ->map(fn (EloquentItem $m) => $this->toDomain($m));
-//     }
-
-//     public function createComment(int $userId, int $itemId, string $comment): array
-//     {
-//         $model = \App\Models\Comment::create([
-//             'user_id' => $userId,
-//             'item_id' => $itemId,
-//             'comment' => $comment,
-//         ]);
-
-//         return $model->toArray();
-//     }
-
-//     public function updateRemainWithLock(int $itemId, int $newRemain): void
-//     {
-//         DB::transaction(function () use ($itemId, $newRemain) {
-//             /** @var ItemModel $row */
-//             $row = ItemModel::where('id', $itemId)->lockForUpdate()->firstOrFail();
-
-//             $row->remain = $newRemain;
-//             $row->save();
-//         });
-//     }
-// }
