@@ -53,10 +53,9 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/styled-jsx/style.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
-// import { useAuth } from "@/hooks/useSanctumAuth";
-// getImageUrl は、utils.ts などで定義されているものと仮定
-var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/utils/utils.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/image.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$ui$2f$auth$2f$useAuth$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/ui/auth/useAuth.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/utils/utils.ts [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature();
 "use client";
@@ -65,7 +64,10 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
-const categories = [
+;
+/* =======================================================
+ * 定数
+ * ======================================================= */ const categories = [
     "ファッション",
     "家電",
     "インテリア",
@@ -79,7 +81,7 @@ const categories = [
     "ハンドメイド",
     "アクセサリー",
     "おもちゃ",
-    "キッズ:ベビー"
+    "キッズ・ベビー"
 ];
 const conditions = [
     "良好",
@@ -90,17 +92,15 @@ const conditions = [
 function ItemSellPage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
-    const { isAuthenticated, isLoading: isAuthLoading, isLoggingOut, apiClient, logout, reloadAuthToken } = useAuth();
-    // -------------------- State --------------------
-    // ProfilePage と同じく、ローカルなユーザー情報とフェッチ状態を持つ
-    const [localBackendUser, setLocalBackendUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const { isAuthenticated, isLoading: isAuthLoading, apiClient } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$ui$2f$auth$2f$useAuth$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const fileInputRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const [localUser, setLocalUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isFetchingProfile, setIsFetchingProfile] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [isSubmitting, setIsSubmitting] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [isImageUploading, setIsImageUploading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [serverErrors, setServerErrors] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({});
     const [successMessage, setSuccessMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [errorMessage, setErrorMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
-    const fileInputRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     const [imageRefreshKey, setImageRefreshKey] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(0);
     const [form, setForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         item_image: null,
@@ -111,950 +111,449 @@ function ItemSellPage() {
         explain: null,
         price: null
     });
-    // -------------------- Computed Value --------------------
-    const isPageLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
-        "ItemSellPage.useMemo[isPageLoading]": ()=>{
-            // useAuthのロード中 or プロフィールフェッチ中の場合はローディング
-            return isLoggingOut || isAuthLoading || isFetchingProfile;
-        }
+    /* =======================================================
+   * Computed
+   * ======================================================= */ const isPageLoading = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "ItemSellPage.useMemo[isPageLoading]": ()=>isAuthLoading || isFetchingProfile
     }["ItemSellPage.useMemo[isPageLoading]"], [
-        isLoggingOut,
         isAuthLoading,
         isFetchingProfile
     ]);
     const hasVerifiedEmail = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
-        "ItemSellPage.useMemo[hasVerifiedEmail]": ()=>{
-            // ローカルで取得した最新のユーザー情報に基づく
-            return !!localBackendUser && !!localBackendUser.email_verified_at;
-        }
+        "ItemSellPage.useMemo[hasVerifiedEmail]": ()=>!!localUser?.email_verified_at
     }["ItemSellPage.useMemo[hasVerifiedEmail]"], [
-        localBackendUser
+        localUser
     ]);
-    // -------------------- 関数定義 --------------------
-    /**
-   * プロフィールデータを取得する関数。認証状態の確定に使用。
-   */ const fetchBackendProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "ItemSellPage.useCallback[fetchBackendProfile]": async ()=>{
+    /* =======================================================
+   * Handlers
+   * ======================================================= */ const fetchProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "ItemSellPage.useCallback[fetchProfile]": async ()=>{
             if (!apiClient || isFetchingProfile) return;
             setIsFetchingProfile(true);
             try {
-                const response = await apiClient.get("/api/mypage/profile");
-                const data = response.data.user || response.data;
-                if (data && data.id) {
-                    console.log("✅ [ItemSellPage] 最新プロフィールデータ取得に成功。");
-                    // ★★★ ログ出力強化: この値が null かどうかを確認してください ★★★
-                    console.log("【検証】email_verified_at:", data.email_verified_at);
-                    setLocalBackendUser(data);
-                } else {
-                    throw new Error("Invalid user data received.");
-                }
-            } catch (err) {
-                console.error("[ItemSellPage] プロフィールデータ取得失敗:", err);
-                if (err.response?.status === 401) {
-                    setLocalBackendUser(null);
-                } else {
-                    setErrorMessage("ユーザー情報のロード中にエラーが発生しました。");
-                }
+                const res = await apiClient.get("/api/mypage/profile");
+                setLocalUser(res.data.user ?? res.data);
+            } catch  {
+                setLocalUser(null);
             } finally{
                 setIsFetchingProfile(false);
             }
         }
-    }["ItemSellPage.useCallback[fetchBackendProfile]"], [
+    }["ItemSellPage.useCallback[fetchProfile]"], [
         apiClient,
         isFetchingProfile
     ]);
-    /**
-   * 認証リトライ付きAPIフェッチ
-   */ const authenticatedFetchWithRetry = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "ItemSellPage.useCallback[authenticatedFetchWithRetry]": async (config)=>{
-            if (!apiClient || !isAuthenticated) {
-                throw new Error("API client unavailable or user not authenticated.");
-            }
-            const requestConfig = {
-                method: config.method,
-                url: config.url,
-                data: config.data,
-                headers: config.headers,
-                params: config.params
-            };
-            try {
-                return await apiClient.request(requestConfig);
-            } catch (e) {
-                const error = e;
-                const status = error.response?.status;
-                if (status === 401) {
-                    console.warn("401 Unauthorized detected. Attempting token refresh...");
-                    try {
-                        await reloadAuthToken();
-                        const secondResponse = await apiClient.request(requestConfig);
-                        console.log("Token refresh and retry successful.");
-                        return secondResponse;
-                    } catch (refreshError) {
-                        console.error("Token refresh or retry failed. Logging out.", refreshError);
-                        await logout();
-                        throw new Error("Authentication failed after retry.");
-                    }
-                }
-                throw error;
-            }
-        }
-    }["ItemSellPage.useCallback[authenticatedFetchWithRetry]"], [
-        isAuthenticated,
-        apiClient,
-        logout,
-        reloadAuthToken
-    ]);
-    /**
-   * フォーム入力変更ハンドラ
-   */ const handleFormChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+    const handleFormChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "ItemSellPage.useCallback[handleFormChange]": (e)=>{
             const { name, value } = e.target;
             setForm({
                 "ItemSellPage.useCallback[handleFormChange]": (prev)=>({
                         ...prev,
-                        [name]: name === "price" ? value ? Number(value) : null : value
+                        [name]: name === "price" ? Number(value) : value
                     })
             }["ItemSellPage.useCallback[handleFormChange]"]);
         }
     }["ItemSellPage.useCallback[handleFormChange]"], []);
-    /**
-   * カテゴリー選択変更ハンドラ
-   */ const handleCategoryChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "ItemSellPage.useCallback[handleCategoryChange]": (category)=>{
+    const handleCategoryChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "ItemSellPage.useCallback[handleCategoryChange]": (cat)=>{
             setForm({
-                "ItemSellPage.useCallback[handleCategoryChange]": (prev)=>{
-                    const currentCategories = prev.category;
-                    if (currentCategories.includes(category)) {
-                        return {
-                            ...prev,
-                            category: currentCategories.filter({
-                                "ItemSellPage.useCallback[handleCategoryChange]": (c)=>c !== category
-                            }["ItemSellPage.useCallback[handleCategoryChange]"])
-                        };
-                    } else {
-                        return {
-                            ...prev,
-                            category: [
-                                ...currentCategories,
-                                category
-                            ]
-                        };
-                    }
-                }
+                "ItemSellPage.useCallback[handleCategoryChange]": (prev)=>({
+                        ...prev,
+                        category: prev.category.includes(cat) ? prev.category.filter({
+                            "ItemSellPage.useCallback[handleCategoryChange]": (c)=>c !== cat
+                        }["ItemSellPage.useCallback[handleCategoryChange]"]) : [
+                            ...prev.category,
+                            cat
+                        ]
+                    })
             }["ItemSellPage.useCallback[handleCategoryChange]"]);
         }
     }["ItemSellPage.useCallback[handleCategoryChange]"], []);
-    /**
-   * 商品画像アップロードハンドラ
-   */ const handleImageUpload = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "ItemSellPage.useCallback[handleImageUpload]": async (event)=>{
-            const file = event.target.files?.[0];
-            if (!file) return;
-            setIsImageUploading(true);
-            setServerErrors({
-                "ItemSellPage.useCallback[handleImageUpload]": (prev)=>({
-                        ...prev,
-                        item_image: undefined
-                    })
-            }["ItemSellPage.useCallback[handleImageUpload]"]);
-            setSuccessMessage("");
-            setErrorMessage("");
-            try {
-                const formData = new FormData();
-                formData.append("item_image", file);
-                const response = await authenticatedFetchWithRetry({
-                    url: "/api/upload",
-                    method: "POST",
-                    data: formData,
-                    headers: {
-                        "Content-Type": "multipart/form-data"
-                    }
-                });
-                const uploadedPath = response.data?.image_path;
-                if (uploadedPath) {
-                    setForm({
-                        "ItemSellPage.useCallback[handleImageUpload]": (prev)=>({
-                                ...prev,
-                                item_image: uploadedPath
-                            })
-                    }["ItemSellPage.useCallback[handleImageUpload]"]);
-                    setImageRefreshKey({
-                        "ItemSellPage.useCallback[handleImageUpload]": (prev)=>prev + 1
-                    }["ItemSellPage.useCallback[handleImageUpload]"]);
-                    setSuccessMessage("商品画像をアップロードできました！");
-                } else {
-                    throw new Error("サーバーから画像パスが返されませんでした。");
+    const handleImageUpload = async (e)=>{
+        const file = e.target.files?.[0];
+        if (!file || !apiClient) return;
+        setIsImageUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("item_image", file);
+            const res = await apiClient.post("/api/upload", fd, {
+                headers: {
+                    "Content-Type": "multipart/form-data"
                 }
-            } catch (error) {
-                console.error("画像アップロードエラー:", error);
-                const errorData = error.response?.data?.errors;
-                if (errorData) {
-                    setServerErrors({
-                        "ItemSellPage.useCallback[handleImageUpload]": (prev)=>({
-                                ...prev,
-                                item_image: errorData.item_image || "画像ファイルが無効です。"
-                            })
-                    }["ItemSellPage.useCallback[handleImageUpload]"]);
-                } else {
-                    setErrorMessage(error.message || "画像アップロード中に予期せぬエラーが発生しました。");
-                }
-            } finally{
-                setIsImageUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-            }
+            });
+            setForm((p)=>({
+                    ...p,
+                    item_image: res.data.image_path
+                }));
+            setImageRefreshKey((k)=>k + 1);
+        } catch  {
+            setErrorMessage("画像アップロードに失敗しました");
+        } finally{
+            setIsImageUploading(false);
         }
-    }["ItemSellPage.useCallback[handleImageUpload]"], [
-        authenticatedFetchWithRetry
-    ]);
-    /**
-   * フォームデータ送信ハンドラ
-   */ const submitNewData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
-        "ItemSellPage.useCallback[submitNewData]": async (e)=>{
-            e.preventDefault();
-            // フォーム送信前にも認証状態をチェック
-            if (isSubmitting || isPageLoading || !isAuthenticated || !hasVerifiedEmail) {
-                setErrorMessage("認証またはメール確認が完了していません。");
-                return;
-            }
-            setIsSubmitting(true);
-            setServerErrors({});
-            setSuccessMessage("");
-            setErrorMessage("");
-            if (!form.item_image) {
-                setServerErrors({
-                    "ItemSellPage.useCallback[submitNewData]": (prev)=>({
-                            ...prev,
-                            item_image: [
-                                "商品画像をアップロードしてください。"
-                            ]
-                        })
-                }["ItemSellPage.useCallback[submitNewData]"]);
-                setErrorMessage("入力内容に誤りがあります。ご確認ください。");
-                setIsSubmitting(false);
-                return;
-            }
-            try {
-                await authenticatedFetchWithRetry({
-                    url: "/api/items",
-                    method: "POST",
-                    data: {
-                        ...form,
-                        price: form.price !== null ? Number(form.price) : null
-                    }
-                });
-                setSuccessMessage("商品を出品しました。サンクスページへ移動します。");
-                setTimeout({
-                    "ItemSellPage.useCallback[submitNewData]": ()=>{
-                        router.push("/thanks/sell");
-                    }
-                }["ItemSellPage.useCallback[submitNewData]"], 1500);
-            } catch (error) {
-                console.error("出品エラー:", error);
-                const errorData = error.response?.data?.errors;
-                if (errorData) {
-                    setServerErrors(errorData || {});
-                    setErrorMessage("入力内容に誤りがあります。ご確認ください。");
-                } else {
-                    setErrorMessage(error.message || `出品中に予期せぬエラーが発生しました。`);
-                }
-            } finally{
-                setIsSubmitting(false);
-            }
+    };
+    const submitItem = async (e)=>{
+        e.preventDefault();
+        if (!apiClient) return;
+        setIsSubmitting(true);
+        try {
+            await apiClient.post("/api/items", form);
+            router.push("/thanks/sell");
+        } catch (e) {
+            setErrorMessage("出品に失敗しました");
+        } finally{
+            setIsSubmitting(false);
         }
-    }["ItemSellPage.useCallback[submitNewData]"], [
-        form,
-        isSubmitting,
-        isPageLoading,
-        isAuthenticated,
-        hasVerifiedEmail,
-        authenticatedFetchWithRetry,
-        router
-    ]);
-    // -------------------- アクセス制御 (useEffect) --------------------
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+    };
+    /* =======================================================
+   * Auth Guard
+   * ======================================================= */ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ItemSellPage.useEffect": ()=>{
-            // 1. 認証ロード中、またはAPIクライアントがない場合はスキップ
             if (isAuthLoading || !apiClient) return;
-            // 2. 未認証であればログインページへ即時リダイレクト
             if (!isAuthenticated) {
-                console.log("[Auth Check] 未認証。/loginへ即時リダイレクト。");
                 router.replace("/login");
                 return;
             }
-            // 3. 認証済みだが、ローカルデータがまだロードされていない場合
-            if (isAuthenticated && !localBackendUser && !isFetchingProfile) {
-                console.log("[Auth Check] 認証済みだがプロファイル未ロード。フェッチ開始。");
-                fetchBackendProfile();
+            if (!localUser) {
+                fetchProfile();
                 return;
             }
-            // 4. ローカルデータがロード済みで、メール未認証の場合
-            if (isAuthenticated && localBackendUser && !hasVerifiedEmail) {
-                console.log("[Auth Check] 認証済みだがメール未確認。/email/verifyへ即時リダイレクト。");
+            if (!hasVerifiedEmail) {
                 router.replace("/email/verify");
-                return;
-            }
-            // 5. 認証・メール認証が完了していれば、エラーメッセージをクリア
-            if (isAuthenticated && hasVerifiedEmail) {
-                setErrorMessage("");
             }
         }
     }["ItemSellPage.useEffect"], [
-        isAuthenticated,
         isAuthLoading,
-        localBackendUser,
-        isFetchingProfile,
-        hasVerifiedEmail,
-        router,
+        isAuthenticated,
         apiClient,
-        fetchBackendProfile
+        localUser,
+        hasVerifiedEmail,
+        fetchProfile,
+        router
     ]);
-    // -------------------- Render --------------------
-    // ローディングガードの強化: isPageLoading または localBackendUser が確定するまでローディングを表示
-    if (isPageLoading || !localBackendUser) {
-        if (!isAuthLoading && !isAuthenticated) {
-        // 認証失敗（useEffectがリダイレクトをトリガー）
-        } else {
-            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "flex justify-center py-10 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "w-full max-w-2xl bg-white p-8 sm:p-10 shadow-xl rounded-xl border border-gray-100",
-                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "flex items-center justify-center min-h-[50vh]",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-500 mx-auto"
-                            }, void 0, false, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 430,
-                                columnNumber: 15
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: "ml-3 text-lg text-gray-700 p-8",
-                                children: isFetchingProfile ? "最新プロフィール情報を取得中..." : "認証状態を最終確認中です..."
-                            }, void 0, false, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 431,
-                                columnNumber: 15
-                            }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 429,
-                        columnNumber: 13
-                    }, this)
-                }, void 0, false, {
-                    fileName: "[project]/app/(main)/sell/page.tsx",
-                    lineNumber: 428,
-                    columnNumber: 11
-                }, this)
-            }, void 0, false, {
-                fileName: "[project]/app/(main)/sell/page.tsx",
-                lineNumber: 427,
-                columnNumber: 9
-            }, this);
-        }
-    }
-    // 認証失敗、またはメール認証未完了時の画面
-    if (!isAuthenticated || !hasVerifiedEmail) {
-        const displayMessage = !isAuthenticated ? "アクセス権限がありません。ログインページへリダイレクト中です。" : "メール認証が完了していません。メールをご確認ください。リダイレクト中です。";
-        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-            className: "flex justify-center py-10 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen",
-            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "w-full max-w-2xl bg-white p-8 sm:p-10 shadow-xl rounded-xl border border-gray-100",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "flex items-center justify-center min-h-[50vh]",
-                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "text-red-700 p-8 bg-white shadow-lg rounded-lg",
-                        children: displayMessage
-                    }, void 0, false, {
-                        fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 453,
-                        columnNumber: 13
-                    }, this)
-                }, void 0, false, {
-                    fileName: "[project]/app/(main)/sell/page.tsx",
-                    lineNumber: 452,
-                    columnNumber: 11
-                }, this)
-            }, void 0, false, {
-                fileName: "[project]/app/(main)/sell/page.tsx",
-                lineNumber: 451,
-                columnNumber: 9
-            }, this)
+    if (isPageLoading || !localUser) {
+        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+            className: "p-10",
+            children: "Loading..."
         }, void 0, false, {
             fileName: "[project]/app/(main)/sell/page.tsx",
-            lineNumber: 450,
-            columnNumber: 7
+            lineNumber: 225,
+            columnNumber: 12
         }, this);
     }
-    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: "jsx-8fe83a96abdf303b" + " " + "flex justify-center py-10 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen",
+    /* =======================================================
+   * Render
+   * ======================================================= */ return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        className: "jsx-7ae959381b4c5e2f" + " " + "max-w-2xl mx-auto p-8 bg-white rounded-xl shadow",
         children: [
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "jsx-8fe83a96abdf303b" + " " + "w-full max-w-2xl bg-white p-8 sm:p-10 shadow-xl rounded-xl border border-gray-100",
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                className: "jsx-7ae959381b4c5e2f" + " " + "text-2xl font-bold mb-6 text-center",
+                children: "商品の出品"
+            }, void 0, false, {
+                fileName: "[project]/app/(main)/sell/page.tsx",
+                lineNumber: 234,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                className: "jsx-7ae959381b4c5e2f" + " " + "mb-8",
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                        className: "jsx-8fe83a96abdf303b" + " " + "text-3xl font-bold text-gray-800 text-center mb-8 border-b pb-4",
-                        children: "商品の出品"
+                    form.item_image && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "w-40 h-40 relative mx-auto mb-4",
+                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                            src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(form.item_image, imageRefreshKey),
+                            alt: "preview",
+                            fill: true,
+                            className: "object-cover rounded"
+                        }, void 0, false, {
+                            fileName: "[project]/app/(main)/sell/page.tsx",
+                            lineNumber: 240,
+                            columnNumber: 13
+                        }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 465,
-                        columnNumber: 9
-                    }, this),
-                    successMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        role: "alert",
-                        className: "jsx-8fe83a96abdf303b" + " " + "bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-md",
-                        children: successMessage
-                    }, void 0, false, {
-                        fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 470,
+                        lineNumber: 239,
                         columnNumber: 11
                     }, this),
-                    errorMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        role: "alert",
-                        className: "jsx-8fe83a96abdf303b" + " " + "bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md",
-                        children: errorMessage
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        type: "button",
+                        onClick: ()=>fileInputRef.current?.click(),
+                        className: "jsx-7ae959381b4c5e2f" + " " + "block mx-auto px-6 py-2 border rounded-full text-red-600 border-red-600",
+                        children: "画像を選択"
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 478,
-                        columnNumber: 11
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                        className: "jsx-8fe83a96abdf303b" + " " + "mb-8 border-b pb-6",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                className: "jsx-8fe83a96abdf303b" + " " + "block text-lg font-bold text-gray-700 mb-4",
-                                children: [
-                                    "商品画像 ",
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                        children: "(必須)"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 488,
-                                        columnNumber: 18
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 487,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-8fe83a96abdf303b" + " " + "border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center space-y-4 bg-gray-50 min-h-[150px]",
-                                children: [
-                                    form.item_image && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "w-32 h-32 relative mb-4",
-                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-                                            src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(form.item_image, imageRefreshKey),
-                                            alt: "商品プレビュー画像",
-                                            fill: true,
-                                            style: {
-                                                objectFit: "cover",
-                                                borderRadius: "8px"
-                                            },
-                                            className: "border border-gray-200",
-                                            unoptimized: true
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/(main)/sell/page.tsx",
-                                            lineNumber: 493,
-                                            columnNumber: 17
-                                        }, this)
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 492,
-                                        columnNumber: 15
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        type: "button",
-                                        disabled: isImageUploading || isSubmitting,
-                                        onClick: ()=>fileInputRef.current?.click(),
-                                        className: "jsx-8fe83a96abdf303b" + " " + "px-6 py-2 text-red-600 font-semibold border-2 border-red-600 bg-white rounded-full hover:bg-red-50 transition duration-150 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-                                        children: isImageUploading ? "アップロード中..." : "画像を選択する"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 504,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                        type: "file",
-                                        ref: fileInputRef,
-                                        onChange: handleImageUpload,
-                                        style: {
-                                            display: "none"
-                                        },
-                                        accept: "image/jpeg, image/png",
-                                        className: "jsx-8fe83a96abdf303b"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 512,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm font-medium",
-                                        children: Array.isArray(serverErrors.item_image) ? serverErrors.item_image[0] : serverErrors.item_image
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 519,
-                                        columnNumber: 13
-                                    }, this),
-                                    form.item_image && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-green-600 font-medium text-sm mt-2",
-                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "jsx-8fe83a96abdf303b",
-                                            children: "✅ 画像がアップロードされました。"
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/(main)/sell/page.tsx",
-                                            lineNumber: 526,
-                                            columnNumber: 17
-                                        }, this)
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 525,
-                                        columnNumber: 15
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 490,
-                                columnNumber: 11
-                            }, this)
-                        ]
-                    }, void 0, true, {
-                        fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 486,
+                        lineNumber: 248,
                         columnNumber: 9
                     }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
-                        onSubmit: submitNewData,
-                        className: "jsx-8fe83a96abdf303b",
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                                className: "jsx-8fe83a96abdf303b" + " " + "mb-10",
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-xl font-bold text-gray-700 border-b-2 border-gray-200 pb-2 mb-6",
-                                        children: "商品の詳細"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 534,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: [
-                                                    "カテゴリー ",
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                                        children: "(必須)"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 541,
-                                                        columnNumber: 23
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 540,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "flex flex-wrap justify-center gap-2 px-0 py-2 category-buttons-container",
-                                                children: categories.map((cat, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].Fragment, {
-                                                        children: [
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                                type: "checkbox",
-                                                                id: `cat${index}`,
-                                                                value: cat,
-                                                                name: "category",
-                                                                checked: form.category.includes(cat),
-                                                                onChange: ()=>handleCategoryChange(cat),
-                                                                className: "jsx-8fe83a96abdf303b" + " " + "category-checkbox-input"
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                                lineNumber: 546,
-                                                                columnNumber: 21
-                                                            }, this),
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                                htmlFor: `cat${index}`,
-                                                                className: "jsx-8fe83a96abdf303b" + " " + "category-checkbox-label",
-                                                                children: cat
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                                lineNumber: 555,
-                                                                columnNumber: 21
-                                                            }, this)
-                                                        ]
-                                                    }, index, true, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 545,
-                                                        columnNumber: 19
-                                                    }, this))
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 543,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.category) ? serverErrors.category[0] : serverErrors.category
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 564,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 539,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                htmlFor: "condition",
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: [
-                                                    "商品の状態 ",
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                                        children: "(必須)"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 577,
-                                                        columnNumber: 23
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 573,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
-                                                id: "condition",
-                                                name: "condition",
-                                                value: form.condition || "",
-                                                onChange: handleFormChange,
-                                                className: "jsx-8fe83a96abdf303b" + " " + "w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2",
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
-                                                        value: "",
-                                                        disabled: true,
-                                                        className: "jsx-8fe83a96abdf303b",
-                                                        children: "選択してください"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 586,
-                                                        columnNumber: 17
-                                                    }, this),
-                                                    conditions.map((cond, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
-                                                            value: cond,
-                                                            className: "jsx-8fe83a96abdf303b",
-                                                            children: cond
-                                                        }, index, false, {
-                                                            fileName: "[project]/app/(main)/sell/page.tsx",
-                                                            lineNumber: 590,
-                                                            columnNumber: 19
-                                                        }, this))
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 579,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.condition) ? serverErrors.condition[0] : serverErrors.condition
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 595,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 572,
-                                        columnNumber: 13
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 533,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                                className: "jsx-8fe83a96abdf303b" + " " + "mb-10",
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-xl font-bold text-gray-700 border-b-2 border-gray-200 pb-2 mb-6",
-                                        children: "商品名と説明"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 604,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                htmlFor: "name",
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: [
-                                                    "商品名 ",
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                                        children: "(必須)"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 614,
-                                                        columnNumber: 21
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 610,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                id: "name",
-                                                name: "name",
-                                                type: "text",
-                                                value: form.name || "",
-                                                onChange: handleFormChange,
-                                                className: "jsx-8fe83a96abdf303b" + " " + "w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2"
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 616,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.name) ? serverErrors.name[0] : serverErrors.name
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 624,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 609,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                htmlFor: "brand",
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: "ブランド名"
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 633,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                id: "brand",
-                                                name: "brand",
-                                                type: "text",
-                                                value: form.brand || "",
-                                                onChange: handleFormChange,
-                                                className: "jsx-8fe83a96abdf303b" + " " + "w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 p-2"
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 639,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.brand) ? serverErrors.brand[0] : serverErrors.brand
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 647,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 632,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                htmlFor: "explain",
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: [
-                                                    "商品の説明 ",
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                                        children: "(必須)"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 660,
-                                                        columnNumber: 23
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 656,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
-                                                id: "explain",
-                                                name: "explain",
-                                                value: form.explain || "",
-                                                onChange: handleFormChange,
-                                                className: "jsx-8fe83a96abdf303b" + " " + "w-full border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity0 p-2 min-h-[120px] resize-y"
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 662,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.explain) ? serverErrors.explain[0] : serverErrors.explain
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 669,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 655,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "mb-6",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                htmlFor: "price",
-                                                className: "jsx-8fe83a96abdf303b" + " " + "block text-sm font-bold text-gray-700 mb-3",
-                                                children: [
-                                                    "販売価格 ",
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm",
-                                                        children: "(必須)"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 682,
-                                                        columnNumber: 22
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 678,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "relative",
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "currency-symbol absolute left-3 top-1/2 transform -translate-y-1/2 text-xl font-semibold text-gray-500",
-                                                        children: "¥"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 685,
-                                                        columnNumber: 17
-                                                    }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                        id: "price",
-                                                        name: "price",
-                                                        type: "text",
-                                                        value: form.price !== null ? form.price : "",
-                                                        onChange: handleFormChange,
-                                                        inputMode: "numeric",
-                                                        className: "jsx-8fe83a96abdf303b" + " " + "w-full h-10 border border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 pl-10 pr-2 text-right text-lg font-semibold"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                                        lineNumber: 688,
-                                                        columnNumber: 17
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 684,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-2",
-                                                children: Array.isArray(serverErrors.price) ? serverErrors.price[0] : serverErrors.price
-                                            }, void 0, false, {
-                                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                                lineNumber: 698,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 677,
-                                        columnNumber: 13
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 603,
-                                columnNumber: 11
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "jsx-8fe83a96abdf303b" + " " + "mt-10",
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        type: "submit",
-                                        disabled: isSubmitting || isImageUploading || !form.item_image,
-                                        className: "jsx-8fe83a96abdf303b" + " " + "w-full py-3 bg-red-600 text-white text-lg font-bold rounded-lg shadow-md hover:bg-red-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed",
-                                        children: isSubmitting ? "出品処理中..." : "出品する"
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 708,
-                                        columnNumber: 13
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "jsx-8fe83a96abdf303b" + " " + "text-red-500 text-sm mt-3 text-center",
-                                        children: !form.item_image && !isImageUploading && !isSubmitting ? "商品画像をアップロードしてください。" : ""
-                                    }, void 0, false, {
-                                        fileName: "[project]/app/(main)/sell/page.tsx",
-                                        lineNumber: 715,
-                                        columnNumber: 13
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 707,
-                                columnNumber: 11
-                            }, this)
-                        ]
-                    }, void 0, true, {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                        ref: fileInputRef,
+                        type: "file",
+                        hidden: true,
+                        onChange: handleImageUpload,
+                        className: "jsx-7ae959381b4c5e2f"
+                    }, void 0, false, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 532,
+                        lineNumber: 255,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/sell/page.tsx",
-                lineNumber: 464,
+                lineNumber: 237,
+                columnNumber: 7
+            }, this),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                onSubmit: submitItem,
+                className: "jsx-7ae959381b4c5e2f",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-2",
+                                children: "カテゴリー"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 266,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "flex flex-wrap gap-2",
+                                children: categories.map((cat, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].Fragment, {
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                type: "checkbox",
+                                                id: `cat-${i}`,
+                                                checked: form.category.includes(cat),
+                                                onChange: ()=>handleCategoryChange(cat),
+                                                className: "jsx-7ae959381b4c5e2f" + " " + "cat-input"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                                lineNumber: 270,
+                                                columnNumber: 17
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                htmlFor: `cat-${i}`,
+                                                className: "jsx-7ae959381b4c5e2f" + " " + "cat-label",
+                                                children: cat
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                                lineNumber: 277,
+                                                columnNumber: 17
+                                            }, this)
+                                        ]
+                                    }, i, true, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 269,
+                                        columnNumber: 15
+                                    }, this))
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 267,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 265,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-2",
+                                children: "商品の状態"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 287,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
+                                name: "condition",
+                                value: form.condition ?? "",
+                                onChange: handleFormChange,
+                                className: "jsx-7ae959381b4c5e2f" + " " + "w-full h-11 border rounded px-3",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                        value: "",
+                                        disabled: true,
+                                        className: "jsx-7ae959381b4c5e2f",
+                                        children: "選択してください"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 294,
+                                        columnNumber: 13
+                                    }, this),
+                                    conditions.map((c)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                            className: "jsx-7ae959381b4c5e2f",
+                                            children: c
+                                        }, c, false, {
+                                            fileName: "[project]/app/(main)/sell/page.tsx",
+                                            lineNumber: 298,
+                                            columnNumber: 15
+                                        }, this))
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 288,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 286,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-1",
+                                children: "ブランド"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 305,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                name: "brand",
+                                placeholder: "例：SONY / ソニー / Apple Inc.",
+                                value: form.brand ?? "",
+                                onChange: handleFormChange,
+                                className: "jsx-7ae959381b4c5e2f" + " " + "w-full h-11 border rounded px-3"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 306,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "text-xs text-gray-500 mt-1",
+                                children: "※ 入力内容は AI により正規化されます"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 313,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 304,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-2",
+                                children: "商品名"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 320,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                name: "name",
+                                value: form.name ?? "",
+                                onChange: handleFormChange,
+                                className: "jsx-7ae959381b4c5e2f" + " " + "w-full h-11 border rounded px-3"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 321,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 319,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-6",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-2",
+                                children: "商品説明"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 331,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                name: "explain",
+                                rows: 5,
+                                value: form.explain ?? "",
+                                onChange: handleFormChange,
+                                className: "jsx-7ae959381b4c5e2f" + " " + "w-full border rounded p-3"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 332,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 330,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+                        className: "jsx-7ae959381b4c5e2f" + " " + "mb-8",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                className: "jsx-7ae959381b4c5e2f" + " " + "font-bold block mb-2",
+                                children: "価格"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 343,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                name: "price",
+                                type: "number",
+                                value: form.price ?? "",
+                                onChange: handleFormChange,
+                                className: "jsx-7ae959381b4c5e2f" + " " + "w-full h-11 border rounded px-3 text-right"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 344,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 342,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        type: "submit",
+                        disabled: isSubmitting,
+                        className: "jsx-7ae959381b4c5e2f" + " " + "w-full py-3 bg-red-600 text-white rounded font-bold",
+                        children: "出品する"
+                    }, void 0, false, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 353,
+                        columnNumber: 9
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/app/(main)/sell/page.tsx",
+                lineNumber: 263,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-                id: "8fe83a96abdf303b",
-                children: ".category-checkbox-input.jsx-8fe83a96abdf303b{display:none}.category-checkbox-label.jsx-8fe83a96abdf303b{color:#ef4444;cursor:pointer;white-space:nowrap;background-color:#fff;border:2px solid #ef4444;border-radius:9999px;padding:6px 14px;font-size:.75rem;font-weight:600;line-height:1;transition:background-color .2s,border-color .2s,color .2s}.category-checkbox-input.jsx-8fe83a96abdf303b:checked+.category-checkbox-label.jsx-8fe83a96abdf303b{color:#fff;background-color:#ef4444;border-color:#ef4444}"
+                id: "7ae959381b4c5e2f",
+                children: ".cat-input.jsx-7ae959381b4c5e2f{display:none}.cat-label.jsx-7ae959381b4c5e2f{color:#ef4444;cursor:pointer;border:2px solid #ef4444;border-radius:9999px;padding:6px 14px;font-size:.75rem;font-weight:600}.cat-input.jsx-7ae959381b4c5e2f:checked+.cat-label.jsx-7ae959381b4c5e2f{color:#fff;background:#ef4444}"
             }, void 0, false, void 0, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/sell/page.tsx",
-        lineNumber: 463,
+        lineNumber: 233,
         columnNumber: 5
     }, this);
 }
-_s(ItemSellPage, "QzSqg953PZrZr9ZL89PP25WR0Xo=", true, function() {
+_s(ItemSellPage, "qvPd9rESoGB/vUeNX2UrO41mHnA=", false, function() {
     return [
-        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$ui$2f$auth$2f$useAuth$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]
     ];
 });
 _c = ItemSellPage;

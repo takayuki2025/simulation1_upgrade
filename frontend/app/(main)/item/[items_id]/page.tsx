@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
-import { getImageUrl, onImageError } from "@/utils/utils";
+import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import { mutate as globalMutate } from "swr";
 
 import styles from "./W-ItemDetailView.module.css";
@@ -293,9 +293,12 @@ export default function ItemDetailPage() {
                     <div key={comment.id} className={styles.commentItem}>
                       <div className={styles.commentUserRow}>
                         <img
-                          src={getImageUrl(comment.user.user_image)}
+                          src={getImageUrl(
+                            comment.user.user_image,
+                            IMAGE_TYPE.USER,
+                          )}
                           className={styles.commentUserImage}
-                          onError={(e) => onImageError(e, comment.user.name)}
+                          onError={onImageError}
                         />
                         <p className={styles.commentUserName}>
                           {comment.user.name}

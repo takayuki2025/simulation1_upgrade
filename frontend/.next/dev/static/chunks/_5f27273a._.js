@@ -3,7 +3,7 @@
 "use strict";
 
 // ======================================
-// 画像タイプ Enum
+// IMAGE TYPE（fallback 用）
 // ======================================
 __turbopack_context__.s([
     "IMAGE_TYPE",
@@ -21,22 +21,43 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     return IMAGE_TYPE;
 }({});
 // ======================================
-//  API ベースURL（使わないが一応保持）
+// Backend Base URL
 // ======================================
-const STORAGE_BASE_URL = ("TURBOPACK compile-time value", "https://localhost/storage") ?? "https://localhost/storage";
-function getImageUrl(path) {
+const BACKEND_BASE_URL = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
+// ======================================
+// Fallback Images（実在パス）
+// ======================================
+const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+function getImageUrl(path, type = "other") {
+    // --- 未設定 ---
     if (!path) {
-        return "/images/no-image.png";
+        if (type === "user") return DEFAULT_USER_IMAGE;
+        return DEFAULT_ITEM_IMAGE;
     }
+    // --- 完全 URL ---
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return path;
     }
-    return `${STORAGE_BASE_URL}/${path}`;
+    // --- /storage から始まる ---
+    if (path.startsWith("/storage/")) {
+        return `${BACKEND_BASE_URL}${path}`;
+    }
+    // --- pictures_user（storage 不要） ---
+    if (path.startsWith("pictures_user/")) {
+        return `${BACKEND_BASE_URL}/${path}`;
+    }
+    // --- item_images / pictures は storage 配下 ---
+    if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+        return `${BACKEND_BASE_URL}/storage/${path}`;
+    }
+    // --- その他（保険） ---
+    return `${BACKEND_BASE_URL}/${path}`;
 }
-const onImageError = (e, name)=>{
-    const img = e.target;
+const onImageError = (e)=>{
+    const img = e.currentTarget;
     img.onerror = null;
-    img.src = `https://placehold.co/300x300?text=${name}`;
+    img.src = "https://placehold.co/300x300?text=No+Image";
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
@@ -91,9 +112,9 @@ function Mypage() {
     const [items, setItems] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const page = searchParams.get("page") === "buy" ? "buy" : "sell";
-    // -----------------------------
+    // =============================
     // プロフィール取得
-    // -----------------------------
+    // =============================
     const fetchProfile = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "Mypage.useCallback[fetchProfile]": async ()=>{
             if (!apiClient) return;
@@ -112,9 +133,9 @@ function Mypage() {
         logout,
         router
     ]);
-    // -----------------------------
+    // =============================
     // 出品 / 購入商品取得
-    // -----------------------------
+    // =============================
     const fetchItems = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "Mypage.useCallback[fetchItems]": async ()=>{
             if (!apiClient) return;
@@ -131,9 +152,9 @@ function Mypage() {
         apiClient,
         page
     ]);
-    // -----------------------------
+    // =============================
     // 初期ロード
-    // -----------------------------
+    // =============================
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Mypage.useEffect": ()=>{
             if (isAuthLoading) return;
@@ -151,7 +172,9 @@ function Mypage() {
     ]);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Mypage.useEffect": ()=>{
-            if (user) fetchItems();
+            if (user) {
+                fetchItems();
+            }
         }
     }["Mypage.useEffect"], [
         user,
@@ -163,11 +186,14 @@ function Mypage() {
             children: "読み込み中..."
         }, void 0, false, {
             fileName: "[project]/app/(main)/mypage/page.tsx",
-            lineNumber: 80,
+            lineNumber: 82,
             columnNumber: 12
         }, this);
     }
     if (!user) return null;
+    // =============================
+    // Render
+    // =============================
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$mypage$2f$W$2d$Mypage$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].profile_page,
         children: [
@@ -179,11 +205,11 @@ function Mypage() {
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                 src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(user.user_image, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["IMAGE_TYPE"].USER),
-                                onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"])(e, user.name),
+                                onError: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"],
                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$mypage$2f$W$2d$Mypage$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].user_image_css
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 89,
+                                lineNumber: 97,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -191,7 +217,7 @@ function Mypage() {
                                 children: user.name
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 94,
+                                lineNumber: 103,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -200,13 +226,13 @@ function Mypage() {
                                 children: "プロフィールを編集"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 98,
+                                lineNumber: 107,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 88,
+                        lineNumber: 96,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -218,7 +244,7 @@ function Mypage() {
                                 children: "出品した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 107,
+                                lineNumber: 116,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -227,19 +253,19 @@ function Mypage() {
                                 children: "購入した商品"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 116,
+                                lineNumber: 125,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 106,
+                        lineNumber: 115,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 87,
+                lineNumber: 95,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -249,7 +275,7 @@ function Mypage() {
                     children: page === "sell" ? "出品した商品はありません" : "購入した商品はありません"
                 }, void 0, false, {
                     fileName: "[project]/app/(main)/mypage/page.tsx",
-                    lineNumber: 127,
+                    lineNumber: 139,
                     columnNumber: 11
                 }, this) : items.map((item)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                         href: `/item/${item.id}`,
@@ -257,34 +283,34 @@ function Mypage() {
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                 src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(item.item_image, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["IMAGE_TYPE"].ITEM),
-                                onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"])(e, item.name)
+                                onError: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"]
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 139,
+                                lineNumber: 151,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 children: item.name
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                                lineNumber: 143,
+                                lineNumber: 155,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, item.id, true, {
                         fileName: "[project]/app/(main)/mypage/page.tsx",
-                        lineNumber: 134,
+                        lineNumber: 146,
                         columnNumber: 13
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/app/(main)/mypage/page.tsx",
-                lineNumber: 125,
+                lineNumber: 137,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/mypage/page.tsx",
-        lineNumber: 86,
+        lineNumber: 91,
         columnNumber: 5
     }, this);
 }

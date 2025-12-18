@@ -41,7 +41,7 @@ const useItemDetailSWR = (itemId)=>{
 "use strict";
 
 // ======================================
-// 画像タイプ Enum
+// IMAGE TYPE（fallback 用）
 // ======================================
 __turbopack_context__.s([
     "IMAGE_TYPE",
@@ -58,22 +58,43 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     return IMAGE_TYPE;
 }({});
 // ======================================
-//  API ベースURL（使わないが一応保持）
+// Backend Base URL
 // ======================================
-const STORAGE_BASE_URL = ("TURBOPACK compile-time value", "https://localhost/storage") ?? "https://localhost/storage";
-function getImageUrl(path) {
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
+// ======================================
+// Fallback Images（実在パス）
+// ======================================
+const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+function getImageUrl(path, type = "other") {
+    // --- 未設定 ---
     if (!path) {
-        return "/images/no-image.png";
+        if (type === "user") return DEFAULT_USER_IMAGE;
+        return DEFAULT_ITEM_IMAGE;
     }
+    // --- 完全 URL ---
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return path;
     }
-    return `${STORAGE_BASE_URL}/${path}`;
+    // --- /storage から始まる ---
+    if (path.startsWith("/storage/")) {
+        return `${BACKEND_BASE_URL}${path}`;
+    }
+    // --- pictures_user（storage 不要） ---
+    if (path.startsWith("pictures_user/")) {
+        return `${BACKEND_BASE_URL}/${path}`;
+    }
+    // --- item_images / pictures は storage 配下 ---
+    if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+        return `${BACKEND_BASE_URL}/storage/${path}`;
+    }
+    // --- その他（保険） ---
+    return `${BACKEND_BASE_URL}/${path}`;
 }
-const onImageError = (e, name)=>{
-    const img = e.target;
+const onImageError = (e)=>{
+    const img = e.currentTarget;
     img.onerror = null;
-    img.src = `https://placehold.co/300x300?text=${name}`;
+    img.src = "https://placehold.co/300x300?text=No+Image";
 };
 }),
 "[project]/app/(main)/item/[items_id]/W-ItemDetailView.module.css [app-ssr] (css module)", ((__turbopack_context__) => {
@@ -620,9 +641,9 @@ function ItemDetailPage() {
                                                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$ssr$5d$__$28$css__module$29$__["default"].commentUserRow,
                                                         children: [
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                                src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getImageUrl"])(comment.user.user_image),
+                                                                src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getImageUrl"])(comment.user.user_image, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["IMAGE_TYPE"].USER),
                                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$ssr$5d$__$28$css__module$29$__["default"].commentUserImage,
-                                                                onError: (e)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onImageError"])(e, comment.user.name)
+                                                                onError: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["onImageError"]
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
                                                                 lineNumber: 295,
@@ -633,7 +654,7 @@ function ItemDetailPage() {
                                                                 children: comment.user.name
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                                lineNumber: 300,
+                                                                lineNumber: 303,
                                                                 columnNumber: 25
                                                             }, this)
                                                         ]
@@ -647,7 +668,7 @@ function ItemDetailPage() {
                                                         children: comment.comment
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 305,
+                                                        lineNumber: 308,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
@@ -659,7 +680,7 @@ function ItemDetailPage() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 307,
+                                                        lineNumber: 310,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
@@ -677,7 +698,7 @@ function ItemDetailPage() {
                                         children: "まだコメントはありません。"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 315,
+                                        lineNumber: 318,
                                         columnNumber: 17
                                     }, this)
                                 ]
@@ -694,7 +715,7 @@ function ItemDetailPage() {
                                         children: "商品へのコメント"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 321,
+                                        lineNumber: 324,
                                         columnNumber: 15
                                     }, this),
                                     commentErrors.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -703,12 +724,12 @@ function ItemDetailPage() {
                                                 children: err
                                             }, index, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 326,
+                                                lineNumber: 329,
                                                 columnNumber: 21
                                             }, this))
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 324,
+                                        lineNumber: 327,
                                         columnNumber: 17
                                     }, this),
                                     isAuthenticated ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -720,7 +741,7 @@ function ItemDetailPage() {
                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$ssr$5d$__$28$css__module$29$__["default"].textarea
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 333,
+                                                lineNumber: 336,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -730,7 +751,7 @@ function ItemDetailPage() {
                                                 children: isSubmittingComment ? "投稿中..." : "コメントを送信する"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 340,
+                                                lineNumber: 343,
                                                 columnNumber: 19
                                             }, this)
                                         ]
@@ -743,13 +764,13 @@ function ItemDetailPage() {
                                         children: "ログインしてコメントする"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 349,
+                                        lineNumber: 352,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 320,
+                                lineNumber: 323,
                                 columnNumber: 13
                             }, this)
                         ]

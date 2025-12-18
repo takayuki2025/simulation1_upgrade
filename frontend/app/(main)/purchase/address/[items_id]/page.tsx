@@ -1,167 +1,157 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/ui/auth/useAuth";
-import { useUserProfileSWR } from "@/services/useUserProfileSWR";
+import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
+import styles from "./W-Mypage.module.css";
 
-import styles from "./W-Purchase-Address.module.css";
-
-type AddressForm = {
-  postNumber: string;
-  address: string;
-  building: string;
+/**
+ * /storage/ が二重になるのを防ぐための正規化関数
+ */
+const normalizeImagePath = (path?: string | null) => {
+  if (!path) return null;
+  return path.replace(/^\/?storage\//, "");
 };
 
-export default function PurchaseAddressPage() {
+export default function Mypage() {
   const router = useRouter();
-  const params = useParams();
-  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
+  const searchParams = useSearchParams();
 
-  /* =========================
-     🧩 itemId（戻り用）
-  ========================= */
-  const itemId = useMemo(() => {
-    const raw = params.item_id;
-    const id = Array.isArray(raw) ? raw[0] : raw;
-    const n = Number(id);
-    return Number.isNaN(n) ? null : n;
-  }, [params.item_id]);
+  const {
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    apiClient,
+    logout,
+  } = useAuth();
 
-  /* =========================
-     📦 Profile
-  ========================= */
-  const { profile, isLoading: isProfileLoading } = useUserProfileSWR();
+  const [user, setUser] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [form, setForm] = useState<AddressForm>({
-    postNumber: "",
-    address: "",
-    building: "",
-  });
+  const page = searchParams.get("page") === "buy" ? "buy" : "sell";
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  /* =========================
-     初期値反映
-  ========================= */
-  useEffect(() => {
-    if (!profile) return;
-
-    setForm({
-      postNumber: profile.postNumber ?? "",
-      address: profile.address ?? "",
-      building: profile.building ?? "",
-    });
-  }, [profile]);
-
-  const isPageLoading = isAuthLoading || isProfileLoading;
-
-  /* =========================
-     更新処理
-  ========================= */
-  const submitAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // -----------------------------
+  // プロフィール取得
+  // -----------------------------
+  const fetchProfile = useCallback(async () => {
     if (!apiClient) return;
+    try {
+      const res = await apiClient.get("/mypage/profile");
+      setUser(res.data.user ?? res.data);
+    } catch (e: any) {
+      if (e.response?.status === 401) {
+        await logout();
+        router.replace("/login");
+      }
+    }
+  }, [apiClient, logout, router]);
 
-    setIsSubmitting(true);
-    setError("");
+  // -----------------------------
+  // 出品 / 購入商品取得
+  // -----------------------------
+  const fetchItems = useCallback(async () => {
+    if (!apiClient) return;
+    setIsLoading(true);
 
     try {
-      await apiClient.patch("/profile", {
-        post_number: form.postNumber,
-        address: form.address,
-        building: form.building,
-      });
-
-      router.push(`/purchase/${itemId}`);
-    } catch (err: any) {
-      setError("住所の更新に失敗しました");
+      const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
+      const res = await apiClient.get(endpoint);
+      setItems(res.data.items ?? []);
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
-  };
+  }, [apiClient, page]);
 
-  /* =========================
-     Guard
-  ========================= */
-  if (isPageLoading) {
-    return <div className={styles.loading}>読み込み中...</div>;
+  // -----------------------------
+  // 初期ロード
+  // -----------------------------
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+
+    fetchProfile();
+  }, [isAuthLoading, isAuthenticated, fetchProfile, router]);
+
+  useEffect(() => {
+    if (user) fetchItems();
+  }, [user, fetchItems]);
+
+  if (isAuthLoading || isLoading) {
+    return <div className="text-center p-10">読み込み中...</div>;
   }
 
-  if (!isAuthenticated) {
-    router.replace("/login");
-    return null;
-  }
+  if (!user) return null;
 
-  /* =========================
-     UI
-  ========================= */
   return (
-    <div className={styles.wrapper}>
-      <h2 className={styles.title}>配送先住所の変更</h2>
-
-      <form onSubmit={submitAddress} className={styles.form}>
-        {/* 郵便番号 */}
-        <div className={styles.formGroup}>
-          <label>郵便番号</label>
-          <input
-            type="text"
-            value={form.postNumber}
-            placeholder="例: 100-0001"
-            onChange={(e) =>
-              setForm((v) => ({ ...v, postNumber: e.target.value }))
-            }
+    <div className={styles.profile_page}>
+      <div className={styles.profile_header}>
+        <div className={styles.profile_header_1}>
+          <img
+            src={getImageUrl(normalizeImagePath(user.user_image))}
+            onError={(e) => onImageError(e, user.name)}
           />
-        </div>
 
-        {/* 住所 */}
-        <div className={styles.formGroup}>
-          <label>住所</label>
-          <input
-            type="text"
-            value={form.address}
-            placeholder="都道府県・市区町村"
-            onChange={(e) =>
-              setForm((v) => ({ ...v, address: e.target.value }))
-            }
-          />
-        </div>
-
-        {/* 建物名 */}
-        <div className={styles.formGroup}>
-          <label>建物名</label>
-          <input
-            type="text"
-            value={form.building}
-            placeholder="建物名・部屋番号"
-            onChange={(e) =>
-              setForm((v) => ({ ...v, building: e.target.value }))
-            }
-          />
-        </div>
-
-        {error && <p className={styles.error}>{error}</p>}
-
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.cancel}
-            onClick={() => router.back()}
-          >
-            戻る
-          </button>
+          <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
+            {user.name}
+          </h2>
 
           <button
-            type="submit"
-            className={styles.submit}
-            disabled={isSubmitting}
+            onClick={() => router.push("/mypage/profile")}
+            className="ml-auto px-4 py-2 border border-red-500 text-red-500 rounded"
           >
-            更新する
+            プロフィールを編集
           </button>
         </div>
-      </form>
+
+        <div className={styles.profile_header_2}>
+          <Link
+            href="/mypage?page=sell"
+            className={
+              page === "sell" ? styles.active_tab : styles.inactive_tab
+            }
+          >
+            出品した商品
+          </Link>
+
+          <Link
+            href="/mypage?page=buy"
+            className={page === "buy" ? styles.active_tab : styles.inactive_tab}
+          >
+            購入した商品
+          </Link>
+        </div>
+      </div>
+
+      <div className={styles.items_select}>
+        {items.length === 0 ? (
+          <p className="text-center text-gray-500">
+            {page === "sell"
+              ? "出品した商品はありません"
+              : "購入した商品はありません"}
+          </p>
+        ) : (
+          items.map((item) => (
+            <Link
+              key={item.id}
+              href={`/item/${item.id}`}
+              className={styles.items_select_all}
+            >
+              <img
+                src={getImageUrl(normalizeImagePath(item.item_image))}
+                onError={(e) => onImageError(e, item.name)}
+              />
+              <div>{item.name}</div>
+            </Link>
+          ))
+        )}
+      </div>
     </div>
   );
 }

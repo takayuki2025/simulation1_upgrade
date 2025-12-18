@@ -3,7 +3,7 @@
 "use strict";
 
 // ======================================
-// 画像タイプ Enum
+// IMAGE TYPE（fallback 用）
 // ======================================
 __turbopack_context__.s([
     "IMAGE_TYPE",
@@ -21,22 +21,43 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     return IMAGE_TYPE;
 }({});
 // ======================================
-//  API ベースURL（使わないが一応保持）
+// Backend Base URL
 // ======================================
-const STORAGE_BASE_URL = ("TURBOPACK compile-time value", "https://localhost/storage") ?? "https://localhost/storage";
-function getImageUrl(path) {
+const BACKEND_BASE_URL = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
+// ======================================
+// Fallback Images（実在パス）
+// ======================================
+const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+function getImageUrl(path, type = "other") {
+    // --- 未設定 ---
     if (!path) {
-        return "/images/no-image.png";
+        if (type === "user") return DEFAULT_USER_IMAGE;
+        return DEFAULT_ITEM_IMAGE;
     }
+    // --- 完全 URL ---
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return path;
     }
-    return `${STORAGE_BASE_URL}/${path}`;
+    // --- /storage から始まる ---
+    if (path.startsWith("/storage/")) {
+        return `${BACKEND_BASE_URL}${path}`;
+    }
+    // --- pictures_user（storage 不要） ---
+    if (path.startsWith("pictures_user/")) {
+        return `${BACKEND_BASE_URL}/${path}`;
+    }
+    // --- item_images / pictures は storage 配下 ---
+    if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+        return `${BACKEND_BASE_URL}/storage/${path}`;
+    }
+    // --- その他（保険） ---
+    return `${BACKEND_BASE_URL}/${path}`;
 }
-const onImageError = (e, name)=>{
-    const img = e.target;
+const onImageError = (e)=>{
+    const img = e.currentTarget;
     img.onerror = null;
-    img.src = `https://placehold.co/300x300?text=${name}`;
+    img.src = "https://placehold.co/300x300?text=No+Image";
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);

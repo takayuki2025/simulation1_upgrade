@@ -138,7 +138,7 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 "use strict";
 
 // ======================================
-// 画像タイプ Enum
+// IMAGE TYPE（fallback 用）
 // ======================================
 __turbopack_context__.s([
     "IMAGE_TYPE",
@@ -156,22 +156,43 @@ var IMAGE_TYPE = /*#__PURE__*/ function(IMAGE_TYPE) {
     return IMAGE_TYPE;
 }({});
 // ======================================
-//  API ベースURL（使わないが一応保持）
+// Backend Base URL
 // ======================================
-const STORAGE_BASE_URL = ("TURBOPACK compile-time value", "https://localhost/storage") ?? "https://localhost/storage";
-function getImageUrl(path) {
+const BACKEND_BASE_URL = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
+// ======================================
+// Fallback Images（実在パス）
+// ======================================
+const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+function getImageUrl(path, type = "other") {
+    // --- 未設定 ---
     if (!path) {
-        return "/images/no-image.png";
+        if (type === "user") return DEFAULT_USER_IMAGE;
+        return DEFAULT_ITEM_IMAGE;
     }
+    // --- 完全 URL ---
     if (path.startsWith("http://") || path.startsWith("https://")) {
         return path;
     }
-    return `${STORAGE_BASE_URL}/${path}`;
+    // --- /storage から始まる ---
+    if (path.startsWith("/storage/")) {
+        return `${BACKEND_BASE_URL}${path}`;
+    }
+    // --- pictures_user（storage 不要） ---
+    if (path.startsWith("pictures_user/")) {
+        return `${BACKEND_BASE_URL}/${path}`;
+    }
+    // --- item_images / pictures は storage 配下 ---
+    if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+        return `${BACKEND_BASE_URL}/storage/${path}`;
+    }
+    // --- その他（保険） ---
+    return `${BACKEND_BASE_URL}/${path}`;
 }
-const onImageError = (e, name)=>{
-    const img = e.target;
+const onImageError = (e)=>{
+    const img = e.currentTarget;
     img.onerror = null;
-    img.src = `https://placehold.co/300x300?text=${name}`;
+    img.src = "https://placehold.co/300x300?text=No+Image";
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
@@ -368,9 +389,10 @@ function Home() {
                                             className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].itemImageWrapper,
                                             children: [
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                    src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(item.item_image),
+                                                    src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getImageUrl"])(item.item_image, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["IMAGE_TYPE"].ITEM),
                                                     alt: item.name,
-                                                    className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].itemImage
+                                                    className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$W$2d$Resource$2d$Rich$2d$Simulation$2d$Center$2d$Home$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].itemImage,
+                                                    onError: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"]
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
                                                     lineNumber: 125,
@@ -381,7 +403,7 @@ function Home() {
                                                     children: "SOLD"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 131,
+                                                    lineNumber: 132,
                                                     columnNumber: 25
                                                 }, this)
                                             ]
@@ -398,7 +420,7 @@ function Home() {
                                                     children: item.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 136,
+                                                    lineNumber: 137,
                                                     columnNumber: 23
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -409,13 +431,13 @@ function Home() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/app/(main)/page.tsx",
-                                                    lineNumber: 137,
+                                                    lineNumber: 138,
                                                     columnNumber: 23
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/(main)/page.tsx",
-                                            lineNumber: 135,
+                                            lineNumber: 136,
                                             columnNumber: 21
                                         }, this)
                                     ]
@@ -433,7 +455,7 @@ function Home() {
                             children: currentTab === "mylist" && !isAuthenticated ? "マイリストを見るにはログインが必要です。" : "該当する商品が見つかりませんでした。"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/page.tsx",
-                            lineNumber: 145,
+                            lineNumber: 146,
                             columnNumber: 15
                         }, this)
                     }, void 0, false, {

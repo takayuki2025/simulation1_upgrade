@@ -1,5 +1,5 @@
 // ======================================
-// 画像タイプ Enum
+// IMAGE TYPE（fallback 用）
 // ======================================
 export enum IMAGE_TYPE {
   USER = "user",
@@ -8,73 +8,60 @@ export enum IMAGE_TYPE {
 }
 
 // ======================================
-//  API ベースURL（使わないが一応保持）
+// Backend Base URL
 // ======================================
-const STORAGE_BASE_URL =
-  process.env.NEXT_PUBLIC_IMAGE_BASE_URL ?? "https://localhost/storage";
-
-
-
-// export const BASE =
-//   process.env.NEXT_PUBLIC_API_BASE_URL || "https://laravel.test";
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://localhost";
 
 // ======================================
-//  getImageUrl(path, type, cacheBuster)
+// Fallback Images（実在パス）
 // ======================================
-/**
- * getImageUrl
- *
- * Backend から返る画像パス（相対 or 完全URL）を
- * 「ブラウザでそのまま使えるURL」に正規化する。
- *
- * - Domain / API は「生パス」しか知らない
- * - CDN / S3 切り替えはここだけを変更する
- */
-export function getImageUrl(path?: string | null): string {
+const DEFAULT_USER_IMAGE = `${BACKEND_BASE_URL}/pictures_user/default-profile2.jpg`;
+
+const DEFAULT_ITEM_IMAGE = `${BACKEND_BASE_URL}/storage/pictures/no-image.png`;
+
+// ======================================
+// getImageUrl（Laravel 実態対応版）
+// ======================================
+export function getImageUrl(
+  path?: string | null,
+  type: IMAGE_TYPE = IMAGE_TYPE.OTHER,
+): string {
+  // --- 未設定 ---
   if (!path) {
-    return "/images/no-image.png";
+    if (type === IMAGE_TYPE.USER) return DEFAULT_USER_IMAGE;
+    return DEFAULT_ITEM_IMAGE;
   }
 
+  // --- 完全 URL ---
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
-  return `${STORAGE_BASE_URL}/${path}`;
+  // --- /storage から始まる ---
+  if (path.startsWith("/storage/")) {
+    return `${BACKEND_BASE_URL}${path}`;
+  }
+
+  // --- pictures_user（storage 不要） ---
+  if (path.startsWith("pictures_user/")) {
+    return `${BACKEND_BASE_URL}/${path}`;
+  }
+
+  // --- item_images / pictures は storage 配下 ---
+  if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+    return `${BACKEND_BASE_URL}/storage/${path}`;
+  }
+
+  // --- その他（保険） ---
+  return `${BACKEND_BASE_URL}/${path}`;
 }
 
-
-
-
-
-
-// export const getImageUrl = (
-//   path: string | null,
-//   _type?: IMAGE_TYPE,
-//   cacheBuster?: number,
-// ): string => {
-//   if (!path) return "https://placehold.co/300x300?text=No+Image";
-
-//   // Laravel が返した public URL / public path はそのまま使う
-//   if (
-//     path.startsWith("/") ||
-//     path.startsWith("http://") ||
-//     path.startsWith("https://")
-//   ) {
-//     return cacheBuster ? `${path}?v=${cacheBuster}` : path;
-//   }
-
-//   // 想定外（保険）
-//   return cacheBuster ? `/${path}?v=${cacheBuster}` : `/${path}`;
-// };
-
 // ======================================
-// 画像エラー時の差し替え
+// onImageError（型安全）
 // ======================================
-export const onImageError = (
-  e: React.SyntheticEvent<HTMLImageElement, Event>,
-  name: string,
-) => {
-  const img = e.target as HTMLImageElement;
+export const onImageError: React.ReactEventHandler<HTMLImageElement> = (e) => {
+  const img = e.currentTarget;
   img.onerror = null;
-  img.src = `https://placehold.co/300x300?text=${name}`;
+  img.src = "https://placehold.co/300x300?text=No+Image";
 };

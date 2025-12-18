@@ -3,11 +3,18 @@
 
 __turbopack_context__.v({
   "actions": "W-Item-Sell-module__E2Da0W__actions",
+  "categoryActive": "W-Item-Sell-module__E2Da0W__categoryActive",
+  "categoryButton": "W-Item-Sell-module__E2Da0W__categoryButton",
+  "categoryButtons": "W-Item-Sell-module__E2Da0W__categoryButtons",
+  "centerTitle": "W-Item-Sell-module__E2Da0W__centerTitle",
   "error": "W-Item-Sell-module__E2Da0W__error",
   "form": "W-Item-Sell-module__E2Da0W__form",
   "formGroup": "W-Item-Sell-module__E2Da0W__formGroup",
+  "hint": "W-Item-Sell-module__E2Da0W__hint",
   "imageBox": "W-Item-Sell-module__E2Da0W__imageBox",
+  "imageBoxWide": "W-Item-Sell-module__E2Da0W__imageBoxWide",
   "imageButton": "W-Item-Sell-module__E2Da0W__imageButton",
+  "imageInner": "W-Item-Sell-module__E2Da0W__imageInner",
   "imagePlaceholder": "W-Item-Sell-module__E2Da0W__imagePlaceholder",
   "preview": "W-Item-Sell-module__E2Da0W__preview",
   "title": "W-Item-Sell-module__E2Da0W__title",
@@ -33,6 +40,28 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
+/* =========================
+   定数
+========================= */ const CATEGORY_LIST = [
+    "ファッション",
+    "家電",
+    "インテリア",
+    "レディース",
+    "メンズ",
+    "コスメ",
+    "本",
+    "ゲーム",
+    "スポーツ",
+    "キッチン",
+    "ハンドメイド",
+    "アクセサリー"
+];
+const CONDITION_LIST = [
+    "良好",
+    "目立った傷や汚れなし",
+    "やや傷や汚れあり",
+    "状態が悪い"
+];
 function ItemSellPage() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
@@ -41,7 +70,10 @@ function ItemSellPage() {
     const [form, setForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         name: "",
         price: "",
-        explain: ""
+        explain: "",
+        brand: "",
+        condition: "",
+        categories: []
     });
     const [imageFile, setImageFile] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [previewUrl, setPreviewUrl] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
@@ -62,6 +94,17 @@ function ItemSellPage() {
         setPreviewUrl(URL.createObjectURL(file));
     };
     /* =========================
+     Category Toggle
+  ========================= */ const toggleCategory = (category)=>{
+        setForm((prev)=>({
+                ...prev,
+                categories: prev.categories.includes(category) ? prev.categories.filter((c)=>c !== category) : [
+                    ...prev.categories,
+                    category
+                ]
+            }));
+    };
+    /* =========================
      Submit
   ========================= */ const submitItem = async (e)=>{
         e.preventDefault();
@@ -73,6 +116,9 @@ function ItemSellPage() {
             formData.append("name", form.name);
             formData.append("price", form.price);
             formData.append("explain", form.explain);
+            formData.append("brand", form.brand);
+            formData.append("condition", form.condition);
+            formData.append("categories", JSON.stringify(form.categories));
             if (imageFile) {
                 formData.append("item_image", imageFile);
             }
@@ -82,7 +128,7 @@ function ItemSellPage() {
                 }
             });
             router.push("/mypage/sell");
-        } catch (err) {
+        } catch  {
             setError("商品の出品に失敗しました");
         } finally{
             setIsSubmitting(false);
@@ -94,11 +140,11 @@ function ItemSellPage() {
         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].wrapper,
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].title,
+                className: `${__TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].title} ${__TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].centerTitle}`,
                 children: "商品の出品"
             }, void 0, false, {
                 fileName: "[project]/app/(main)/sell/page.tsx",
-                lineNumber: 88,
+                lineNumber: 137,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -106,31 +152,33 @@ function ItemSellPage() {
                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].form,
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imageBox,
+                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imageBoxWide,
                         children: [
-                            previewUrl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                src: previewUrl,
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].preview
-                            }, void 0, false, {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imageInner,
+                                children: [
+                                    previewUrl && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                        src: previewUrl,
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].preview
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 143,
+                                        columnNumber: 28
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imageButton,
+                                        onClick: ()=>fileInputRef.current?.click(),
+                                        children: "画像を選択する"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 145,
+                                        columnNumber: 13
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 94,
-                                columnNumber: 13
-                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imagePlaceholder,
-                                children: "画像を選択"
-                            }, void 0, false, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 96,
-                                columnNumber: 13
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                type: "button",
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].imageButton,
-                                onClick: ()=>fileInputRef.current?.click(),
-                                children: "画像を選択する"
-                            }, void 0, false, {
-                                fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 99,
+                                lineNumber: 142,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -141,13 +189,129 @@ function ItemSellPage() {
                                 onChange: handleImageChange
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 107,
+                                lineNumber: 154,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 92,
+                        lineNumber: 141,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].formGroup,
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                children: "カテゴリー（複数選択）"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 165,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].categoryButtons,
+                                children: CATEGORY_LIST.map((cat)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        className: form.categories.includes(cat) ? __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].categoryActive : __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].categoryButton,
+                                        onClick: ()=>toggleCategory(cat),
+                                        children: cat
+                                    }, cat, false, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 168,
+                                        columnNumber: 15
+                                    }, this))
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 166,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 164,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].formGroup,
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                children: "商品の状態"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 186,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
+                                value: form.condition,
+                                onChange: (e)=>setForm((v)=>({
+                                            ...v,
+                                            condition: e.target.value
+                                        })),
+                                required: true,
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                        value: "",
+                                        children: "選択してください"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/(main)/sell/page.tsx",
+                                        lineNumber: 194,
+                                        columnNumber: 13
+                                    }, this),
+                                    CONDITION_LIST.map((c)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                            value: c,
+                                            children: c
+                                        }, c, false, {
+                                            fileName: "[project]/app/(main)/sell/page.tsx",
+                                            lineNumber: 196,
+                                            columnNumber: 15
+                                        }, this))
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 187,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 185,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].formGroup,
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                children: "ブランド（手動入力）"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 205,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                type: "text",
+                                placeholder: "例：Apple / SONY など.",
+                                value: form.brand,
+                                onChange: (e)=>setForm((v)=>({
+                                            ...v,
+                                            brand: e.target.value
+                                        }))
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 206,
+                                columnNumber: 11
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$sell$2f$W$2d$Item$2d$Sell$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].hint,
+                                children: "※ 入力値は AI により正規化されます"
+                            }, void 0, false, {
+                                fileName: "[project]/app/(main)/sell/page.tsx",
+                                lineNumber: 212,
+                                columnNumber: 11
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/app/(main)/sell/page.tsx",
+                        lineNumber: 204,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -157,7 +321,7 @@ function ItemSellPage() {
                                 children: "商品名"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 118,
+                                lineNumber: 219,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -170,13 +334,13 @@ function ItemSellPage() {
                                 required: true
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 119,
+                                lineNumber: 220,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 117,
+                        lineNumber: 218,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -186,27 +350,27 @@ function ItemSellPage() {
                                 children: "価格"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 129,
+                                lineNumber: 230,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
                                 type: "number",
+                                placeholder: "¥",
                                 value: form.price,
                                 onChange: (e)=>setForm((v)=>({
                                             ...v,
                                             price: e.target.value
                                         })),
-                                placeholder: "¥",
                                 required: true
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 130,
+                                lineNumber: 231,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 128,
+                        lineNumber: 229,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -216,7 +380,7 @@ function ItemSellPage() {
                                 children: "商品説明"
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 141,
+                                lineNumber: 242,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
@@ -228,13 +392,13 @@ function ItemSellPage() {
                                         }))
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/sell/page.tsx",
-                                lineNumber: 142,
+                                lineNumber: 243,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 140,
+                        lineNumber: 241,
                         columnNumber: 9
                     }, this),
                     error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -242,7 +406,7 @@ function ItemSellPage() {
                         children: error
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 151,
+                        lineNumber: 252,
                         columnNumber: 19
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -253,28 +417,28 @@ function ItemSellPage() {
                             children: "出品する"
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/sell/page.tsx",
-                            lineNumber: 154,
+                            lineNumber: 255,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/sell/page.tsx",
-                        lineNumber: 153,
+                        lineNumber: 254,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/sell/page.tsx",
-                lineNumber: 90,
+                lineNumber: 139,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/(main)/sell/page.tsx",
-        lineNumber: 87,
+        lineNumber: 136,
         columnNumber: 5
     }, this);
 }
-_s(ItemSellPage, "VH/E8nUvg7prq8dMgiV64jRkQnw=", false, function() {
+_s(ItemSellPage, "P3tLQ/moxQxnLlm2qLf5ssw18Lk=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$ui$2f$auth$2f$useAuth$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]

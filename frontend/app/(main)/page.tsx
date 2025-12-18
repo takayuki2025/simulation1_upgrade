@@ -9,7 +9,7 @@ import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
 import type { Item } from "@/types/item";
-import { getImageUrl } from "@/utils/utils";
+import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
 import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
@@ -123,9 +123,10 @@ export default function Home() {
                   <Link href={`/item/${item.id}`} className={styles.cardLink}>
                     <div className={styles.itemImageWrapper}>
                       <img
-                        src={getImageUrl(item.item_image)}
+                        src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
                         alt={item.name}
                         className={styles.itemImage}
+                        onError={onImageError}
                       />
                       {item.remain === 0 && (
                         <div className={styles.sold_text}>SOLD</div>

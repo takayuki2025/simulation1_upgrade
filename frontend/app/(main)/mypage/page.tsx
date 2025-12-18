@@ -25,11 +25,12 @@ export default function Mypage() {
 
   const page = searchParams.get("page") === "buy" ? "buy" : "sell";
 
-  // -----------------------------
+  // =============================
   // プロフィール取得
-  // -----------------------------
+  // =============================
   const fetchProfile = useCallback(async () => {
     if (!apiClient) return;
+
     try {
       const res = await apiClient.get("/mypage/profile");
       setUser(res.data.user ?? res.data);
@@ -41,16 +42,15 @@ export default function Mypage() {
     }
   }, [apiClient, logout, router]);
 
-  // -----------------------------
+  // =============================
   // 出品 / 購入商品取得
-  // -----------------------------
+  // =============================
   const fetchItems = useCallback(async () => {
     if (!apiClient) return;
-    setIsLoading(true);
 
+    setIsLoading(true);
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
-
       const res = await apiClient.get(endpoint);
       setItems(res.data.items ?? []);
     } finally {
@@ -58,9 +58,9 @@ export default function Mypage() {
     }
   }, [apiClient, page]);
 
-  // -----------------------------
+  // =============================
   // 初期ロード
-  // -----------------------------
+  // =============================
   useEffect(() => {
     if (isAuthLoading) return;
 
@@ -73,7 +73,9 @@ export default function Mypage() {
   }, [isAuthLoading, isAuthenticated, fetchProfile, router]);
 
   useEffect(() => {
-    if (user) fetchItems();
+    if (user) {
+      fetchItems();
+    }
   }, [user, fetchItems]);
 
   if (isAuthLoading || isLoading) {
@@ -82,15 +84,22 @@ export default function Mypage() {
 
   if (!user) return null;
 
+  // =============================
+  // Render
+  // =============================
   return (
     <div className={styles.profile_page}>
+      {/* =============================
+          Header
+      ============================== */}
       <div className={styles.profile_header}>
         <div className={styles.profile_header_1}>
           <img
             src={getImageUrl(user.user_image, IMAGE_TYPE.USER)}
-            onError={(e) => onImageError(e, user.name)}
+            onError={onImageError}
             className={styles.user_image_css}
           />
+
           <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
             {user.name}
           </h2>
@@ -122,6 +131,9 @@ export default function Mypage() {
         </div>
       </div>
 
+      {/* =============================
+          Items
+      ============================== */}
       <div className={styles.items_select}>
         {items.length === 0 ? (
           <p className="text-center text-gray-500">
@@ -138,7 +150,7 @@ export default function Mypage() {
             >
               <img
                 src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
-                onError={(e) => onImageError(e, item.name)}
+                onError={onImageError}
               />
               <div>{item.name}</div>
             </Link>
