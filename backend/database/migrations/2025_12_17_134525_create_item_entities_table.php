@@ -10,27 +10,18 @@ return new class () extends Migration {
         Schema::create('item_entities', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('item_id')
-                ->constrained('items')
-                ->cascadeOnDelete();
+            $table->unsignedBigInteger('item_id')->unique(); // 1:1
+            $table->unsignedBigInteger('brand_entity_id')->nullable();
 
-            $table->string('entity_type', 50);      // brand/category/condition/document_term...
-            $table->text('raw_value');
-            $table->text('canonical_value');
-
-            $table->float('confidence');            // 0.0 - 1.0
-            $table->string('decision', 50);         // auto_accept/needs_review/rejected
-
-            $table->string('policy_version', 50)->nullable(); // decision_policy.v1 等
-            $table->string('schema_version', 50);   // entity_analysis.v1
-            $table->string('engine_version', 50);   // 0.1.0
-
-            $table->json('extensions')->nullable(); // policy_trace/escalation...
+            $table->string('generated_version')->default('v1_brand_only');
+            $table->timestamp('generated_at');
 
             $table->timestamps();
 
-            $table->index(['item_id', 'entity_type']);
-            $table->index(['entity_type', 'decision']);
+            $table->foreign('item_id')->references('id')->on('items')->cascadeOnDelete();
+            $table->foreign('brand_entity_id')->references('id')->on('brand_entities')->nullOnDelete();
+
+            $table->index('brand_entity_id');
         });
     }
 

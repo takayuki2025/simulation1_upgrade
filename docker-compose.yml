@@ -147,6 +147,12 @@ services:
     working_dir: /app
     volumes:
       - ./python_batch/atlaskernel:/app
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: laravel_db
+      DB_USER: laravel_user
+      DB_PASS: laravel_pass
     networks:
       simulation1_network:
         ipv4_address: 172.22.0.8

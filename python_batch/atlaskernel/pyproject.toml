@@ -9,7 +9,8 @@ dependencies = [
   "jsonschema>=4.23",
   "PyYAML>=6.0",
   "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.30.0"
+  "uvicorn[standard]>=0.30.0",
+  "mysql-connector-python (>=9.5.0,<10.0.0)"
 ]
 
 [project.scripts]

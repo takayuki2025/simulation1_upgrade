@@ -3,28 +3,25 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItemEntity extends Model
 {
+    protected $table = 'item_entities';
+
     protected $fillable = [
         'item_id',
-        'entity_type',
-        'raw_value',
-        'canonical_value',
-        'confidence',
-        'decision',
-        'policy_version',
-        'schema_version',
-        'engine_version',
-        'extensions',
-        'is_latest',
+        'brand_entity_id',
+        'generated_version',
+        'generated_at',
     ];
 
     protected $casts = [
-        'extensions' => 'array',
-        'confidence' => 'float',
-        'is_latest' => 'boolean',
+        'generated_at' => 'datetime',
     ];
-}
 
+    public function brandEntity(): BelongsTo
+    {
+        return $this->belongsTo(BrandEntity::class, 'brand_entity_id');
+    }
+}
