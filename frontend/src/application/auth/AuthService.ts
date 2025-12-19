@@ -37,23 +37,14 @@ export class AuthService {
     email: string;
     password: string;
   }): Promise<LoginResult> {
+    // ① Firebase login
     const firebaseUser = await this.firebase.login(email, password);
 
-    const result = await this.issueLaravelTokens(firebaseUser);
+    // ② ★ 必ず最新トークンを取得
+    const firebaseToken = await this.firebase.getFreshIdToken(firebaseUser);
 
-    return {
-      user: result.user,
-      isFirstLogin: result.isFirstLogin,
-    };
-  }
-
-  private async issueLaravelTokens(firebaseUser: User): Promise<{
-    user: AuthUser;
-    isFirstLogin: boolean;
-  }> {
-    const firebaseToken = await this.firebase.getIdToken(firebaseUser);
+    // ③ Laravel に交換
     const deviceId = getDeviceId();
-
     const { tokens, user, isFirstLogin } =
       await this.laravel.loginWithFirebaseToken(firebaseToken, deviceId);
 
@@ -63,7 +54,7 @@ export class AuthService {
   }
 
   async logout() {
-    await this.firebase.logout?.();
+    await this.firebase.logout();
     TokenStorage.clear();
   }
 }

@@ -16,7 +16,7 @@ final class ItemDetailViewDto
         public readonly array $category,
         public readonly ?string $item_image,
         public readonly int $remain,
-        public readonly int $user_id,
+        public readonly ?int $shop_id, // ★ user_id ではなく shop_id
     ) {
     }
 
@@ -25,8 +25,6 @@ final class ItemDetailViewDto
      */
     public static function fromDomain(Item $item): self
     {
-        $imagePath = $item->getItemImage()?->Value();
-
         return new self(
             id: $item->getId()->getValue(),
             name: $item->getName(),
@@ -35,15 +33,12 @@ final class ItemDetailViewDto
             explain: $item->getExplain(),
             condition: $item->getCondition(),
             category: $item->getCategory()->toArray(),
-            item_image: $item->getItemImage()?->Value(),
+            item_image: $item->getItemImage()?->value(),
             remain: $item->getRemain()->getValue(),
-            user_id: $item->getUserId(),
+            shop_id: $item->getShopId(), // ★ ここだけ
         );
     }
 
-    /**
-     * JSON serialize
-     */
     public function toArray(): array
     {
         return get_object_vars($this);

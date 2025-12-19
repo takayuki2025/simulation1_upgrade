@@ -5,20 +5,25 @@ namespace App\Modules\Item\Domain\Service;
 use App\Modules\Item\Domain\ValueObject\SellerId;
 use App\Modules\Item\Domain\ValueObject\SellerType;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use App\Models\Shop;
 use Illuminate\Support\Facades\DB;
 
 final class SellerResolver
 {
     public function resolve(
-        string $sellerRaw,
+        string $rawSellerId,
         AuthPrincipal $principal,
         ?int $tenantId = null,
     ): SellerId {
-        [$type, $id] = $this->parse($sellerRaw);
+
+        [$type, $id] = $this->parse($rawSellerId);
 
         return match ($type) {
-            SellerType::INDIVIDUAL => $this->resolveIndividual($id, $principal),
-            SellerType::SHOP       => $this->resolveShop($id, $principal, $tenantId),
+            SellerType::INDIVIDUAL =>
+                $this->resolveIndividual($id, $principal),
+
+            SellerType::SHOP =>
+                $this->resolveShop($id, $principal, $tenantId),
         };
     }
 
@@ -30,16 +35,22 @@ final class SellerResolver
 
         [$type, $id] = explode(':', $raw, 2);
 
-        return [SellerType::from($type), (int) $id];
+        return [
+            SellerType::from($type),
+            (int) $id
+        ];
     }
 
     private function resolveIndividual(
         int $userId,
         AuthPrincipal $principal,
     ): SellerId {
-        if ((int) $principal->providerUid !== $userId) {
+
+
+        if ($principal->userId !== $userId) {
             throw new \DomainException('Cannot sell as another user.');
         }
+
 
         return SellerId::user($userId);
     }
@@ -49,12 +60,13 @@ final class SellerResolver
         AuthPrincipal $principal,
         ?int $tenantId,
     ): SellerId {
+
         if ($tenantId !== null && $tenantId !== $shopId) {
             throw new \DomainException('Tenant mismatch.');
         }
 
         $hasRole = DB::table('role_user')
-            ->where('user_id', (int) $principal->providerUid)
+            ->where('user_id', $principal->userId)
             ->where('shop_id', $shopId)
             ->exists();
 

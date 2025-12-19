@@ -17,7 +17,6 @@ export class FirebaseAuthClient {
     if (typeof window === "undefined") {
       throw new Error("FirebaseAuthClient must be used on client only");
     }
-
     this.auth = getFirebaseAuth();
   }
 
@@ -31,20 +30,15 @@ export class FirebaseAuthClient {
   }
 
   async login(email: string, password: string): Promise<User> {
-    try {
-      return (await signInWithEmailAndPassword(this.auth, email, password))
-        .user;
-    } catch (e) {
-      console.error("[Firebase login error]", e);
-      throw e;
-    }
+    const result = await signInWithEmailAndPassword(this.auth, email, password);
+    return result.user;
   }
 
-  async getIdToken(user: User): Promise<string> {
-    return user.getIdToken(true);
+  /** ★ 常に最新トークンを取得（超重要） */
+  async getFreshIdToken(user: User): Promise<string> {
+    return user.getIdToken(true); // ← true 必須
   }
 
-  // ★ 追加
   async logout(): Promise<void> {
     await signOut(this.auth);
   }

@@ -23,30 +23,78 @@ final class LoginOrRegisterUseCase
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
         // ① Firebase 検証（SSOT）
+
         $verified = $this->firebase->verifyToken($input->firebaseIdToken);
 
 
+        \Log::info('[LoginOrRegister] firebase verified', [
+            'keys' => array_keys($verified),
+            'verified' => $verified,
+        ]);
 
+
+
+        $firebaseUid = $verified['sub'];
+
+
+
+        \Log::info('[LoginOrRegister] firebase uid resolved', [
+            'firebaseUid' => $firebaseUid,
+        ]);
+
+
+        $email = $verified['email'] ?? null;
+        $emailVerified = (bool) ($verified['email_verified'] ?? false);
+        $displayName = $verified['name'] ?? null;
+
+
+        // ② AuthPrincipal（※ userId はまだ不要）
         $principal = new AuthPrincipal(
             provider: 'firebase',
-            providerUid: $verified['sub'],
-            email: $verified['email'] ?? null,
-            emailVerified: (bool) ($verified['email_verified'] ?? false),
-            displayName: $input->displayName
-                ?? ($verified['name'] ?? $verified['email'] ?? null),
+            providerUid: $firebaseUid,
+            userId: 0,                 // ★ 仮（次で確定）
+            email: $email,
+            emailVerified: $emailVerified,
+            displayName: $displayName,
+            shopIds: [],               // ★ 仮（次で確定）
         );
 
-
-
-        // ② User側で provision（作成/初回ログイン/初期ロール/メール同期はUser責務）
+        // ③ User 側で provision（user 作成 or 取得）
         $provisioned = $this->userProvisioning->provision($principal);
 
-        // ③ Access Token（JWT）発行（User/Eloquentに依存しない）
+
+        \Log::info('[LoginOrRegister] provisioned user', [
+            'userId'        => $provisioned->userId,
+            'email'         => $provisioned->email,
+            'shopIds'       => $provisioned->shopIds ?? [],
+            'isFirstLogin'  => $provisioned->isFirstLogin,
+        ]);
+
+
+        // ④ principal を「確定版」に更新（※ 重要）
+        $principal = new AuthPrincipal(
+            provider: 'firebase',
+            providerUid: $firebaseUid,
+            userId: $provisioned->userId,
+            email: $provisioned->email,
+            emailVerified: $emailVerified,
+            displayName: $displayName,
+            shopIds: $provisioned->shopIds ?? [],
+        );
+
+        // ⑤ Access Token 発行
         $accessToken = $this->tokenIssuer->issue($provisioned);
 
-        // ④ Refresh Token 発行（DB 永続はAuth責務でOK：ただしUserはDTOで渡すのが理想）
-        //    今は既存Serviceが User(Eloquent) 前提なので、次の段階でRefreshTokenServiceもDTO対応へ寄せる。
-        //    ここでは最小改修として refreshTokens->issueByUserId を追加するのがベスト。
+
+        \Log::info('[LoginOrRegister] issuing token with principal', [
+            'userId'   => $principal->userId,
+            'provider' => $principal->provider,
+            'uid'      => $principal->providerUid,
+            'shopIds'  => $principal->shopIds,
+        ]);
+
+
+        // ⑥ Refresh Token
         $refresh = $this->refreshTokens->issueByUserId(
             $provisioned->userId,
             request()->ip(),
@@ -57,15 +105,15 @@ final class LoginOrRegisterUseCase
             token: $accessToken,
             user: [
                 'id'                => $provisioned->userId,
-                'name'              => $principal->displayName,
+                'name'              => $displayName,
                 'email'             => $provisioned->email,
                 'shop_id'           => $provisioned->tenantId,
-                'email_verified_at' => $principal->emailVerified ? now() : null,
+                'email_verified_at' => $emailVerified ? now() : null,
                 'first_login_at'    => $provisioned->isFirstLogin ? now() : null,
                 'roles'             => $provisioned->roles,
             ],
             status: 'login_or_register',
-            needsEmailVerification: ! $principal->emailVerified,
+            needsEmailVerification: ! $emailVerified,
             refreshToken: $refresh,
             isFirstLogin: $provisioned->isFirstLogin,
         );

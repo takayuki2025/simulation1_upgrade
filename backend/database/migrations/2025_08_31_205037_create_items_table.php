@@ -18,10 +18,15 @@ class CreateItemsTable extends Migration
 
 
             $table->foreignId('shop_id')->nullable() // 💡 ここを追加
-      ->constrained()
-      ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
 
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+
+            $table->foreignId('user_id')
+                    ->nullable()
+                    ->constrained()
+                    ->nullOnDelete();
+
             $table->string('name', 20);
             $table->integer('price');
             $table->string('brand', 20)->nullable();

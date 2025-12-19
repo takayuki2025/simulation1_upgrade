@@ -18,7 +18,7 @@ final class ItemResource
             'condition' => $item->getCondition(),
             'category'  => $item->getCategory()->toArray(),
             'remain'    => $item->getRemain()->getValue(),
-            'user_id'   => $item->getUserId(),
+            'user_id' => null,
 
             // 画像
             'item_image' => $item->getItemImage()

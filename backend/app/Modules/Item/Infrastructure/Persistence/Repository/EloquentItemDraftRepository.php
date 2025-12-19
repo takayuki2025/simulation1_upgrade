@@ -30,27 +30,18 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
             ?? new EloquentItemDraft();
 
         $model->id = $draft->id()->value();
+        $model->shop_id = $draft->sellerId()->id(); // ★ 常に shop_id
+        $model->user_id = null;
 
-        if ($draft->sellerId()->isShop()) {
-            $model->shop_id = $draft->sellerId()->id();
-            $model->user_id = null;
-        } else {
-            $model->shop_id = null;
-            $model->user_id = $draft->sellerId()->id();
-        }
-
-        $model->name       = $draft->name()->value();
-        $model->price      = $draft->price()->amount();
-        $model->brand      = $draft->brand()?->raw();
-        $model->status     = $draft->status()->value;
-        $model->explain    = $draft->explain();
-        $model->condition  = $draft->condition();
-        $model->category   = $draft->category()?->toArray();
-        $model->remain     = $draft->remain()->getValue();
-
-        $model->item_image = $draft->itemImage()
-            ? $draft->itemImage()->value()
-            : null;
+        $model->name = $draft->name()->value();
+        $model->price = $draft->price()->amount();
+        $model->brand = $draft->brand()?->raw();
+        $model->status = $draft->status()->value;
+        $model->explain = $draft->explain();
+        $model->condition = $draft->condition();
+        $model->category = $draft->category()?->toArray();
+        $model->remain = $draft->remain()->getValue();
+        $model->item_image = $draft->itemImage()?->value();
 
         $model->save();
     }

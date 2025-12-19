@@ -6,6 +6,7 @@ use App\Modules\User\Domain\Repository\MypageRepository;
 use App\Models\User;
 use App\Models\Item;
 use App\Models\OrderHistory;
+use Illuminate\Support\Facades\DB;
 
 class EloquentMypageRepository implements MypageRepository
 {
@@ -32,7 +33,17 @@ class EloquentMypageRepository implements MypageRepository
 
     public function listSellItems(int $userId): array
     {
-        return Item::where('user_id', $userId)
+        // ユーザーが所属する shop_id 一覧を取得
+        $shopIds = DB::table('role_user')
+            ->where('user_id', $userId)
+            ->pluck('shop_id')
+            ->all();
+
+        if (empty($shopIds)) {
+            return [];
+        }
+
+        return Item::whereIn('shop_id', $shopIds)
             ->orderByDesc('id')
             ->get()
             ->toArray();

@@ -23,7 +23,7 @@ class ShopItemListController extends Controller
         foreach ($items as $item) {
             $data[] = [
                 'id'        => $item->getId()?->getValue(),
-                'user_id'   => $item->getUserId(),
+                'user_id' => null,
                 'shop_id'   => $item->getShopId(),
                 'name'      => $item->getName(),
                 'price'     => $item->getPrice()->getValue(),

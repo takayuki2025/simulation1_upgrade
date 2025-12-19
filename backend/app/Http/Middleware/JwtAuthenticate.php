@@ -58,18 +58,22 @@ class JwtAuthenticate
         Auth::setUser($user);
 
         // ==============================
-// AuthPrincipal を生成（DDD Auth 用）
-// ==============================
-$principal = new AuthPrincipal(
-    provider: 'jwt', // TokenIssuer に合わせて将来切替可
-    providerUid: (string) $decoded->sub,
-    email: $user->email,
-    emailVerified: (bool) ($user->email_verified_at !== null),
-    displayName: $user->name ?? null,
-);
+        // AuthPrincipal を生成（DDD Auth 用）
+        // ==============================
 
-// Request attributes に inject（UseCase 用）
-$request->attributes->set('auth_principal', $principal);
+        $principal = new AuthPrincipal(
+            provider: 'jwt',                       // 認証方式
+            providerUid: (string) $decoded->sub,   // 認証ID（今回は user_id だが将来分離可）
+            userId: $user->id,                     // ★ ここが最重要
+            email: $user->email,
+            emailVerified: (bool) ($user->email_verified_at !== null),
+            displayName: $user->name ?? null,
+            shopIds: $user->shops()->pluck('shops.id')->all(), // ★ あれば
+        );
+
+
+        // Request attributes に inject（UseCase 用）
+        $request->attributes->set('auth_principal', $principal);
 
         // tenant_id を統一（claim: tenant or shop_id）
         $tenantId = null;
@@ -88,31 +92,31 @@ $request->attributes->set('auth_principal', $principal);
     }
 
     public function resolveUserFromRequest(Request $request): ?User
-{
-    $token = $this->getBearerToken($request);
-    if (! $token) {
-        return null;
-    }
+    {
+        $token = $this->getBearerToken($request);
+        if (! $token) {
+            return null;
+        }
 
-    try {
-        // ✅ handle() と同じ verifier を使う
-        $decoded = $this->verifier->decode($token);
-    } catch (\Throwable $e) {
-        Log::warning('[resolveUserFromRequest] decode failed', [
-            'error' => $e->getMessage(),
-        ]);
-        return null;
-    }
+        try {
+            // ✅ handle() と同じ verifier を使う
+            $decoded = $this->verifier->decode($token);
+        } catch (\Throwable $e) {
+            Log::warning('[resolveUserFromRequest] decode failed', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
 
-    if (
-        !property_exists($decoded, 'sub')
-        || (int)$decoded->sub <= 0
-    ) {
-        return null;
-    }
+        if (
+            !property_exists($decoded, 'sub')
+            || (int)$decoded->sub <= 0
+        ) {
+            return null;
+        }
 
-    return User::find((int)$decoded->sub);
-}
+        return User::find((int)$decoded->sub);
+    }
 
     private function getBearerToken(Request $request): ?string
     {

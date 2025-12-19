@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\RoleUser;
 use App\Notifications\CustomVerifyEmail;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 // use Illuminate\Auth\Notifications\VerifyEmail; // sendEmailVerificationNotificationで使用　
 
@@ -98,9 +99,15 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->withTimestamps();
     }
 
-    public function shop()
+    public function shops(): BelongsToMany
     {
-        return $this->belongsTo(Shop::class);
+        return $this->belongsToMany(
+            Shop::class,
+            'role_user',
+            'user_id',
+            'shop_id'
+        )->withPivot('role_id')
+         ->withTimestamps();
     }
 
     public function formattedRoles(): array

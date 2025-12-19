@@ -33,8 +33,10 @@ class ItemMapper
     {
         $model ??= new EloquentItem();
 
-        $model->user_id   = $item->getUserId();
-        $model->shop_id   = $item->getShopId();
+
+        $model->user_id = null; // or 削除
+        $model->shop_id = $item->getShopId();
+
         $model->name      = $item->getName();
         $model->price     = $item->getPrice()->getValue();
         $model->explain   = $item->getExplain();

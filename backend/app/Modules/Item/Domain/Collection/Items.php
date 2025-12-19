@@ -6,7 +6,6 @@ use App\Modules\Item\Domain\Entity\Item;
 use App\Models\Item as EloquentItem;
 use Illuminate\Support\Collection;
 use App\Modules\Item\Domain\ValueObject\Money;
-
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
     Price,
@@ -81,10 +80,10 @@ final class Items
      */
     private static function toDomain(EloquentItem $model): Item
     {
+
         return new Item(
-            id: new ItemId($model->id),          // ★ int禁止
-            userId: $model->user_id,
-            shopId: $model->shop_id,
+            id: new ItemId($model->id),
+            shopId: $model->shop_id ?? null,
             name: $model->name,
             price: new Money($model->price, 'JPY'),
             explain: $model->explain,
@@ -94,6 +93,7 @@ final class Items
             itemImage: ItemImagePath::fromRaw($model->item_image),
             remain: new StockCount($model->remain),
         );
+
     }
 
 

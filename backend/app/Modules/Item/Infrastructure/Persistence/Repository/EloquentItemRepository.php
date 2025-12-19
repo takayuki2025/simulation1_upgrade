@@ -24,8 +24,7 @@ final class EloquentItemRepository implements ItemRepository
     {
         return new Item(
             id: new ItemId($model->id),
-            userId: $model->user_id ?? 0,
-            shopId: $model->shop_id ?? 0,
+            shopId: $model->shop_id,   // ★ userId 削除
             name: $model->name,
             price: new Money($model->price, 'JPY'),
             explain: $model->explain,
@@ -47,8 +46,7 @@ final class EloquentItemRepository implements ItemRepository
     {
         $model = new EloquentItem();
 
-        $model->user_id = $item->getUserId() ?: null;
-        $model->shop_id = $item->getShopId() ?: null;
+        $model->shop_id = $item->getShopId();   // ★ これだけ
         $model->name = $item->getName();
         $model->price = $item->getPrice()->amount();
         $model->brand = $item->getBrand();

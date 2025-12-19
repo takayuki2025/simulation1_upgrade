@@ -6,10 +6,6 @@ use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
 final class SellerId
 {
-    /**
-     * @param SellerType $type  INDIVIDUAL | SHOP
-     * @param int        $id    user_id or shop_id
-     */
     private function __construct(
         private SellerType $type,
         private int $id,
@@ -40,46 +36,46 @@ final class SellerId
         return $this->id;
     }
 
-    /* ========= Helper ========= */
-
-    // ★ v1 Publish 用（追加）
-    public function isUser(): bool
+    public function isIndividual(): bool
     {
         return $this->type === SellerType::INDIVIDUAL;
     }
 
-    // ★ v1 Publish 用（追加）
     public function isShop(): bool
     {
         return $this->type === SellerType::SHOP;
     }
 
-    // ★ v1 Publish 用（追加）
-    public function userId(): int
-    {
-        if (! $this->isUser()) {
-            throw new \LogicException('Seller is not individual user');
-        }
-        return $this->id;
-    }
-
-    /* ========= Authorization ========= */
-
-    // ✅ これは絶対に消さない（正しい）
     public function belongsTo(AuthPrincipal $principal): bool
     {
         return match ($this->type) {
             SellerType::INDIVIDUAL =>
-                (int)$principal->providerUid === $this->id,
+                $principal->userId === $this->id,
 
             SellerType::SHOP =>
-                in_array($this->id, $principal->shopIds ?? [], true),
+                // 通常ショップ（role_user）
+                in_array($this->id, $principal->shopIds ?? [], true)
+                // Free Shop（owner 判定）
+                || $this->isOwnedFreeShopBy($principal),
         };
     }
 
-    public function isIndividual(): bool
+    private function isOwnedFreeShopBy(AuthPrincipal $principal): bool
     {
-        return $this->type === SellerType::INDIVIDUAL;
+        return \DB::table('shops')
+            ->where('id', $this->id)
+            ->where('owner_user_id', $principal->userId)
+            ->exists();
+    }
+
+    private function isOwnedBy(AuthPrincipal $principal): bool
+    {
+        // Free Shop は shop_code = FREE_{user_id} などで判別しても良い
+        // まずは DB 直参照で OK
+        return \DB::table('shops')
+            ->where('id', $this->id)
+            ->where('owner_user_id', (int)$principal->providerUid)
+            ->exists();
     }
 
     public function asString(): string

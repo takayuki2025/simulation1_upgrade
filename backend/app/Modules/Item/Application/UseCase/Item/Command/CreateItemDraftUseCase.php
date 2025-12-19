@@ -30,6 +30,8 @@ final class CreateItemDraftUseCase
         AuthPrincipal $principal,
         ?int $tenantId,
     ): CreateItemDraftOutput {
+
+        // ★ 正しい呼び出し
         $sellerId = $this->sellerResolver->resolve(
             $input->sellerId,
             $principal,
@@ -37,7 +39,6 @@ final class CreateItemDraftUseCase
         );
 
         $draftId = $this->draftRepository->nextIdentity();
-
 
         $draft = ItemDraft::create(
             $draftId,
@@ -49,7 +50,6 @@ final class CreateItemDraftUseCase
             $input->condition,
             $input->category,
         );
-
 
         $this->draftRepository->save($draft);
 
