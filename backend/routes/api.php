@@ -104,9 +104,17 @@ Route::get(
     [ItemEntityAuditController::class, 'index']
 );
 
-
 Route::get('/entity-kpis', EntityKpiController::class);
 
+
+
+//データー加工後表示
+use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
+
+// Route::get('/items/{itemId}', [ItemReadController::class, 'show']);
+
+Route::withoutMiddleware(['throttle:api'])
+    ->get('/items/{itemId}', [ItemReadController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------

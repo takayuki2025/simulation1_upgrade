@@ -17,6 +17,12 @@ def write_results_to_db(results):
     try:
         # ★ item_id と result を同時に受け取る
         for item_id, result in results:
+            print(
+    "[DEBUG]",
+    "item_id=", item_id,
+    "decision=", result.decision,
+    "canonical=", result.canonical_value,
+)
             # brand-only v1
             if result.entity_type != "brand":
                 continue
@@ -24,7 +30,7 @@ def write_results_to_db(results):
             brand_entity_id = None
 
             # accepted のみ永続化
-            if result.decision == "accepted" and result.canonical_value:
+            if result.decision in ("auto_accept", "needs_review") and result.canonical_value:
                 normalized_key = result.canonical_value.lower()
 
                 cursor.execute(

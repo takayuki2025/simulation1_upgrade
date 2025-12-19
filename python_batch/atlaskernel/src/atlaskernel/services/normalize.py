@@ -4,14 +4,21 @@ from typing import Dict, List
 # =========================
 # 汎用 normalize（brand 等）
 # =========================
+BRAND_ALIASES = {
+    "rolax": "rolex",
+    "ロレックス": "rolex",
+    "ro lex": "rolex",
+}
+
 def normalize(text: str) -> str:
     if not text:
         return ""
 
     t = text.lower().strip()
-    t = re.sub(r"[^\w\s]", " ", t)
+    t = re.sub(r"[^\w\s\u3040-\u30FF\u4E00-\u9FFF]", " ", t)
     t = re.sub(r"\s+", " ", t)
-    return t
+
+    return BRAND_ALIASES.get(t, t)
 
 
 # =========================

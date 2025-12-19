@@ -9,6 +9,7 @@ use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Infrastructure\Eloquent\Models\Item as ItemModel;
 use App\Modules\Item\Domain\Repository\ItemRepository;
+use Illuminate\Support\Facades\DB;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
     Money,
@@ -75,14 +76,6 @@ final class EloquentItemRepository implements ItemRepository
             ->exists();
     }
 
-    // public function listComments(int $itemId): array
-    // {
-    //     return Comment::with('user')
-    //         ->where('item_id', $itemId)
-    //         ->orderByDesc('created_at')
-    //         ->get()
-    //         ->toArray();
-    // }
 
     public function findPublicItems(
         int $limit,
@@ -204,5 +197,48 @@ final class EloquentItemRepository implements ItemRepository
     public function nextIdentity(): ItemId
     {
         return ItemId::generate();
+    }
+
+    public function findWithDisplayBrand(int $itemId)
+    {
+        return Item::query()
+            ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
+            // ->leftJoin('item_entities', function ($join) {
+            //     $join->on('items.id', '=', 'item_entities.item_id')
+            //          ->where('item_entities.is_latest', true);
+            // })
+            // ->leftJoin(
+            //     'brand_entities',
+            //     'item_entities.brand_entity_id',
+            //     '=',
+            //     'brand_entities.id'
+            // )
+            ->where('items.id', $itemId)
+            ->select([
+                'items.*',
+                DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
+            ])
+            ->first();
+    }
+
+    public function paginateWithDisplayBrand(int $perPage = 20)
+    {
+        return Item::query()
+            ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
+            // ->leftJoin('item_entities', function ($join) {
+            //     $join->on('items.id', '=', 'item_entities.item_id')
+            //         ->where('item_entities.is_latest', true);
+            // })
+            // ->leftJoin(
+            //     'brand_entities',
+            //     'item_entities.brand_entity_id',
+            //     '=',
+            //     'brand_entities.id'
+            // )
+            ->select([
+                'items.*',
+                DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
+            ])
+            ->paginate($perPage);
     }
 }
