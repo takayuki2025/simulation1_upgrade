@@ -21,47 +21,95 @@ use App\Modules\Item\Domain\ValueObject\{
 final class EloquentItemRepository implements ItemRepository
 {
     private function toDomain(EloquentItem $model): Item
-{
-    return new Item(
-        id: new ItemId($model->id),
-        userId: $model->user_id,
-        shopId: $model->shop_id,
-        name: $model->name,
-        price: new Money($model->price, 'JPY'),
-        explain: $model->explain,
-        condition: $model->condition,
-        category: new CategoryList($model->category ?? []),
-        brand: $model->brand,
-        itemImage: ItemImagePath::fromRaw($model->item_image),
-        remain: new StockCount($model->remain),
-    );
-}
+    {
+        return new Item(
+            id: new ItemId($model->id),
+            userId: $model->user_id ?? 0,
+            shopId: $model->shop_id ?? 0,
+            name: $model->name,
+            price: new Money($model->price, 'JPY'),
+            explain: $model->explain,
+            condition: $model->condition,
+            category: new CategoryList($model->category ?? []),
+            brand: $model->brand,
+            itemImage: ItemImagePath::fromRaw($model->item_image),
+            remain: new StockCount($model->remain),
+        );
+    }
 
+    public function findById(int $id): ?Item
+    {
+        $model = EloquentItem::find($id);
+        return $model ? $this->toDomain($model) : null;
+    }
+
+    public function save(Item $item): ItemId
+    {
+        $model = new EloquentItem();
+
+        $model->user_id = $item->getUserId() ?: null;
+        $model->shop_id = $item->getShopId() ?: null;
+        $model->name = $item->getName();
+        $model->price = $item->getPrice()->amount();
+        $model->brand = $item->getBrand();
+        $model->explain = $item->getExplain();
+        $model->condition = $item->getCondition();
+        $model->category = $item->getCategory()->toArray();
+        $model->item_image = $item->getItemImage()->value();
+        $model->remain = $item->getRemain()->getValue();
+
+        $model->save();
+
+        return new ItemId($model->id);
+    }
+
+    /* ===== 既存の Query 系 ===== */
+
+    public function favoritesCount(int $itemId): int
+    {
+        return Good::where('item_id', $itemId)->count();
+    }
+
+    public function isFavorited(int $itemId, int $userId): bool
+    {
+        return Good::where('item_id', $itemId)
+            ->where('user_id', $userId)
+            ->exists();
+    }
+
+    // public function listComments(int $itemId): array
+    // {
+    //     return Comment::with('user')
+    //         ->where('item_id', $itemId)
+    //         ->orderByDesc('created_at')
+    //         ->get()
+    //         ->toArray();
+    // }
 
     public function findPublicItems(
-    int $limit,
-    int $page,
-    ?string $keyword,
-    ?int $viewerUserId
-): Items {
-    $query = EloquentItem::query();
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $viewerUserId
+    ): Items {
+        $query = EloquentItem::query();
 
-    if ($keyword) {
-        $query->where('name', 'like', "%{$keyword}%");
+        if ($keyword) {
+            $query->where('name', 'like', "%{$keyword}%");
+        }
+
+        if ($viewerUserId) {
+            $query->where('user_id', '!=', $viewerUserId);
+        }
+
+        $models = $query
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->offset(($page - 1) * $limit)
+            ->get();
+
+        return Items::fromEloquent($models);
     }
-
-    if ($viewerUserId) {
-        $query->where('user_id', '!=', $viewerUserId);
-    }
-
-    $models = $query
-        ->orderByDesc('created_at')
-        ->limit($limit)
-        ->offset(($page - 1) * $limit)
-        ->get();
-
-    return Items::fromEloquent($models);
-}
 
 
     /**
@@ -88,29 +136,29 @@ final class EloquentItemRepository implements ItemRepository
     }
 
     public function searchPublic(
-    int $limit,
-    int $page,
-    ?string $keyword,
-    ?int $viewerUserId,
-): Items {
-    $query = EloquentItem::query();
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $viewerUserId,
+    ): Items {
+        $query = EloquentItem::query();
 
-    if ($keyword) {
-        $query->where('name', 'like', "%{$keyword}%");
+        if ($keyword) {
+            $query->where('name', 'like', "%{$keyword}%");
+        }
+
+        if ($viewerUserId) {
+            $query->where('user_id', '!=', $viewerUserId);
+        }
+
+        $paginator = $query
+            ->orderByDesc('created_at')
+            ->paginate($limit, ['*'], 'page', $page);
+
+        return Items::fromEloquent(
+            collect($paginator->items())
+        );
     }
-
-    if ($viewerUserId) {
-        $query->where('user_id', '!=', $viewerUserId);
-    }
-
-    $paginator = $query
-        ->orderByDesc('created_at')
-        ->paginate($limit, ['*'], 'page', $page);
-
-    return Items::fromEloquent(
-        collect($paginator->items())
-    );
-}
 
 
     /**
@@ -131,14 +179,7 @@ final class EloquentItemRepository implements ItemRepository
      * ★ 今回不足していたメソッド
      * 単体取得
      */
-    public function findById(int $id): ?Item
-    {
-        $model = EloquentItem::find($id);
 
-        return $model
-            ? $this->toDomain($model)
-            : null;
-    }
 
     public function listComments(int $itemId): array
     {
@@ -161,51 +202,9 @@ final class EloquentItemRepository implements ItemRepository
             ->toArray();
     }
 
-    public function favoritesCount(int $itemId): int
+
+    public function nextIdentity(): ItemId
     {
-        return Good::where('item_id', $itemId)->count();
+        return ItemId::generate();
     }
-
-    /**
-     * ユーザーがお気に入り済みか
-     */
-    public function isFavorited(int $itemId, int $userId): bool
-    {
-        return Good::where('item_id', $itemId)
-            ->where('user_id', $userId)
-            ->exists();
-    }
-
-    public function save(Item $item): void
-{
-    $model = new EloquentItem();
-
-    // seller 分岐
-    if ($item->sellerId()->type() === SellerType::SHOP) {
-        $model->shop_id = $item->sellerId()->id();
-        $model->user_id = auth()->id(); // 出品者（owner / staff）
-    } else {
-        $model->shop_id = null;
-        $model->user_id = $item->sellerId()->id();
-    }
-
-    // 必須カラム（migration と完全一致）
-    $model->name = $item->name()->value();
-    $model->price = $item->price()->amount();
-    $model->brand = $item->brand()?->canonical();
-    $model->explain = $item->explain();
-    $model->condition = $item->condition();
-    $model->category = $item->category()->toArray();
-    $model->item_image = $item->imagePath()->raw();
-    $model->remain = $item->remain()->value();
-
-    $model->save();
 }
-
-public function nextIdentity(): ItemId
-{
-    // 仮 ID（DB insert 後に実 ID が確定する設計）
-    return new ItemId(0);
-}
-}
-

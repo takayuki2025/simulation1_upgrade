@@ -44,9 +44,7 @@ interface ItemRepository
 ): Items;
 
 
-    public function nextIdentity(): ItemId;
-
-    public function save(Item $item): void;
+    public function save(Item $item): ItemId;
 }
 
 

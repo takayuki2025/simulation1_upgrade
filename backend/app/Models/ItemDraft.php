@@ -8,7 +8,12 @@ final class ItemDraft extends Model
 {
     protected $table = 'item_drafts';
 
+    // ★ これが無いと UUID は 100% 壊れる
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
+        'id',          // ★ id も fillable に入れる
         'user_id',
         'shop_id',
         'name',

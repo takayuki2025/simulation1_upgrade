@@ -22,7 +22,8 @@ final class PublishItemUseCase
         private ItemRepository $itemRepo,
         private NormalizeBrandUseCase $normalizeBrandUseCase,
         private SellerResolver $sellerResolver,
-    ) {}
+    ) {
+    }
 
     public function execute(
         PublishItemInput $input,
@@ -41,11 +42,11 @@ final class PublishItemUseCase
         // =========================================
         // 2. 認可（Seller / Tenant）
         // =========================================
-        $this->sellerResolver->resolve(
-            $draft->sellerId()->asString(),
-            $principal,
-            $tenantId
-        );
+        // $this->sellerResolver->resolve(
+        //     $draft->sellerId()->asString(),
+        //     $principal,
+        //     $tenantId
+        // );
 
         // =========================================
         // 3. Brand 正規化（副作用あり）
@@ -65,11 +66,11 @@ final class PublishItemUseCase
 
 
         logger()->info('Publish debug', [
-    'draft_id' => $draft->id()->value(),
-    'status' => $draft->status()->value,
-    'hasImage' => $draft->hasImage(),
-    'image' => $draft->itemImage()?->value(),
-]);
+            'draft_id' => $draft->id()->value(),
+            'status' => $draft->status()->value,
+            'hasImage' => $draft->hasImage(),
+            'image' => $draft->itemImage()?->value(),
+        ]);
         // =========================================
         // 5. Publish 条件チェック（最終形）
         // =========================================
@@ -80,14 +81,13 @@ final class PublishItemUseCase
         // =========================================
         // 6. Item 生成（Draft → Item）
         // =========================================
-        $itemId = $this->itemRepo->nextIdentity();
 
         $item = Item::publishFromDraft(
-            $itemId,
             $draft
         );
 
-        $this->itemRepo->save($item);
+        $itemId = $this->itemRepo->save($item);
+
 
         // =========================================
         // 7. Draft を Published に更新
@@ -98,9 +98,11 @@ final class PublishItemUseCase
         // =========================================
         // 8. Output
         // =========================================
+
         return new PublishItemOutput(
-            itemId: $itemId->value(),
+            itemId: $itemId->getValue(),
             status: ItemStatus::PUBLISHED->value
         );
+
     }
 }

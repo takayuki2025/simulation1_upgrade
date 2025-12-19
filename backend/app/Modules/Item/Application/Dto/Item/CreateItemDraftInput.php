@@ -10,5 +10,9 @@ final class CreateItemDraftInput
         public readonly int $priceAmount,
         public readonly string $priceCurrency,
         public readonly ?string $brandRaw,
-    ) {}
+        public readonly ?string $explain,
+        public readonly ?string $condition,
+        public readonly ?array $category,
+    ) {
+    }
 }

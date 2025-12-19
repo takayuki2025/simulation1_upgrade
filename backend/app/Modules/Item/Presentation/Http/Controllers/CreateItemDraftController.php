@@ -13,16 +13,34 @@ final class CreateItemDraftController extends Controller
 {
     public function __construct(
         private CreateItemDraftUseCase $useCase,
-    ) {}
+    ) {
+    }
+
 
     public function __invoke(Request $request): JsonResponse
     {
+
+
+        logger()->info('[CreateItemDraftController] raw request', [
+            'seller_id' => $request->input('seller_id'),
+            'explain'   => $request->input('explain'),
+            'condition' => $request->input('condition'),
+            'category'  => $request->input('category'),
+            'category_type' => gettype($request->input('category')),
+            'all' => $request->all(),
+        ]);
+
         $validated = $request->validate([
             'seller_id'      => ['required', 'string'],
             'name'           => ['required', 'string', 'max:255'],
             'price_amount'   => ['required', 'integer', 'min:0'],
             'price_currency' => ['required', 'string', 'size:3'],
             'brand'          => ['nullable', 'string'],
+
+            // ★ 追加
+            'explain'        => ['nullable', 'string'],
+            'condition'      => ['nullable', 'string'],
+            'category'       => ['nullable', 'array'],
         ]);
 
         $principal = $request->attributes->get('auth_principal');
@@ -39,6 +57,11 @@ final class CreateItemDraftController extends Controller
             priceAmount: $validated['price_amount'],
             priceCurrency: $validated['price_currency'],
             brandRaw: $validated['brand'] ?? null,
+
+            // ★ Draft 用
+            explain: $validated['explain'] ?? null,
+            condition: $validated['condition'] ?? null,
+            category: $validated['category'] ?? null,
         );
 
         $output = $this->useCase->execute(

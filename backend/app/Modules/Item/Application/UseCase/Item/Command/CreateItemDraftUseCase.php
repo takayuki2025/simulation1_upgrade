@@ -22,35 +22,41 @@ final class CreateItemDraftUseCase
     public function __construct(
         private ItemDraftRepository $draftRepository,
         private SellerResolver $sellerResolver,
-    ) {}
+    ) {
+    }
 
     public function execute(
-    CreateItemDraftInput $input,
-    AuthPrincipal $principal,
-    ?int $tenantId,
-): CreateItemDraftOutput {
-    $sellerId = $this->sellerResolver->resolve(
-        $input->sellerId,
-        $principal,
-        $tenantId
-    );
+        CreateItemDraftInput $input,
+        AuthPrincipal $principal,
+        ?int $tenantId,
+    ): CreateItemDraftOutput {
+        $sellerId = $this->sellerResolver->resolve(
+            $input->sellerId,
+            $principal,
+            $tenantId
+        );
 
-    $draftId = $this->draftRepository->nextIdentity();
+        $draftId = $this->draftRepository->nextIdentity();
 
-    $draft = ItemDraft::create(
-        $draftId,
-        $sellerId,
-        new ItemName($input->name),
-        new Money($input->priceAmount, $input->priceCurrency),
-        $input->brandRaw ? new BrandName($input->brandRaw) : null
-    );
 
-    $this->draftRepository->save($draft);
+        $draft = ItemDraft::create(
+            $draftId,
+            $sellerId,
+            new ItemName($input->name),
+            new Money($input->priceAmount, $input->priceCurrency),
+            $input->brandRaw ? new BrandName($input->brandRaw) : null,
+            $input->explain,
+            $input->condition,
+            $input->category,
+        );
 
-    return new CreateItemDraftOutput(
-        $draftId->value(),
-        ItemStatus::DRAFT->value,
-        true
-    );
-}
+
+        $this->draftRepository->save($draft);
+
+        return new CreateItemDraftOutput(
+            $draftId->value(),
+            ItemStatus::DRAFT->value,
+            true
+        );
+    }
 }

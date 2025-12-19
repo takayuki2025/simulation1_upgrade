@@ -115,11 +115,16 @@ export default function ItemSellPage() {
          1. Draft 作成
       ========================= */
       const draftRes = await apiClient.post("/items/drafts", {
-        seller_id: "individual:2", // v1: 仮固定
+        seller_id: "individual:2", // v1 仮
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
         brand: form.brand || null,
+
+        // ★ 追加（これがなかった）
+        explain: form.explain || null,
+        condition: form.condition || null,
+        category: form.categories.length ? form.categories : null,
       });
 
       const draftId: string = draftRes.data.draft_id;
@@ -139,7 +144,7 @@ export default function ItemSellPage() {
       ========================= */
       await apiClient.post(`/items/drafts/${draftId}/publish`);
 
-      router.push("/mypage/sell");
+      router.push("/"); //mypage/sellに修正
     } catch (e) {
       setError("商品の出品に失敗しました");
     } finally {

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Item\Domain\Entity;
 
+use App\Modules\Item\Domain\Entity\ItemDraft;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
     SellerId,
@@ -57,59 +58,37 @@ final class Item
        Getter（Entity は read-only）
     ========================= */
 
-    public function getId(): ?ItemId
-    {
-        return $this->id;
-    }
+    public function getId(): ?ItemId { return $this->id; }
+    public function getUserId(): int { return $this->userId; }
+    public function getShopId(): int { return $this->shopId; }
+    public function getName(): string { return $this->name; }
+    public function getPrice(): Money { return $this->price; }
+    public function getExplain(): string { return $this->explain; }
+    public function getCondition(): string { return $this->condition; }
+    public function getCategory(): CategoryList { return $this->category; }
+    public function getBrand(): ?string { return $this->brand; }
+    public function getItemImage(): ItemImagePath { return $this->itemImage; }
+    public function getRemain(): StockCount { return $this->remain; }
 
-    public function getUserId(): int
-    {
-        return $this->userId;
-    }
+    /* ===== Factory ===== */
 
-    public function getShopId(): int
+    public static function publishFromDraft(ItemDraft $draft): self
     {
-        return $this->shopId;
-    }
+        $sellerId = $draft->sellerId();
 
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    public function getPrice(): Money
-    {
-    return $this->price;
-    }
-
-    public function getExplain(): string
-    {
-        return $this->explain;
-    }
-
-    public function getCondition(): string
-    {
-        return $this->condition;
-    }
-
-    public function getCategory(): CategoryList
-    {
-        return $this->category;
-    }
-
-    public function getBrand(): ?string
-    {
-        return $this->brand;
-    }
-
-    public function getItemImage(): ItemImagePath
-    {
-        return $this->itemImage;
-    }
-
-    public function getRemain(): StockCount
-    {
-        return $this->remain;
+        return new self(
+            id: null,
+            userId: $sellerId->isIndividual() ? $sellerId->id() : 0,
+            shopId: $sellerId->isShop() ? $sellerId->id() : 0,
+            name: $draft->name()->value(),
+            price: $draft->price(),
+            explain: $draft->explain(),
+            condition: $draft->condition(),
+            category: $draft->category() ?? new CategoryList([]),
+            brand: $draft->brand()?->raw(),
+            itemImage: $draft->itemImage(),
+            remain: $draft->remain(),
+        );
     }
 
     /* =========================
@@ -146,5 +125,5 @@ final class Item
             remain: $this->remain->decrease($quantity),
         );
     }
-    
+
 }

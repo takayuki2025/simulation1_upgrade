@@ -27,11 +27,10 @@ final class ItemDraft
         private ItemStatus $status,
         private string $explain,
         private string $condition,
-        private CategoryList $category,
+        private ?CategoryList $category,
         private StockCount $remain,
-    ) {}
-
-    /* ========= Factory ========= */
+    ) {
+    }
 
     public static function create(
         ItemDraftId $id,
@@ -39,6 +38,9 @@ final class ItemDraft
         ItemName $name,
         Money $price,
         ?BrandName $brandRaw,
+        ?string $explain,
+        ?string $condition,
+        ?array $category,
     ): self {
         return new self(
             id: $id,
@@ -47,9 +49,9 @@ final class ItemDraft
             price: $price,
             brandRaw: $brandRaw,
             status: ItemStatus::DRAFT,
-            explain: '',
-            condition: '',
-            category: new CategoryList([]),
+            explain: $explain ?? '',
+            condition: $condition ?? '',
+            category: $category ? new CategoryList($category) : new CategoryList([]),
             remain: new StockCount(1),
         );
     }
@@ -61,29 +63,67 @@ final class ItemDraft
         Money $price,
         ?BrandName $brandRaw,
         ItemStatus $status,
+        ?string $explain,
+        ?string $condition,
+        ?array $category,
+        StockCount $remain,
     ): self {
         return new self(
-            id: $id,
-            sellerId: $sellerId,
-            name: $name,
-            price: $price,
-            brandRaw: $brandRaw,
-            status: $status,
-            explain: '',
-            condition: '',
-            category: new CategoryList([]),
-            remain: new StockCount(1),
+            $id,
+            $sellerId,
+            $name,
+            $price,
+            $brandRaw,
+            $status,
+            $explain ?? '',
+            $condition ?? '',
+            $category ? new CategoryList($category) : new CategoryList([]),
+            $remain,
         );
     }
 
-    /* ========= Getter ========= */
+    /* ===== Getter ===== */
 
-    public function id(): ItemDraftId { return $this->id; }
-    public function sellerId(): SellerId { return $this->sellerId; }
-    public function name(): ItemName { return $this->name; }
-    public function price(): Money { return $this->price; }
-    public function brand(): ?BrandName { return $this->brandRaw; }
-    public function status(): ItemStatus { return $this->status; }
+    public function id(): ItemDraftId
+    {
+        return $this->id;
+    }
+    public function sellerId(): SellerId
+    {
+        return $this->sellerId;
+    }
+    public function name(): ItemName
+    {
+        return $this->name;
+    }
+    public function price(): Money
+    {
+        return $this->price;
+    }
+    public function brand(): ?BrandName
+    {
+        return $this->brandRaw;
+    }
+    public function status(): ItemStatus
+    {
+        return $this->status;
+    }
+    public function explain(): string
+    {
+        return $this->explain;
+    }
+    public function condition(): string
+    {
+        return $this->condition;
+    }
+    public function category(): ?CategoryList
+    {
+        return $this->category;
+    }
+    public function remain(): StockCount
+    {
+        return $this->remain;
+    }
 
     public function itemImage(): ?ItemImagePath
     {

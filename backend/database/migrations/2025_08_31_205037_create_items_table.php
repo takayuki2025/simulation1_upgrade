@@ -28,7 +28,7 @@ class CreateItemsTable extends Migration
             $table->string('explain', 255);
             $table->string('condition', 20);
             $table->json('category');
-            $table->string('item_image');
+            $table->string('item_image')->nullable();
             $table->integer('remain');
 
 
