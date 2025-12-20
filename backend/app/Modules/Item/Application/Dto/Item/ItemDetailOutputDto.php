@@ -13,7 +13,7 @@ class ItemDetailOutputDto
      * @param int $favoritesCount
      */
     public function __construct(
-        public readonly Item $item,
+        public readonly object $itemRow,
         public readonly iterable $comments,
         public readonly bool $isFavorited,
         public readonly int $favoritesCount,

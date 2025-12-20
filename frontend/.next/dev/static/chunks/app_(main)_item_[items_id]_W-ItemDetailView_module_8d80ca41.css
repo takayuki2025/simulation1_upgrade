@@ -122,6 +122,30 @@
   margin-bottom: 12px;
 }
 
+.W-ItemDetailView-module__jxxsBG__brandTokensRow {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  display: flex;
+}
+
+.W-ItemDetailView-module__jxxsBG__brandToken {
+  cursor: pointer;
+  background-color: #fff;
+  border: 1px solid #00000026;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all .15s;
+}
+
+.W-ItemDetailView-module__jxxsBG__brandToken:hover {
+  color: #fff;
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
 .W-ItemDetailView-module__jxxsBG__brandLabel {
   color: #4b5563;
   font-weight: 700;
@@ -399,6 +423,23 @@
   cursor: pointer;
   margin-top: 10px;
   font-weight: bold;
+}
+
+.W-ItemDetailView-module__jxxsBG__conditionRow {
+  gap: 14px;
+  margin-top: 16px;
+  display: flex;
+}
+
+.W-ItemDetailView-module__jxxsBG__conditionCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.W-ItemDetailView-module__jxxsBG__colorRow {
+  align-items: center;
+  margin-top: 10px;
+  display: flex;
 }
 
 @media (max-width: 768px) {

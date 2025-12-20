@@ -10,9 +10,12 @@ final class ItemReadResource
             'id'        => $row->id,
             'name'      => $row->name,
             'price'     => $row->price,
-            'brand'     => $row->display_brand, // ★ entity 優先
+
+            // ★ entity 優先
+            'brand'     => $row->display_brand,
             'condition' => $row->display_condition ?? $row->condition,
             'color'     => $row->display_color ?? null,
+
             'explain'   => $row->explain,
             'category'  => $row->category,
             'remain'    => $row->remain,

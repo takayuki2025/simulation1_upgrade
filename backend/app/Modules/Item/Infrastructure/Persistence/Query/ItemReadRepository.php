@@ -45,35 +45,49 @@ final class ItemReadRepository
             ->paginate($limit, ['*'], 'page', $page);
     }
 
-    public function findWithDisplayEntities(int $itemId)
+    /**
+     * 商品詳細（entity 優先）
+     */
+    public function findWithDisplayEntities(int $itemId): ?Item
     {
         return Item::query()
-            ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
-            ->leftJoin('brand_entities', 'item_entities.brand_entity_id', '=', 'brand_entities.id')
-            ->leftJoin('condition_entities', 'item_entities.condition_entity_id', '=', 'condition_entities.id')
-            ->leftJoin('color_entities', 'item_entities.color_entity_id', '=', 'color_entities.id')
+            ->leftJoin('item_entities as ie', function ($join) {
+                $join->on('items.id', '=', 'ie.item_id')
+                     ->where('ie.is_latest', true);
+            })
+            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
             ->where('items.id', $itemId)
             ->select([
                 'items.*',
-                DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
-                DB::raw('condition_entities.canonical_name as display_condition'),
-                DB::raw('color_entities.canonical_name as display_color'),
+
+                DB::raw('COALESCE(be.canonical_name, items.brand) as display_brand'),
+                DB::raw('COALESCE(ce.canonical_name, items.condition) as display_condition'),
+                DB::raw('coe.canonical_name as display_color'),
             ])
             ->first();
     }
 
+    /**
+     * 一覧（entity 優先）
+     */
     public function paginateWithDisplayEntities(int $limit, int $page)
     {
         return Item::query()
-            ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
-            ->leftJoin('brand_entities', 'item_entities.brand_entity_id', '=', 'brand_entities.id')
-            ->leftJoin('condition_entities', 'item_entities.condition_entity_id', '=', 'condition_entities.id')
-            ->leftJoin('color_entities', 'item_entities.color_entity_id', '=', 'color_entities.id')
+            ->leftJoin('item_entities as ie', function ($join) {
+                $join->on('items.id', '=', 'ie.item_id')
+                     ->where('ie.is_latest', true);
+            })
+            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
             ->select([
                 'items.*',
-                DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
-                DB::raw('condition_entities.canonical_name as display_condition'),
-                DB::raw('color_entities.canonical_name as display_color'),
+
+                DB::raw('COALESCE(be.canonical_name, items.brand) as display_brand'),
+                DB::raw('COALESCE(ce.canonical_name, items.condition) as display_condition'),
+                DB::raw('coe.canonical_name as display_color'),
             ])
             ->paginate($limit, ['*'], 'page', $page);
     }

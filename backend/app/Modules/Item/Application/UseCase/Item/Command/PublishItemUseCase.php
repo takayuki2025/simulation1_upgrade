@@ -11,7 +11,10 @@ use App\Modules\Item\Domain\Repository\{
     ItemDraftRepository,
     ItemRepository
 };
-use App\Modules\Item\Domain\Service\SellerResolver;
+use App\Modules\Item\Domain\Service\{
+    SellerResolver,
+    AtlasKernelService
+};
 use App\Modules\Item\Domain\ValueObject\ItemStatus;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
@@ -20,8 +23,8 @@ final class PublishItemUseCase
     public function __construct(
         private ItemDraftRepository $draftRepo,
         private ItemRepository $itemRepo,
-        private NormalizeBrandUseCase $normalizeBrandUseCase,
         private SellerResolver $sellerResolver,
+        private AtlasKernelService $atlasKernel, // ★ 正式DI
     ) {
     }
 
@@ -30,79 +33,42 @@ final class PublishItemUseCase
         AuthPrincipal $principal,
         ?int $tenantId,
     ): PublishItemOutput {
-        // =========================================
-        // 1. Draft 取得（存在チェック）
-        // =========================================
+        // 1. Draft 取得
         $draft = $this->draftRepo->findById($input->draftId);
-
         if (! $draft) {
             throw new \DomainException('Draft not found.');
         }
 
-        // =========================================
-        // 2. 認可（Seller / Tenant）
-        // =========================================
-        // $this->sellerResolver->resolve(
-        //     $draft->sellerId()->asString(),
-        //     $principal,
-        //     $tenantId
-        // );
+        // 2. 認可（今はスキップOK）
+        // $this->sellerResolver->resolve(...);
 
-        // =========================================
-        // 3. Brand 正規化（副作用あり）
-        //    ★ Draft を更新する UseCase
-        // =========================================
-        // $this->normalizeBrandUseCase->execute($input->draftId);
-
-        // =========================================
-        // 4. ★ 再取得（超重要）
-        //    normalize による再構築差分を反映
-        // =========================================
-        $draft = $this->draftRepo->findById($input->draftId);
-
-        if (! $draft) {
-            throw new \DomainException('Draft not found after normalization.');
-        }
-
-
-        logger()->info('Publish debug', [
-            'draft_id' => $draft->id()->value(),
-            'status' => $draft->status()->value,
-            'hasImage' => $draft->hasImage(),
-            'image' => $draft->itemImage()?->value(),
-        ]);
-        // =========================================
-        // 5. Publish 条件チェック（最終形）
-        // =========================================
+        // 3. Publish 条件チェック
         if (! $draft->isPublishableV1()) {
             throw new \DomainException('Draft is not publishable.');
         }
 
-        // =========================================
-        // 6. Item 生成（Draft → Item）
-        // =========================================
-
-        $item = Item::publishFromDraft(
-            $draft
-        );
-
+        // 4. Item 生成
+        $item = Item::publishFromDraft($draft);
         $itemId = $this->itemRepo->save($item);
 
 
-        // =========================================
-        // 7. Draft を Published に更新
-        // =========================================
+        // 5. ★ AtlasKernel 実行
+        $this->atlasKernel->analyzeItem(
+            itemId: $itemId->getValue(),
+            rawText: $draft->brand()
+       ? $draft->brand()->raw()
+       : '',
+            tenantId: $tenantId,
+        );
+
+
+        // 6. Draft を Published に
         $draft->markPublished();
         $this->draftRepo->save($draft);
-
-        // =========================================
-        // 8. Output
-        // =========================================
 
         return new PublishItemOutput(
             itemId: $itemId->getValue(),
             status: ItemStatus::PUBLISHED->value
         );
-
     }
 }

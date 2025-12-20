@@ -10,6 +10,41 @@ import { mutate as globalMutate } from "swr";
 
 import styles from "./W-ItemDetailView.module.css";
 
+/**
+ * 将来の拡張に備えて「brand が string / string[] どちらでも」扱えるようにする
+ * さらに、string の場合は " / | ・ , 、 空白" などを許容して分割する。
+ */
+function toTokenList(input: unknown): string[] {
+  if (!input) return [];
+
+  if (Array.isArray(input)) {
+    return input.map((v) => String(v ?? "").trim()).filter(Boolean);
+  }
+
+  const s = String(input).trim();
+  if (!s) return [];
+
+  // 区切り候補を多めに許容（将来の複雑入力や複数属性にも耐える）
+  // 例: "ROLEX|SWISS|Ref:123", "ROLEX / SWISS", "ROLEX,SWISS", "ROLEX・SWISS"
+  const parts = s
+    .split(/[|/,\u3001\u30fb]+/) // | / , 、 ・
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  // 分割できなければ単体扱い
+  return parts.length ? parts : [s];
+}
+
+/**
+ * UI用：ボタンに載せる短いラベル
+ * 長い場合は省略（必要なら後で tooltip などへ）
+ */
+function shortenLabel(s: string, max = 14): string {
+  const t = s.trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max) + "…";
+}
+
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -19,12 +54,12 @@ export default function ItemDetailPage() {
      itemId 解決
   ========================= */
   const itemId = useMemo(() => {
-    const raw = params.items_id;
+    const raw = (params as any).items_id;
     if (!raw) return null;
     const id = Array.isArray(raw) ? raw[0] : raw;
     const n = Number(id);
     return Number.isNaN(n) ? null : n;
-  }, [params.items_id]);
+  }, [params]);
 
   /* =========================
      Query
@@ -150,8 +185,38 @@ export default function ItemDetailPage() {
 
   const itemCategories = Array.isArray(item.category) ? item.category : [];
 
+  /**
+   * ブランドを「複数表示」するためのトークン化。
+   * 優先順：
+   * 1) item.brand_tokens（将来APIが返すならここ）
+   * 2) item.brand（string / string[] どちらでも）
+   */
+  const brandTokens: string[] = toTokenList(
+    (item as any).brand_tokens ?? item.brand,
+  );
+
+  /**
+   * condition / color も将来 raw と display を分けられるように準備
+   * - raw: items テーブル由来（例: "良好"）
+   * - display: entity 由来（例: "ほぼ新品"）
+   * 現状APIが display しか返さないなら raw=display で表示されるだけ（壊れない）
+   */
+  const rawCondition =
+    (item as any).raw_condition ??
+    (item as any).original_condition ??
+    item.condition;
+
+  const displayCondition = (item as any).display_condition ?? item.condition;
+
+  const rawColor =
+    (item as any).raw_color ??
+    (item as any).original_color ??
+    (item as any).color;
+
+  const displayColor = (item as any).display_color ?? (item as any).color;
+
   /* =========================
-     JSX（省略なし）
+     JSX
   ========================= */
   return (
     <div className={styles.item_detail_wrapper}>
@@ -172,10 +237,48 @@ export default function ItemDetailPage() {
             {/* 商品名 */}
             <h2 className={styles.itemTitle}>{item.name}</h2>
 
-            {/* ブランド */}
+            {/* ブランド（複数ボタン） */}
             <div className={styles.brandBlock}>
               <p className={styles.brandLabel}>ブランド名</p>
-              <p className={styles.brandValue}>{item.brand || "未登録"}</p>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                {brandTokens.length > 0 ? (
+                  brandTokens.map((b, idx) => (
+                    <button
+                      key={`${b}-${idx}`}
+                      type="button"
+                      // ここは「将来UI向上ボタン」に育てられる（検索/同ブランド一覧/属性説明など）
+                      onClick={() => {
+                        // v1: 動作確認用（必要なら後で実装を入れる）
+                        // 例: router.push(`/search?brand=${encodeURIComponent(b)}`)
+                        console.log("[brand token clicked]", b);
+                      }}
+                      style={{
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        fontSize: 13,
+                        lineHeight: 1,
+                        background: "white",
+                        cursor: "pointer",
+                        maxWidth: 220,
+                      }}
+                      title={b}
+                    >
+                      {shortenLabel(b)}
+                    </button>
+                  ))
+                ) : (
+                  <p className={styles.brandValue}>未登録</p>
+                )}
+              </div>
             </div>
 
             {/* 価格 */}
@@ -270,10 +373,31 @@ export default function ItemDetailPage() {
                 </ul>
               </div>
 
-              <div className={styles.conditionRow}>
-                <p className={styles.conditionLabel}>商品の状態</p>
+              {/* 状態：左 raw / 右 加工後（スペースあり） */}
+              <div
+                className={styles.conditionRow}
+                style={{ display: "flex", gap: 14 }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className={styles.conditionLabel}>商品の状態</p>
+                  <p className={styles.conditionValue}>
+                    {rawCondition || "未登録"}
+                  </p>
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className={styles.conditionLabel}>状態（加工）</p>
+                  <p className={styles.conditionValue}>
+                    {displayCondition || rawCondition || "未登録"}
+                  </p>
+                </div>
+              </div>
+
+              {/* カラー：新規追加 */}
+              <div className={styles.conditionRow} style={{ marginTop: 10 }}>
+                <p className={styles.conditionLabel}>カラー</p>
                 <p className={styles.conditionValue}>
-                  {item.condition || "未登録"}
+                  {displayColor || rawColor || "未登録"}
                 </p>
               </div>
             </div>

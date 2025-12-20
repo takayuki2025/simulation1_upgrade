@@ -175,3 +175,27 @@ Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
     Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
 });
+
+
+
+
+
+
+
+
+
+use App\Modules\Item\Infrastructure\Persistence\Query\ItemReadRepository;
+use App\Modules\Item\Presentation\Http\Resources\ItemReadResource;
+
+Route::get('/__debug/item/{id}', function ($id) {
+    $item = app(ItemReadRepository::class)
+        ->findWithDisplayEntities((int)$id);
+
+    if (!$item) {
+        return response()->json(['error' => 'not found'], 404);
+    }
+
+    return response()->json(
+        ItemReadResource::fromRow($item)
+    );
+});

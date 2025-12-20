@@ -13,8 +13,7 @@ type SellForm = {
   name: string;
   price: string;
   explain: string;
-  brand: string;
-  condition: string;
+  attributes: string; // ★ brand / condition / color をまとめる
   categories: string[];
 };
 
@@ -36,13 +35,6 @@ const CATEGORY_LIST = [
   "アクセサリー",
 ];
 
-const CONDITION_LIST = [
-  "良好",
-  "目立った傷や汚れなし",
-  "やや傷や汚れあり",
-  "状態が悪い",
-];
-
 export default function ItemSellPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, apiClient } = useAuth();
@@ -53,8 +45,7 @@ export default function ItemSellPage() {
     name: "",
     price: "",
     explain: "",
-    brand: "",
-    condition: "",
+    attributes: "",
     categories: [],
   });
 
@@ -102,6 +93,7 @@ export default function ItemSellPage() {
   ========================= */
   const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!apiClient || !imageFile) {
       setError("画像を選択してください");
       return;
@@ -113,17 +105,18 @@ export default function ItemSellPage() {
     try {
       /* =========================
          1. Draft 作成
+         ※ attributes を brand として送信
       ========================= */
       const draftRes = await apiClient.post("/items/drafts", {
         seller_id: "individual:2", // v1 仮
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
-        brand: form.brand || null,
 
-        // ★ 追加（これがなかった）
+        // ★ AtlasKernel 解析対象
+        brand: form.attributes || null,
+
         explain: form.explain || null,
-        condition: form.condition || null,
         category: form.categories.length ? form.categories : null,
       });
 
@@ -144,7 +137,7 @@ export default function ItemSellPage() {
       ========================= */
       await apiClient.post(`/items/drafts/${draftId}/publish`);
 
-      router.push("/"); //mypage/sellに修正
+      router.push("/"); // or /mypage/sell
     } catch (e) {
       setError("商品の出品に失敗しました");
     } finally {
@@ -183,7 +176,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* カテゴリー（※ v1 では未送信） */}
+        {/* カテゴリー */}
         <div className={styles.formGroup}>
           <label>カテゴリー（複数選択）</label>
           <div className={styles.categoryButtons}>
@@ -204,35 +197,20 @@ export default function ItemSellPage() {
           </div>
         </div>
 
-        {/* 状態（※ v1 では未送信） */}
+        {/* ★ brand / condition / color 統合入力 */}
         <div className={styles.formGroup}>
-          <label>商品の状態</label>
-          <select
-            value={form.condition}
-            onChange={(e) =>
-              setForm((v) => ({ ...v, condition: e.target.value }))
-            }
-          >
-            <option value="">選択してください</option>
-            {CONDITION_LIST.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* ブランド */}
-        <div className={styles.formGroup}>
-          <label>ブランド（手動入力）</label>
+          <label>ブランド・状態・色（まとめて入力可能でどのような複雑なデーターでも処理できる開発をしています。）</label>
           <input
             type="text"
-            placeholder="例：Apple / SONY など"
-            value={form.brand}
-            onChange={(e) => setForm((v) => ({ ...v, brand: e.target.value }))}
+            placeholder="例：Apple ほぼ新品 黒（スペース、コンマなど有無でも可能）"
+            value={form.attributes}
+            onChange={(e) =>
+              setForm((v) => ({ ...v, attributes: e.target.value }))
+            }
           />
           <small className={styles.hint}>
-            ※ 入力値は将来 AI により正規化されます
+            ※ 入力内容は自動で解析・正規化されます 
+            ※企業判断や成長企画や実績に未来再利用可能な形で蓄積するエンジン開発のプロトタイプです。
           </small>
         </div>
 
@@ -247,19 +225,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* 価格 */}
-        <div className={styles.formGroup}>
-          <label>価格</label>
-          <input
-            type="number"
-            placeholder="¥"
-            value={form.price}
-            onChange={(e) => setForm((v) => ({ ...v, price: e.target.value }))}
-            required
-          />
-        </div>
-
-        {/* 説明（※ v1 では未送信） */}
+        {/* 商品説明 ★ 先に表示 */}
         <div className={styles.formGroup}>
           <label>商品説明</label>
           <textarea
@@ -271,6 +237,17 @@ export default function ItemSellPage() {
           />
         </div>
 
+        {/* 価格 ★ 後に表示 */}
+        <div className={styles.formGroup}>
+          <label>価格</label>
+          <input
+            type="number"
+            placeholder="¥"
+            value={form.price}
+            onChange={(e) => setForm((v) => ({ ...v, price: e.target.value }))}
+            required
+          />
+        </div>
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.actions}>
