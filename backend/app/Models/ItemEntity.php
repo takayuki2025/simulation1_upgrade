@@ -54,27 +54,16 @@ class ItemEntity extends Model
     /** 正規化ブランド */
     public function brand(): BelongsTo
     {
-        return $this->belongsTo(
-            BrandEntity::class,
-            'brand_entity_id'
-        );
+        return $this->belongsTo(BrandEntity::class, 'brand_entity_id');
     }
 
-    /** 正規化コンディション */
     public function condition(): BelongsTo
     {
-        return $this->belongsTo(
-            ConditionEntity::class,
-            'condition_entity_id'
-        );
+        return $this->belongsTo(ConditionEntity::class, 'condition_entity_id');
     }
 
-    /** 正規化カラー */
     public function color(): BelongsTo
     {
-        return $this->belongsTo(
-            ColorEntity::class,
-            'color_entity_id'
-        );
+        return $this->belongsTo(ColorEntity::class, 'color_entity_id');
     }
 }

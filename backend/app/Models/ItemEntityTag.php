@@ -41,4 +41,31 @@ class ItemEntityTag extends Model
             'entity_id'
         );
     }
+
+    /** brand entity */
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(
+            BrandEntity::class,
+            'entity_id'
+        );
+    }
+
+    /** condition entity */
+    public function condition(): BelongsTo
+    {
+        return $this->belongsTo(
+            ConditionEntity::class,
+            'entity_id'
+        );
+    }
+
+    /** color entity */
+    public function color(): BelongsTo
+    {
+        return $this->belongsTo(
+            ColorEntity::class,
+            'entity_id'
+        );
+    }
 }

@@ -7,13 +7,13 @@ use App\Modules\Item\Domain\Entity\Item;
 class ItemDetailOutputDto
 {
     /**
-     * @param Item $item
+     * @param array $itemRow
      * @param iterable $comments   // Eloquent Comment[] を想定
      * @param bool $isFavorited
      * @param int $favoritesCount
      */
     public function __construct(
-        public readonly object $itemRow,
+        public readonly array $itemRow,
         public readonly iterable $comments,
         public readonly bool $isFavorited,
         public readonly int $favoritesCount,

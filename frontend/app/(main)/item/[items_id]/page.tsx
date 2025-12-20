@@ -202,10 +202,7 @@ export default function ItemDetailPage() {
    * 1) item.brand_tokens（将来APIが返すならここ）
    * 2) item.brand（string / string[] どちらでも）
    */
-  const brandTokens: string[] =
-    tagBrandTokens.length > 0
-      ? tagBrandTokens
-      : toTokenList((item as any).brand_tokens ?? item.brand);
+  const brandTokens: string[] = Array.isArray(item.brands) ? item.brands : [];
 
   /**
    * condition / color も将来 raw と display を分けられるように準備
@@ -218,16 +215,14 @@ export default function ItemDetailPage() {
     (item as any).original_condition ??
     item.condition;
 
-  const displayCondition =
-    tagCondition ?? (item as any).display_condition ?? item.condition;
+  const displayCondition = item.condition ?? null;
 
   const rawColor =
     (item as any).raw_color ??
     (item as any).original_color ??
     (item as any).color;
 
-  const displayColor =
-    tagColor ?? (item as any).display_color ?? (item as any).color;
+  const displayColor = item.color ?? null;
 
   /* =========================
      JSX
