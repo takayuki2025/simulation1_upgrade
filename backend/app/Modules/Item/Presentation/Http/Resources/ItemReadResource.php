@@ -11,8 +11,9 @@ final class ItemReadResource
             'name'      => $row->name,
             'price'     => $row->price,
             'brand'     => $row->display_brand, // ★ entity 優先
+            'condition' => $row->display_condition ?? $row->condition,
+            'color'     => $row->display_color ?? null,
             'explain'   => $row->explain,
-            'condition' => $row->condition,
             'category'  => $row->category,
             'remain'    => $row->remain,
             'item_image' => $row->item_image,

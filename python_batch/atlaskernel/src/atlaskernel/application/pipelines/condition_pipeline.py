@@ -8,9 +8,9 @@ from atlaskernel.domain.result import AnalysisResult
 from atlaskernel.version import VERSION
 
 
-def analyze_brand(request, policy_engine):
+def analyze_condition(request, policy_engine):
     norm = normalize(request.raw_value)
-    assets = load_assets(request.known_assets_ref or "brands_v1")
+    assets = load_assets(request.known_assets_ref or "conditions_v1")
 
     candidates: List[Candidate] = []
     for a in assets:
@@ -18,13 +18,13 @@ def analyze_brand(request, policy_engine):
         candidates.append(Candidate(value=a, score=score))
 
     if not candidates:
-        raise RuntimeError("No brand assets loaded.")
+        raise RuntimeError("No condition assets loaded.")
 
     candidates.sort(key=lambda c: c.score, reverse=True)
     top = candidates[0]
 
     decision, reason, trace = policy_engine.evaluate(
-        policy_engine.load("brand"),
+        policy_engine.load("condition"),
         {"score": top.score},
     )
 
@@ -38,11 +38,11 @@ def analyze_brand(request, policy_engine):
     if decision in ("needs_review", "rejected"):
         extensions["escalation"] = {
             "action": "human_review",
-            "queue": "entity_review.brand",
+            "queue": "entity_review.condition",
         }
 
     return AnalysisResult(
-        entity_type="brand",
+        entity_type="condition",
         raw_value=request.raw_value,
         canonical_value=top.value,
         confidence=top.score,

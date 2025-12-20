@@ -2,7 +2,7 @@ import os
 import mysql.connector
 
 
-def write_results_to_db(results):
+def write_results_to_db(pairs):
     conn = mysql.connector.connect(
         host=os.getenv("DB_HOST"),
         port=int(os.getenv("DB_PORT", 3306)),
@@ -15,68 +15,109 @@ def write_results_to_db(results):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # ★ item_id と result を同時に受け取る
-        for item_id, result in results:
+        for item_id, result in pairs:
+            # =====================================================
+            # ① デバッグ：受け取った結果をすべて表示
+            # =====================================================
             print(
-    "[DEBUG]",
-    "item_id=", item_id,
-    "decision=", result.decision,
-    "canonical=", result.canonical_value,
-)
-            # brand-only v1
-            if result.entity_type != "brand":
-                continue
+                "[DEBUG pair]",
+                "item_id=", item_id,
+                "entity_type=", result.entity_type,
+                "raw=", result.raw_value,
+                "canonical=", result.canonical_value,
+                "confidence=", result.confidence,
+                "decision=", result.decision,
+            )
 
-            brand_entity_id = None
-
-            # accepted のみ永続化
-            if result.decision in ("auto_accept", "needs_review") and result.canonical_value:
-                normalized_key = result.canonical_value.lower()
-
-                cursor.execute(
-                    "SELECT id FROM brand_entities WHERE normalized_key=%s LIMIT 1",
-                    (normalized_key,),
-                )
-                row = cursor.fetchone()
-
-                if row:
-                    brand_entity_id = row["id"]
-                else:
-                    cursor.execute(
-                        """
-                        INSERT INTO brand_entities
-                            (canonical_name, normalized_key, confidence, created_from, created_at, updated_at)
-                        VALUES
-                            (%s, %s, %s, %s, NOW(), NOW())
-                        """,
-                        (
-                            result.canonical_value,
-                            normalized_key,
-                            result.confidence,
-                            "atlaskernel_v1",
-                        ),
-                    )
-                    brand_entity_id = cursor.lastrowid
-
-            # item_entities は必ず upsert（NULL も許容）
+            # =====================================================
+            # ② item_entities のベース行を必ず作る（v1思想）
+            # =====================================================
             cursor.execute(
                 """
                 INSERT INTO item_entities
-                    (item_id, brand_entity_id, generated_version, generated_at, created_at, updated_at)
+                  (item_id, generated_version, generated_at, created_at, updated_at)
                 VALUES
-                    (%s, %s, 'v1_brand_only', NOW(), NOW(), NOW())
-                ON DUPLICATE KEY UPDATE
-                    brand_entity_id=VALUES(brand_entity_id),
-                    generated_at=NOW(),
-                    updated_at=NOW()
+                  (%s, 'v1', NOW(), NOW(), NOW())
+                ON DUPLICATE KEY UPDATE updated_at = NOW()
                 """,
-                (item_id, brand_entity_id),
+                (item_id,),
+            )
+
+            # canonical が無ければ entity 保存しない（ログだけ出す）
+            if not result.canonical_value:
+                print("[DEBUG skip] no canonical_value")
+                continue
+
+            normalized_key = result.canonical_value.lower()
+
+            # =====================================================
+            # ③ entity 種別判定
+            # =====================================================
+            if result.entity_type == "brand":
+                table, column = "brand_entities", "brand_entity_id"
+            elif result.entity_type == "condition":
+                table, column = "condition_entities", "condition_entity_id"
+            elif result.entity_type == "color":
+                table, column = "color_entities", "color_entity_id"
+            else:
+                print("[DEBUG skip] unknown entity_type:", result.entity_type)
+                continue
+
+            # =====================================================
+            # ④ entity の upsert
+            # =====================================================
+            cursor.execute(
+                f"SELECT id FROM {table} WHERE normalized_key=%s LIMIT 1",
+                (normalized_key,),
+            )
+            row = cursor.fetchone()
+
+            if row:
+                entity_id = row["id"]
+                print(f"[DEBUG reuse] {table} id={entity_id}")
+            else:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {table}
+                      (canonical_name, normalized_key, confidence, created_from, created_at, updated_at)
+                    VALUES
+                      (%s, %s, %s, %s, NOW(), NOW())
+                    """,
+                    (
+                        result.canonical_value,
+                        normalized_key,
+                        result.confidence,
+                        "atlaskernel_v1",
+                    ),
+                )
+                entity_id = cursor.lastrowid
+                print(f"[DEBUG insert] {table} id={entity_id}")
+
+            # =====================================================
+            # ⑤ item_entities に関連付け
+            # =====================================================
+            cursor.execute(
+                f"""
+                UPDATE item_entities
+                SET {column} = %s,
+                    generated_at = NOW(),
+                    updated_at = NOW()
+                WHERE item_id = %s
+                """,
+                (entity_id, item_id),
+            )
+
+            print(
+                f"[DEBUG link] item_id={item_id} "
+                f"{column}={entity_id}"
             )
 
         conn.commit()
+        print("[OK] AtlasKernel DB pipeline committed")
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("[ERROR] rollback:", e)
         raise
 
     finally:
