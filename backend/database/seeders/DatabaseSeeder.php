@@ -24,6 +24,9 @@ class DatabaseSeeder extends Seeder
             ShopsTableSeeder::class,
             RoleUserSeeder::class,
             ItemsTableSeeder::class,
+            BrandEntitySeeder::class,
+            ConditionEntitySeeder::class,
+            ColorEntitySeeder::class,
         ]);
 
 

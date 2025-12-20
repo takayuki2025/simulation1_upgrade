@@ -14,7 +14,7 @@ return new class () extends Migration {
             $table->string('canonical_name');
 
             // 検索・同一判定用（lower 済み）
-            $table->string('normalized_key')->unique();
+            // $table->string('normalized_key')->unique();
 
             // AtlasKernel の信頼度
             $table->float('confidence')->nullable();

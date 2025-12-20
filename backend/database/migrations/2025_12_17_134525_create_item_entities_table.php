@@ -21,6 +21,8 @@ return new class () extends Migration {
             $table->unsignedBigInteger('condition_entity_id')->nullable();
             $table->unsignedBigInteger('color_entity_id')->nullable();
 
+            $table->json('confidence')->nullable();
+
             // =====================================================
             // Versioning / State
             // =====================================================

@@ -327,6 +327,12 @@ function ItemDetailPage() {
         if (!item) return;
         router.push(`/purchase/${item.id}`);
     };
+    /**
+   * v2対応：
+   * API が tags を返す場合は必ずそれを優先する
+   */ const tagBrandTokens = item?.tags?.brand?.map((b)=>b.name) ?? [];
+    const tagCondition = item?.tags?.condition?.[0]?.name ?? null;
+    const tagColor = item?.tags?.color?.[0]?.name ?? null;
     /* =========================
      Guard
   ========================= */ if (isLoading) {
@@ -335,7 +341,7 @@ function ItemDetailPage() {
             children: "商品情報を読み込み中..."
         }, void 0, false, {
             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-            lineNumber: 179,
+            lineNumber: 190,
             columnNumber: 12
         }, this);
     }
@@ -345,7 +351,7 @@ function ItemDetailPage() {
             children: "商品が見つかりませんでした。"
         }, void 0, false, {
             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-            lineNumber: 183,
+            lineNumber: 194,
             columnNumber: 12
         }, this);
     }
@@ -355,16 +361,16 @@ function ItemDetailPage() {
    * 優先順：
    * 1) item.brand_tokens（将来APIが返すならここ）
    * 2) item.brand（string / string[] どちらでも）
-   */ const brandTokens = toTokenList(item.brand_tokens ?? item.brand);
+   */ const brandTokens = tagBrandTokens.length > 0 ? tagBrandTokens : toTokenList(item.brand_tokens ?? item.brand);
     /**
    * condition / color も将来 raw と display を分けられるように準備
    * - raw: items テーブル由来（例: "良好"）
    * - display: entity 由来（例: "ほぼ新品"）
    * 現状APIが display しか返さないなら raw=display で表示されるだけ（壊れない）
    */ const rawCondition = item.raw_condition ?? item.original_condition ?? item.condition;
-    const displayCondition = item.display_condition ?? item.condition;
+    const displayCondition = tagCondition ?? item.display_condition ?? item.condition;
     const rawColor = item.raw_color ?? item.original_color ?? item.color;
-    const displayColor = item.display_color ?? item.color;
+    const displayColor = tagColor ?? item.display_color ?? item.color;
     /* =========================
      JSX
   ========================= */ return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -383,12 +389,12 @@ function ItemDetailPage() {
                             className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].image
                         }, void 0, false, {
                             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                            lineNumber: 227,
+                            lineNumber: 241,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                        lineNumber: 226,
+                        lineNumber: 240,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -399,7 +405,7 @@ function ItemDetailPage() {
                                 children: item.name
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 238,
+                                lineNumber: 252,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -410,7 +416,7 @@ function ItemDetailPage() {
                                         children: "ブランド名"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 242,
+                                        lineNumber: 256,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -442,25 +448,25 @@ function ItemDetailPage() {
                                                 children: shortenLabel(b)
                                             }, `${b}-${idx}`, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 254,
+                                                lineNumber: 268,
                                                 columnNumber: 21
                                             }, this)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                             className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].brandValue,
                                             children: "未登録"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                            lineNumber: 279,
+                                            lineNumber: 293,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 244,
+                                        lineNumber: 258,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 241,
+                                lineNumber: 255,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -470,7 +476,7 @@ function ItemDetailPage() {
                                     children: "SOLD OUT"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                    lineNumber: 287,
+                                    lineNumber: 301,
                                     columnNumber: 17
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
                                     className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].price,
@@ -480,7 +486,7 @@ function ItemDetailPage() {
                                             children: "¥"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                            lineNumber: 290,
+                                            lineNumber: 304,
                                             columnNumber: 19
                                         }, this),
                                         item.price?.toLocaleString(),
@@ -489,18 +495,18 @@ function ItemDetailPage() {
                                             children: " (税込)"
                                         }, void 0, false, {
                                             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                            lineNumber: 292,
+                                            lineNumber: 306,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                    lineNumber: 289,
+                                    lineNumber: 303,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 285,
+                                lineNumber: 299,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -517,19 +523,19 @@ function ItemDetailPage() {
                                                     children: displayedFavorited ? "❤️" : "🤍"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                    lineNumber: 305,
+                                                    lineNumber: 319,
                                                     columnNumber: 21
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 301,
+                                                lineNumber: 315,
                                                 columnNumber: 19
                                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].disabledHeart,
                                                 children: "🤍"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 314,
+                                                lineNumber: 328,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -537,13 +543,13 @@ function ItemDetailPage() {
                                                 children: displayedCount
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 317,
+                                                lineNumber: 331,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 299,
+                                        lineNumber: 313,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -554,7 +560,7 @@ function ItemDetailPage() {
                                                 children: "💬"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 321,
+                                                lineNumber: 335,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -562,19 +568,19 @@ function ItemDetailPage() {
                                                 children: comments.length
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 322,
+                                                lineNumber: 336,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 320,
+                                        lineNumber: 334,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 298,
+                                lineNumber: 312,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -594,12 +600,12 @@ function ItemDetailPage() {
                                     children: isOwner ? "マイページへ移動する" : !isAuthenticated ? "ログインして購入" : isSoldOut ? "SOLD OUT" : "カートへ"
                                 }, void 0, false, {
                                     fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                    lineNumber: 328,
+                                    lineNumber: 342,
                                     columnNumber: 15
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 327,
+                                lineNumber: 341,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -610,7 +616,7 @@ function ItemDetailPage() {
                                         children: "商品説明"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 357,
+                                        lineNumber: 371,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -618,13 +624,13 @@ function ItemDetailPage() {
                                         children: item.explain
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 358,
+                                        lineNumber: 372,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 356,
+                                lineNumber: 370,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -635,7 +641,7 @@ function ItemDetailPage() {
                                         children: "商品情報"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 363,
+                                        lineNumber: 377,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -646,7 +652,7 @@ function ItemDetailPage() {
                                                 children: "カテゴリー"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 366,
+                                                lineNumber: 380,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("ul", {
@@ -656,18 +662,18 @@ function ItemDetailPage() {
                                                         children: category
                                                     }, index, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 369,
+                                                        lineNumber: 383,
                                                         columnNumber: 21
                                                     }, this))
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 367,
+                                                lineNumber: 381,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 365,
+                                        lineNumber: 379,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -688,7 +694,7 @@ function ItemDetailPage() {
                                                         children: "商品の状態"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 382,
+                                                        lineNumber: 396,
                                                         columnNumber: 19
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -696,13 +702,13 @@ function ItemDetailPage() {
                                                         children: rawCondition || "未登録"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 383,
+                                                        lineNumber: 397,
                                                         columnNumber: 19
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 381,
+                                                lineNumber: 395,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -716,7 +722,7 @@ function ItemDetailPage() {
                                                         children: "状態（加工）"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 389,
+                                                        lineNumber: 403,
                                                         columnNumber: 19
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -724,19 +730,19 @@ function ItemDetailPage() {
                                                         children: displayCondition || rawCondition || "未登録"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 390,
+                                                        lineNumber: 404,
                                                         columnNumber: 19
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 388,
+                                                lineNumber: 402,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 377,
+                                        lineNumber: 391,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -750,7 +756,7 @@ function ItemDetailPage() {
                                                 children: "カラー"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 398,
+                                                lineNumber: 412,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -758,19 +764,19 @@ function ItemDetailPage() {
                                                 children: displayColor || rawColor || "未登録"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 399,
+                                                lineNumber: 413,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 397,
+                                        lineNumber: 411,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 362,
+                                lineNumber: 376,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -784,7 +790,7 @@ function ItemDetailPage() {
                                                 children: "コメント"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 408,
+                                                lineNumber: 422,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -796,13 +802,13 @@ function ItemDetailPage() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 409,
+                                                lineNumber: 423,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 407,
+                                        lineNumber: 421,
                                         columnNumber: 15
                                     }, this),
                                     comments.length > 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -819,7 +825,7 @@ function ItemDetailPage() {
                                                                 onError: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["onImageError"]
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                                lineNumber: 419,
+                                                                lineNumber: 433,
                                                                 columnNumber: 25
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -827,13 +833,13 @@ function ItemDetailPage() {
                                                                 children: comment.user.name
                                                             }, void 0, false, {
                                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                                lineNumber: 427,
+                                                                lineNumber: 441,
                                                                 columnNumber: 25
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 418,
+                                                        lineNumber: 432,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -841,7 +847,7 @@ function ItemDetailPage() {
                                                         children: comment.comment
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 432,
+                                                        lineNumber: 446,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
@@ -853,31 +859,31 @@ function ItemDetailPage() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                        lineNumber: 434,
+                                                        lineNumber: 448,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, comment.id, true, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 417,
+                                                lineNumber: 431,
                                                 columnNumber: 21
                                             }, this))
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 415,
+                                        lineNumber: 429,
                                         columnNumber: 17
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                         className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].noComments,
                                         children: "まだコメントはありません。"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 442,
+                                        lineNumber: 456,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 406,
+                                lineNumber: 420,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -888,7 +894,7 @@ function ItemDetailPage() {
                                         children: "商品へのコメント"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 448,
+                                        lineNumber: 462,
                                         columnNumber: 15
                                     }, this),
                                     commentErrors.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -897,12 +903,12 @@ function ItemDetailPage() {
                                                 children: err
                                             }, index, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 453,
+                                                lineNumber: 467,
                                                 columnNumber: 21
                                             }, this))
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 451,
+                                        lineNumber: 465,
                                         columnNumber: 17
                                     }, this),
                                     isAuthenticated ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -914,7 +920,7 @@ function ItemDetailPage() {
                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$app$2f28$main$292f$item$2f5b$items_id$5d2f$W$2d$ItemDetailView$2e$module$2e$css__$5b$app$2d$client$5d$__$28$css__module$29$__["default"].textarea
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 460,
+                                                lineNumber: 474,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -924,7 +930,7 @@ function ItemDetailPage() {
                                                 children: isSubmittingComment ? "投稿中..." : "コメントを送信する"
                                             }, void 0, false, {
                                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                                lineNumber: 467,
+                                                lineNumber: 481,
                                                 columnNumber: 19
                                             }, this)
                                         ]
@@ -937,35 +943,35 @@ function ItemDetailPage() {
                                         children: "ログインしてコメントする"
                                     }, void 0, false, {
                                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                        lineNumber: 476,
+                                        lineNumber: 490,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                                lineNumber: 447,
+                                lineNumber: 461,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                        lineNumber: 236,
+                        lineNumber: 250,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-                lineNumber: 224,
+                lineNumber: 238,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-            lineNumber: 223,
+            lineNumber: 237,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/app/(main)/item/[items_id]/page.tsx",
-        lineNumber: 222,
+        lineNumber: 236,
         columnNumber: 5
     }, this);
 }

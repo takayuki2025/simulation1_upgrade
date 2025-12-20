@@ -7,17 +7,26 @@ use Illuminate\Support\Facades\Schema;
 return new class () extends Migration {
     public function up(): void
     {
+
         Schema::create('brand_entities', function (Blueprint $table) {
             $table->id();
-            $table->string('canonical_name');
-            $table->string('normalized_key')->unique();
+
+            // 比較・検索・JOIN 用（正規化済み）
+            $table->string('canonical_name')->unique();
+
+            // UI 表示用
+            $table->string('display_name');
+
+            // alias / synonym（将来用）
             $table->json('synonyms_json')->nullable();
-            $table->decimal('confidence', 3, 2)->default(1.00); // 0.00 - 9.99
-            $table->string('created_from')->default('manual'); // manual / inferred
+
+            $table->decimal('confidence', 3, 2)->default(1.00);
+            $table->string('created_from')->default('manual');
             $table->timestamps();
 
             $table->index('canonical_name');
         });
+
     }
 
     public function down(): void
@@ -25,4 +34,3 @@ return new class () extends Migration {
         Schema::dropIfExists('brand_entities');
     }
 };
-

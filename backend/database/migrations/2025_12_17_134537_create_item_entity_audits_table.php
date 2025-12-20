@@ -10,17 +10,24 @@ return new class () extends Migration {
         Schema::create('item_entity_audits', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('item_entity_id')
-                ->constrained('item_entities')
-                ->cascadeOnDelete();
+            // 対象 item
+            $table->unsignedBigInteger('item_id');
 
-            $table->string('decision', 50);
-            $table->float('confidence');
+            // AtlasKernel 判定ログ
+            $table->json('confidence')->nullable();
+            $table->text('raw_text')->nullable();
 
-            $table->json('payload'); // AtlasKernel output 丸ごと（不変ログ）
+            // meta
+            $table->string('generated_version')->default('v1.5');
             $table->timestamps();
 
-            $table->index(['item_entity_id', 'created_at']);
+            // FK
+            $table->foreign('item_id')
+                ->references('id')
+                ->on('items')
+                ->cascadeOnDelete();
+
+            $table->index('item_id');
         });
     }
 

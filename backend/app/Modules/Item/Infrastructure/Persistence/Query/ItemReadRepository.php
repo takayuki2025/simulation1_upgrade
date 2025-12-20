@@ -3,6 +3,7 @@
 namespace App\Modules\Item\Infrastructure\Persistence\Query;
 
 use App\Models\Item;
+use App\Modules\Item\Infrastructure\Persistence\Query\ItemEntityTagReadRepository;
 use Illuminate\Support\Facades\DB;
 
 final class ItemReadRepository
@@ -48,26 +49,34 @@ final class ItemReadRepository
     /**
      * 商品詳細（entity 優先）
      */
-    public function findWithDisplayEntities(int $itemId): ?Item
+    public function findWithDisplayEntities(int $itemId): ?array
     {
-        return Item::query()
-            ->leftJoin('item_entities as ie', function ($join) {
-                $join->on('items.id', '=', 'ie.item_id')
-                     ->where('ie.is_latest', true);
-            })
-            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
-            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
-            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
-            ->where('items.id', $itemId)
-            ->select([
-                'items.*',
+        $item = Item::with([
+            'latestEntity.brand',
+            'latestEntity.condition',
+            'latestEntity.color',
+            'entityTags'
+        ])->find($itemId);
 
-                DB::raw('COALESCE(be.canonical_name, items.brand) as display_brand'),
-                DB::raw('COALESCE(ce.canonical_name, items.condition) as display_condition'),
-                DB::raw('coe.canonical_name as display_color'),
-            ])
-            ->first();
+        if (!$item) {
+            return null;
+        }
+
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'price' => $item->price_amount,
+            'brands' => $item->entityTags
+                ->where('tag_type', 'brand')
+                ->map(fn ($t) => $t->display_name)
+                ->values()
+                ->all(),
+            'brand_primary' => optional($item->latestEntity?->brand)->canonical_name,
+            'condition' => optional($item->latestEntity?->condition)->canonical_name,
+            'color' => optional($item->latestEntity?->color)->canonical_name,
+        ];
     }
+
 
     /**
      * 一覧（entity 優先）
@@ -90,5 +99,32 @@ final class ItemReadRepository
                 DB::raw('coe.canonical_name as display_color'),
             ])
             ->paginate($limit, ['*'], 'page', $page);
+    }
+
+    private function loadTags(int $itemId): array
+    {
+        return DB::table('item_entity_tags')
+            ->where('item_id', $itemId)
+            ->select('entity_type', 'canonical_name')
+            ->get()
+            ->groupBy('entity_type')
+            ->map(fn ($rows) => $rows->pluck('canonical_name')->values())
+            ->toArray();
+    }
+
+    public function findWithDisplayEntitiesAndTags(
+        int $itemId,
+        ItemEntityTagReadRepository $tagRepo
+    ): ?array {
+        $item = $this->findWithDisplayEntities($itemId);
+
+        if (!$item) {
+            return null;
+        }
+
+        return [
+            'item' => $item,
+            'tags' => $tagRepo->getGroupedByItemId($itemId),
+        ];
     }
 }

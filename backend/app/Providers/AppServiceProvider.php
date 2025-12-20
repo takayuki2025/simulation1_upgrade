@@ -38,6 +38,8 @@ use App\Domain\Auth\FirebaseAuthPort;
 // Adapters
 use App\Infrastructure\Payment\StripePaymentAdapter;
 use App\Infrastructure\Auth\FirebaseAuthAdapter;
+use App\Modules\Item\Domain\Repository\ItemEntityTagRepository;
+use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityTagRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -92,6 +94,14 @@ class AppServiceProvider extends ServiceProvider
 
         // Stripe Payment
         $this->app->bind(StripePaymentPort::class, StripePaymentAdapter::class);
+
+
+
+        $this->app->bind(
+            ItemEntityTagRepository::class,
+            EloquentItemEntityTagRepository::class
+        );
+
     }
 
     public function boot()
