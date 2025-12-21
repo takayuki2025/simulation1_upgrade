@@ -36,7 +36,7 @@ export default function PurchaseConfirmPage() {
   /* =========================
      💳 支払い方法
   ========================= */
-  const [payment, setPayment] = useState<"" | "convenience" | "card">("");
+  const [payment, setPayment] = useState<"" | "コンビニ支払い" | "クレジットカード支払い">("");
 
   const canPurchase =
     isAuthenticated &&

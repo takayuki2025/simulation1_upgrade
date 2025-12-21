@@ -2,7 +2,8 @@ backend/config/firebase-service-account.json
 
 takayuki-2025-ver-1-786d018a3e17.json
 node_modules/
-
+.next/
+frontend/.next/
 
 
 
