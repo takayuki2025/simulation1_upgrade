@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\DB;
 
 final class ItemReadRepository
 {
+    public function __construct(
+        private readonly ItemEntityTagReadRepository $tagRepo
+    ) {
+    }
+
+
     public function findWithDisplayBrand(int $itemId)
     {
         return Item::query()
@@ -51,38 +57,79 @@ final class ItemReadRepository
      */
     public function findWithDisplayEntities(int $itemId): ?array
     {
-        $item = Item::with([
-            'latestEntity.brand',
-            'latestEntity.condition',
-            'latestEntity.color',
-            'entityTags'
-        ])->find($itemId);
+        $item = Item::query()
+            ->leftJoin('item_entities as ie', function ($join) {
+                $join->on('items.id', '=', 'ie.item_id')
+                     ->where('ie.is_latest', true);
+            })
+            ->leftJoin('brand_entities as be', 'ie.brand_entity_id', '=', 'be.id')
+            ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
+            ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
+            ->where('items.id', $itemId)
+            ->select([
+                'items.id',
+                'items.name',
+                'items.price',
+                'items.explain',
+                'items.remain',
+                'items.item_image',
 
-        if (!$item) {
+                DB::raw('be.canonical_name  as brand_primary'),
+                DB::raw('ce.canonical_name  as condition_name'),
+                DB::raw('coe.canonical_name as color_name'),
+            ])
+            ->first();
+
+        if (! $item) {
             return null;
         }
 
+        $tags = $this->tagRepo->getGroupedByItemId($itemId);
+
+        $brandTags = $tags['brand'] ?? [];
+        $conditionTags = $tags['condition'] ?? [];
+        $colorTags = $tags['color'] ?? [];
+
+
+
         return [
-            'id' => $item->id,
-            'name' => $item->name,
-            'price' => $item->price_amount,
-            'brands' => $item->entityTags
-                ->where('tag_type', 'brand')
-                ->map(fn ($t) => $t->display_name)
-                ->values()
-                ->all(),
-            'brand_primary' => optional($item->latestEntity?->brand)->canonical_name,
-            'condition' => optional($item->latestEntity?->condition)->canonical_name,
-            'color' => optional($item->latestEntity?->color)->canonical_name,
+            'id'        => $item->id,
+            'name'      => $item->name,
+            'price'     => $item->price,
+            'explain'   => $item->explain,
+            'remain'    => $item->remain,
+
+            // ✅ brand（複数）
+            'brands'        => array_column($brandTags, 'display_name'),
+            'brand_primary' => $item->brand_primary,
+
+            // ✅ condition / color は tags から
+            'condition' => $conditionTags[0]['display_name']
+            ?? $item->condition_name
+            ?? null,
+
+            'color' => $colorTags[0]['display_name']
+                ?? $item->color_name
+                ?? null,
+
+            // ✅ 完全 tags（confidence 含む）
+            'tags' => $tags,
+
+            // image
+            'item_image' => $item->item_image
+                ? asset('storage/' . $item->item_image)
+                : null,
         ];
+
     }
 
-
     /**
-     * 一覧（entity 優先）
+     * 一覧（entity 優先・軽量）
      */
-    public function paginateWithDisplayEntities(int $limit, int $page)
-    {
+    public function paginateWithDisplayEntities(
+        int $limit,
+        int $page
+    ) {
         return Item::query()
             ->leftJoin('item_entities as ie', function ($join) {
                 $join->on('items.id', '=', 'ie.item_id')
@@ -92,13 +139,29 @@ final class ItemReadRepository
             ->leftJoin('condition_entities as ce', 'ie.condition_entity_id', '=', 'ce.id')
             ->leftJoin('color_entities as coe', 'ie.color_entity_id', '=', 'coe.id')
             ->select([
-                'items.*',
+                'items.id',
+                'items.name',
+                'items.price',
+                'items.item_image',
 
-                DB::raw('COALESCE(be.canonical_name, items.brand) as display_brand'),
-                DB::raw('COALESCE(ce.canonical_name, items.condition) as display_condition'),
-                DB::raw('coe.canonical_name as display_color'),
+                DB::raw('be.canonical_name  as brand_primary'),
+                DB::raw('ce.canonical_name  as condition_name'),
+                DB::raw('coe.canonical_name as color_name'),
             ])
-            ->paginate($limit, ['*'], 'page', $page);
+            ->paginate($limit, ['*'], 'page', $page)
+            ->through(function ($row) {
+                return [
+                    'id'        => $row->id,
+                    'name'      => $row->name,
+                    'price'     => $row->price,
+                    'brand'     => $row->brand_primary,
+                    'condition' => $row->condition_name,
+                    'color'     => $row->color_name,
+                    'item_image' => $row->item_image
+                        ? asset('storage/' . $row->item_image)
+                        : null,
+                ];
+            });
     }
 
     private function loadTags(int $itemId): array

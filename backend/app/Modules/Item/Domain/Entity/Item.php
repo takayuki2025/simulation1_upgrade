@@ -2,10 +2,8 @@
 
 namespace App\Modules\Item\Domain\Entity;
 
-use App\Modules\Item\Domain\Entity\ItemDraft;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
-    ItemName,
     Money,
     CategoryList,
     ItemImagePath,
@@ -14,18 +12,24 @@ use App\Modules\Item\Domain\ValueObject\{
 
 final class Item
 {
-    private ?ItemId $id;
-    private ?int $shopId;
-    private string $name;
-    private Money $price;
-    private string $explain;
-    private string $condition;
-    private CategoryList $category;
-    private ?string $brand;
-    private ItemImagePath $itemImage;
-    private StockCount $remain;
+    private function __construct(
+        private ?ItemId $id,
+        private ?int $shopId,
+        private string $name,
+        private Money $price,
+        private string $explain,
+        private string $condition,
+        private CategoryList $category,
+        private ?ItemImagePath $itemImage,
+        private StockCount $remain,
+    ) {
+    }
 
-    public function __construct(
+    /* =========================
+       Factory（再構築専用）
+    ========================= */
+
+    public static function reconstitute(
         ?ItemId $id,
         ?int $shopId,
         string $name,
@@ -33,31 +37,31 @@ final class Item
         string $explain,
         string $condition,
         CategoryList $category,
-        ?string $brand,
-        ItemImagePath $itemImage,
+        ?ItemImagePath $itemImage,
         StockCount $remain,
-    ) {
-        $this->id = $id;
-        $this->shopId = $shopId;
-        $this->name = $name;
-        $this->price = $price;
-        $this->explain = $explain;
-        $this->condition = $condition;
-        $this->category = $category;
-        $this->brand = $brand;
-        $this->itemImage = $itemImage;
-        $this->remain = $remain;
+    ): self {
+        return new self(
+            $id,
+            $shopId,
+            $name,
+            $price,
+            $explain,
+            $condition,
+            $category,
+            $itemImage,
+            $remain
+        );
     }
 
     /* =========================
-       Getter（read-only）
+       Getters
     ========================= */
 
     public function getId(): ?ItemId
     {
         return $this->id;
     }
-    public function getShopId(): int
+    public function getShopId(): ?int
     {
         return $this->shopId;
     }
@@ -81,11 +85,7 @@ final class Item
     {
         return $this->category;
     }
-    public function getBrand(): ?string
-    {
-        return $this->brand;
-    }
-    public function getItemImage(): ItemImagePath
+    public function getItemImage(): ?ItemImagePath
     {
         return $this->itemImage;
     }
@@ -94,23 +94,28 @@ final class Item
         return $this->remain;
     }
 
-    /* ===== Factory ===== */
+    /* =========================
+       Domain Mutation（安全）
+    ========================= */
 
-    public static function publishFromDraft(ItemDraft $draft): self
+    public function withItemImage(ItemImagePath $image): self
     {
-        return new self(
-            id: null,
-            shopId: $draft->sellerId()->id(),
-            name: $draft->name()->value(),
-            price: $draft->price(),
-            explain: $draft->explain(),
-            condition: $draft->condition(),
-            category: $draft->category() ?? new CategoryList([]),
-            brand: $draft->brand()?->raw(),
-            itemImage: $draft->itemImage(),
-            remain: $draft->remain(),
+        return self::reconstitute(
+            $this->id,
+            $this->shopId,
+            $this->name,
+            $this->price,
+            $this->explain,
+            $this->condition,
+            $this->category,
+            $image,
+            $this->remain
         );
     }
+
+
+
+
 
     /* =========================
        Domain Logic
@@ -140,9 +145,10 @@ final class Item
             explain: $this->explain,
             condition: $this->condition,
             category: $this->category,
-            brand: $this->brand,
+            // brand: $this->brand,
             itemImage: $this->itemImage,
             remain: $this->remain->decrease($quantity),
         );
     }
+
 }

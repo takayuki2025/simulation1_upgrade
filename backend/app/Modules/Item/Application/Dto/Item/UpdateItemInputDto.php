@@ -15,7 +15,7 @@ class UpdateItemInputDto
         public readonly string $explain,
         public readonly string $condition,
         public readonly array $category,
-        public readonly ?string $brand,
+        public readonly array $brandsRaw,
         public readonly ?string $itemImagePath,
         public readonly int $remain,
     ) {

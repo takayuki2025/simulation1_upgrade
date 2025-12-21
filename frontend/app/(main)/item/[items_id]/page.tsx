@@ -395,7 +395,7 @@ export default function ItemDetailPage() {
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className={styles.conditionLabel}>状態（加工）</p>
+                  <p className={styles.conditionLabel}>Update</p>
                   <p className={styles.conditionValue}>
                     {displayCondition || rawCondition || "未登録"}
                   </p>

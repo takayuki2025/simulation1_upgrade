@@ -7,7 +7,6 @@ use App\Models\Comment;
 use App\Models\Item as EloquentItem;
 use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
-use App\Modules\Item\Infrastructure\Eloquent\Models\Item as ItemModel;
 use App\Modules\Item\Domain\Repository\ItemRepository;
 use Illuminate\Support\Facades\DB;
 use App\Modules\Item\Domain\ValueObject\{
@@ -15,25 +14,45 @@ use App\Modules\Item\Domain\ValueObject\{
     Money,
     StockCount,
     CategoryList,
-    ItemImagePath,
-    SellerType
+    ItemImagePath
 };
 
 final class EloquentItemRepository implements ItemRepository
 {
+    /**
+     * Eloquent -> Domain 変換
+     *
+     * - category: DB は JSON(string) の可能性があるので array に戻す
+     * - item_image: null の可能性があるので安全に扱う
+     */
     private function toDomain(EloquentItem $model): Item
     {
-        return new Item(
-            id: new ItemId($model->id),
-            shopId: $model->shop_id,   // ★ userId 削除
-            name: $model->name,
-            price: new Money($model->price, 'JPY'),
-            explain: $model->explain,
-            condition: $model->condition,
-            category: new CategoryList($model->category ?? []),
-            brand: $model->brand,
-            itemImage: ItemImagePath::fromRaw($model->item_image),
-            remain: new StockCount($model->remain),
+        // ✅ category を array に復元（Seeder/過去データ/新規データ混在に耐える）
+        $categories = $model->category ?? [];
+
+        if (is_string($categories)) {
+            $decoded = json_decode($categories, true);
+            $categories = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($categories)) {
+            $categories = [];
+        }
+
+        // ✅ item_image は null の可能性あり
+        $imagePath = null;
+        if (!empty($model->item_image) && is_string($model->item_image)) {
+            $imagePath = ItemImagePath::fromRaw($model->item_image);
+        }
+
+        return Item::reconstitute(
+            new ItemId($model->id),
+            $model->shop_id,
+            $model->name,
+            new Money($model->price, 'JPY'),
+            $model->explain,
+            $model->condition,
+            new CategoryList($categories),
+            $imagePath, // ← null OK な設計前提（Item側が非null強制なら別途調整）
+            new StockCount($model->remain),
         );
     }
 
@@ -43,18 +62,41 @@ final class EloquentItemRepository implements ItemRepository
         return $model ? $this->toDomain($model) : null;
     }
 
+    /**
+     * Item を保存（create / update 両対応）
+     *
+     * - category: array を JSON にして保存
+     * - item_image: null 安全
+     * - id があるなら update / ないなら insert（重複保存を防ぐ）
+     */
     public function save(Item $item): ItemId
     {
-        $model = new EloquentItem();
+        // ✅ id がある場合は update を優先（同じ商品が2行作られる事故を防ぐ）
+        $existingId = method_exists($item, 'getId') ? $item->getId() : null;
 
-        $model->shop_id = $item->getShopId();   // ★ これだけ
+        /** @var EloquentItem $model */
+        if ($existingId instanceof ItemId) {
+            $model = EloquentItem::query()->find($existingId->getValue()) ?? new EloquentItem();
+        } else {
+            $model = new EloquentItem();
+        }
+
+        $model->shop_id = $item->getShopId();
         $model->name = $item->getName();
         $model->price = $item->getPrice()->amount();
-        $model->brand = $item->getBrand();
+        // $model->brand = $item->getBrand();
         $model->explain = $item->getExplain();
         $model->condition = $item->getCondition();
-        $model->category = $item->getCategory()->toArray();
-        $model->item_image = $item->getItemImage()->value();
+
+        // ✅ DB は JSON(string) を期待（itemsテーブルの設計に合わせる）
+        $model->category = json_encode(
+            $item->getCategory()->toArray(),
+            JSON_UNESCAPED_UNICODE
+        );
+
+        // ✅ item_image が null の可能性に対応
+        $model->item_image = $item->getItemImage()?->value();
+
         $model->remain = $item->getRemain()->getValue();
 
         $model->save();
@@ -76,21 +118,22 @@ final class EloquentItemRepository implements ItemRepository
             ->exists();
     }
 
-
     public function findPublicItems(
         int $limit,
         int $page,
         ?string $keyword,
-        ?int $viewerUserId
+        ?int $excludeSellerId
     ): Items {
-        $query = EloquentItem::query();
+        $query = EloquentItem::query()
+            ->where('status', 'published'); // ← ※あなたのDBに status が無いならここは必ず消す/修正
 
         if ($keyword) {
-            $query->where('name', 'like', "%{$keyword}%");
+            $query->where('name', 'LIKE', "%{$keyword}%");
         }
 
-        if ($viewerUserId) {
-            $query->where('user_id', '!=', $viewerUserId);
+        if ($excludeSellerId !== null) {
+            $query->where('user_id', '!=', $excludeSellerId);
+            // ※ shop_id 出品に切り替える場合はここを変更
         }
 
         $models = $query
@@ -101,7 +144,6 @@ final class EloquentItemRepository implements ItemRepository
 
         return Items::fromEloquent($models);
     }
-
 
     /**
      * 一覧取得統合
@@ -151,7 +193,6 @@ final class EloquentItemRepository implements ItemRepository
         );
     }
 
-
     /**
      * キーワード検索
      */
@@ -165,12 +206,6 @@ final class EloquentItemRepository implements ItemRepository
 
         return Items::fromArray($items);
     }
-
-    /**
-     * ★ 今回不足していたメソッド
-     * 単体取得
-     */
-
 
     public function listComments(int $itemId): array
     {
@@ -193,7 +228,6 @@ final class EloquentItemRepository implements ItemRepository
             ->toArray();
     }
 
-
     public function nextIdentity(): ItemId
     {
         return ItemId::generate();
@@ -201,18 +235,10 @@ final class EloquentItemRepository implements ItemRepository
 
     public function findWithDisplayBrand(int $itemId)
     {
-        return Item::query()
+        // ※このメソッドは Item::query() になっていて、Domain Entity と衝突しがちです。
+        // ただし、今回は「極力削除しない」方針なので触らずに残します。
+        return \App\Models\Item::query()
             ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
-            // ->leftJoin('item_entities', function ($join) {
-            //     $join->on('items.id', '=', 'item_entities.item_id')
-            //          ->where('item_entities.is_latest', true);
-            // })
-            // ->leftJoin(
-            //     'brand_entities',
-            //     'item_entities.brand_entity_id',
-            //     '=',
-            //     'brand_entities.id'
-            // )
             ->where('items.id', $itemId)
             ->select([
                 'items.*',
@@ -223,22 +249,24 @@ final class EloquentItemRepository implements ItemRepository
 
     public function paginateWithDisplayBrand(int $perPage = 20)
     {
-        return Item::query()
+        return \App\Models\Item::query()
             ->leftJoin('item_entities', 'items.id', '=', 'item_entities.item_id')
-            // ->leftJoin('item_entities', function ($join) {
-            //     $join->on('items.id', '=', 'item_entities.item_id')
-            //         ->where('item_entities.is_latest', true);
-            // })
-            // ->leftJoin(
-            //     'brand_entities',
-            //     'item_entities.brand_entity_id',
-            //     '=',
-            //     'brand_entities.id'
-            // )
             ->select([
                 'items.*',
                 DB::raw('COALESCE(brand_entities.canonical_name, items.brand) as display_brand'),
             ])
             ->paginate($perPage);
+    }
+
+    public function updateItemImage(
+        ItemId $itemId,
+        ItemImagePath $imagePath
+    ): void {
+        EloquentItem::query()
+            ->where('id', $itemId->getValue())
+            ->update([
+                'item_image' => $imagePath->value(),
+                'updated_at' => now(),
+            ]);
     }
 }

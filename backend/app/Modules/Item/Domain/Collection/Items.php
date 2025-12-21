@@ -80,20 +80,27 @@ final class Items
      */
     private static function toDomain(EloquentItem $model): Item
     {
+        // ★ category を必ず array に正規化
+        $categories = [];
 
-        return new Item(
-            id: new ItemId($model->id),
-            shopId: $model->shop_id ?? null,
-            name: $model->name,
-            price: new Money($model->price, 'JPY'),
-            explain: $model->explain,
-            condition: $model->condition,
-            category: new CategoryList($model->category ?? []),
-            brand: $model->brand,
-            itemImage: ItemImagePath::fromRaw($model->item_image),
-            remain: new StockCount($model->remain),
+        if (is_string($model->category)) {
+            $decoded = json_decode($model->category, true);
+            $categories = is_array($decoded) ? $decoded : [];
+        } elseif (is_array($model->category)) {
+            $categories = $model->category;
+        }
+
+        return Item::reconstitute(
+            new ItemId($model->id),
+            $model->shop_id,
+            $model->name,
+            new Money($model->price, 'JPY'),
+            $model->explain,
+            $model->condition,
+            new CategoryList($categories),   // ← ここが修正点
+            ItemImagePath::fromRaw($model->item_image),
+            new StockCount($model->remain),
         );
-
     }
 
 
@@ -101,4 +108,5 @@ final class Items
     {
         return empty($this->items);
     }
+
 }

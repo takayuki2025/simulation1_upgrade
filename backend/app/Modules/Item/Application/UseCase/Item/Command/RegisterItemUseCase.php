@@ -56,7 +56,7 @@ class RegisterItemUseCase
             explain: $input->explain,
             condition: $input->condition,
             category: new CategoryList($input->category),
-            brand: $input->brand,
+            brand: $input->brandRaw,
             itemImage: ItemImagePath::fromRaw($input->itemImagePath),
             remain: new StockCount($input->remain),
         );

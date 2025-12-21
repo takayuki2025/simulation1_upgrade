@@ -67,13 +67,19 @@ Route::middleware('auth.jwt.optional')->group(function () {
     Route::get('/items/public', PublicItemListController::class);
 });
 
-
-
 Route::middleware('auth.jwt.optional')
     ->get('/item/{id}', ItemDetailController::class);
 
 // ✅ 詳細（単体）
 // Route::get('/item/{id}', ItemDetailController::class);
+
+
+
+
+
+
+
+
 
 
 use App\Modules\Item\Presentation\Http\Controllers\CreateItemDraftController;

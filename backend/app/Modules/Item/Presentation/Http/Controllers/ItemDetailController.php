@@ -5,9 +5,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
-use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
-use App\Modules\Item\Application\Dto\Item\ItemDetailViewDto;
-use App\Modules\Item\Presentation\Http\Resources\ItemReadResource;
+use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
 
 final class ItemDetailController extends Controller
 {
@@ -20,14 +18,11 @@ final class ItemDetailController extends Controller
 
         $output = $useCase->execute($id, $viewerUserId);
 
-        // ★ ReadModel を使う
-
         return response()->json([
-            'item' => ItemReadResource::fromRow($output->itemRow),
-            'comments' => $output->comments,
-            'isFavorited' => $output->isFavorited,
+            'item'           => ItemDetailResource::fromReadModel($output->itemRow),
+            'comments'       => $output->comments,
+            'isFavorited'    => $output->isFavorited,
             'favoritesCount' => $output->favoritesCount,
         ]);
-
     }
 }

@@ -10,6 +10,8 @@ use App\Modules\Item\Domain\Collection\Items;
  * - ログインユーザー自身が出品した商品を除外する
  * - 未ログイン時は全件表示
  */
+
+
 final class ListCatalogItemsUseCase
 {
     public function __construct(
@@ -23,11 +25,15 @@ final class ListCatalogItemsUseCase
         ?string $keyword,
         ?int $viewerUserId
     ): Items {
+        // 🔽 ここで「意味」を確定させる
+        $excludeSellerId = $viewerUserId;
+
         return $this->itemRepository->findPublicItems(
             limit: $limit,
             page: $page,
             keyword: $keyword,
-            viewerUserId: $viewerUserId
+            excludeSellerId: $excludeSellerId
         );
     }
 }
+

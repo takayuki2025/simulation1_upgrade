@@ -4,9 +4,8 @@ namespace App\Modules\Item\Domain\Repository;
 
 use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
-
 use App\Modules\Item\Domain\ValueObject\ItemId;
-
+use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 
 interface ItemRepository
 {
@@ -37,16 +36,17 @@ interface ItemRepository
     ): Items;
 
     public function findPublicItems(
-    int $limit,
-    int $page,
-    ?string $keyword,
-    ?int $viewerUserId
-): Items;
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $excludeSellerId
+    ): Items;
 
 
     public function save(Item $item): ItemId;
+
+    public function updateItemImage(
+        ItemId $itemId,
+        ItemImagePath $path
+    ): void;
 }
-
-
-
-

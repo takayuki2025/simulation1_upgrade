@@ -4,47 +4,38 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Application\UseCase\Item\Query\ListCatalogItemsUseCase;
-use App\Modules\Item\Presentation\Http\Resources\ItemResource;
+use App\Modules\Item\Application\UseCase\Item\Query\ListPublicCatalogItemsUseCase;
+use App\Modules\Item\Presentation\Http\Resources\PublicCatalogItemResource;
+use App\Modules\Item\Domain\Service\ViewerShopResolver;
 
-/**
- * 公開用商品一覧 API
- * GET /api/items/public
- */
 final class PublicItemListController extends Controller
 {
     public function __invoke(
         Request $request,
-        ListCatalogItemsUseCase $useCase
+        ListPublicCatalogItemsUseCase $useCase,
+        ViewerShopResolver $viewerShopResolver // ★ 追加
     ) {
-        $viewerUserId = $request->user()?->id;
+        $viewer = $request->user();
 
+        $viewerShopId = $viewerShopResolver
+            ->resolveForPublicCatalog($viewer);
 
         \Log::info('[PublicItemListController]', [
-            'viewerUserId' => $viewerUserId,
-            'keyword' => $request->query('keyword'),
-            'page' => (int) $request->query('page', 1),
+            'viewer_user_id' => $viewer?->id,
+            'viewer_shop_id' => $viewerShopId,
         ]);
 
-
-        $items = $useCase->execute(
+        $collection = $useCase->execute(
             limit: 20,
             page: (int) $request->query('page', 1),
             keyword: $request->query('keyword'),
-            viewerUserId: $viewerUserId
+            viewerShopId: $viewerShopId
         );
-
-
-        \Log::info('[PublicItemListController] result', [
-            'count' => $items->count(),
-            'first' => $items->all()[0]->userId ?? null,
-        ]);
-
 
         return response()->json([
             'items' => array_map(
-                fn ($item) => ItemResource::fromDomain($item),
-                $items->all()
+                fn ($dto) => PublicCatalogItemResource::fromDto($dto),
+                $collection->all()
             ),
         ]);
     }

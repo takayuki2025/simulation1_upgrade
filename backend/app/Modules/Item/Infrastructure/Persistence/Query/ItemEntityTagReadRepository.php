@@ -8,11 +8,19 @@ final class ItemEntityTagReadRepository
 {
     /**
      * 商品詳細用
-     * 例:
+     *
+     * return example:
      * [
-     *   'brand' => ['Apple', '富士フィルム'],
-     *   'condition' => ['美品'],
-     *   'color' => ['青']
+     *   'brand' => [
+     *      ['id'=>1,'display_name'=>'Apple','confidence'=>0.9],
+     *      ['id'=>2,'display_name'=>'富士フィルム','confidence'=>0.9],
+     *   ],
+     *   'condition' => [
+     *      ['id'=>3,'display_name'=>'美品','confidence'=>1.0],
+     *   ],
+     *   'color' => [
+     *      ['id'=>5,'display_name'=>'青','confidence'=>1.0],
+     *   ],
      * ]
      */
     public function getGroupedByItemId(int $itemId): array
@@ -25,9 +33,10 @@ final class ItemEntityTagReadRepository
         $grouped = [];
 
         foreach ($rows as $row) {
-            $grouped[$row->entity_type][] = [
-                'name'       => $row->canonical_name,
-                'confidence' => $row->confidence,
+            $grouped[$row->tag_type][] = [
+                'id'           => $row->entity_id,
+                'display_name' => $row->display_name,
+                'confidence'   => (float) $row->confidence,
             ];
         }
 
@@ -35,15 +44,15 @@ final class ItemEntityTagReadRepository
     }
 
     /**
-     * 一覧検索用（brand など）
+     * 検索用（brand / condition / color）
      */
     public function findItemIdsByTag(
-        string $entityType,
+        string $tagType,
         string $canonicalName
     ): array {
         return DB::table('item_entity_tags')
-            ->where('entity_type', $entityType)
-            ->where('canonical_name', $canonicalName)
+            ->where('tag_type', $tagType)
+            ->where('display_name', $canonicalName)
             ->pluck('item_id')
             ->unique()
             ->values()

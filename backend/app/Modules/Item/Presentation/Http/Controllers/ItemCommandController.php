@@ -10,7 +10,7 @@ use App\Modules\Item\Application\Dto\Item\UpdateItemInputDto;
 use App\Modules\Item\Presentation\Http\Requests\RegisterItemRequest;
 use App\Modules\Item\Presentation\Http\Requests\UpdateItemRequest;
 
-class ItemCommandController
+final class ItemCommandController
 {
     public function __construct(
         private readonly RegisterItemUseCase $registerItemUseCase,
@@ -19,6 +19,9 @@ class ItemCommandController
     ) {
     }
 
+    /**
+     * 新規出品
+     */
     public function store(RegisterItemRequest $request)
     {
         $userId = $request->user()->id;
@@ -31,7 +34,9 @@ class ItemCommandController
             explain: $request->input('explain'),
             condition: $request->input('condition'),
             category: $request->input('category', []),
-            brand: $request->input('brand'),
+
+            // ★ raw brand（単数 or 複数どちらでもOK）
+            brandsRaw: (array) $request->input('brands', []),
             itemImagePath: $request->input('item_image'),
             remain: (int) $request->input('remain'),
         );
@@ -44,6 +49,9 @@ class ItemCommandController
         ], 201);
     }
 
+    /**
+     * 更新
+     */
     public function update(UpdateItemRequest $request, int $id)
     {
         $userId = $request->user()->id;
@@ -57,7 +65,9 @@ class ItemCommandController
             explain: $request->input('explain'),
             condition: $request->input('condition'),
             category: $request->input('category', []),
-            brand: $request->input('brand'),
+
+            // ★ brand はここで「配列」にする
+            brandsRaw: (array) $request->input('brands', []),
             itemImagePath: $request->input('item_image'),
             remain: (int) $request->input('remain'),
         );
@@ -67,6 +77,9 @@ class ItemCommandController
         return response()->json(['message' => 'Item updated']);
     }
 
+    /**
+     * 削除
+     */
     public function destroy(int $id)
     {
         $this->deleteItemUseCase->execute($id);

@@ -9,12 +9,16 @@ use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 use App\Modules\Item\Domain\ValueObject\Price;
 use App\Modules\Item\Domain\ValueObject\StockCount;
 use App\Modules\Item\Domain\Exception\TenantMismatchException;
+use App\Modules\Item\Domain\Service\BrandNormalizationService;
+use App\Modules\Item\Domain\Repository\ItemEntityTagRepository;
 use RuntimeException;
 
-class UpdateItemUseCase
+final class UpdateItemUseCase
 {
     public function __construct(
         private readonly ItemRepository $itemRepository,
+        private readonly BrandNormalizationService $brandNormalizer,
+        private readonly ItemEntityTagRepository $itemEntityTagRepository,
     ) {
     }
 
@@ -22,42 +26,44 @@ class UpdateItemUseCase
     {
         $tenantId = request()->attributes->get('tenant_id');
 
-        $item = $this->items->findById($dto->itemId); // 既存Repositoryに合わせて取得
+        $item = $this->itemRepository->findById($dto->itemId);
         if (! $item) {
-            throw new \RuntimeException('Item not found');
+            throw new RuntimeException('Item not found');
         }
 
-
-        // 所有者チェック（最低限）
+        // owner check
         if ($item->getUserId() !== $dto->userId) {
-            throw new \RuntimeException('Forbidden: not owner');
+            throw new RuntimeException('Forbidden');
         }
 
-        // tenant整合（shop出品の場合）
-        $shopId = $item->getShopId();
-        if ($shopId !== null && $tenantId !== null && (int)$shopId !== (int)$tenantId) {
-            throw new TenantMismatchException((int)$tenantId, (int)$shopId);
+        // tenant check
+        if ($item->getShopId() !== null
+            && $tenantId !== null
+            && (int)$item->getShopId() !== (int)$tenantId) {
+            throw new TenantMismatchException((int)$tenantId, (int)$item->getShopId());
         }
 
-
-        // Domain Entity を新しく再構築してもよいが、
-        // 今回は既存 Entity を再利用するパターンでも OK
-        $updated = new \App\Modules\Item\Domain\Entity\Item(
-            id: $item->getId(),
-            userId: $input->userId,
-            shopId: $input->shopId,
-            name: $input->name,
-            price: new Price($input->price),
-            explain: $input->explain,
-            condition: $input->condition,
-            category: new CategoryList($input->category),
-            brand: $input->brand,
+        // Item 自体は「事実データ」のみ更新
+        $updated = $item->withUpdatedFields(
+            name: $dto->name,
+            price: new Price($dto->price),
+            explain: $dto->explain,
+            category: new CategoryList($dto->category),
             itemImage: ItemImagePath::fromRaw(
-                $input->itemImagePath ?? $item->getItemImage()?->value()
+                $dto->itemImagePath ?? $item->getItemImage()?->value()
             ),
-            remain: new StockCount($input->remain),
+            remain: new StockCount($dto->remain),
         );
 
         $this->itemRepository->save($updated);
+
+        // ★ AtlasKernel 正規化（INSERT 相当）
+        $brands = $this->brandNormalizer->normalize($dto->brandsRaw);
+
+        $this->itemEntityTagRepository->replaceByItemId(
+            itemId: $updated->getId()->getValue(),
+            tagType: 'brand',
+            entities: $brands
+        );
     }
 }

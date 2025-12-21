@@ -23,7 +23,7 @@ class ItemMapper
             explain: $model->explain,
             condition: $model->condition,
             category: new CategoryList($model->category ?? []),
-            brand: $model->brand,
+            // brand: $model->brand,
             itemImage: ItemImagePath::fromRaw($model->item_image),
             remain: new StockCount($model->remain),
         );
@@ -42,7 +42,7 @@ class ItemMapper
         $model->explain   = $item->getExplain();
         $model->condition = $item->getCondition();
         $model->category  = $item->getCategory()->getValues();
-        $model->brand     = $item->getBrand();
+        // $model->brand     = $item->getBrand();
         $model->item_image = $item->getItemImage()->getPath();
         $model->remain    = $item->getRemain()->getValue();
 

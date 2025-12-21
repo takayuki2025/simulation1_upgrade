@@ -40,6 +40,8 @@ use App\Infrastructure\Payment\StripePaymentAdapter;
 use App\Infrastructure\Auth\FirebaseAuthAdapter;
 use App\Modules\Item\Domain\Repository\ItemEntityTagRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityTagRepository;
+use App\Modules\Item\Domain\Repository\BrandRepository;
+use App\Modules\Item\Infrastructure\Persistence\EntityDefinition\BrandRepositoryImpl;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -97,10 +99,22 @@ class AppServiceProvider extends ServiceProvider
 
 
 
+        // ✅ item_entity_tags Write 用
         $this->app->bind(
             ItemEntityTagRepository::class,
             EloquentItemEntityTagRepository::class
         );
+
+
+        // ✅ Brand 正規化
+        $this->app->bind(
+            BrandRepository::class,
+            BrandRepositoryImpl::class
+        );
+
+
+
+
 
     }
 

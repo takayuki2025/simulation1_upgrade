@@ -2,11 +2,11 @@
 
 namespace App\Modules\Item\Application\UseCase\Item\Command;
 
-use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Application\Dto\Item\{
     PublishItemInput,
     PublishItemOutput
 };
+use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Domain\Repository\{
     ItemDraftRepository,
     ItemRepository
@@ -15,8 +15,15 @@ use App\Modules\Item\Domain\Service\{
     SellerResolver,
     AtlasKernelService
 };
-use App\Modules\Item\Domain\ValueObject\ItemStatus;
+use App\Modules\Item\Domain\ValueObject\{
+    ItemStatus,
+    ItemImagePath,
+    CategoryList
+};
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 final class PublishItemUseCase
 {
@@ -24,7 +31,7 @@ final class PublishItemUseCase
         private ItemDraftRepository $draftRepo,
         private ItemRepository $itemRepo,
         private SellerResolver $sellerResolver,
-        private AtlasKernelService $atlasKernel, // ★ 正式DI
+        private AtlasKernelService $atlasKernel,
     ) {
     }
 
@@ -33,42 +40,86 @@ final class PublishItemUseCase
         AuthPrincipal $principal,
         ?int $tenantId,
     ): PublishItemOutput {
-        // 1. Draft 取得
-        $draft = $this->draftRepo->findById($input->draftId);
-        if (! $draft) {
-            throw new \DomainException('Draft not found.');
-        }
 
-        // 2. 認可（今はスキップOK）
-        // $this->sellerResolver->resolve(...);
+        return DB::transaction(function () use ($input, $principal, $tenantId) {
 
-        // 3. Publish 条件チェック
-        if (! $draft->isPublishableV1()) {
-            throw new \DomainException('Draft is not publishable.');
-        }
+            /* =====================================================
+             * 1. Draft 取得
+             * ===================================================== */
+            $draft = $this->draftRepo->findById($input->draftId);
+            if (! $draft) {
+                throw new \DomainException('Draft not found.');
+            }
 
-        // 4. Item 生成
-        $item = Item::publishFromDraft($draft);
-        $itemId = $this->itemRepo->save($item);
-
-
-        // 5. ★ AtlasKernel 実行
-        $this->atlasKernel->analyzeItem(
-            itemId: $itemId->getValue(),
-            rawText: $draft->brand()
-       ? $draft->brand()->raw()
-       : '',
-            tenantId: $tenantId,
-        );
+            /* =====================================================
+             * 2. Publish 条件チェック
+             * ===================================================== */
+            if (! $draft->isPublishableV1()) {
+                throw new \DomainException('Draft is not publishable.');
+            }
 
 
-        // 6. Draft を Published に
-        $draft->markPublished();
-        $this->draftRepo->save($draft);
+            /* =====================================================
+             * 3. Draft → Item（INSERT は一度だけ）
+             * ===================================================== */
+            $item = Item::reconstitute(
+                id: null,
+                shopId: $draft->sellerId()->id(),
+                name: $draft->name()->value(),
+                price: $draft->price(),
+                explain: $draft->explain(),
+                condition: $draft->condition(),
+                category: $draft->category() ?? new CategoryList([]),
+                itemImage: null, // ← ここではまだ入れない
+                remain: $draft->remain(),
+            );
 
-        return new PublishItemOutput(
-            itemId: $itemId->getValue(),
-            status: ItemStatus::PUBLISHED->value
-        );
+            $itemId = $this->itemRepo->save($item);
+
+            /* =====================================================
+             * 4. Draft Image → Public Image（UPDATE）
+             * ===================================================== */
+            if ($draft->itemImage()) {
+
+                $draftPath = $draft->itemImage()->value();
+
+                $publicFilename = Str::uuid() . '.' . pathinfo($draftPath, PATHINFO_EXTENSION);
+                $publicPath = 'item_images/' . $publicFilename;
+
+                Storage::disk('public')->put(
+                    $publicPath,
+                    Storage::disk('public')->get($draftPath)
+                );
+
+                $this->itemRepo->updateItemImage(
+                    $itemId,
+                    ItemImagePath::fromRaw($publicPath)
+                );
+            }
+
+            /* =====================================================
+             * 5. AtlasKernel（この item_id で一度だけ）
+             * ===================================================== */
+            $this->atlasKernel->analyzeItem(
+                itemId: $itemId->getValue(),
+                rawText: $draft->brand()?->raw() ?? '',
+                tenantId: $tenantId,
+            );
+
+
+            /* =====================================================
+             * 6. Draft → Published
+             * ===================================================== */
+            $draft->markPublished();
+            $this->draftRepo->save($draft);
+
+            /* =====================================================
+             * 7. 完了
+             * ===================================================== */
+            return new PublishItemOutput(
+                itemId: $itemId->getValue(),
+                status: ItemStatus::PUBLISHED->value
+            );
+        });
     }
 }

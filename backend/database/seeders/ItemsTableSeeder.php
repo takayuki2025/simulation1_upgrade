@@ -4,38 +4,38 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log; // Log ファサードを使用
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use App\Models\Shop;
+use App\Models\Item;
+use App\Modules\Item\Domain\Service\AtlasKernelService;
 
-class ItemsTableSeeder extends Seeder
+final class ItemsTableSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
-        // 既存データを削除
+        /* =====================================================
+         * 0. 初期化
+         * ===================================================== */
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('items')->truncate();
+        DB::table('item_entities')->truncate();
+        DB::table('item_entity_tags')->truncate();
+        DB::table('item_entity_audits')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        // =============================================
-        // 💡 修正箇所 1: shop_id に使う Shop レコードを ID 順にすべて取得
-        // =============================================
-        $shops = Shop::orderBy('id', 'asc')->pluck('id')->toArray();
-        $numShops = count($shops);
-
-        if ($numShops === 0) {
-            Log::error("ItemsTableSeeder: No shops found. Seeding skipped.");
+        /* =====================================================
+         * 1. shop_id 解決
+         * ===================================================== */
+        $shops = Shop::orderBy('id')->pluck('id')->toArray();
+        if (empty($shops)) {
+            Log::error('[ItemsSeeder] No shops found.');
             return;
         }
 
-        // =============================================
-        // 💡 修正箇所 2: ユーザーIDをメールアドレスから動的に取得
-        // =============================================
+        /* =====================================================
+         * 2. user_id 解決
+         * ===================================================== */
         $userEmails = [
             'valid.email@example.com',
             'taro.y@coachtech.com',
@@ -44,83 +44,168 @@ class ItemsTableSeeder extends Seeder
         ];
 
         $userIds = User::whereIn('email', $userEmails)
-                       ->pluck('id', 'email')
-                       ->toArray();
+            ->pluck('id', 'email')
+            ->toArray();
 
-        // ユーザーIDが見つからない場合のフォールバック値（最初のユーザーID）
-        $fallbackUserId = $userIds['valid.email@example.com'] ?? 1;
+        $fallbackUserId = $userIds['valid.email@example.com'] ?? User::min('id');
 
-        // 商品データ。
-        $params = [
-            // shop_id が 1 のアイテム群
+        /* =====================================================
+         * 3. Seeder データ（完全統合・重複なし）
+         * ===================================================== */
+        $items = [
+            // shop 1
             [
-                'user_id' => $userIds['valid.email@example.com'] ?? $fallbackUserId,
-                'name' => '腕時計', 'price' => 15000, 'brand' => 'Rolax', 'explain' => 'スタイリッシュなデザインのメンズ腕時計',
-                'condition' => '良好', 'category' => json_encode(['メンズ']), 'item_image' => 'storage/item_images/Armani+Mens+Clock.jpg',
-                'remain' => 1, 'shop_id' => $shops[0] ?? 1,
+                'email' => 'valid.email@example.com',
+                'shop' => 0,
+                'name' => '腕時計',
+                'price' => 15000,
+                'brand' => 'Rolax',
+                'explain' => 'スタイリッシュなデザインのメンズ腕時計',
+                'condition' => '良好',
+                'category' => ['メンズ'],
+                'image' => 'item_images/Armani+Mens+Clock.jpg',
             ],
             [
-                'user_id' => $userIds['valid.email@example.com'] ?? $fallbackUserId,
-                'name' => 'HDD', 'price' => 5000, 'brand' => '西芝', 'explain' => '高速で信頼性の高いハードディスク',
-                'condition' => '目立った傷や汚れなし', 'category' => json_encode(['家電']), 'item_image' => 'storage/item_images/HDD+Hard+Disk.jpg',
-                'remain' => 1, 'shop_id' => $shops[0] ?? 1,
-            ],
-
-            // shop_id が 2 のアイテム群
-            [
-                'user_id' => $userIds['taro.y@coachtech.com'] ?? $fallbackUserId,
-                'name' => '玉ねぎ３束', 'price' => 300, 'brand' => 'なし', 'explain' => '新鮮な玉ねぎ3束のセット',
-                'condition' => 'やや傷や汚れあり', 'category' => json_encode(['キッチン']), 'item_image' => 'storage/item_images/iLoveIMG+d.jpg',
-                'remain' => 1, 'shop_id' => $shops[1] ?? 2,
-            ],
-            [
-                'user_id' => $userIds['taro.y@coachtech.com'] ?? $fallbackUserId,
-                'name' => '革靴', 'price' => 4000, 'brand' => '', 'explain' => 'クラシックなデザインの革靴',
-                'condition' => '状態が悪い', 'category' => json_encode(['メンズ']), 'item_image' => 'storage/item_images/Leather+Shoes+Product+Photo.jpg',
-                'remain' => 1, 'shop_id' => $shops[1] ?? 2,
+                'email' => 'valid.email@example.com',
+                'shop' => 0,
+                'name' => 'HDD',
+                'price' => 5000,
+                'brand' => '西芝',
+                'explain' => '高速で信頼性の高いハードディスク',
+                'condition' => '目立った傷や汚れなし',
+                'category' => ['家電'],
+                'image' => 'item_images/HDD+Hard+Disk.jpg',
             ],
 
-            // shop_id が 3 のアイテム群
+            // shop 2
             [
-                'user_id' => $userIds['reina.n@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'ノートPC', 'price' => 45000, 'brand' => '', 'explain' => '高性能なノートパソコン',
-                'condition' => '良好', 'category' => json_encode(['家電']), 'item_image' => 'storage/item_images/Living+Room+Laptop.jpg',
-                'remain' => 1, 'shop_id' => $shops[2] ?? 3,
+                'email' => 'taro.y@coachtech.com',
+                'shop' => 1,
+                'name' => '玉ねぎ３束',
+                'price' => 300,
+                'brand' => 'なし',
+                'explain' => '新鮮な玉ねぎ3束のセット',
+                'condition' => 'やや傷や汚れあり',
+                'category' => ['キッチン'],
+                'image' => 'item_images/iLoveIMG+d.jpg',
             ],
             [
-                'user_id' => $userIds['reina.n@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'マイク', 'price' => 8000, 'brand' => 'なし', 'explain' => '高音質のレコーディング用マイク',
-                'condition' => '目立った傷や汚れなし', 'category' => json_encode(['家電']), 'item_image' => 'storage/item_images/Music+Mic+4632231.jpg',
-                'remain' => 1, 'shop_id' => $shops[2] ?? 3,
-            ],
-            [
-                'user_id' => $userIds['reina.n@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'ショルダーバッグ', 'price' => 3500, 'brand' => '', 'explain' => 'おしゃれなショルダーバッグ',
-                'condition' => 'やや傷や汚れあり', 'category' => json_encode(['レディース']), 'item_image' => 'storage/item_images/Purse+fashion+pocket.jpg',
-                'remain' => 1, 'shop_id' => $shops[2] ?? 3,
+                'email' => 'taro.y@coachtech.com',
+                'shop' => 1,
+                'name' => '革靴',
+                'price' => 4000,
+                'brand' => '',
+                'explain' => 'クラシックなデザインの革靴',
+                'condition' => '状態が悪い',
+                'category' => ['メンズ'],
+                'image' => 'item_images/Leather+Shoes+Product+Photo.jpg',
             ],
 
-            // shop_id が 4 のアイテム群
+            // shop 3
             [
-                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'タンブラー', 'price' => 500, 'brand' => 'なし', 'explain' => '使いやすいタンブラー',
-                'condition' => '状態が悪い', 'category' => json_encode(['キッチン']), 'item_image' => 'storage/item_images/Tumbler+souvenir.jpg',
-                'remain' => 1, 'shop_id' => $shops[3] ?? 4,
+                'email' => 'reina.n@coachtech.com',
+                'shop' => 2,
+                'name' => 'ノートPC',
+                'price' => 45000,
+                'brand' => '',
+                'explain' => '高性能なノートパソコン',
+                'condition' => '良好',
+                'category' => ['家電'],
+                'image' => 'item_images/Living+Room+Laptop.jpg',
             ],
             [
-                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'コーヒーミル', 'price' => 4000, 'brand' => 'Starbacks', 'explain' => '手動のコーヒーミル',
-                'condition' => '良好', 'category' => json_encode(['キッチン']), 'item_image' => 'storage/item_images/Waitress+with+Coffee+Grinder.jpg',
-                'remain' => 1, 'shop_id' => $shops[3] ?? 4,
+                'email' => 'reina.n@coachtech.com',
+                'shop' => 2,
+                'name' => 'マイク',
+                'price' => 8000,
+                'brand' => 'なし',
+                'explain' => '高音質のレコーディング用マイク',
+                'condition' => '目立った傷や汚れなし',
+                'category' => ['家電'],
+                'image' => 'item_images/Music+Mic+4632231.jpg',
             ],
             [
-                'user_id' => $userIds['tomomi.a@coachtech.com'] ?? $fallbackUserId,
-                'name' => 'メイクセット', 'price' => 2500, 'brand' => '', 'explain' => '便利なメイクアップセット',
-                'condition' => '目立った傷や汚れなし', 'category' => json_encode(['レディース']), 'item_image' => 'storage/item_images/外出メイクアップセット.jpg',
-                'remain' => 1, 'shop_id' => $shops[3] ?? 4,
+                'email' => 'reina.n@coachtech.com',
+                'shop' => 2,
+                'name' => 'ショルダーバッグ',
+                'price' => 3500,
+                'brand' => '',
+                'explain' => 'おしゃれなショルダーバッグ',
+                'condition' => 'やや傷や汚れあり',
+                'category' => ['レディース'],
+                'image' => 'item_images/Purse+fashion+pocket.jpg',
+            ],
+
+            // shop 4
+            [
+                'email' => 'tomomi.a@coachtech.com',
+                'shop' => 3,
+                'name' => 'タンブラー',
+                'price' => 500,
+                'brand' => 'なし',
+                'explain' => '使いやすいタンブラー',
+                'condition' => '状態が悪い',
+                'category' => ['キッチン'],
+                'image' => 'item_images/Tumbler+souvenir.jpg',
+            ],
+            [
+                'email' => 'tomomi.a@coachtech.com',
+                'shop' => 3,
+                'name' => 'コーヒーミル',
+                'price' => 4000,
+                'brand' => 'Starbacks',
+                'explain' => '手動のコーヒーミル',
+                'condition' => '良好',
+                'category' => ['キッチン'],
+                'image' => 'item_images/Waitress+with+Coffee+Grinder.jpg',
+            ],
+            [
+                'email' => 'tomomi.a@coachtech.com',
+                'shop' => 3,
+                'name' => 'メイクセット',
+                'price' => 2500,
+                'brand' => '',
+                'explain' => '便利なメイクアップセット',
+                'condition' => '目立った傷や汚れなし',
+                'category' => ['レディース'],
+                'image' => 'item_images/外出メイクアップセット.jpg',
             ],
         ];
 
-        DB::table('items')->insert($params);
+        /* =====================================================
+         * 4. Eloquent + AtlasKernel
+         * ===================================================== */
+        $atlasKernel = app(AtlasKernelService::class);
+
+        foreach ($items as $data) {
+            $userId = $userIds[$data['email']] ?? $fallbackUserId;
+            $shopId = $shops[$data['shop']] ?? $shops[0];
+
+            $item = Item::create([
+                'user_id' => $userId,
+                'shop_id' => $shopId,
+                'name' => $data['name'],
+                'price' => $data['price'],
+                'brand' => $data['brand'],
+                'explain' => $data['explain'],
+                'condition' => $data['condition'],
+                'category' => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
+                'item_image' => $data['image'],
+                'remain' => 1,
+            ]);
+
+            Log::info('[Seeder][ItemCreated]', [
+                'item_id' => $item->id,
+                'brand' => $item->brand,
+            ]);
+
+            $atlasKernel->analyzeItem(
+                itemId: $item->id,
+                rawText: $item->brand ?? '',
+                tenantId: null
+            );
+        }
+
+        Log::info('[ItemsSeeder] completed with AtlasKernel.');
     }
 }
