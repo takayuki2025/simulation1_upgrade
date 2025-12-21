@@ -224,6 +224,9 @@ export default function ItemDetailPage() {
 
   const displayColor = item.color ?? null;
 
+  const categoryTokens: string[] =
+    (item as any)?.tags?.category?.map((c: any) => c.display_name) ?? [];
+
   /* =========================
      JSX
   ========================= */
@@ -372,12 +375,10 @@ export default function ItemDetailPage() {
               <h2 className={styles.sectionTitle}>商品情報</h2>
 
               <div className={styles.categoryRow}>
-                <p className={styles.categoryLabel}>カテゴリー</p>
+                <p className={styles.categoryLabel}>カテゴリー：</p>
                 <ul className={styles.categoryList}>
-                  {itemCategories.map((category, index) => (
-                    <li key={index} className={styles.categoryTag}>
-                      {category}
-                    </li>
+                  {categoryTokens.map((c) => (
+                    <li key={c}>{c}</li>
                   ))}
                 </ul>
               </div>
@@ -388,108 +389,111 @@ export default function ItemDetailPage() {
                 style={{ display: "flex", gap: 14 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className={styles.conditionLabel}>商品の状態</p>
+                  <p className={styles.conditionLabel}>商品の状態：</p>
                   <p className={styles.conditionValue}>
                     {rawCondition || "未登録"}
                   </p>
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* <div style={{ flex: 1, minWidth: 0 }}>
                   <p className={styles.conditionLabel}>Update</p>
                   <p className={styles.conditionValue}>
                     {displayCondition || rawCondition || "未登録"}
                   </p>
                 </div>
+              </div> */}
+
+                {/* カラー：新規追加 */}
+                <div className={styles.conditionRow} style={{ marginTop: 10 }}>
+                  <p className={styles.conditionLabel}>カラー：</p>
+                  <p className={styles.conditionValue}>
+                    {displayColor || rawColor || "未登録"}
+                  </p>
+                </div>
               </div>
 
-              {/* カラー：新規追加 */}
-              <div className={styles.conditionRow} style={{ marginTop: 10 }}>
-                <p className={styles.conditionLabel}>カラー</p>
-                <p className={styles.conditionValue}>
-                  {displayColor || rawColor || "未登録"}
-                </p>
-              </div>
-            </div>
+              {/* コメント一覧 */}
+              <div className={styles.section}>
+                <div className={styles.commentHeader}>
+                  <h2 className={styles.sectionTitle}>コメント</h2>
+                  <span className={styles.commentCountText}>
+                    ({comments.length})
+                  </span>
+                </div>
 
-            {/* コメント一覧 */}
-            <div className={styles.section}>
-              <div className={styles.commentHeader}>
-                <h2 className={styles.sectionTitle}>コメント</h2>
-                <span className={styles.commentCountText}>
-                  ({comments.length})
-                </span>
-              </div>
+                {comments.length > 0 ? (
+                  <div className={styles.commentList}>
+                    {comments.map((comment) => (
+                      <div key={comment.id} className={styles.commentItem}>
+                        <div className={styles.commentUserRow}>
+                          <img
+                            src={getImageUrl(
+                              comment.user.user_image,
+                              IMAGE_TYPE.USER,
+                            )}
+                            className={styles.commentUserImage}
+                            onError={onImageError}
+                          />
+                          <p className={styles.commentUserName}>
+                            {comment.user.name}
+                          </p>
+                        </div>
 
-              {comments.length > 0 ? (
-                <div className={styles.commentList}>
-                  {comments.map((comment) => (
-                    <div key={comment.id} className={styles.commentItem}>
-                      <div className={styles.commentUserRow}>
-                        <img
-                          src={getImageUrl(
-                            comment.user.user_image,
-                            IMAGE_TYPE.USER,
-                          )}
-                          className={styles.commentUserImage}
-                          onError={onImageError}
-                        />
-                        <p className={styles.commentUserName}>
-                          {comment.user.name}
-                        </p>
+                        <p className={styles.commentText}>{comment.comment}</p>
+
+                        <small className={styles.commentDate}>
+                          投稿日時:{" "}
+                          {new Date(comment.created_at).toLocaleString()}
+                        </small>
                       </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.noComments}>
+                    まだコメントはありません。
+                  </p>
+                )}
+              </div>
 
-                      <p className={styles.commentText}>{comment.comment}</p>
+              {/* コメント投稿 */}
+              <div className={styles.section}>
+                <h2 className={styles.sectionTitle}>商品へのコメント</h2>
 
-                      <small className={styles.commentDate}>
-                        投稿日時:{" "}
-                        {new Date(comment.created_at).toLocaleString()}
-                      </small>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className={styles.noComments}>まだコメントはありません。</p>
-              )}
-            </div>
+                {commentErrors.length > 0 && (
+                  <div className={styles.errorBoxSmall}>
+                    {commentErrors.map((err, index) => (
+                      <p key={index}>{err}</p>
+                    ))}
+                  </div>
+                )}
 
-            {/* コメント投稿 */}
-            <div className={styles.section}>
-              <h2 className={styles.sectionTitle}>商品へのコメント</h2>
+                {isAuthenticated ? (
+                  <>
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      rows={5}
+                      className={styles.textarea}
+                    />
 
-              {commentErrors.length > 0 && (
-                <div className={styles.errorBoxSmall}>
-                  {commentErrors.map((err, index) => (
-                    <p key={index}>{err}</p>
-                  ))}
-                </div>
-              )}
-
-              {isAuthenticated ? (
-                <>
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    rows={5}
-                    className={styles.textarea}
-                  />
-
-                  <button
+                    <button
+                      className={styles.submitBtn}
+                      onClick={submitComment}
+                      disabled={isSubmittingComment}
+                    >
+                      {isSubmittingComment ? "投稿中..." : "コメントを送信する"}
+                    </button>
+                  </>
+                ) : (
+                  <p
                     className={styles.submitBtn}
-                    onClick={submitComment}
-                    disabled={isSubmittingComment}
+                    onClick={() => router.push("/login")}
+                    style={{ cursor: "pointer" }}
                   >
-                    {isSubmittingComment ? "投稿中..." : "コメントを送信する"}
-                  </button>
-                </>
-              ) : (
-                <p
-                  className={styles.submitBtn}
-                  onClick={() => router.push("/login")}
-                  style={{ cursor: "pointer" }}
-                >
-                  ログインしてコメントする
-                </p>
-              )}
+                    ログインしてコメントする
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

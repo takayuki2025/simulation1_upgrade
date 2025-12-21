@@ -90,6 +90,10 @@ final class ItemReadRepository
         $conditionTags = $tags['condition'] ?? [];
         $colorTags = $tags['color'] ?? [];
 
+        $categoryTags = $tags['category'] ?? [];
+
+
+
 
 
         return [
@@ -99,27 +103,29 @@ final class ItemReadRepository
             'explain'   => $item->explain,
             'remain'    => $item->remain,
 
-            // ✅ brand（複数）
+            // brand
             'brands'        => array_column($brandTags, 'display_name'),
             'brand_primary' => $item->brand_primary,
 
-            // ✅ condition / color は tags から
+            // condition / color
             'condition' => $conditionTags[0]['display_name']
-            ?? $item->condition_name
-            ?? null,
+                ?? $item->condition_name
+                ?? null,
 
             'color' => $colorTags[0]['display_name']
                 ?? $item->color_name
                 ?? null,
 
-            // ✅ 完全 tags（confidence 含む）
+            // ★ category（追加）
+            'categories' => array_column($categoryTags, 'display_name'),
+
             'tags' => $tags,
 
-            // image
             'item_image' => $item->item_image
                 ? asset('storage/' . $item->item_image)
                 : null,
         ];
+
 
     }
 

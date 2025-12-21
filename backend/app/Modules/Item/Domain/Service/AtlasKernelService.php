@@ -46,6 +46,10 @@ final class AtlasKernelService
             $conditionDict = $this->loadDict('conditions_v1.txt');
             $colorDict     = $this->loadDict('colors_v1.txt');
 
+            $categoryDict  = $this->loadDict('categories_v1.txt');
+            $categoryAlias = $this->loadAlias('category_alias.txt');
+
+
             /* ==================================================
                1.5 brand 検索用辞書を合成
             ================================================== */
@@ -54,8 +58,46 @@ final class AtlasKernelService
                 array_keys($brandAlias)
             ));
 
+
+
+            // 0) category mirror: items.category を読む（ここで確定させる）
+            $rawCategories = DB::table('items')
+                ->where('id', $itemId)
+                ->value('category');
+
+            $categories = [];
+
+            if ($rawCategories) {
+                $decoded = json_decode($rawCategories, true);
+
+                // 二重エンコード対策
+                if (is_string($decoded)) {
+                    $decoded = json_decode($decoded, true);
+                }
+
+                if (is_array($decoded)) {
+
+                    $categories = array_map(
+                        fn ($c) => trim((string)$c),
+                        $decoded
+                    );
+
+                }
+            }
+
+            logger()->info('[AtlasKernel] raw categories json', [
+                'item_id' => $itemId,
+                'raw'     => $rawCategories,
+            ]);
+
+            logger()->info('[AtlasKernel] category decoded', [
+                'item_id' => $itemId,
+                'categories' => $categories,
+            ]);
+
+
             /* ==================================================
-               1.6 alias を text に事前適用
+            1.6 alias を text に事前適用
             ================================================== */
             // foreach ($brandAlias as $from => $to) {
             //     $text = str_replace($from, $to, $text);
@@ -79,11 +121,15 @@ final class AtlasKernelService
 
             $confidence['brand'] = count($brands) > 0 ? 0.9 : 0.0;
 
+
+
             logger()->info('[AtlasKernel] extracted', [
                 'brands'    => $brands,
                 'condition' => $condition,
                 'color'     => $color,
+                'categories' => $categories,
             ]);
+
 
             /* ==================================================
                3. brand alias 正規化
@@ -179,6 +225,33 @@ final class AtlasKernelService
             }
 
 
+            $inserted = 0;
+
+            foreach ($categories as $category) {
+                $entityId = $this->resolveEntityId('category_entities', $category);
+
+                DB::table('item_entity_tags')->insert([
+                    'item_id'      => $itemId,
+                    'tag_type'     => 'category',
+                    'entity_id'    => $entityId,
+                    'display_name' => $category,
+                    'confidence'   => 1.0, // 転写なので最大
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+
+                $inserted++;
+
+            }
+
+
+            logger()->info('[AtlasKernel] category mirror inserted', [
+                'item_id' => $itemId,
+                'count'   => $inserted,
+            ]);
+
+
+
 
             /* ==================================================
                7. audit
@@ -197,7 +270,7 @@ final class AtlasKernelService
     ====================================================== */
     private function normalize(string $text): string
     {
-        return trim(mb_convert_kana($text, 'asKVc', 'UTF-8'));
+        return trim(mb_convert_kana($text, 'asVC', 'UTF-8'));
     }
 
     /* ======================================================
@@ -220,12 +293,23 @@ final class AtlasKernelService
     {
         $map = [];
         $path = "{$this->assetPath}/{$file}";
+
         if (!file_exists($path)) {
             return $map;
         }
 
         foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            // コメント・無効行をスキップ
+            if (!str_contains($line, ',')) {
+                continue;
+            }
+
             [$from, $to] = array_map('trim', explode(',', $line, 2));
+
+            if ($from === '' || $to === '') {
+                continue;
+            }
+
             $map[$this->normalize($from)] = $this->normalize($to);
         }
 

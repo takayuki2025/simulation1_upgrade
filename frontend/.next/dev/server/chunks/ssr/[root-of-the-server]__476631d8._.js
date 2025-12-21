@@ -15,7 +15,7 @@ __turbopack_context__.n(__turbopack_context__.i("[project]/app/(main)/layout.tsx
 }),
 "[project]/app/(main)/item/[items_id]/page.tsx [app-rsc] (ecmascript)", ((__turbopack_context__, module, exports) => {
 
-const e = new Error("Could not parse module '[project]/app/(main)/item/[items_id]/page.tsx'\n\nExpected ident");
+const e = new Error("Could not parse module '[project]/app/(main)/item/[items_id]/page.tsx'\n\nUnexpected token. Did you mean `{'}'}` or `&rbrace;`?");
 e.code = 'MODULE_UNPARSABLE';
 throw e;
 }),

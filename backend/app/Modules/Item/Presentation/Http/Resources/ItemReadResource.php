@@ -11,15 +11,21 @@ final class ItemReadResource
             'name'       => $row['name'],
             'price'      => $row['price'],
 
-            // 🔥 複数ブランド → ボタン複数生成
+            // brands
             'brands'     => $row['brands'] ?? [],
 
-            // 🔥 状態・カラー
+            // condition / color
             'condition'  => $row['condition'] ?? null,
             'color'      => $row['color'] ?? null,
 
             'explain'    => $row['explain'] ?? null,
-            'category'   => $row['category'] ?? [],
+
+            // ✅ 修正点：categories を正として返す
+            'categories' => $row['categories'] ?? $row['category'] ?? [],
+
+            // ⬇ 後方互換（必要なら）
+            'category'   => $row['categories'] ?? [],
+
             'remain'     => $row['remain'] ?? null,
             'item_image' => $row['item_image'] ?? null,
         ];

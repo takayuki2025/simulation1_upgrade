@@ -283,9 +283,13 @@
 }
 
 .W-ItemDetailView-module__jxxsBG__categoryList {
+  color: #4b5563;
   flex-wrap: wrap;
   gap: 8px;
+  font-weight: 600;
   display: flex;
+  position: relative;
+  left: 160px;
 }
 
 .W-ItemDetailView-module__jxxsBG__categoryTag {

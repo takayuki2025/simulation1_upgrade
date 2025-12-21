@@ -27,20 +27,19 @@ final class ItemEntityTagReadRepository
     {
         $rows = DB::table('item_entity_tags')
             ->where('item_id', $itemId)
-            ->orderByDesc('confidence')
+            ->orderBy('id')
             ->get();
 
-        $grouped = [];
-
-        foreach ($rows as $row) {
-            $grouped[$row->tag_type][] = [
-                'id'           => $row->entity_id,
-                'display_name' => $row->display_name,
-                'confidence'   => (float) $row->confidence,
-            ];
-        }
-
-        return $grouped;
+        return $rows
+            ->groupBy('tag_type')
+            ->map(function ($items) {
+                return $items->map(fn ($row) => [
+                    'entity_id'    => $row->entity_id,
+                    'display_name' => $row->display_name,
+                    'confidence'   => $row->confidence,
+                ])->values()->toArray();
+            })
+            ->toArray();
     }
 
     /**

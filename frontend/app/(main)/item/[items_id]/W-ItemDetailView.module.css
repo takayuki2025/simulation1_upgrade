@@ -310,6 +310,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  color: #4b5563;
+  font-weight: 600;
+  position: relative;
+  left: 160px;
 }
 
 .categoryTag {
