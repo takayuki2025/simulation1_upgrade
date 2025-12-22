@@ -54,9 +54,11 @@
     50 => 'App\\Modules\\Reaction\\Infrastructure\\ReactionServiceProvider',
     51 => 'App\\Modules\\Comment\\Infrastructure\\CommentServiceProvider',
     52 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemModuleServiceProvider',
-    53 => 'App\\Providers\\AppServiceProvider',
-    54 => 'App\\Providers\\AuthServiceProvider',
+    53 => 'App\\Providers\\OrderModuleServiceProvider',
+    54 => 'App\\Providers\\PaymentModuleServiceProvider',
     55 => 'App\\Providers\\AppServiceProvider',
+    56 => 'App\\Providers\\AuthServiceProvider',
+    57 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -99,9 +101,11 @@
     36 => 'App\\Modules\\Reaction\\Infrastructure\\ReactionServiceProvider',
     37 => 'App\\Modules\\Comment\\Infrastructure\\CommentServiceProvider',
     38 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemModuleServiceProvider',
-    39 => 'App\\Providers\\AppServiceProvider',
-    40 => 'App\\Providers\\AuthServiceProvider',
+    39 => 'App\\Providers\\OrderModuleServiceProvider',
+    40 => 'App\\Providers\\PaymentModuleServiceProvider',
     41 => 'App\\Providers\\AppServiceProvider',
+    42 => 'App\\Providers\\AuthServiceProvider',
+    43 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (

@@ -205,3 +205,27 @@ Route::get('/__debug/item/{id}', function ($id) {
         ItemReadResource::fromRow($item)
     );
 });
+
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\OrderController;
+
+Route::middleware(['jwt.auth'])->group(function () {
+    Route::post('/orders', [OrderController::class, 'create']);
+    Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
+});
+
+
+
+
+
+use App\Modules\Payment\Presentation\Http\Controllers\PaymentController;
+use App\Modules\Payment\Presentation\Http\Controllers\PaymentWebhookController;
+
+Route::middleware(['jwt.auth'])->group(function () {
+    Route::post('/payments/start', [PaymentController::class, 'start']);
+});
+
+// Webhook: no auth (signature)
+Route::post('/payments/webhook/stripe', [PaymentWebhookController::class, 'stripe']);
