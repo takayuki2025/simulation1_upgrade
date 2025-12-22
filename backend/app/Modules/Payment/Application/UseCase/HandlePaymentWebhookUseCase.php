@@ -6,8 +6,9 @@ use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Repository\PaymentQueryRepository;
-use App\Modules\Payment\Domain\Enum\PaymentStatus;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
+use App\Modules\Shop\Domain\Repository\ShopLedgerRepository;
+use App\Modules\Shop\Domain\Entity\ShopLedger;
 use Illuminate\Support\Facades\DB;
 
 final class HandlePaymentWebhookUseCase
@@ -17,69 +18,130 @@ final class HandlePaymentWebhookUseCase
         private PaymentQueryRepository $queries,
         private PaymentRepository $payments,
         private OrderRepository $orders,
+        private ShopLedgerRepository $ledgers,
     ) {
     }
 
-    public function handle(string $payload, array $headers): array
+    public function handle(string $payload, string $signature): array
     {
         $payloadHash = hash('sha256', $payload);
 
-        $parsed = $this->gateway->parseWebhook($payload, $headers);
+        // 1) Parse & verify signature
+        $parsed = $this->gateway->parseWebhook($payload, $signature);
 
-        $eventId = $parsed['provider_event_id'];
+        $eventId   = $parsed['provider_event_id'];
         $eventType = $parsed['event_type'];
-        $providerPaymentId = $parsed['provider_payment_id'] ?? null;
 
-        // 1) Idempotency
-        $marked = $this->queries->markWebhookProcessed('stripe', $eventId, $eventType, $payloadHash);
-        if (! $marked) {
+        // 2) 対象イベント制限（超重要）
+        if (!str_starts_with($eventType, 'payment_intent.')) {
+            return ['ok' => true, 'ignored' => 'unsupported_event_type'];
+        }
+
+        // 3) Reserve (idempotency)
+        $reserved = $this->queries->reserve(
+            'stripe',
+            $eventId,
+            $eventType,
+            $payloadHash
+        );
+
+        if (!$reserved) {
             return ['ok' => true, 'idempotent' => true];
         }
 
-        // 2) Find payment by provider_payment_id
-        if (! $providerPaymentId) {
-            return ['ok' => true, 'ignored' => 'no_provider_payment_id'];
+        try {
+            return DB::transaction(function () use ($parsed, $eventId) {
+
+                $providerPaymentId = $parsed['provider_payment_id'];
+                if (!$providerPaymentId) {
+                    $this->queries->complete('stripe', $eventId, 'ignored');
+                    return ['ok' => true, 'ignored' => 'no_payment_id'];
+                }
+
+                $payment = $this->payments->findByProviderPaymentId($providerPaymentId);
+                if (!$payment) {
+                    $this->queries->complete('stripe', $eventId, 'ignored');
+                    return ['ok' => true, 'ignored' => 'payment_not_found'];
+                }
+
+                $order = $this->orders->findById($payment->orderId());
+                if (!$order) {
+                    $this->queries->complete('stripe', $eventId, 'failed', $payment->id(), null, 'order_not_found');
+                    return ['ok' => false];
+                }
+
+                // 4) 状態分岐
+                switch ($parsed['status']) {
+                    case 'succeeded':
+                        $payment = $payment->markSucceeded(['webhook' => $parsed]);
+                        $this->payments->save($payment);
+
+                        $order = $order->markPaid();
+                        $this->orders->save($order);
+
+                        // Ledger 追加（売上確定）
+                        $this->ledgers->save(
+                            ShopLedger::record(
+                                shopId: $payment->shopId(),
+                                type: 'sale',
+                                amount: $payment->amount(),
+                                currency: $payment->currency(),
+                                orderId: $order->id(),
+                                paymentId: $payment->id(),
+                            )
+                        );
+
+                        $this->queries->complete(
+                            'stripe',
+                            $eventId,
+                            'succeeded',
+                            $payment->id(),
+                            $order->id()
+                        );
+
+                        return ['ok' => true, 'status' => 'succeeded'];
+
+                    case 'payment_failed':
+                    case 'canceled':
+                        $payment = $payment->markFailed(['webhook' => $parsed]);
+                        $this->payments->save($payment);
+
+                        $order = $order->markPaymentFailed();
+                        $this->orders->save($order);
+
+                        $this->queries->complete(
+                            'stripe',
+                            $eventId,
+                            'failed',
+                            $payment->id(),
+                            $order->id()
+                        );
+
+                        return ['ok' => true, 'status' => 'failed'];
+
+                    default:
+                        $this->queries->complete(
+                            'stripe',
+                            $eventId,
+                            'ignored',
+                            $payment->id(),
+                            $order->id()
+                        );
+                        return ['ok' => true, 'status' => 'ignored'];
+                }
+            });
+
+        } catch (\Throwable $e) {
+            $this->queries->complete(
+                'stripe',
+                $eventId,
+                'failed',
+                null,
+                null,
+                'exception',
+                $e->getMessage()
+            );
+            throw $e;
         }
-
-        $payment = $this->payments->findByProviderPaymentId($providerPaymentId);
-        if (! $payment) {
-            return ['ok' => true, 'ignored' => 'payment_not_found'];
-        }
-
-        // 3) Decide status mapping
-        $status = $parsed['status'] ?? null;
-
-        return DB::transaction(function () use ($payment, $status, $parsed) {
-
-            // Stripe status -> internal
-            if ($status === 'succeeded') {
-                $this->payments->updateStatusById($payment->id() ?? 0, PaymentStatus::SUCCEEDED->value, [
-                    'webhook' => $parsed,
-                ]);
-
-                // update Order
-                $this->orders->updateStatus($payment->orderId(), OrderStatus::PAID->value);
-
-                return ['ok' => true, 'status' => 'succeeded'];
-            }
-
-            if ($status === 'requires_action' || $status === 'processing') {
-                $this->payments->updateStatusById($payment->id() ?? 0, PaymentStatus::REQUIRES_ACTION->value, [
-                    'webhook' => $parsed,
-                ]);
-                return ['ok' => true, 'status' => 'requires_action'];
-            }
-
-            if ($status === 'canceled' || $status === 'requires_payment_method') {
-                $this->payments->updateStatusById($payment->id() ?? 0, PaymentStatus::FAILED->value, [
-                    'webhook' => $parsed,
-                ]);
-                $this->orders->updateStatus($payment->orderId(), OrderStatus::PAYMENT_FAILED->value);
-
-                return ['ok' => true, 'status' => 'failed'];
-            }
-
-            return ['ok' => true, 'status' => 'ignored_unknown'];
-        });
     }
 }

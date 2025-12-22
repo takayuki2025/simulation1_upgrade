@@ -20,17 +20,11 @@ final class PaymentWebhookController extends Controller
      */
     public function stripe(Request $request): JsonResponse
     {
-        $payload = $request->getContent();
-        $headers = $request->headers->all();
-
-        // normalize header
-        $sig = $request->header('Stripe-Signature');
-        if ($sig) {
-            $headers['stripe-signature'] = $sig;
-        }
-
-        $result = $this->useCase->handle($payload, $headers);
-
-        return response()->json($result, 200);
+        return response()->json(
+            $this->useCase->handle(
+                $request->getContent(),
+                (string) $request->header('Stripe-Signature')
+            )
+        );
     }
 }

@@ -64,35 +64,36 @@ final class StripePaymentGateway implements PaymentGatewayPort
         throw new \InvalidArgumentException('Unsupported method');
     }
 
-    public function parseWebhook(string $payload, array $headers): array
+    public function parseWebhook(string $payload, string $signature): array
     {
-        $secret = config('services.stripe.webhook_secret');
-        $sig = $headers['stripe-signature'] ?? $headers['Stripe-Signature'] ?? null;
-
-        if (! $sig) {
+        if (!$signature) {
             throw new \RuntimeException('Stripe-Signature header missing');
         }
 
-        $event = Webhook::constructEvent($payload, $sig, $secret);
+        $event = Webhook::constructEvent(
+            $payload,
+            $signature,
+            config('services.stripe.webhook_secret')
+        );
 
-        $eventId = $event->id;
-        $eventType = $event->type;
-
-        // We mostly care about payment_intent.*
-        $obj = $event->data->object;
-        $providerPaymentId = $obj->id ?? null;
-
-        $normalizedStatus = null;
-        if (isset($obj->status)) {
-            // succeeded, requires_action, requires_payment_method, canceled, processing...
-            $normalizedStatus = (string)$obj->status;
+        // payment_intent.* 以外は明示的に無視
+        if (!str_starts_with($event->type, 'payment_intent.')) {
+            return [
+                'ignored' => true,
+                'provider_event_id' => $event->id,
+                // 'reason' => 'unsupported_event_type',
+                'event_type' => $event->type,
+            ];
         }
 
+        $pi = $event->data->object;
+
         return [
-            'provider_event_id' => $eventId,
-            'event_type' => $eventType,
-            'provider_payment_id' => $providerPaymentId,
-            'status' => $normalizedStatus,
+            'ignored' => false,
+            'provider_event_id' => $event->id,
+            'event_type' => $event->type,
+            'provider_payment_id' => $pi->id ?? null,
+            'status' => $pi->status ?? null,
         ];
     }
 }

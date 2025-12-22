@@ -19,11 +19,15 @@ final class OrderPaymentFlowTest extends TestCase
     public function test_order_payment_flow_card_then_webhook_succeeded(): void
     {
         // 1) Gateway を Fake（start と parseWebhook を制御）
+
         $this->app->bind(PaymentGatewayPort::class, function () {
             return new class () implements PaymentGatewayPort {
-                public function start(PaymentMethod $method, int $amount, string $currency, array $context): array
-                {
-                    // StartPaymentUseCase が payments を作った後に呼ばれる
+                public function start(
+                    PaymentMethod $method,
+                    int $amount,
+                    string $currency,
+                    array $context
+                ): array {
                     return [
                         'provider_payment_id' => 'pi_test_flow_123',
                         'client_secret' => 'cs_test_flow_123',
@@ -32,11 +36,10 @@ final class OrderPaymentFlowTest extends TestCase
                     ];
                 }
 
-                public function parseWebhook(string $payload, array $headers): array
+                public function parseWebhook(string $payload, string $signature): array
                 {
-                    // Webhook UseCase に渡した payload/headers を無視して、
-                    // 「succeeded」を再現する
                     return [
+                        'ignored' => false,
                         'provider_event_id' => 'evt_test_flow_001',
                         'event_type' => 'payment_intent.succeeded',
                         'provider_payment_id' => 'pi_test_flow_123',
@@ -45,6 +48,7 @@ final class OrderPaymentFlowTest extends TestCase
                 }
             };
         });
+
 
         // 2) User / Order を最小生成
         $user = User::factory()->create();
@@ -101,10 +105,10 @@ final class OrderPaymentFlowTest extends TestCase
         $webhook = app(HandlePaymentWebhookUseCase::class);
 
         $payload = '{"type":"payment_intent.succeeded"}';
-        $headers = ['stripe-signature' => 'test']; // Fake gatewayなので使わない
 
-        $out = $webhook->handle($payload, $headers);
+        $signature = 'test';
 
+        $out = $webhook->handle($payload, $signature);
         $this->assertTrue($out['ok']);
 
         // 6) processed_webhook_events が記録される（冪等の証拠）
@@ -127,7 +131,8 @@ final class OrderPaymentFlowTest extends TestCase
         ]);
 
         // 9) 冪等：同じ webhook をもう一度投げても processed が増えない（no-op）
-        $out2 = $webhook->handle($payload, $headers);
+
+        $out2 = $webhook->handle($payload, $signature);
         $this->assertTrue($out2['ok']);
         $this->assertTrue($out2['idempotent']);
 

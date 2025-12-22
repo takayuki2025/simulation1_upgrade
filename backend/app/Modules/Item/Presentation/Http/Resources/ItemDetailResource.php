@@ -25,7 +25,7 @@ final class ItemDetailResource
             'price'     => $row['price'],
             'explain'   => $row['explain'] ?? null,
             'remain'    => $row['remain'] ?? null,
-
+            'shop_id'   => $row['shop_id'] ?? null,
             // ★ 正規化結果
             'brands'        => $row['brands'] ?? [],
             'brand_primary' => $row['brand_primary'] ?? null,
@@ -40,4 +40,3 @@ final class ItemDetailResource
         ];
     }
 }
-

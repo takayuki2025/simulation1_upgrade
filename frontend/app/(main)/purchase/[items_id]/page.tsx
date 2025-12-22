@@ -6,9 +6,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useUserProfileSWR } from "@/services/useUserProfileSWR";
-
+import { getStripe } from "@/lib/stripe";
 import { getImageUrl } from "@/utils/utils";
 import styles from "./W-Purchase-Confirm.module.css";
+
+/** 内部的な支払い種別 */
+type PaymentMethod = "" | "card" | "convenience";
+
+/** 表示用 */
+const paymentLabelMap: Record<PaymentMethod, string> = {
+  "": "未選択",
+  card: "クレジットカード支払い",
+  convenience: "コンビニ支払い",
+};
 
 export default function PurchaseConfirmPage() {
   const router = useRouter();
@@ -16,7 +26,7 @@ export default function PurchaseConfirmPage() {
   const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
 
   /* =========================
-     🧩 itemId
+     itemId
   ========================= */
   const itemId = useMemo(() => {
     const raw = params.items_id;
@@ -26,17 +36,15 @@ export default function PurchaseConfirmPage() {
   }, [params.items_id]);
 
   /* =========================
-     📦 Item / Profile
+     Item / Profile
   ========================= */
   const { item, isLoading: isItemLoading, isError } = useItemDetailSWR(itemId);
-
   const { profile, isLoading: isProfileLoading } = useUserProfileSWR();
-  
 
   /* =========================
-     💳 支払い方法
+     支払い方法
   ========================= */
-  const [payment, setPayment] = useState<"" | "コンビニ支払い" | "クレジットカード支払い">("");
+  const [payment, setPayment] = useState<PaymentMethod>("");
 
   const canPurchase =
     isAuthenticated &&
@@ -48,30 +56,56 @@ export default function PurchaseConfirmPage() {
   const isPageLoading = isAuthLoading || isItemLoading || isProfileLoading;
 
   /* =========================
-     🧾 Purchase
+     購入処理
   ========================= */
   const submitPurchase = async () => {
     if (!canPurchase || !item || !apiClient) return;
 
     try {
-      if (payment === "card") {
-        const res = await apiClient.post("/purchase/card", {
-          item_id: item.id,
-        });
+      /* ① Order 作成 */
+      const orderRes = await apiClient.post("/orders", {
+        shop_id: item.shop_id,
+        items: [
+          {
+            item_id: item.id,
+            name: item.name,
+            price_amount: item.price,
+            price_currency: "JPY",
+            quantity: 1,
+            image_path: item.item_image,
+          },
+        ],
+      });
 
-        if (res.data?.stripe_url) {
-          window.location.href = res.data.stripe_url;
+      const orderId = orderRes.data.order_id;
+
+      /* ② Payment 開始 */
+      const paymentRes = await apiClient.post("/payments/start", {
+        order_id: orderId,
+        method: payment === "card" ? "card" : "konbini",
+      });
+
+      /* ③ 支払い別分岐 */
+      if (payment === "card") {
+        const { client_secret } = paymentRes.data;
+        if (!client_secret) {
+          throw new Error("client_secret not returned");
+        }
+
+        const stripe = await getStripe();
+        if (!stripe) {
+          throw new Error("Stripe initialization failed");
+        }
+
+        const result = await stripe.confirmCardPayment(client_secret);
+        if (result.error) {
+          alert(result.error.message ?? "カード決済に失敗しました");
           return;
         }
-        throw new Error("Stripe URL が取得できませんでした");
       }
 
-      if (payment === "convenience") {
-        await apiClient.post("/purchase/convenience", {
-          item_id: item.id,
-        });
-        router.push("/thanks/buy");
-      }
+      // card / konbini 共通
+      router.push("/purchase/processing");
     } catch (e) {
       console.error(e);
       alert("購入処理に失敗しました");
@@ -79,7 +113,7 @@ export default function PurchaseConfirmPage() {
   };
 
   /* =========================
-     🛑 Guard
+     Guard
   ========================= */
   if (isPageLoading) {
     return <div className={styles.loadingOverlay}>購入情報を読み込み中...</div>;
@@ -99,15 +133,26 @@ export default function PurchaseConfirmPage() {
     );
   }
 
+  console.log("ORDER PAYLOAD", {
+    shop_id: item.shop_id,
+    items: [
+      {
+        item_id: item.id,
+        name: item.name,
+        price_amount: item.price,
+        price_currency: "JPY",
+        quantity: 1,
+        image_path: item.item_image,
+      },
+    ],
+  });
   /* =========================
-     🎨 UI（Vue 完全再現）
+     UI
   ========================= */
   return (
     <div className={styles.item_buy_contents}>
       <div className={styles.item_buy_lr}>
-        {/* 左 */}
         <div className={styles.item_buy_l}>
-          {/* 商品 */}
           <div className={styles.item_buy_content_section}>
             <div className={styles.item_buy_image}>
               <img
@@ -127,52 +172,36 @@ export default function PurchaseConfirmPage() {
             </div>
           </div>
 
-          {/* 支払い */}
           <div className={styles.item_buy_content_section}>
             <h4>支払い方法</h4>
-
             <select
               value={payment}
-              onChange={(e) =>
-                setPayment(e.target.value as "convenience" | "card" | "")
-              }
-              disabled={item.remain <= 0}
+              onChange={(e) => setPayment(e.target.value as PaymentMethod)}
             >
               <option value="">選択してください</option>
-              <option value="convenience">コンビニ払い</option>
-              <option value="card">カード支払い</option>
+              <option value="convenience">コンビニ支払い</option>
+              <option value="card">クレジットカード支払い</option>
             </select>
           </div>
 
-          {/* 配送先 */}
           <div className={styles.item_buy_content_section}>
-            <div className={styles.addressHeader}>
-              <h4>配送先</h4>
-              <button
-                className={styles.linkBtn}
-                onClick={() => router.push(`/purchase/address/${item.id}`)}
-              >
-                変更する
-              </button>
-            </div>
-
+            <h4>配送先</h4>
             {profile ? (
-              <div>
+              <>
                 <p>〒{profile.postNumber}</p>
                 <p>{profile.address}</p>
                 {profile.building && <p>{profile.building}</p>}
-              </div>
+              </>
             ) : (
               <p className={styles.warnText}>配送先住所が未登録です</p>
             )}
           </div>
         </div>
 
-        {/* 右 */}
         <div className={styles.item_buy_r}>
           <div className={styles.item_buy_summary_box}>
             <p>商品代金: ¥{item.price.toLocaleString()}</p>
-            <p>支払い方法: {payment || "未選択"}</p>
+            <p>支払い方法: {paymentLabelMap[payment]}</p>
 
             {item.remain > 0 ? (
               <button disabled={!canPurchase} onClick={submitPurchase}>

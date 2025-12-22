@@ -68,6 +68,7 @@ final class ItemReadRepository
             ->where('items.id', $itemId)
             ->select([
                 'items.id',
+                'items.shop_id',
                 'items.name',
                 'items.price',
                 'items.explain',
@@ -98,6 +99,7 @@ final class ItemReadRepository
 
         return [
             'id'        => $item->id,
+            'shop_id'   => $item->shop_id,
             'name'      => $item->name,
             'price'     => $item->price,
             'explain'   => $item->explain,

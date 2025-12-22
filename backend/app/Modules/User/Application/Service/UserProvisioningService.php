@@ -63,6 +63,7 @@ final class UserProvisioningService implements UserProvisioningPort
             ->values()
             ->all();
 
+
         return new ProvisionedUser(
             userId: $user->id,
             email: $user->email,
@@ -70,6 +71,8 @@ final class UserProvisioningService implements UserProvisioningPort
             roles: $roles,
             tenantId: $user->shop_id,
             isFirstLogin: $isFirstLogin,
+            emailVerified: (bool) $principal->emailVerified,
         );
+
     }
 }
