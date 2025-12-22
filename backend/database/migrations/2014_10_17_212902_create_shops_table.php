@@ -14,7 +14,9 @@ return new class () extends Migration {
             $table->string('name', 50);
 
             // 店舗コード（短い識別子で URL や API に使う）
-            $table->string('shop_code', 30)->unique();
+
+            $table->string('shop_code', 64)->unique();
+
 
             // 店舗のオーナーとなるユーザー
             // ★ 修正: foreignId を使用しているため、constrained('users') を有効化し、外部キー制約を設定

@@ -14,6 +14,7 @@ final class ProvisionedUser
         public readonly array $roles,
         public readonly ?int $tenantId, // shop_id
         public readonly bool $isFirstLogin,
+         public readonly ?int $shopId,
     ) {
     }
 }

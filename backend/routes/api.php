@@ -27,6 +27,19 @@ Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegist
 // Refresh Token
 Route::post('/auth/refresh', [TokenController::class, 'refresh']);
 
+
+
+
+
+
+
+use App\Modules\Shop\Presentation\Http\Controllers\ShopController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::post('/shops', [ShopController::class, 'create']);
+    Route::get('/shops/me', [ShopController::class, 'me']);
+});
+
 /*
 |--------------------------------------------------------------------------
 | 🔐 JWT Protected（最低限）

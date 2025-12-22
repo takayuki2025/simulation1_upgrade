@@ -42,6 +42,8 @@ use App\Modules\Item\Domain\Repository\ItemEntityTagRepository;
 use App\Modules\Item\Infrastructure\Persistence\Repository\EloquentItemEntityTagRepository;
 use App\Modules\Item\Domain\Repository\BrandRepository;
 use App\Modules\Item\Infrastructure\Persistence\EntityDefinition\BrandRepositoryImpl;
+use App\Modules\Shop\Domain\Repository\ShopRepository;
+use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -112,6 +114,8 @@ class AppServiceProvider extends ServiceProvider
             BrandRepositoryImpl::class
         );
 
+
+        $this->app->bind(ShopRepository::class, EloquentShopRepository::class);
 
 
 
