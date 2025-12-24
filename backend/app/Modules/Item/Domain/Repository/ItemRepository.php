@@ -49,4 +49,6 @@ interface ItemRepository
         ItemId $itemId,
         ItemImagePath $path
     ): void;
+
+    public function findPublicByShopId(int $shopId): array;
 }

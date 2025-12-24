@@ -27,19 +27,15 @@ final class EloquentItemRepository implements ItemRepository
      */
     private function toDomain(EloquentItem $model): Item
     {
-        // ✅ category を array に復元（Seeder/過去データ/新規データ混在に耐える）
         $categories = $model->category ?? [];
 
         if (is_string($categories)) {
             $decoded = json_decode($categories, true);
             $categories = is_array($decoded) ? $decoded : [];
-        } elseif (!is_array($categories)) {
-            $categories = [];
         }
 
-        // ✅ item_image は null の可能性あり
         $imagePath = null;
-        if (!empty($model->item_image) && is_string($model->item_image)) {
+        if (!empty($model->item_image)) {
             $imagePath = ItemImagePath::fromRaw($model->item_image);
         }
 
@@ -51,7 +47,7 @@ final class EloquentItemRepository implements ItemRepository
             $model->explain,
             $model->condition,
             new CategoryList($categories),
-            $imagePath, // ← null OK な設計前提（Item側が非null強制なら別途調整）
+            $imagePath,
             new StockCount($model->remain),
         );
     }
@@ -268,5 +264,16 @@ final class EloquentItemRepository implements ItemRepository
                 'item_image' => $imagePath->value(),
                 'updated_at' => now(),
             ]);
+    }
+
+    public function findPublicByShopId(int $shopId): array
+    {
+        return EloquentItem::query()
+            ->where('shop_id', $shopId)
+            // ->where('is_public', true)
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (EloquentItem $m) => $this->toDomain($m))
+            ->all();
     }
 }

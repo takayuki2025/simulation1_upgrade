@@ -15,13 +15,11 @@ final class EloquentShopRepository implements ShopRepository
             ? ShopModel::findOrFail($shop->id())
             : new ShopModel();
 
-        $model->shop_code = $shop->shopCode();
-
-        $model->owner_user_id = $shop->ownerUserId();
-        $model->name = $shop->name();
-        $model->status = $shop->status()->value;
+        $model->shop_code      = $shop->shopCode();
+        $model->owner_user_id  = $shop->ownerUserId();
+        $model->name           = $shop->name();
+        $model->status         = $shop->status()->value;
         $model->save();
-
 
         return new Shop(
             id: $model->id,
@@ -35,10 +33,10 @@ final class EloquentShopRepository implements ShopRepository
     public function findByOwnerUserId(int $userId): ?Shop
     {
         $model = ShopModel::where('owner_user_id', $userId)->first();
+
         if (! $model) {
             return null;
         }
-
 
         return new Shop(
             id: $model->id,
@@ -47,16 +45,15 @@ final class EloquentShopRepository implements ShopRepository
             name: $model->name,
             status: ShopStatus::from($model->status),
         );
-
     }
 
     public function findById(int $shopId): ?Shop
     {
         $model = ShopModel::find($shopId);
+
         if (! $model) {
             return null;
         }
-
 
         return new Shop(
             id: $model->id,
@@ -65,6 +62,25 @@ final class EloquentShopRepository implements ShopRepository
             name: $model->name,
             status: ShopStatus::from($model->status),
         );
+    }
 
+    /**
+     * ✅ ResolveTenant 用（最重要）
+     */
+    public function findByCode(string $shopCode): ?Shop
+    {
+        $model = ShopModel::where('shop_code', $shopCode)->first();
+
+        if (! $model) {
+            return null;
+        }
+
+        return new Shop(
+            id: $model->id,
+            shopCode: $model->shop_code,
+            ownerUserId: $model->owner_user_id,
+            name: $model->name,
+            status: ShopStatus::from($model->status),
+        );
     }
 }

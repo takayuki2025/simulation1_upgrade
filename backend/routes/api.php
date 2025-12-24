@@ -40,6 +40,21 @@ Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/shops/me', [ShopController::class, 'me']);
 });
 
+
+
+// === Shop / Tenant ===
+use App\Modules\Item\Presentation\Http\Controllers\{
+    ShopShowController,
+    ShopItemListController
+};
+
+Route::prefix('shops/{shop_code}')
+    ->middleware('tenant')
+    ->group(function () {
+        Route::get('/', ShopShowController::class);
+        Route::get('/items', ShopItemListController::class);
+    });
+
 /*
 |--------------------------------------------------------------------------
 | 🔐 JWT Protected（最低限）
@@ -173,18 +188,7 @@ Route::middleware(['auth.jwt'])->group(function () {
 });
 
 
-// === Shop / Tenant ===
-use App\Modules\Item\Presentation\Http\Controllers\{
-    ShopShowController,
-    ShopItemListController
-};
 
-Route::prefix('shops/{shop_code}')
-    ->middleware('tenant')
-    ->group(function () {
-        Route::get('/', ShopShowController::class);
-        Route::get('/items', ShopItemListController::class);
-    });
 
 // === MyPage / User ===
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
@@ -252,3 +256,5 @@ Route::post('/payments/webhook/stripe', StripeWebhookController::class);
 Route::middleware('auth.jwt.optional')->group(function () {
     Route::get('/payments/latest-by-order', [PaymentReadController::class, 'latestByOrder']);
 });
+
+

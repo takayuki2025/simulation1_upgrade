@@ -11,4 +11,6 @@ interface ShopRepository
     public function findByOwnerUserId(int $userId): ?Shop;
 
     public function findById(int $shopId): ?Shop;
+
+    public function findByCode(string $shopCode): ?Shop;
 }

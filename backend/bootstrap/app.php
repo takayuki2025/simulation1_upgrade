@@ -58,7 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // 'firebase.verify' => VerifyFirebaseToken::class,
             // 既存の古い名前空間のミドルウェアのエイリアスはLaravel 11では不要なため、削除
             // ⭐ ここに 'tenant' ミドルウェアのエイリアスを追加 ⭐
-            'tenant' => \App\Http\Middleware\SetCurrentShop::class,
+            'tenant' => \App\Http\Middleware\ResolveTenant::class,
+
             'auth.jwt'   => \App\Http\Middleware\JwtAuthenticate::class,
             'auth.jwt.optional' => \App\Http\Middleware\OptionalJwtAuth::class,
             'role'       => \App\Http\Middleware\RoleMiddleware::class,

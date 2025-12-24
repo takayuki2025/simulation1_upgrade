@@ -3,16 +3,20 @@
 namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Domain\Repository\ItemRepository;
+use App\Modules\Item\Domain\Entity\Item;
 
-class ListItemByShopUseCase
+final class ListItemByShopUseCase
 {
     public function __construct(
-        private readonly ItemRepository $itemRepository
+        private ItemRepository $items
     ) {
     }
 
-    public function execute(int $shopId): iterable
+    /**
+     * @return Item[]
+     */
+    public function execute(int $shopId): array
     {
-        return $this->itemRepository->listByShop($shopId);
+        return $this->items->findPublicByShopId($shopId);
     }
 }
