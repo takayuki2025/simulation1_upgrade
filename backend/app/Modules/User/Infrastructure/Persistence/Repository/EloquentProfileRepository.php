@@ -6,6 +6,7 @@ use App\Modules\User\Domain\Entity\Profile;
 // ✅ 新しいインターフェース名を使用
 use App\Modules\User\Domain\Repository\ProfileRepository;
 use App\Models\User; // Eloquent Model
+use Illuminate\Support\Facades\DB;
 
 // ✅ インターフェースを実装する
 class EloquentProfileRepository implements ProfileRepository
@@ -86,6 +87,26 @@ class EloquentProfileRepository implements ProfileRepository
             emailVerifiedAt: $user->email_verified_at
                 ? new \DateTimeImmutable($user->email_verified_at)
                 : null,
+        );
+    }
+
+    public function findByUserId(int $userId): ?Profile
+    {
+        $row = DB::table('profiles')
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        return Profile::reconstitute(
+            id: (int)$row->id,
+            userId: (int)$row->user_id,
+            name: (string)$row->name,
+            postNumber: $row->post_number,
+            address: $row->address,
+            building: $row->building,
         );
     }
 }

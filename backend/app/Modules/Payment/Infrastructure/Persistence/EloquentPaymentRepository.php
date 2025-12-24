@@ -103,4 +103,14 @@ final class EloquentPaymentRepository implements PaymentRepository
             meta: $row->meta ? json_decode($row->meta, true) : null,
         );
     }
+
+    public function findLatestByOrderId(int $orderId): ?Payment
+    {
+        $row = DB::table('payments')
+            ->where('order_id', $orderId)
+            ->orderByDesc('id')
+            ->first();
+
+        return $row ? $this->mapRow($row) : null;
+    }
 }

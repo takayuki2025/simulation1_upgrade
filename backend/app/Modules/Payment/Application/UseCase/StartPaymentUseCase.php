@@ -11,6 +11,7 @@ use App\Modules\Payment\Domain\Enum\PaymentMethod;
 use App\Modules\Payment\Domain\Enum\PaymentProvider;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
+use App\Modules\User\Domain\Repository\ProfileRepository;
 use Illuminate\Support\Facades\DB;
 
 final class StartPaymentUseCase
@@ -30,18 +31,20 @@ final class StartPaymentUseCase
             if (! $order) {
                 throw new \RuntimeException('Order not found');
             }
-            if ((int)$order->userId() !== (int)$userId) {
+
+            if ((int)$order->userId() !== $userId) {
                 throw new \DomainException('Forbidden');
             }
+
             if ($order->status() !== OrderStatus::PENDING_PAYMENT) {
                 throw new \DomainException('Order is not payable');
             }
 
             $method = PaymentMethod::from($input->method);
 
-            // 1) initiate payment record
+            // Payment 作成
             $payment = Payment::initiate(
-                orderId: $order->id() ?? 0,
+                orderId: $order->id(),
                 shopId: $order->shopId(),
                 userId: $order->userId(),
                 provider: PaymentProvider::STRIPE,
@@ -53,35 +56,35 @@ final class StartPaymentUseCase
 
             $payment = $this->payments->save($payment);
 
-            // 2) call gateway
+            // ★ ここが重要：payer_name は User ID 由来で十分
+            $payerName = '購入者-' . $order->userId();
+
             $res = $this->gateway->start(
                 method: $method,
                 amount: $order->totalAmount(),
                 currency: $order->currency(),
                 context: [
-                    'order_id' => $order->id(),
+                    'order_id'   => $order->id(),
                     'payment_id' => $payment->id(),
-                    'user_id' => $order->userId(),
-                    'shop_id' => $order->shopId(),
+                    'user_id'    => $order->userId(),
+                    'shop_id'    => $order->shopId(),
+                    'payer_name' => $payerName,
                 ]
             );
 
-            // 3) update payment with provider ids / instructions
             if (!empty($res['provider_payment_id'])) {
                 $payment = $payment->withProviderPayment($res['provider_payment_id']);
             }
 
             if (($res['requires_action'] ?? false) === true) {
-                $payment = $payment->markRequiresAction(['gateway_status' => $res['status'] ?? null]);
+                $payment = $payment->markRequiresAction([
+                    'gateway_status' => $res['status'] ?? null
+                ]);
             }
-
-            $meta = [
-                'gateway_status' => $res['status'] ?? null,
-            ];
 
             $payment = $this->payments->save(
                 Payment::reconstitute(
-                    id: $payment->id() ?? 0,
+                    id: $payment->id(),
                     orderId: $payment->orderId(),
                     shopId: $payment->shopId(),
                     userId: $payment->userId(),
@@ -91,15 +94,17 @@ final class StartPaymentUseCase
                     amount: $payment->amount(),
                     currency: $payment->currency(),
                     providerPaymentId: $payment->providerPaymentId(),
-                    providerCustomerId: $payment->providerCustomerId(),
-                    methodDetails: $payment->methodDetails(),
+                    providerCustomerId: null,
+                    methodDetails: [
+                        'receipt_number' => $res['provider_payment_id'] ?? null,
+                    ],
                     instructions: $res['instructions'] ?? null,
-                    meta: $meta
+                    meta: ['gateway_status' => $res['status'] ?? null],
                 )
             );
 
             return new StartPaymentOutput(
-                paymentId: $payment->id() ?? 0,
+                paymentId: $payment->id(),
                 status: $payment->status()->value,
                 providerPaymentId: $payment->providerPaymentId(),
                 clientSecret: $res['client_secret'] ?? null,

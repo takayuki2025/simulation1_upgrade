@@ -30,4 +30,6 @@ interface ProfileRepository
         string $address,
         ?string $building
     ): Profile;
+
+    public function findByUserId(int $userId): ?Profile;
 }

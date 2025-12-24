@@ -121,6 +121,8 @@ function PurchaseConfirmPage() {
         method: payment === "card" ? "card" : "konbini",
       });
 
+      // localStorage.setItem("latest_order_id", String(orderId));
+
       /* -----------------------
          ③ Card 決済
       ----------------------- */
@@ -158,7 +160,7 @@ function PurchaseConfirmPage() {
       if (payment === "card") {
         router.push("/thanks/buy/stripe-card");
       } else {
-        router.push("/thanks/buy/konbini");
+        router.push(`/thanks/buy/konbini?order_id=${orderId}`);
       }
     } catch (e) {
       console.error(e);
@@ -186,6 +188,9 @@ function PurchaseConfirmPage() {
       </div>
     );
   }
+
+
+
 
   /* =====================================================
      UI

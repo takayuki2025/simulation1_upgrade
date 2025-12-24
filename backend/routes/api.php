@@ -234,11 +234,21 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 
 use App\Modules\Payment\Presentation\Http\Controllers\PaymentController;
-use App\Modules\Payment\Presentation\Http\Controllers\PaymentWebhookController;
+use App\Modules\Payment\Presentation\Http\Controllers\StripeWebhookController;
+
+use App\Modules\Payment\Presentation\Http\Controllers\PaymentReadController;
+
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/payments/start', [PaymentController::class, 'start']);
 });
 
 // Webhook: no auth (signature)
-Route::post('/payments/webhook/stripe', [PaymentWebhookController::class, 'stripe']);
+
+Route::post('/payments/webhook/stripe', StripeWebhookController::class);
+
+
+
+Route::middleware('auth.jwt.optional')->group(function () {
+    Route::get('/payments/latest-by-order', [PaymentReadController::class, 'latestByOrder']);
+});

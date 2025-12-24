@@ -19,69 +19,101 @@ final class StripePaymentGateway implements PaymentGatewayPort
         ]);
     }
 
-    public function start(PaymentMethod $method, int $amount, string $currency, array $context): array
-    {
+    public function start(
+        PaymentMethod $method,
+        int $amount,
+        string $currency,
+        array $context
+    ): array {
+
+        /* =========================
+           CARD
+        ========================= */
         if ($method === PaymentMethod::CARD) {
-            // v1: PaymentIntent を作る（client_secret を返す）
-            // context expects: order_id, user_id, shop_id, payment_id
             $pi = $this->stripe->paymentIntents->create([
                 'amount' => $amount,
                 'currency' => strtolower($currency),
                 'automatic_payment_methods' => ['enabled' => true],
                 'metadata' => [
-                    'order_id' => (string)($context['order_id'] ?? ''),
-                    'payment_id' => (string)($context['payment_id'] ?? ''),
-                    'user_id' => (string)($context['user_id'] ?? ''),
-                    'shop_id' => (string)($context['shop_id'] ?? ''),
+                    'order_id'   => (string)$context['order_id'],
+                    'payment_id' => (string)$context['payment_id'],
+                    'user_id'    => (string)$context['user_id'],
+                    'shop_id'    => (string)$context['shop_id'],
                 ],
             ]);
 
             return [
                 'provider_payment_id' => $pi->id,
                 'client_secret' => $pi->client_secret,
-                'requires_action' => ($pi->status === 'requires_action'),
+                'requires_action' => $pi->status === 'requires_action',
                 'status' => $pi->status,
             ];
         }
 
-        // KONBINI: 今回はダミー（状態とDTOだけ整備）
+        /* =========================
+           KONBINI（本番仕様）
+        ========================= */
+
         if ($method === PaymentMethod::KONBINI) {
-            $ref = 'KONBINI-DUMMY-' . bin2hex(random_bytes(6));
+
+            $payerName  = $context['payer_name'] ?? '購入者';
+            $payerEmail = $context['payer_email'] ?? 'no-reply@example.com';
+
+            $pi = $this->stripe->paymentIntents->create([
+                'amount' => $amount,
+                'currency' => 'jpy',
+
+                // ★ 重要：confirm を true にする
+                'confirm' => true,
+
+                'payment_method_types' => ['konbini'],
+                'payment_method_data' => [
+                    'type' => 'konbini',
+                    'billing_details' => [
+                        'name'  => $payerName,
+                        'email' => $payerEmail,
+                    ],
+                ],
+                'metadata' => [
+                    'order_id'   => (string)$context['order_id'],
+                    'payment_id' => (string)$context['payment_id'],
+                    'user_id'    => (string)$context['user_id'],
+                    'shop_id'    => (string)$context['shop_id'],
+                ],
+            ]);
+
+            $details = $pi->next_action->konbini_display_details ?? null;
+
             return [
-                'provider_payment_id' => null,
-                'client_secret' => null,
+                'provider_payment_id' => $pi->id,
+                'client_secret' => $pi->client_secret,
                 'requires_action' => true,
-                'status' => 'requires_action',
+                'status' => $pi->status,
                 'instructions' => [
                     'type' => 'konbini',
-                    'reference' => $ref,
-                    'expires_at' => now()->addDay()->toISOString(),
-                    'payload' => null, // future: QR/barcode/base64
+                    'expires_at' => $details?->expires_at,
+                    'reference' => $details?->confirmation_number,
+                    'store' => $details?->stores,
                 ],
             ];
         }
 
-        throw new \InvalidArgumentException('Unsupported method');
+
+        throw new \InvalidArgumentException('Unsupported payment method');
     }
 
     public function parseWebhook(string $payload, string $signature): array
     {
-        if (!$signature) {
-            throw new \RuntimeException('Stripe-Signature header missing');
-        }
-
         $event = Webhook::constructEvent(
             $payload,
             $signature,
             config('services.stripe.webhook_secret')
         );
 
-        // payment_intent.* 以外は明示的に無視
         if (!str_starts_with($event->type, 'payment_intent.')) {
             return [
                 'ignored' => true,
                 'provider_event_id' => $event->id,
-                // 'reason' => 'unsupported_event_type',
                 'event_type' => $event->type,
             ];
         }
@@ -92,8 +124,8 @@ final class StripePaymentGateway implements PaymentGatewayPort
             'ignored' => false,
             'provider_event_id' => $event->id,
             'event_type' => $event->type,
-            'provider_payment_id' => $pi->id ?? null,
-            'status' => $pi->status ?? null,
+            'provider_payment_id' => $pi->id,
+            'status' => $pi->status,
         ];
     }
 }
