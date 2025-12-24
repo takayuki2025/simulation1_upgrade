@@ -3,7 +3,7 @@
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Item\Application\UseCase\Item\ListItemByShopUseCase;
+use App\Modules\Item\Application\UseCase\Item\Query\ListItemByShopUseCase;
 use Illuminate\Http\Request;
 
 class ShopItemListController extends Controller

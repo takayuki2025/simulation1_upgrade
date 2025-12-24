@@ -15,5 +15,6 @@ class VerifyCsrfToken extends Middleware
         // ★★★ この配列の中に、以下の2行を追加/確認してください ★★★
         'api/firebase/auth',
         'api/*',
+        'api/payments/webhook/stripe',
     ];
 }

@@ -11,7 +11,6 @@ use App\Modules\Payment\Domain\Enum\PaymentMethod;
 use App\Modules\Payment\Domain\Enum\PaymentProvider;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
-use App\Modules\User\Domain\Repository\ProfileRepository;
 use Illuminate\Support\Facades\DB;
 
 final class StartPaymentUseCase
@@ -27,12 +26,15 @@ final class StartPaymentUseCase
     {
         return DB::transaction(function () use ($input, $userId) {
 
+            /* ============================================
+               ① Order 検証
+            ============================================ */
             $order = $this->orders->findById($input->orderId);
             if (! $order) {
                 throw new \RuntimeException('Order not found');
             }
 
-            if ((int)$order->userId() !== $userId) {
+            if ((int) $order->userId() !== $userId) {
                 throw new \DomainException('Forbidden');
             }
 
@@ -40,9 +42,11 @@ final class StartPaymentUseCase
                 throw new \DomainException('Order is not payable');
             }
 
+            /* ============================================
+               ② Payment 初期作成
+            ============================================ */
             $method = PaymentMethod::from($input->method);
 
-            // Payment 作成
             $payment = Payment::initiate(
                 orderId: $order->id(),
                 shopId: $order->shopId(),
@@ -51,14 +55,16 @@ final class StartPaymentUseCase
                 method: $method,
                 amount: $order->totalAmount(),
                 currency: $order->currency(),
-                meta: ['order_status' => $order->status()->value]
+                meta: [
+                    'order_status' => $order->status()->value,
+                ]
             );
 
             $payment = $this->payments->save($payment);
 
-            // ★ ここが重要：payer_name は User ID 由来で十分
-            $payerName = '購入者-' . $order->userId();
-
+            /* ============================================
+               ③ Gateway 呼び出し
+            ============================================ */
             $res = $this->gateway->start(
                 method: $method,
                 amount: $order->totalAmount(),
@@ -68,41 +74,38 @@ final class StartPaymentUseCase
                     'payment_id' => $payment->id(),
                     'user_id'    => $order->userId(),
                     'shop_id'    => $order->shopId(),
-                    'payer_name' => $payerName,
+                    'payer_name' => '購入者-' . $order->userId(),
                 ]
             );
 
+            /* ============================================
+               ④ provider_payment_id 反映
+            ============================================ */
             if (!empty($res['provider_payment_id'])) {
                 $payment = $payment->withProviderPayment($res['provider_payment_id']);
             }
 
+            /* ============================================
+               ⑤ requires_action 遷移
+            ============================================ */
             if (($res['requires_action'] ?? false) === true) {
                 $payment = $payment->markRequiresAction([
-                    'gateway_status' => $res['status'] ?? null
+                    'gateway_status' => $res['status'] ?? null,
                 ]);
             }
 
-            $payment = $this->payments->save(
-                Payment::reconstitute(
-                    id: $payment->id(),
-                    orderId: $payment->orderId(),
-                    shopId: $payment->shopId(),
-                    userId: $payment->userId(),
-                    provider: $payment->provider(),
-                    method: $payment->method(),
-                    status: $payment->status(),
-                    amount: $payment->amount(),
-                    currency: $payment->currency(),
-                    providerPaymentId: $payment->providerPaymentId(),
-                    providerCustomerId: null,
-                    methodDetails: [
-                        'receipt_number' => $res['provider_payment_id'] ?? null,
-                    ],
-                    instructions: $res['instructions'] ?? null,
-                    meta: ['gateway_status' => $res['status'] ?? null],
-                )
-            );
+            /* ============================================
+               ⑥ instructions のみ反映（★重要）
+            ============================================ */
+            if (!empty($res['instructions'])) {
+                $payment = $payment->withInstructions($res['instructions']);
+            }
 
+            $payment = $this->payments->save($payment);
+
+            /* ============================================
+               ⑦ レスポンス
+            ============================================ */
             return new StartPaymentOutput(
                 paymentId: $payment->id(),
                 status: $payment->status()->value,

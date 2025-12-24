@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/ui/auth/useAuth";
+import type { AxiosResponse } from "axios";
 import styles from "./W-StripeThankYou.module.css";
 
 type PaymentResponse = {
@@ -18,8 +19,8 @@ type PaymentResponse = {
 export default function StripeThankYouPage() {
   const { apiClient } = useAuth();
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // 購入直後に保存した order_id
   const orderId =
     typeof window !== "undefined"
       ? localStorage.getItem("latest_order_id")
@@ -28,36 +29,89 @@ export default function StripeThankYouPage() {
   useEffect(() => {
     if (!apiClient || !orderId) return;
 
-    apiClient
-      .get("/payments/latest-by-order", {
-        params: { order_id: orderId },
-      })
-      .then((res) => setPayment(res.data))
-      .catch(() => {});
+    let cancelled = false;
+    let retryCount = 0;
+    const MAX_RETRY = 10;
+    const INTERVAL_MS = 500;
+
+    const fetchPayment = async () => {
+      try {
+        const res: AxiosResponse<PaymentResponse> = await apiClient.get(
+          "/payments/latest-by-order",
+          {
+            params: { order_id: orderId },
+            validateStatus: () => true, // ★ 404 / 202 を catch しない
+          },
+        );
+
+        if (cancelled) return;
+
+        if (res.status === 200) {
+          setPayment(res.data);
+          return;
+        }
+
+        // 404 / 202 = まだ処理中
+        if (retryCount < MAX_RETRY) {
+          retryCount++;
+          setTimeout(fetchPayment, INTERVAL_MS);
+          return;
+        }
+
+        setError(
+          "決済の確認に時間がかかっています。しばらくしてから再度ご確認ください。",
+        );
+      } catch (e) {
+        if (retryCount < MAX_RETRY) {
+          retryCount++;
+          setTimeout(fetchPayment, INTERVAL_MS);
+        } else {
+          setError("決済情報の取得に失敗しました。");
+        }
+      }
+    };
+
+    fetchPayment();
+
+    return () => {
+      cancelled = true;
+    };
   }, [apiClient, orderId]);
 
-  if (!payment) {
+  /* ==========================
+     表示
+  ========================== */
+
+  if (error) {
     return (
       <div className={styles.thankYouPage}>
         <div className={styles.messageBox}>
-          <p>決済情報を取得中です…</p>
+          <p>{error}</p>
+          <Link href="/" className={styles.backHomeLink}>
+            ホームへ戻る
+          </Link>
         </div>
       </div>
     );
   }
 
-  const receiptNumber = payment.method_details?.receipt_number;
+  if (!payment) {
+    return (
+      <div className={styles.thankYouPage}>
+        <div className={styles.messageBox}>
+          <p>決済情報を確認中です…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.thankYouPage}>
       <div className={styles.messageBox}>
         <h1 className={styles.title}>ご購入ありがとうございます！</h1>
 
-        {receiptNumber && (
-          <p>
-            <strong>受付番号：</strong>
-            {receiptNumber}
-          </p>
+        {payment.method_details?.receipt_number && (
+          <p>受付番号：{payment.method_details.receipt_number}</p>
         )}
 
         <p className={styles.message}>

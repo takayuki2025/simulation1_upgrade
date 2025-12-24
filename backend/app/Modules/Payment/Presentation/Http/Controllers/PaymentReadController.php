@@ -11,13 +11,19 @@ final class PaymentReadController extends Controller
     public function latestByOrder(Request $request, PaymentRepository $payments)
     {
         $orderId = (int) $request->query('order_id');
-        if (!$orderId) {
-            abort(400, 'order_id is required');
+        if (! $orderId) {
+            return response()->json([
+                'message' => 'order_id is required',
+            ], 400);
         }
 
         $payment = $payments->findLatestByOrderId($orderId);
-        if (!$payment) {
-            abort(404);
+
+        // ★ 非同期決済では 404 は返さない
+        if (! $payment) {
+            return response()->json([
+                'status' => 'processing',
+            ], 202);
         }
 
         return response()->json([
@@ -27,6 +33,6 @@ final class PaymentReadController extends Controller
             'provider_payment_id' => $payment->providerPaymentId(),
             'instructions' => $payment->instructions(),
             'method_details' => $payment->methodDetails(),
-        ]);
+        ], 200);
     }
 }

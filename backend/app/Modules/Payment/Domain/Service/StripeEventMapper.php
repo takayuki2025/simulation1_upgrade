@@ -12,12 +12,16 @@ final class StripeEventMapper
     {
         $object = $input->payload['data']['object'] ?? [];
 
+        // Stripe payload の "id" は eventType によって意味が違うので注意
+        // payment_intent.* の場合: object['id'] は "pi_***"
+        // charge.* の場合: object['id'] は "ch_***"
+
         return match ($input->eventType) {
 
             'payment_intent.succeeded' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::SUCCEEDED,
-                    $object['id'],
+                    $object['id'] ?? null,
                     null,
                     $input->occurredAt,
                 ),
@@ -25,7 +29,7 @@ final class StripeEventMapper
             'payment_intent.payment_failed' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::FAILED,
-                    $object['id'],
+                    $object['id'] ?? null,
                     $object['last_payment_error']['message'] ?? null,
                     $input->occurredAt,
                 ),
@@ -33,13 +37,20 @@ final class StripeEventMapper
             'payment_intent.requires_action' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::REQUIRES_ACTION,
-                    $object['id'],
+                    $object['id'] ?? null,
                     null,
                     $input->occurredAt,
                 ),
 
+            // ★重要：Stripe CLI / 実運用では charge.* や payment_intent.created も普通に来る
+            // ここで例外 throw すると Stripe がリトライ地獄になるので「無視」が正解
             default =>
-                throw new \DomainException('Unhandled Stripe event: ' . $input->eventType),
+                new DomainPaymentEvent(
+                    DomainPaymentEventType::IGNORED,
+                    null,
+                    null,
+                    $input->occurredAt,
+                ),
         };
     }
 }

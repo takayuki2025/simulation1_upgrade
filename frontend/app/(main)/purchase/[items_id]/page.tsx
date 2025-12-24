@@ -121,7 +121,7 @@ function PurchaseConfirmPage() {
         method: payment === "card" ? "card" : "konbini",
       });
 
-      // localStorage.setItem("latest_order_id", String(orderId));
+      localStorage.setItem("latest_order_id", String(orderId));
 
       /* -----------------------
          ③ Card 決済

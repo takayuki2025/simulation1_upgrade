@@ -7,8 +7,8 @@ use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
 use App\Modules\Payment\Infrastructure\External\StripePaymentGateway;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Repository\PaymentQueryRepository;
-use App\Modules\Payment\Infrastructure\Persistence\EloquentPaymentRepository;
-use App\Modules\Payment\Infrastructure\Persistence\EloquentPaymentQueryRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\EloquentPaymentRepository;
+use App\Modules\Payment\Infrastructure\Persistence\Repository\EloquentPaymentQueryRepository;
 
 final class PaymentModuleServiceProvider extends ServiceProvider
 {

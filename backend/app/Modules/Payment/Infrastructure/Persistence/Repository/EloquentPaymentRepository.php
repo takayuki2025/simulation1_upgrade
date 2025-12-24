@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Payment\Infrastructure\Persistence;
+namespace App\Modules\Payment\Infrastructure\Persistence\Repository;
 
 use App\Modules\Payment\Domain\Entity\Payment;
 use App\Modules\Payment\Domain\Enum\PaymentMethod;
@@ -13,7 +13,13 @@ final class EloquentPaymentRepository implements PaymentRepository
 {
     public function save(Payment $payment): Payment
     {
+        /**
+         * ==================================================
+         * INSERT
+         * ==================================================
+         */
         if ($payment->id() === null) {
+
             $id = DB::table('payments')->insertGetId([
                 'order_id' => $payment->orderId(),
                 'shop_id' => $payment->shopId(),
@@ -25,9 +31,15 @@ final class EloquentPaymentRepository implements PaymentRepository
                 'currency' => $payment->currency(),
                 'provider_payment_id' => $payment->providerPaymentId(),
                 'provider_customer_id' => $payment->providerCustomerId(),
-                'method_details' => $payment->methodDetails() ? json_encode($payment->methodDetails(), JSON_UNESCAPED_UNICODE) : null,
-                'instructions' => $payment->instructions() ? json_encode($payment->instructions(), JSON_UNESCAPED_UNICODE) : null,
-                'meta' => $payment->meta() ? json_encode($payment->meta(), JSON_UNESCAPED_UNICODE) : null,
+                'method_details' => $payment->methodDetails()
+                    ? json_encode($payment->methodDetails(), JSON_UNESCAPED_UNICODE)
+                    : null,
+                'instructions' => $payment->instructions()
+                    ? json_encode($payment->instructions(), JSON_UNESCAPED_UNICODE)
+                    : null,
+                'meta' => $payment->meta()
+                    ? json_encode($payment->meta(), JSON_UNESCAPED_UNICODE)
+                    : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -50,15 +62,36 @@ final class EloquentPaymentRepository implements PaymentRepository
             );
         }
 
-        DB::table('payments')->where('id', $payment->id())->update([
+        /**
+         * ==================================================
+         * UPDATE（★ ここが最重要修正点）
+         * ==================================================
+         */
+        $update = [
             'status' => $payment->status()->value,
             'provider_payment_id' => $payment->providerPaymentId(),
             'provider_customer_id' => $payment->providerCustomerId(),
-            'method_details' => $payment->methodDetails() ? json_encode($payment->methodDetails(), JSON_UNESCAPED_UNICODE) : null,
-            'instructions' => $payment->instructions() ? json_encode($payment->instructions(), JSON_UNESCAPED_UNICODE) : null,
-            'meta' => $payment->meta() ? json_encode($payment->meta(), JSON_UNESCAPED_UNICODE) : null,
             'updated_at' => now(),
-        ]);
+        ];
+
+        if ($payment->methodDetails() !== null) {
+            $update['method_details'] =
+                json_encode($payment->methodDetails(), JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($payment->instructions() !== null) {
+            $update['instructions'] =
+                json_encode($payment->instructions(), JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($payment->meta() !== null) {
+            $update['meta'] =
+                json_encode($payment->meta(), JSON_UNESCAPED_UNICODE);
+        }
+
+        DB::table('payments')
+            ->where('id', $payment->id())
+            ->update($update);
 
         return $payment;
     }
@@ -71,17 +104,27 @@ final class EloquentPaymentRepository implements PaymentRepository
 
     public function findByProviderPaymentId(string $providerPaymentId): ?Payment
     {
-        $row = DB::table('payments')->where('provider_payment_id', $providerPaymentId)->first();
+        $row = DB::table('payments')
+            ->where('provider_payment_id', $providerPaymentId)
+            ->first();
+
         return $row ? $this->mapRow($row) : null;
     }
 
     public function updateStatusById(int $paymentId, string $status, ?array $meta = null): void
     {
-        DB::table('payments')->where('id', $paymentId)->update([
+        $update = [
             'status' => $status,
-            'meta' => $meta ? json_encode($meta, JSON_UNESCAPED_UNICODE) : null,
             'updated_at' => now(),
-        ]);
+        ];
+
+        if ($meta !== null) {
+            $update['meta'] = json_encode($meta, JSON_UNESCAPED_UNICODE);
+        }
+
+        DB::table('payments')
+            ->where('id', $paymentId)
+            ->update($update);
     }
 
     private function mapRow(object $row): Payment
@@ -96,11 +139,17 @@ final class EloquentPaymentRepository implements PaymentRepository
             status: PaymentStatus::from((string)$row->status),
             amount: (int)$row->amount,
             currency: (string)$row->currency,
-            providerPaymentId: $row->provider_payment_id ? (string)$row->provider_payment_id : null,
-            providerCustomerId: $row->provider_customer_id ? (string)$row->provider_customer_id : null,
-            methodDetails: $row->method_details ? json_decode($row->method_details, true) : null,
-            instructions: $row->instructions ? json_decode($row->instructions, true) : null,
-            meta: $row->meta ? json_decode($row->meta, true) : null,
+            providerPaymentId: $row->provider_payment_id ?: null,
+            providerCustomerId: $row->provider_customer_id ?: null,
+            methodDetails: $row->method_details
+                ? json_decode($row->method_details, true)
+                : null,
+            instructions: $row->instructions
+                ? json_decode($row->instructions, true)
+                : null,
+            meta: $row->meta
+                ? json_decode($row->meta, true)
+                : null,
         );
     }
 

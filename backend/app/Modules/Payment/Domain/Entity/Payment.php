@@ -32,6 +32,10 @@ final class Payment
         }
     }
 
+    /* ============================================
+       Factory
+    ============================================ */
+
     public static function initiate(
         int $orderId,
         int $shopId,
@@ -94,7 +98,10 @@ final class Payment
         );
     }
 
-    // getters
+    /* ============================================
+       Getters
+    ============================================ */
+
     public function id(): ?int
     {
         return $this->id;
@@ -152,7 +159,10 @@ final class Payment
         return $this->meta;
     }
 
-    // mutations (immutable style)
+    /* ============================================
+       Mutations（immutable）
+    ============================================ */
+
     public function withProviderPayment(string $providerPaymentId, ?string $customerId = null): self
     {
         return self::reconstitute(
@@ -169,6 +179,46 @@ final class Payment
             providerCustomerId: $customerId,
             methodDetails: $this->methodDetails,
             instructions: $this->instructions,
+            meta: $this->meta
+        );
+    }
+
+    public function withMethodDetails(array $methodDetails): self
+    {
+        return self::reconstitute(
+            id: $this->id ?? 0,
+            orderId: $this->orderId,
+            shopId: $this->shopId,
+            userId: $this->userId,
+            provider: $this->provider,
+            method: $this->method,
+            status: $this->status,
+            amount: $this->amount,
+            currency: $this->currency,
+            providerPaymentId: $this->providerPaymentId,
+            providerCustomerId: $this->providerCustomerId,
+            methodDetails: $methodDetails,
+            instructions: $this->instructions,
+            meta: $this->meta
+        );
+    }
+
+    public function withInstructions(array $instructions): self
+    {
+        return self::reconstitute(
+            id: $this->id ?? 0,
+            orderId: $this->orderId,
+            shopId: $this->shopId,
+            userId: $this->userId,
+            provider: $this->provider,
+            method: $this->method,
+            status: $this->status,
+            amount: $this->amount,
+            currency: $this->currency,
+            providerPaymentId: $this->providerPaymentId,
+            providerCustomerId: $this->providerCustomerId,
+            methodDetails: $this->methodDetails,
+            instructions: $instructions,
             meta: $this->meta
         );
     }

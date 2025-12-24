@@ -24,7 +24,6 @@ interface PaymentQueryRepository
         string $status,
         ?int $paymentId = null,
         ?int $orderId = null,
-        // ?string $reason = null,
         ?string $errorMessage = null,
     ): void;
 }

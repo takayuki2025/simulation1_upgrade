@@ -18,18 +18,20 @@ final class StripeWebhookController extends Controller
 
     public function __invoke(Request $request): Response
     {
+        \Log::info('[Stripe Webhook RAW HIT]', [
+            'headers' => $request->headers->all(),
+        ]);
+
         $payload = $request->getContent();
         $sig     = $request->header('Stripe-Signature');
-
-        $secret = config('services.stripe.webhook_secret');
+        $secret  = config('services.stripe.webhook_secret');
 
         try {
-            $event = Webhook::constructEvent(
-                $payload,
-                $sig,
-                $secret
-            );
+            $event = Webhook::constructEvent($payload, $sig, $secret);
         } catch (\Throwable $e) {
+            \Log::warning('[Stripe Webhook Invalid Signature]', [
+                'message' => $e->getMessage(),
+            ]);
             return response('Invalid signature', 400);
         }
 
@@ -42,8 +44,18 @@ final class StripeWebhookController extends Controller
             occurredAt: new \DateTimeImmutable('@' . $event->created),
         );
 
-        $this->useCase->handle($input);
+        // ★最後の砦：UseCase 内で何が起きても 200 を返す
+        try {
+            $this->useCase->handle($input);
+        } catch (\Throwable $e) {
+            \Log::error('[Stripe Webhook UseCase Throwable Swallowed]', [
+                'event_id'   => $input->eventId,
+                'event_type' => $input->eventType,
+                'message'    => $e->getMessage(),
+            ]);
+            // throw しない
+        }
 
-        return response()->noContent();
+        return response()->json(['ok' => true], 200);
     }
 }
