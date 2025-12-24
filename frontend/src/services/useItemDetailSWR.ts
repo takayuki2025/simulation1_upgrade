@@ -8,19 +8,16 @@ export const useItemDetailSWR = (itemId: number | null) => {
   const shouldFetch = typeof itemId === "number" && !authLoading;
 
   const fetcher = async (url: string) => {
-    // 🔐 ログイン済み → apiClient（Bearer 付き）
     if (apiClient) {
-      const res = await apiClient.get(url.replace("/api", ""));
+      const res = await apiClient.get(url); // ← 素のパス
       return res.data;
     }
-
-    // 👤 未ログイン → 通常 axios
-    const res = await axios.get(url);
+    const res = await axios.get(`/api${url}`); // 未ログイン時だけ /api
     return res.data;
   };
 
   const { data, error, isLoading, mutate } = useSWR(
-    shouldFetch ? `/api/item/${itemId}` : null,
+    shouldFetch ? `/item/${itemId}` : null, // ← /api を消す
     fetcher,
   );
 

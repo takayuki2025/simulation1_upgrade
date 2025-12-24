@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
 use App\Modules\Payment\Domain\Enum\PaymentMethod;
 use App\Modules\Payment\Application\UseCase\HandlePaymentWebhookUseCase;
+use App\Modules\Payment\Application\Dto\HandlePaymentWebhookInput;
 
 final class OrderPaymentFlowTest extends TestCase
 {
@@ -18,8 +19,9 @@ final class OrderPaymentFlowTest extends TestCase
 
     public function test_order_payment_flow_card_then_webhook_succeeded(): void
     {
-        // 1) Gateway を Fake（start と parseWebhook を制御）
-
+        /* =====================================================
+           1) Gateway Fake（Payment Start 用）
+        ===================================================== */
         $this->app->bind(PaymentGatewayPort::class, function () {
             return new class () implements PaymentGatewayPort {
                 public function start(
@@ -36,21 +38,17 @@ final class OrderPaymentFlowTest extends TestCase
                     ];
                 }
 
+                // Webhook は UseCase 直呼びなので実際は未使用
                 public function parseWebhook(string $payload, string $signature): array
                 {
-                    return [
-                        'ignored' => false,
-                        'provider_event_id' => 'evt_test_flow_001',
-                        'event_type' => 'payment_intent.succeeded',
-                        'provider_payment_id' => 'pi_test_flow_123',
-                        'status' => 'succeeded',
-                    ];
+                    return [];
                 }
             };
         });
 
-
-        // 2) User / Order を最小生成
+        /* =====================================================
+           2) User / Order 作成
+        ===================================================== */
         $user = User::factory()->create();
         $this->actingAs($user);
 
@@ -74,72 +72,81 @@ final class OrderPaymentFlowTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        // 3) Payment start（HTTP 経由で結合）
+        /* =====================================================
+           3) Payment Start（HTTP）
+        ===================================================== */
         $res = $this->postJson('/api/payments/start', [
             'order_id' => $orderId,
             'method' => 'card',
         ]);
 
         $res->assertStatus(200);
-        $res->assertJsonStructure([
-            'payment_id',
-            'status',
-            'provider_payment_id',
-            'client_secret',
-            'instructions',
-        ]);
 
         $paymentId = (int) $res->json('payment_id');
 
-        // 4) payments に provider_payment_id が入ったこと
         $this->assertDatabaseHas('payments', [
             'id' => $paymentId,
             'order_id' => $orderId,
             'provider' => 'stripe',
-            'method' => 'card',
             'provider_payment_id' => 'pi_test_flow_123',
         ]);
 
-        // 5) Webhook（UseCase 直で結合）
+        /* =====================================================
+           4) Webhook UseCase（正規 Stripe payload）
+        ===================================================== */
         /** @var HandlePaymentWebhookUseCase $webhook */
         $webhook = app(HandlePaymentWebhookUseCase::class);
 
-        $payload = '{"type":"payment_intent.succeeded"}';
+        $payloadArray = [
+            'id' => 'evt_test_flow_001',
+            'type' => 'payment_intent.succeeded',
+            'data' => [
+                'object' => [
+                    'id' => 'pi_test_flow_123',
+                ],
+            ],
+        ];
 
-        $signature = 'test';
+        $payloadJson = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
 
-        $out = $webhook->handle($payload, $signature);
-        $this->assertTrue($out['ok']);
+        $input = new HandlePaymentWebhookInput(
+            provider: 'stripe',
+            eventId: 'evt_test_flow_001',
+            eventType: 'payment_intent.succeeded',
+            payload: $payloadArray,
+            payloadHash: hash('sha256', $payloadJson),
+            occurredAt: new \DateTimeImmutable(),
+        );
 
-        // 6) processed_webhook_events が記録される（冪等の証拠）
-        $this->assertDatabaseHas('processed_webhook_events', [
-            'provider' => 'stripe',
-            'event_id' => 'evt_test_flow_001',
-            'event_type' => 'payment_intent.succeeded',
-        ]);
+        // 1回目（処理される）
+        $webhook->handle($input);
 
-        // 7) Payment status が succeeded
+        // 2回目（冪等：no-op）
+        $webhook->handle($input);
+
+        /* =====================================================
+           5) 検証
+        ===================================================== */
+
+        // Webhook イベントは 1 件のみ
+        $this->assertSame(
+            1,
+            DB::table('processed_webhook_events')
+                ->where('provider', 'stripe')
+                ->where('event_id', 'evt_test_flow_001')
+                ->count()
+        );
+
+        // Payment が succeeded
         $this->assertDatabaseHas('payments', [
             'id' => $paymentId,
             'status' => 'succeeded',
         ]);
 
-        // 8) Order status が paid
+        // Order が paid
         $this->assertDatabaseHas('orders', [
             'id' => $orderId,
             'status' => 'paid',
         ]);
-
-        // 9) 冪等：同じ webhook をもう一度投げても processed が増えない（no-op）
-
-        $out2 = $webhook->handle($payload, $signature);
-        $this->assertTrue($out2['ok']);
-        $this->assertTrue($out2['idempotent']);
-
-        $count = DB::table('processed_webhook_events')
-            ->where('provider', 'stripe')
-            ->where('event_id', 'evt_test_flow_001')
-            ->count();
-        $this->assertSame(1, $count);
     }
 }

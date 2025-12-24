@@ -6,24 +6,56 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { useUserProfileSWR } from "@/services/useUserProfileSWR";
-import { getStripe } from "@/lib/stripe";
 import { getImageUrl } from "@/utils/utils";
 import styles from "./W-Purchase-Confirm.module.css";
 
-/** 内部的な支払い種別 */
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+
+/* =====================================================
+   Stripe Provider（最重要）
+===================================================== */
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+);
+
+/* =====================================================
+   Types
+===================================================== */
 type PaymentMethod = "" | "card" | "convenience";
 
-/** 表示用 */
 const paymentLabelMap: Record<PaymentMethod, string> = {
   "": "未選択",
   card: "クレジットカード支払い",
   convenience: "コンビニ支払い",
 };
 
-export default function PurchaseConfirmPage() {
+/* =====================================================
+   Wrapper（Elements は最上位）
+===================================================== */
+export default function PurchaseConfirmPageWrapper() {
+  return (
+    <Elements stripe={stripePromise}>
+      <PurchaseConfirmPage />
+    </Elements>
+  );
+}
+
+/* =====================================================
+   Page
+===================================================== */
+function PurchaseConfirmPage() {
   const router = useRouter();
   const params = useParams();
   const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
+
+  const stripe = useStripe();
+  const elements = useElements();
 
   /* =========================
      itemId
@@ -42,7 +74,7 @@ export default function PurchaseConfirmPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfileSWR();
 
   /* =========================
-     支払い方法
+     Payment
   ========================= */
   const [payment, setPayment] = useState<PaymentMethod>("");
 
@@ -55,14 +87,16 @@ export default function PurchaseConfirmPage() {
 
   const isPageLoading = isAuthLoading || isItemLoading || isProfileLoading;
 
-  /* =========================
-     購入処理
-  ========================= */
+  /* =====================================================
+     Purchase Flow
+  ===================================================== */
   const submitPurchase = async () => {
     if (!canPurchase || !item || !apiClient) return;
 
     try {
-      /* ① Order 作成 */
+      /* -----------------------
+         ① Order 作成
+      ----------------------- */
       const orderRes = await apiClient.post("/orders", {
         shop_id: item.shop_id,
         items: [
@@ -79,42 +113,62 @@ export default function PurchaseConfirmPage() {
 
       const orderId = orderRes.data.order_id;
 
-      /* ② Payment 開始 */
+      /* -----------------------
+         ② Payment Start
+      ----------------------- */
       const paymentRes = await apiClient.post("/payments/start", {
         order_id: orderId,
         method: payment === "card" ? "card" : "konbini",
       });
 
-      /* ③ 支払い別分岐 */
+      /* -----------------------
+         ③ Card 決済
+      ----------------------- */
       if (payment === "card") {
+        if (!stripe || !elements) {
+          throw new Error("Stripe not ready");
+        }
+
+        const card = elements.getElement(CardElement);
+
+        // ★ destroy 対策（超重要）
+        if (!card || (card as any)._destroyed) {
+          alert("カード入力が初期化されています。再度入力してください。");
+          return;
+        }
+
         const { client_secret } = paymentRes.data;
         if (!client_secret) {
           throw new Error("client_secret not returned");
         }
 
-        const stripe = await getStripe();
-        if (!stripe) {
-          throw new Error("Stripe initialization failed");
-        }
+        const result = await stripe.confirmCardPayment(client_secret, {
+          payment_method: { card },
+        });
 
-        const result = await stripe.confirmCardPayment(client_secret);
         if (result.error) {
           alert(result.error.message ?? "カード決済に失敗しました");
           return;
         }
       }
 
-      // card / konbini 共通
-      router.push("/purchase/processing");
+      /* -----------------------
+         ④ 完了画面へ遷移（★ここだけ変更）
+      ----------------------- */
+      if (payment === "card") {
+        router.push("/thanks/buy/stripe-card");
+      } else {
+        router.push("/thanks/buy/konbini");
+      }
     } catch (e) {
       console.error(e);
       alert("購入処理に失敗しました");
     }
   };
 
-  /* =========================
-     Guard
-  ========================= */
+  /* =====================================================
+     Guards
+  ===================================================== */
   if (isPageLoading) {
     return <div className={styles.loadingOverlay}>購入情報を読み込み中...</div>;
   }
@@ -133,26 +187,14 @@ export default function PurchaseConfirmPage() {
     );
   }
 
-  console.log("ORDER PAYLOAD", {
-    shop_id: item.shop_id,
-    items: [
-      {
-        item_id: item.id,
-        name: item.name,
-        price_amount: item.price,
-        price_currency: "JPY",
-        quantity: 1,
-        image_path: item.item_image,
-      },
-    ],
-  });
-  /* =========================
+  /* =====================================================
      UI
-  ========================= */
+  ===================================================== */
   return (
     <div className={styles.item_buy_contents}>
       <div className={styles.item_buy_lr}>
         <div className={styles.item_buy_l}>
+          {/* 商品 */}
           <div className={styles.item_buy_content_section}>
             <div className={styles.item_buy_image}>
               <img
@@ -172,6 +214,7 @@ export default function PurchaseConfirmPage() {
             </div>
           </div>
 
+          {/* 支払い方法 */}
           <div className={styles.item_buy_content_section}>
             <h4>支払い方法</h4>
             <select
@@ -184,6 +227,16 @@ export default function PurchaseConfirmPage() {
             </select>
           </div>
 
+          {/* Card */}
+          <div
+            className={styles.item_buy_content_section}
+            style={{ display: payment === "card" ? "block" : "none" }}
+          >
+            <h4>カード情報</h4>
+            <CardElement options={{ hidePostalCode: true }} />
+          </div>
+
+          {/* 配送先 */}
           <div className={styles.item_buy_content_section}>
             <h4>配送先</h4>
             {profile ? (
@@ -198,6 +251,7 @@ export default function PurchaseConfirmPage() {
           </div>
         </div>
 
+        {/* Summary */}
         <div className={styles.item_buy_r}>
           <div className={styles.item_buy_summary_box}>
             <p>商品代金: ¥{item.price.toLocaleString()}</p>

@@ -2,146 +2,127 @@
 
 namespace App\Modules\Payment\Application\UseCase;
 
-use App\Modules\Order\Domain\Repository\OrderRepository;
-use App\Modules\Order\Domain\Enum\OrderStatus;
+use App\Modules\Payment\Application\Dto\HandlePaymentWebhookInput;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Repository\PaymentQueryRepository;
-use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
+use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Shop\Domain\Repository\ShopLedgerRepository;
-use App\Modules\Shop\Domain\Entity\ShopLedger;
+use App\Modules\Payment\Domain\Enum\PaymentStatus;
+use App\Modules\Payment\Domain\Event\DomainPaymentEventType;
+use App\Modules\Payment\Domain\Service\StripeEventMapper;
 use Illuminate\Support\Facades\DB;
 
 final class HandlePaymentWebhookUseCase
 {
     public function __construct(
-        private PaymentGatewayPort $gateway,
-        private PaymentQueryRepository $queries,
+        private PaymentQueryRepository $webhookEvents,
         private PaymentRepository $payments,
         private OrderRepository $orders,
         private ShopLedgerRepository $ledgers,
+        private StripeEventMapper $mapper,
     ) {
     }
 
-    public function handle(string $payload, string $signature): array
+    public function handle(HandlePaymentWebhookInput $input): void
     {
-        $payloadHash = hash('sha256', $payload);
+        DB::transaction(function () use ($input) {
 
-        // 1) Parse & verify signature
-        $parsed = $this->gateway->parseWebhook($payload, $signature);
+            /* ============================================
+               ① 冪等ロック
+            ============================================ */
+            if (! $this->webhookEvents->reserve(
+                $input->provider,
+                $input->eventId,
+                $input->eventType,
+                $input->payloadHash
+            )) {
+                return;
+            }
 
-        $eventId   = $parsed['provider_event_id'];
-        $eventType = $parsed['event_type'];
+            try {
+                /* ============================================
+                   ② Stripe → Domain Event
+                ============================================ */
+                $event = $this->mapper->map($input);
 
-        // 2) 対象イベント制限（超重要）
-        if (!str_starts_with($eventType, 'payment_intent.')) {
-            return ['ok' => true, 'ignored' => 'unsupported_event_type'];
-        }
+                /* ============================================
+                   ③ Payment 取得
+                ============================================ */
+                $payment = $this->payments
+                    ->findByProviderPaymentId($event->providerPaymentId);
 
-        // 3) Reserve (idempotency)
-        $reserved = $this->queries->reserve(
-            'stripe',
-            $eventId,
-            $eventType,
-            $payloadHash
-        );
-
-        if (!$reserved) {
-            return ['ok' => true, 'idempotent' => true];
-        }
-
-        try {
-            return DB::transaction(function () use ($parsed, $eventId) {
-
-                $providerPaymentId = $parsed['provider_payment_id'];
-                if (!$providerPaymentId) {
-                    $this->queries->complete('stripe', $eventId, 'ignored');
-                    return ['ok' => true, 'ignored' => 'no_payment_id'];
+                if (! $payment) {
+                    throw new \RuntimeException('Payment not found');
                 }
 
-                $payment = $this->payments->findByProviderPaymentId($providerPaymentId);
-                if (!$payment) {
-                    $this->queries->complete('stripe', $eventId, 'ignored');
-                    return ['ok' => true, 'ignored' => 'payment_not_found'];
+                /* ============================================
+                   ④ Payment 状態遷移
+                ============================================ */
+                $payment = match ($event->type) {
+                    DomainPaymentEventType::SUCCEEDED =>
+                        $payment->markSucceeded([
+                            'occurred_at' => $event->occurredAt->format(DATE_ATOM),
+                        ]),
+
+                    DomainPaymentEventType::FAILED =>
+                        $payment->markFailed([
+                            'reason' => $event->reason,
+                        ]),
+
+                    DomainPaymentEventType::REQUIRES_ACTION =>
+                        $payment->markRequiresAction(),
+
+                    default => $payment,
+                };
+
+                $this->payments->save($payment);
+
+                /* ============================================
+                   ⑤ Order / Ledger 同期
+                ============================================ */
+                if ($payment->status() === PaymentStatus::SUCCEEDED) {
+
+                    $order = $this->orders->findById($payment->orderId());
+                    $this->orders->save($order->markPaid());
+
+                    $this->ledgers->recordSale(
+                        shopId: $payment->shopId(),
+                        amount: $payment->amount(),
+                        currency: $payment->currency(),
+                        orderId: $payment->orderId(),
+                        paymentId: $payment->id(),
+                        occurredAt: $event->occurredAt,
+                    );
                 }
 
-                $order = $this->orders->findById($payment->orderId());
-                if (!$order) {
-                    $this->queries->complete('stripe', $eventId, 'failed', $payment->id(), null, 'order_not_found');
-                    return ['ok' => false];
-                }
+                /* ============================================
+                   ⑥ Webhook 完了
+                ============================================ */
+                $this->webhookEvents->complete(
+                    $input->provider,
+                    $input->eventId,
+                    'succeeded',
+                    $payment->id(),
+                    $payment->orderId(),
+                );
 
-                // 4) 状態分岐
-                switch ($parsed['status']) {
-                    case 'succeeded':
-                        $payment = $payment->markSucceeded(['webhook' => $parsed]);
-                        $this->payments->save($payment);
+            } catch (\Throwable $e) {
 
-                        $order = $order->markPaid();
-                        $this->orders->save($order);
+                /* ============================================
+                   ⑦ 失敗記録（再実行可能）
+                ============================================ */
+                $this->webhookEvents->complete(
+                    $input->provider,
+                    $input->eventId,
+                    'failed',
+                    null,                // paymentId
+                    null,                // orderId
+                    'exception',         // errorType
+                    $e->getMessage(),    // errorMessage
+                );
 
-                        // Ledger 追加（売上確定）
-                        $this->ledgers->save(
-                            ShopLedger::record(
-                                shopId: $payment->shopId(),
-                                type: 'sale',
-                                amount: $payment->amount(),
-                                currency: $payment->currency(),
-                                orderId: $order->id(),
-                                paymentId: $payment->id(),
-                            )
-                        );
-
-                        $this->queries->complete(
-                            'stripe',
-                            $eventId,
-                            'succeeded',
-                            $payment->id(),
-                            $order->id()
-                        );
-
-                        return ['ok' => true, 'status' => 'succeeded'];
-
-                    case 'payment_failed':
-                    case 'canceled':
-                        $payment = $payment->markFailed(['webhook' => $parsed]);
-                        $this->payments->save($payment);
-
-                        $order = $order->markPaymentFailed();
-                        $this->orders->save($order);
-
-                        $this->queries->complete(
-                            'stripe',
-                            $eventId,
-                            'failed',
-                            $payment->id(),
-                            $order->id()
-                        );
-
-                        return ['ok' => true, 'status' => 'failed'];
-
-                    default:
-                        $this->queries->complete(
-                            'stripe',
-                            $eventId,
-                            'ignored',
-                            $payment->id(),
-                            $order->id()
-                        );
-                        return ['ok' => true, 'status' => 'ignored'];
-                }
-            });
-
-        } catch (\Throwable $e) {
-            $this->queries->complete(
-                'stripe',
-                $eventId,
-                'failed',
-                null,
-                null,
-                'exception',
-                $e->getMessage()
-            );
-            throw $e;
-        }
+                throw $e;
+            }
+        });
     }
 }

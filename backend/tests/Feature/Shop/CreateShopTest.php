@@ -16,15 +16,17 @@ class CreateShopTest extends TestCase
     {
         $issuer = app(TokenIssuerService::class);
 
+
         return $issuer->issue(new ProvisionedUser(
             userId: $user->id,
             email: $user->email,
-            externalId: 'firebase_dummy_uid',
+            externalId: 'test_uid',
             roles: ['user'],
             tenantId: null,
-            shopId: null,
             isFirstLogin: false,
+            emailVerified: true,
         ));
+
     }
 
     /** @test */

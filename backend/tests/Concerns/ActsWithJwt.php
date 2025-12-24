@@ -1,6 +1,5 @@
 <?php
 
-
 namespace Tests\Concerns;
 
 use App\Models\User;
@@ -13,6 +12,7 @@ trait ActsWithJwt
     {
         $issuer = app(TokenIssuerService::class);
 
+
         $jwt = $issuer->issue(new ProvisionedUser(
             userId: $user->id,
             email: $user->email,
@@ -20,8 +20,9 @@ trait ActsWithJwt
             roles: ['user'],
             tenantId: null,
             isFirstLogin: false,
-            shopId: null,
+            emailVerified: true,
         ));
+
 
         return $this->withHeader('Authorization', 'Bearer '.$jwt);
     }

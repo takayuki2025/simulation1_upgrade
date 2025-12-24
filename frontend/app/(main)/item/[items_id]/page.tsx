@@ -58,6 +58,8 @@ export default function ItemDetailPage() {
     if (!raw) return null;
     const id = Array.isArray(raw) ? raw[0] : raw;
     const n = Number(id);
+    console.log("purchaseBefore params:", params);
+    // console.log("purchaseBefore itemId:", itemId);
     return Number.isNaN(n) ? null : n;
   }, [params]);
 

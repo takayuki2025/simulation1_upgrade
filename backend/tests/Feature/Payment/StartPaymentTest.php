@@ -28,7 +28,7 @@ final class StartPaymentTest extends TestCase
                         'status' => 'requires_payment_method',
                     ];
                 }
-                public function parseWebhook(string $payload, array $headers): array
+                public function parseWebhook(string $payload, string $signature): array
                 {
                     return [];
                 }

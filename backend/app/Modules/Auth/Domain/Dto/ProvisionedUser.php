@@ -12,7 +12,7 @@ final class ProvisionedUser
         public readonly string $email,
         public readonly string $externalId,
         public readonly array $roles,
-        public readonly ?int $tenantId, // shop_id
+        public readonly ?int $tenantId,
         public readonly bool $isFirstLogin,
         public readonly bool $emailVerified,
         //  public readonly ?int $shopId,
