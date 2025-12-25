@@ -9,25 +9,37 @@ use App\Modules\Shipment\Domain\Entity\Shipment;
 final class CreateShipmentUseCase
 {
     public function __construct(
-        private ShipmentRepository $shipments
+        private ShipmentRepository $shipments,
     ) {
     }
 
     public function handle(CreateShipmentInput $input): void
     {
-        /**
-         * 冪等性保証（OrderPaid が複数回飛んでも 1 Shipment）
-         */
-        if ($this->shipments->findByOrderId($input->orderId)) {
+        \Log::info('[Shipment] CreateShipmentUseCase start', [
+            'shop_id' => $input->shopId,
+            'order_id' => $input->orderId,
+        ]);
+
+        $existing = $this->shipments->findByOrderId($input->orderId);
+
+        if ($existing) {
+            \Log::info('[Shipment] already exists, skip', [
+                'order_id' => $input->orderId,
+                'shipment_id' => $existing->id,
+            ]);
             return;
         }
 
-        $shipment = Shipment::create(
-            orderId: $input->orderId,
+        $shipment = Shipment::createInitial(
             shopId: $input->shopId,
-            userId: $input->userId,
+            orderId: $input->orderId,
         );
 
         $this->shipments->save($shipment);
+
+        \Log::info('[Shipment] created', [
+            'shipment_id' => $shipment->id,
+            'order_id' => $shipment->orderId,
+        ]);
     }
 }

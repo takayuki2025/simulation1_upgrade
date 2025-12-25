@@ -9,7 +9,7 @@ use Carbon\Carbon;
 final class Shipment
 {
     public function __construct(
-        public int $id,
+        public ?int $id,
         public int $shopId,
         public int $orderId,
         public ShipmentStatus $status,
@@ -18,6 +18,31 @@ final class Shipment
         public ?Carbon $eta,
     ) {
     }
+
+    /* ============================
+       Factory
+    ============================ */
+
+    /**
+     * Webhook（OrderPaid）時点では住所を確定させない。
+     * 住所は後工程（出荷準備）で埋める。
+     */
+    public static function createInitial(int $shopId, int $orderId): self
+    {
+        return new self(
+            id: null,
+            shopId: $shopId,
+            orderId: $orderId,
+            status: ShipmentStatus::CREATED,
+            originAddress: [],
+            destinationAddress: [],
+            eta: null,
+        );
+    }
+
+    /* ============================
+       State Transitions
+    ============================ */
 
     public function pack(): void
     {

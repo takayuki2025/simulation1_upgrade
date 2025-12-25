@@ -19,12 +19,10 @@ final class CreateShipmentOnOrderPaidListener
             'order_id' => $event->orderId,
         ]);
 
-        // ★ Shipment は UseCase に完全委譲する
         $this->useCase->handle(
             new CreateShipmentInput(
                 shopId: $event->shopId,
                 orderId: $event->orderId,
-                userId: $event->userId,
             )
         );
     }

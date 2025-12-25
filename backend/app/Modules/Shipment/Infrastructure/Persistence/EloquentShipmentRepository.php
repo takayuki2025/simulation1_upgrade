@@ -5,77 +5,59 @@ namespace App\Modules\Shipment\Infrastructure\Persistence;
 use App\Modules\Shipment\Domain\Entity\Shipment;
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
-use App\Modules\Shipment\Infrastructure\Persistence\Models\ShipmentModel;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class EloquentShipmentRepository implements ShipmentRepository
 {
-    public function create(
-        int $shopId,
-        int $orderId,
-        array $origin,
-        array $destination,
-        Carbon $eta
-    ): Shipment {
-        $id = DB::table('shipments')->insertGetId([
-            'shop_id' => $shopId,
-            'order_id' => $orderId,
-            'status' => ShipmentStatus::CREATED->value,
-            'origin_address' => json_encode($origin),
-            'destination_address' => json_encode($destination),
-            'eta' => $eta,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return $this->find($id);
-    }
-
-    public function find(int $id): ?Shipment
+    public function save(Shipment $shipment): Shipment
     {
-        $row = DB::table('shipments')->where('id', $id)->first();
-        if (!$row) {
-            return null;
+        if ($shipment->id === null) {
+            $id = DB::table('shipments')->insertGetId([
+                'shop_id' => $shipment->shopId,
+                'order_id' => $shipment->orderId,
+                'status' => $shipment->status->value,
+                'origin_address' => json_encode($shipment->originAddress, JSON_UNESCAPED_UNICODE),
+                'destination_address' => json_encode($shipment->destinationAddress, JSON_UNESCAPED_UNICODE),
+                'eta' => $shipment->eta?->toDateTimeString(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // immutable に寄せるなら「reconstitute」推奨だが、今の entity は public property なので代入でOK
+            $shipment->id = (int) $id;
+
+            return $shipment;
         }
 
-        return new Shipment(
-            $row->id,
-            $row->shop_id,
-            $row->order_id,
-            ShipmentStatus::from($row->status),
-            json_decode($row->origin_address, true),
-            json_decode($row->destination_address, true),
-            $row->eta ? Carbon::parse($row->eta) : null,
-        );
-    }
+        DB::table('shipments')
+            ->where('id', $shipment->id)
+            ->update([
+                'status' => $shipment->status->value,
+                'origin_address' => json_encode($shipment->originAddress, JSON_UNESCAPED_UNICODE),
+                'destination_address' => json_encode($shipment->destinationAddress, JSON_UNESCAPED_UNICODE),
+                'eta' => $shipment->eta?->toDateTimeString(),
+                'updated_at' => now(),
+            ]);
 
-    public function save(Shipment $shipment): void
-    {
-        DB::table('shipments')->where('id', $shipment->id)->update([
-            'status' => $shipment->status->value,
-            'eta' => $shipment->eta,
-            'updated_at' => now(),
-        ]);
+        return $shipment;
     }
 
     public function findByOrderId(int $orderId): ?Shipment
     {
-        $model = ShipmentModel::where('order_id', $orderId)->first();
+        $row = DB::table('shipments')->where('order_id', $orderId)->first();
+        if (! $row) {
+            return null;
+        }
 
-        return $model ? $this->toEntity($model) : null;
-    }
-
-    private function toEntity(ShipmentModel $model): Shipment
-    {
-        return Shipment::reconstitute(
-            id: (int) $model->id,
-            orderId: (int) $model->order_id,
-            status: $model->status,
-            eta: $model->eta,
-            createdAt: $model->created_at
-                ? new \DateTimeImmutable($model->created_at)
-                : null
+        return new Shipment(
+            id: (int) $row->id,
+            shopId: (int) $row->shop_id,
+            orderId: (int) $row->order_id,
+            status: ShipmentStatus::from((string) $row->status),
+            originAddress: $row->origin_address ? json_decode($row->origin_address, true) : [],
+            destinationAddress: $row->destination_address ? json_decode($row->destination_address, true) : [],
+            eta: $row->eta ? Carbon::parse($row->eta) : null,
         );
     }
 }

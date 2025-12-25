@@ -11,7 +11,7 @@ use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentEventReposit
 use App\Modules\Shipment\Domain\Service\EtaCalculator;
 // 💡 イベントとリスナーをインポート
 use App\Modules\Order\Domain\Event\OrderPaid;
-use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaid;
+use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaidListener;
 
 final class ShipmentServiceProvider extends ServiceProvider
 {
@@ -37,7 +37,7 @@ final class ShipmentServiceProvider extends ServiceProvider
         // 💡 支払完了イベントを受け取ったら、出荷を作成するリスナーを起動する
         Event::listen(
             OrderPaid::class,
-            CreateShipmentOnOrderPaid::class
+            CreateShipmentOnOrderPaidListener::class
         );
     }
 }

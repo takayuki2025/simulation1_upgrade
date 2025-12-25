@@ -8,20 +8,29 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::create('shipments', function (Blueprint $table) {
+
+            // PK
             $table->id();
 
-            // Order との 1:1 関係
+            // マルチショップ前提
+            $table->unsignedBigInteger('shop_id');
+            $table->index('shop_id');
+
+            // Order と 1:1
             $table->unsignedBigInteger('order_id')->unique();
 
-            // 配送状態（v1 は文字列で十分）
+            // 配送状態
             $table->string('status', 32);
 
-            // 到着予定（nullable）
+            // 住所情報（JSON）
+            $table->json('origin_address');
+            $table->json('destination_address');
+
+            // 到着予定
             $table->dateTime('eta')->nullable();
 
             $table->timestamps();
 
-            // 将来 v2 のための最低限の整合性
             $table->foreign('order_id')
                 ->references('id')
                 ->on('orders')
