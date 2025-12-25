@@ -1,53 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { AxiosResponse } from "axios";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import styles from "./W-ThanksKonbini.module.css";
 
-/* =====================================================
+/* =======================
    Types
-===================================================== */
+======================= */
 
 type KonbiniStoreInfo = {
-  payment_code?: string;
   confirmation_number?: string;
 };
 
 type KonbiniInstructions = {
-  expires_at?: number; // UNIX timestamp (seconds)
+  expires_at?: number;
   store?: Record<string, KonbiniStoreInfo>;
 };
 
-type PaymentLatestByOrderResponse = {
+type Payment = {
   payment_id: number;
   method: "konbini";
   status: string;
   instructions: KonbiniInstructions | null;
 };
 
-/* =====================================================
-   Page
-===================================================== */
+type OrderDetailResponse = {
+  order_id: number;
+  order_status: string;
+  payment: Payment | null;
+};
 
 export default function ThanksBuyKonbiniPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
-
   const { apiClient } = useAuth();
 
-  const [payment, setPayment] = useState<PaymentLatestByOrderResponse | null>(
-    null,
-  );
+  const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  /* =====================================================
-     Fetch payment by order_id
-  ===================================================== */
+  const MAX_RETRY = 30;
+  const INTERVAL_MS = 1000;
+
+  /* =======================
+     Fetch with polling
+  ======================= */
 
   useEffect(() => {
     if (!apiClient || !orderId) {
@@ -55,83 +56,127 @@ export default function ThanksBuyKonbiniPage() {
       return;
     }
 
-    apiClient
-      .get("/payments/latest-by-order", {
-        params: { order_id: orderId },
-      })
-      .then((res: AxiosResponse<PaymentLatestByOrderResponse>) => {
-        setPayment(res.data);
-      })
-      .catch(() => {
-        setError("支払い情報の取得に失敗しました。");
-      });
-  }, [apiClient, orderId]);
+    let cancelled = false;
 
-  /* =====================================================
+    const fetchOrder = async () => {
+      try {
+        const res: AxiosResponse<OrderDetailResponse> = await apiClient.get(
+          `/me/orders/${orderId}`,
+        );
+
+        if (cancelled) return;
+
+        setOrder(res.data);
+
+        if (
+          res.data.payment &&
+          res.data.payment.method === "konbini" &&
+          !res.data.payment.instructions &&
+          retryCount < MAX_RETRY
+        ) {
+          setRetryCount((c) => c + 1);
+          setTimeout(fetchOrder, INTERVAL_MS);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("注文情報の取得に失敗しました。");
+        }
+      }
+    };
+
+    fetchOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, orderId, retryCount]);
+
+  /* =======================
      Guards
-  ===================================================== */
+  ======================= */
 
   if (error) {
     return (
       <div className={styles.thankYouPage}>
         <div className={styles.messageBox}>
-          <h1 className={styles.title}>エラー</h1>
           <p className={styles.message}>{error}</p>
-          <Link href="/" className={styles.backHomeLink}>
-            ホームへ戻る
-          </Link>
         </div>
       </div>
     );
   }
 
-  if (!payment) {
+  if (!order) {
     return (
       <div className={styles.thankYouPage}>
         <div className={styles.messageBox}>
-          <p>支払い情報を取得中です…</p>
+          <p className={styles.message}>注文情報を取得中です…</p>
         </div>
       </div>
     );
   }
 
-  /* =====================================================
-     Normalize Stripe data
-  ===================================================== */
+  if (!order.payment) {
+    return (
+      <div className={styles.thankYouPage}>
+        <div className={styles.messageBox}>
+          <p className={styles.message}>支払い情報を生成中です…</p>
+        </div>
+      </div>
+    );
+  }
 
-  const instructions = payment.instructions;
+  const instructions = order.payment.instructions;
 
-  // 支払期限（UNIX秒 → 日本時間）
-  const expiresAtText = instructions?.expires_at
+  if (!instructions) {
+    return (
+      <div className={styles.thankYouPage}>
+        <div className={styles.messageBox}>
+          <p className={styles.message}>
+            支払い情報を生成中です…
+            <br />
+            数秒後に自動で反映されます。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* =======================
+     Normalize
+  ======================= */
+
+  const expiresAtText = instructions.expires_at
     ? new Date(instructions.expires_at * 1000).toLocaleString("ja-JP")
     : "未設定";
 
-  // 受付番号（Stripe は store ごとに同一値を返す）
   const confirmationNumber =
-    instructions?.store &&
+    instructions.store &&
     Object.values(instructions.store)[0]?.confirmation_number
       ? Object.values(instructions.store)[0]!.confirmation_number
-      : "未発行";
+      : "未発行（後ほど表示されます）";
 
-  // 利用可能なコンビニ一覧
-  const availableStores = instructions?.store
+  const availableStores = instructions.store
     ? Object.keys(instructions.store)
     : [];
 
-  /* =====================================================
+  /* =======================
      UI
-  ===================================================== */
+  ======================= */
 
   return (
     <div className={styles.thankYouPage}>
       <div className={styles.messageBox}>
-        <h1 className={styles.title}>ご購入ありがとうございます！</h1>
+        <h1 className={styles.title}>ご購入ありがとうございます</h1>
 
         <p className={styles.message}>
           以下の内容でコンビニ支払いを行ってください。
         </p>
 
         <div className={styles.konbiniInfo}>
+          <p>
+            <strong>注文状態：</strong>
+            未払い（コンビニ支払い待ち）
+          </p>
+
           <p>
             <strong>支払期限：</strong>
             {expiresAtText}
@@ -142,21 +187,23 @@ export default function ThanksBuyKonbiniPage() {
             {confirmationNumber}
           </p>
 
-          <div className={styles.storeList}>
-            <p>
-              <strong>利用可能なコンビニ：</strong>
-            </p>
-            <ul>
-              {availableStores.map((store) => (
-                <li key={store}>{store}</li>
-              ))}
-            </ul>
-          </div>
+          {availableStores.length > 0 && (
+            <>
+              <p>
+                <strong>利用可能なコンビニ：</strong>
+              </p>
+              <ul>
+                {availableStores.map((store) => (
+                  <li key={store}>{store}</li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
 
         <div className={styles.actions}>
-          <Link href="/" className={styles.backHomeLink}>
-            ホームへ戻る
+          <Link href="/me/orders" className={styles.backHomeLink}>
+            注文履歴へ
           </Link>
         </div>
       </div>

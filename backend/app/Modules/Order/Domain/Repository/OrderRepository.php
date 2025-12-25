@@ -11,7 +11,7 @@ interface OrderRepository
     public function findById(int $orderId): ?Order;
 
     /**
-     * Update status safely (used by payment/webhook)
+     * MyPage / Query 用
      */
-    public function updateStatus(int $orderId, string $status): void;
+    public function findByBuyer(int $userId): array;
 }

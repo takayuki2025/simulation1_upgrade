@@ -1,86 +1,53 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/ui/auth/useAuth";
 import type { AxiosResponse } from "axios";
+import { useAuth } from "@/ui/auth/useAuth";
 import styles from "./W-StripeThankYou.module.css";
 
-type PaymentResponse = {
-  payment_id: number;
-  method: "card";
-  status: string;
-  provider_payment_id?: string;
-  method_details?: {
-    receipt_number?: string;
-  };
+type OrderDetailResponse = {
+  order_id: number;
+  order_status: string;
+  payment: {
+    payment_id: number;
+    method: "card";
+    status: string;
+    method_details?: {
+      receipt_number?: string;
+    };
+  } | null;
+  shipment: {
+    shipment_id: number;
+    status: string;
+    eta?: string | null;
+  } | null;
 };
 
 export default function StripeThankYouPage() {
   const { apiClient } = useAuth();
-  const [payment, setPayment] = useState<PaymentResponse | null>(null);
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("order_id");
+
+  const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const orderId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("latest_order_id")
-      : null;
-
   useEffect(() => {
-    if (!apiClient || !orderId) return;
+    if (!apiClient || !orderId) {
+      setError("注文情報が取得できませんでした。");
+      return;
+    }
 
-    let cancelled = false;
-    let retryCount = 0;
-    const MAX_RETRY = 10;
-    const INTERVAL_MS = 500;
-
-    const fetchPayment = async () => {
-      try {
-        const res: AxiosResponse<PaymentResponse> = await apiClient.get(
-          "/payments/latest-by-order",
-          {
-            params: { order_id: orderId },
-            validateStatus: () => true, // ★ 404 / 202 を catch しない
-          },
-        );
-
-        if (cancelled) return;
-
-        if (res.status === 200) {
-          setPayment(res.data);
-          return;
-        }
-
-        // 404 / 202 = まだ処理中
-        if (retryCount < MAX_RETRY) {
-          retryCount++;
-          setTimeout(fetchPayment, INTERVAL_MS);
-          return;
-        }
-
-        setError(
-          "決済の確認に時間がかかっています。しばらくしてから再度ご確認ください。",
-        );
-      } catch (e) {
-        if (retryCount < MAX_RETRY) {
-          retryCount++;
-          setTimeout(fetchPayment, INTERVAL_MS);
-        } else {
-          setError("決済情報の取得に失敗しました。");
-        }
-      }
-    };
-
-    fetchPayment();
-
-    return () => {
-      cancelled = true;
-    };
+    apiClient
+      .get(`/me/orders/${orderId}`)
+      .then((res: AxiosResponse<OrderDetailResponse>) => {
+        setOrder(res.data);
+      })
+      .catch(() => {
+        setError("注文情報の取得に失敗しました。");
+      });
   }, [apiClient, orderId]);
-
-  /* ==========================
-     表示
-  ========================== */
 
   if (error) {
     return (
@@ -95,11 +62,11 @@ export default function StripeThankYouPage() {
     );
   }
 
-  if (!payment) {
+  if (!order || !order.payment) {
     return (
       <div className={styles.thankYouPage}>
         <div className={styles.messageBox}>
-          <p>決済情報を確認中です…</p>
+          <p>注文情報を取得中です…</p>
         </div>
       </div>
     );
@@ -110,19 +77,19 @@ export default function StripeThankYouPage() {
       <div className={styles.messageBox}>
         <h1 className={styles.title}>ご購入ありがとうございます！</h1>
 
-        {payment.method_details?.receipt_number && (
-          <p>受付番号：{payment.method_details.receipt_number}</p>
+        {order.payment.method_details?.receipt_number && (
+          <p>受付番号：{order.payment.method_details.receipt_number}</p>
         )}
 
         <p className={styles.message}>
-          Stripe カード決済が正常に完了しました。
+          カード決済が正常に完了しました。
           <br />
-          商品発送完了までしばらくお待ちください。
+          {order.shipment ? "商品発送準備中です。" : "発送情報を準備中です。"}
         </p>
 
         <div className={styles.actions}>
-          <Link href="/" className={styles.backHomeLink}>
-            ホームへ戻る
+          <Link href="/me/orders" className={styles.backHomeLink}>
+            注文履歴へ
           </Link>
         </div>
       </div>

@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // アプリケーション固有のプロバイダ
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
+
+        App\Modules\Shipment\Infrastructure\Providers\ShipmentServiceProvider::class,
     ])
 
     ->withMiddleware(function (Middleware $middleware) {
@@ -96,6 +98,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+
     ->withExceptions(function (Exceptions $exceptions) {
 
         // --- 例外処理: APIリクエスト時にJSON応答を返す ---

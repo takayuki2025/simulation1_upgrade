@@ -192,7 +192,7 @@ use App\Modules\User\Presentation\Http\Controllers\MypageController;
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/mypage/profile', [MypageController::class, 'profile']);
     Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
-    Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
+    // Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
 });
 
 
@@ -235,9 +235,7 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 use App\Modules\Payment\Presentation\Http\Controllers\PaymentController;
 use App\Modules\Payment\Presentation\Http\Controllers\StripeWebhookController;
-
 use App\Modules\Payment\Presentation\Http\Controllers\PaymentReadController;
-
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/payments/start', [PaymentController::class, 'start']);
@@ -254,3 +252,70 @@ Route::middleware('auth.jwt.optional')->group(function () {
 });
 
 
+
+
+
+
+use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\AdminShipmentKpiController;
+use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentController;
+
+
+/*
+|--------------------------------------------------------------------------
+| Shipment (FlexVelocity_v1)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('shipments')
+    ->middleware(['auth.jwt', 'tenant']) // shop スコープ前提
+    ->group(function () {
+
+        // Create shipment (OrderEvent::PAID から呼ばれる想定)
+        Route::post('/', [ShipmentController::class, 'store']);
+
+        // State transitions (Admin / Shop)
+        Route::post('{id}/pack', [ShipmentController::class, 'pack']);
+        Route::post('{id}/ship', [ShipmentController::class, 'ship']);
+        Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
+        Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
+    });
+
+
+Route::get('/admin/shipments/kpi', AdminShipmentKpiController::class)
+    ->middleware(['auth.jwt', 'role:admin']);
+
+
+Route::get('/me/shipments/{id}', [CustomerShipmentController::class, 'show'])
+    ->middleware(['auth.jwt']);
+
+
+
+
+use App\Modules\User\Presentation\Http\Controllers\MypageBoughtController;
+
+Route::middleware(['auth.jwt'])
+    ->get('/mypage/bought', MypageBoughtController::class);
+
+
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\GetMyOrderShipmentController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get(
+        '/me/orders/{orderId}/shipment',
+        GetMyOrderShipmentController::class
+    );
+});
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\MeOrderController;
+use App\Modules\Order\Presentation\Http\Controllers\OrderReadController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::get('/me/orders', [MeOrderController::class, 'index']);
+    Route::get('/me/orders/{orderId}', [OrderReadController::class, 'show']);
+});

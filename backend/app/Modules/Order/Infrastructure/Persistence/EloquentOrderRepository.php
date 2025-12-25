@@ -6,75 +6,76 @@ use App\Modules\Order\Domain\Entity\Order;
 use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Order\Application\Dto\OrderItemSnapshot;
+use App\Modules\Order\Infrastructure\Persistence\Models\OrderModel;
 use Illuminate\Support\Facades\DB;
+
 
 final class EloquentOrderRepository implements OrderRepository
 {
     public function save(Order $order): Order
     {
         if ($order->id() === null) {
-            $id = DB::table('orders')->insertGetId([
+            $model = OrderModel::create([
                 'shop_id'        => $order->shopId(),
                 'user_id'        => $order->userId(),
                 'status'         => $order->status()->value,
                 'total_amount'   => $order->totalAmount(),
                 'currency'       => $order->currency(),
-                'items_snapshot' => json_encode(array_map(fn (OrderItemSnapshot $s) => $s->toArray(), $order->items()), JSON_UNESCAPED_UNICODE),
-                'meta'           => $order->meta() ? json_encode($order->meta(), JSON_UNESCAPED_UNICODE) : null,
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'items_snapshot' => array_map(
+                    fn (OrderItemSnapshot $s) => $s->toArray(),
+                    $order->items()
+                ),
+                'meta' => $order->meta(),
             ]);
 
-            return Order::reconstitute(
-                id: (int) $id,
-                shopId: $order->shopId(),
-                userId: $order->userId(),
-                status: $order->status(),
-                totalAmount: $order->totalAmount(),
-                currency: $order->currency(),
-                items: $order->items(),
-                meta: $order->meta(),
-            );
+            return $this->toEntity($model);
         }
 
-        DB::table('orders')->where('id', $order->id())->update([
-            'status'     => $order->status()->value,
-            'meta'       => $order->meta() ? json_encode($order->meta(), JSON_UNESCAPED_UNICODE) : null,
-            'updated_at' => now(),
+        $model = OrderModel::findOrFail($order->id());
+
+        $model->update([
+            'status' => $order->status()->value,
+            'meta'   => $order->meta(),
         ]);
 
-        return $order;
+        return $this->toEntity($model);
     }
 
     public function findById(int $orderId): ?Order
     {
-        $row = DB::table('orders')->where('id', $orderId)->first();
-        if (! $row) {
-            return null;
-        }
+        $model = OrderModel::find($orderId);
 
-        $itemsArr = json_decode($row->items_snapshot, true) ?? [];
-        $items = array_map(fn ($r) => OrderItemSnapshot::fromArray($r), $itemsArr);
-
-        $meta = $row->meta ? json_decode($row->meta, true) : null;
-
-        return Order::reconstitute(
-            id: (int) $row->id,
-            shopId: (int) $row->shop_id,
-            userId: (int) $row->user_id,
-            status: OrderStatus::from((string) $row->status),
-            totalAmount: (int) $row->total_amount,
-            currency: (string) $row->currency,
-            items: $items,
-            meta: $meta
-        );
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function updateStatus(int $orderId, string $status): void
+    /**
+     * ★ MyPage Bought 用（正解）
+     */
+    public function findByBuyer(int $userId): array
     {
-        DB::table('orders')->where('id', $orderId)->update([
-            'status'     => $status,
-            'updated_at' => now(),
-        ]);
+        return OrderModel::where('user_id', $userId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (OrderModel $model) => $this->toEntity($model))
+            ->all();
+    }
+
+    private function toEntity(OrderModel $model): Order
+    {
+        $items = array_map(
+            fn (array $row) => OrderItemSnapshot::fromArray($row),
+            $model->items_snapshot ?? []
+        );
+
+        return Order::reconstitute(
+            id: (int) $model->id,
+            shopId: (int) $model->shop_id,
+            userId: (int) $model->user_id,
+            status: OrderStatus::from($model->status),
+            totalAmount: (int) $model->total_amount,
+            currency: (string) $model->currency,
+            items: $items,
+            meta: $model->meta
+        );
     }
 }

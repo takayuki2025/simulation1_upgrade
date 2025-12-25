@@ -32,6 +32,8 @@ final class Order
     }
 
     /**
+     * 新規作成（未保存）
+     *
      * @param OrderItemSnapshot[] $items
      */
     public static function create(
@@ -55,6 +57,8 @@ final class Order
     }
 
     /**
+     * 永続化データから再構築
+     *
      * @param OrderItemSnapshot[] $items
      */
     public static function reconstitute(
@@ -79,42 +83,55 @@ final class Order
         );
     }
 
-    // getters
+    // ========================
+    // Getters
+    // ========================
+
     public function id(): ?int
     {
         return $this->id;
     }
+
     public function shopId(): int
     {
         return $this->shopId;
     }
+
     public function userId(): int
     {
         return $this->userId;
     }
+
     public function status(): OrderStatus
     {
         return $this->status;
     }
+
     public function totalAmount(): int
     {
         return $this->totalAmount;
     }
+
     public function currency(): string
     {
         return $this->currency;
     }
+
     /** @return OrderItemSnapshot[] */
     public function items(): array
     {
         return $this->items;
     }
+
     public function meta(): ?array
     {
         return $this->meta;
     }
 
-    // state transitions
+    // ========================
+    // State transitions
+    // ========================
+
     public function markPaid(): self
     {
         if ($this->status !== OrderStatus::PENDING_PAYMENT) {
@@ -126,24 +143,6 @@ final class Order
             shopId: $this->shopId,
             userId: $this->userId,
             status: OrderStatus::PAID,
-            totalAmount: $this->totalAmount,
-            currency: $this->currency,
-            items: $this->items,
-            meta: $this->meta
-        );
-    }
-
-    public function markPaymentFailed(): self
-    {
-        if ($this->status !== OrderStatus::PENDING_PAYMENT) {
-            throw new \DomainException('Order cannot be marked payment_failed from status: ' . $this->status->value);
-        }
-
-        return self::reconstitute(
-            id: $this->id ?? 0,
-            shopId: $this->shopId,
-            userId: $this->userId,
-            status: OrderStatus::PAYMENT_FAILED,
             totalAmount: $this->totalAmount,
             currency: $this->currency,
             items: $this->items,

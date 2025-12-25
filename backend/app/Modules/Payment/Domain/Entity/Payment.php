@@ -65,7 +65,7 @@ final class Payment
     }
 
     public static function reconstitute(
-        int $id,
+        ?int $id,
         int $orderId,
         int $shopId,
         int $userId,
@@ -166,7 +166,7 @@ final class Payment
     public function withProviderPayment(string $providerPaymentId, ?string $customerId = null): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,
@@ -186,7 +186,7 @@ final class Payment
     public function withMethodDetails(array $methodDetails): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,
@@ -206,7 +206,7 @@ final class Payment
     public function withInstructions(array $instructions): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,
@@ -226,7 +226,7 @@ final class Payment
     public function markRequiresAction(?array $meta = null): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,
@@ -246,7 +246,7 @@ final class Payment
     public function markSucceeded(?array $meta = null): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,
@@ -266,7 +266,7 @@ final class Payment
     public function markFailed(?array $meta = null): self
     {
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             orderId: $this->orderId,
             shopId: $this->shopId,
             userId: $this->userId,

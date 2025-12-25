@@ -42,11 +42,32 @@ final class StartPaymentUseCase
                 throw new \DomainException('Order is not payable');
             }
 
-            /* ============================================
-               ② Payment 初期作成
-            ============================================ */
             $method = PaymentMethod::from($input->method);
 
+            /* ============================================
+               ② Gateway 呼び出し（★先に PI を作る）
+               - provider_payment_id (= payment_intent.id) を必ず取得
+            ============================================ */
+            $res = $this->gateway->start(
+                method: $method,
+                amount: $order->totalAmount(),
+                currency: $order->currency(),
+                context: [
+                    'order_id'   => $order->id(),
+                    'user_id'    => $order->userId(),
+                    'shop_id'    => $order->shopId(),
+                    'payer_name' => '購入者-' . $order->userId(),
+                ]
+            );
+
+            if (empty($res['provider_payment_id'])) {
+                // ここが空だと “絶対ルール” を満たせないので gateway 実装側の修正が必要
+                throw new \RuntimeException('provider_payment_id missing from gateway response');
+            }
+
+            /* ============================================
+               ③ Payment 初期作成（★PI を持った状態で作る）
+            ============================================ */
             $payment = Payment::initiate(
                 orderId: $order->id(),
                 shopId: $order->shopId(),
@@ -60,33 +81,11 @@ final class StartPaymentUseCase
                 ]
             );
 
-            $payment = $this->payments->save($payment);
+            // ★ provider_payment_id を必ずセットしてから INSERT する
+            $payment = $payment->withProviderPayment($res['provider_payment_id']);
 
             /* ============================================
-               ③ Gateway 呼び出し
-            ============================================ */
-            $res = $this->gateway->start(
-                method: $method,
-                amount: $order->totalAmount(),
-                currency: $order->currency(),
-                context: [
-                    'order_id'   => $order->id(),
-                    'payment_id' => $payment->id(),
-                    'user_id'    => $order->userId(),
-                    'shop_id'    => $order->shopId(),
-                    'payer_name' => '購入者-' . $order->userId(),
-                ]
-            );
-
-            /* ============================================
-               ④ provider_payment_id 反映
-            ============================================ */
-            if (!empty($res['provider_payment_id'])) {
-                $payment = $payment->withProviderPayment($res['provider_payment_id']);
-            }
-
-            /* ============================================
-               ⑤ requires_action 遷移
+               ④ requires_action 遷移
             ============================================ */
             if (($res['requires_action'] ?? false) === true) {
                 $payment = $payment->markRequiresAction([
@@ -95,12 +94,15 @@ final class StartPaymentUseCase
             }
 
             /* ============================================
-               ⑥ instructions のみ反映（★重要）
+               ⑤ instructions 反映
             ============================================ */
-            if (!empty($res['instructions'])) {
+            if (! empty($res['instructions'])) {
                 $payment = $payment->withInstructions($res['instructions']);
             }
 
+            /* ============================================
+               ⑥ INSERT（provider_payment_id が必ず入る）
+            ============================================ */
             $payment = $this->payments->save($payment);
 
             /* ============================================

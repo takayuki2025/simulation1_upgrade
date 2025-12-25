@@ -1,12 +1,40 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { AxiosResponse } from "axios";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import styles from "./W-Mypage.module.css";
+
+/**
+ * sell: 既存 item の一覧（/item/[id]へ）
+ * buy : 購入済み item の一覧だが、ここでは「注文詳細」へ遷移させたい
+ *
+ * buy 側は API が order_id を返す前提（返さない場合はフォールバック表示）
+ */
+
+type PageMode = "sell" | "buy";
+
+type MypageItem = {
+  id: number;
+  name: string;
+  item_image: string | null;
+
+  // buy のときに必要（APIが返す想定）
+  order_id?: number | null;
+
+  // 必要なら今後追加
+  price?: number | null;
+};
+
+type ProfileUser = {
+  id: number;
+  name: string;
+  user_image: string | null;
+};
 
 export default function Mypage() {
   const router = useRouter();
@@ -19,11 +47,13 @@ export default function Mypage() {
     logout,
   } = useAuth();
 
-  const [user, setUser] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [items, setItems] = useState<MypageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const page = searchParams.get("page") === "buy" ? "buy" : "sell";
+  const page: PageMode = useMemo(() => {
+    return searchParams.get("page") === "buy" ? "buy" : "sell";
+  }, [searchParams]);
 
   // =============================
   // プロフィール取得
@@ -32,8 +62,9 @@ export default function Mypage() {
     if (!apiClient) return;
 
     try {
-      const res = await apiClient.get("/mypage/profile");
-      setUser(res.data.user ?? res.data);
+      const res: AxiosResponse<any> = await apiClient.get("/mypage/profile");
+      const data = (res.data?.user ?? res.data) as ProfileUser;
+      setUser(data);
     } catch (e: any) {
       if (e.response?.status === 401) {
         await logout();
@@ -51,8 +82,10 @@ export default function Mypage() {
     setIsLoading(true);
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
-      const res = await apiClient.get(endpoint);
-      setItems(res.data.items ?? []);
+      const res: AxiosResponse<any> = await apiClient.get(endpoint);
+
+      const list = (res.data?.items ?? []) as MypageItem[];
+      setItems(list);
     } finally {
       setIsLoading(false);
     }
@@ -98,6 +131,7 @@ export default function Mypage() {
             src={getImageUrl(user.user_image, IMAGE_TYPE.USER)}
             onError={onImageError}
             className={styles.user_image_css}
+            alt="ユーザー画像"
           />
 
           <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
@@ -110,6 +144,8 @@ export default function Mypage() {
           >
             プロフィールを編集
           </button>
+
+          {/* ❌ ここに item を参照する Link を置くと必ず壊れるので置かない */}
         </div>
 
         <div className={styles.profile_header_2}>
@@ -142,19 +178,34 @@ export default function Mypage() {
               : "購入した商品はありません"}
           </p>
         ) : (
-          items.map((item) => (
-            <Link
-              key={item.id}
-              href={`/item/${item.id}`}
-              className={styles.items_select_all}
-            >
-              <img
-                src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
-                onError={onImageError}
-              />
-              <div>{item.name}</div>
-            </Link>
-          ))
+          items.map((item) => {
+            const imgSrc = getImageUrl(item.item_image, IMAGE_TYPE.ITEM);
+
+            // buy のときは「注文詳細」に行きたい（Amazon型）
+            const href =
+              page === "buy" && item.order_id
+                ? `/mypage/orders/${item.order_id}`
+                : `/item/${item.id}`;
+
+            // buy なのに order_id が無い場合は、API側未対応の可能性が高い
+            const showMissingOrderHint = page === "buy" && !item.order_id;
+
+            return (
+              <div key={item.id} className={styles.items_select_all}>
+                <Link href={href}>
+                  <img src={imgSrc} onError={onImageError} alt={item.name} />
+                  <div>{item.name}</div>
+
+                  {showMissingOrderHint && (
+                    <div className="text-xs text-red-500 mt-1">
+                      注文IDが未連携です（/mypage/bought が order_id
+                      を返す必要があります）
+                    </div>
+                  )}
+                </Link>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

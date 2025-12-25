@@ -36,7 +36,7 @@ final class StripePaymentGateway implements PaymentGatewayPort
                 'automatic_payment_methods' => ['enabled' => true],
                 'metadata' => [
                     'order_id'   => (string)$context['order_id'],
-                    'payment_id' => (string)$context['payment_id'],
+                    // 'payment_id' => (string)$context['payment_id'],
                     'user_id'    => (string)$context['user_id'],
                     'shop_id'    => (string)$context['shop_id'],
                 ],
@@ -76,7 +76,7 @@ final class StripePaymentGateway implements PaymentGatewayPort
                 ],
                 'metadata' => [
                     'order_id'   => (string)$context['order_id'],
-                    'payment_id' => (string)$context['payment_id'],
+                    // 'payment_id' => (string)$context['payment_id'],
                     'user_id'    => (string)$context['user_id'],
                     'shop_id'    => (string)$context['shop_id'],
                 ],

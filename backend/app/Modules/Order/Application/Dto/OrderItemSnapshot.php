@@ -23,6 +23,37 @@ final class OrderItemSnapshot
         }
     }
 
+    /* =========================
+       Getter（← ★これだけ追加）
+       ========================= */
+
+    public function itemId(): int
+    {
+        return $this->itemId;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function imagePath(): ?string
+    {
+        return $this->imagePath;
+    }
+
+    public function priceAmount(): int
+    {
+        return $this->priceAmount;
+    }
+
+    public function quantity(): int
+    {
+        return $this->quantity;
+    }
+
+    /* ========================= */
+
     public function toArray(): array
     {
         return [

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Event;
 // Domain Repositories
 // NOTE: UserRepositoryInterface は App\Domain\Repository\UserRepository に置き換えられていると想定
 use App\Domain\Repository\OrderHistoryRepository;
@@ -44,6 +45,10 @@ use App\Modules\Item\Domain\Repository\BrandRepository;
 use App\Modules\Item\Infrastructure\Persistence\EntityDefinition\BrandRepositoryImpl;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
 use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRepository;
+use App\Modules\Order\Domain\Repository\OrderRepository;
+use App\Modules\Order\Infrastructure\Persistence\EloquentOrderRepository;
+use App\Modules\Order\Domain\Event\OrderPaid;
+use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaidListener;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -118,11 +123,25 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ShopRepository::class, EloquentShopRepository::class);
 
 
+        $this->app->bind(
+            OrderRepository::class,
+            EloquentOrderRepository::class
+        );
+
+
+
 
 
     }
 
+
     public function boot()
     {
+
+        Event::listen(
+            OrderPaid::class,
+            CreateShipmentOnOrderPaidListener::class
+        );
+
     }
 }

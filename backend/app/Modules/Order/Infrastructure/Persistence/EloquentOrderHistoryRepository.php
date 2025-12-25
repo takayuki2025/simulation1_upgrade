@@ -17,4 +17,9 @@ final class EloquentOrderHistoryRepository implements OrderHistoryRepository
             'updated_at'  => now(),
         ]);
     }
+
+    public function findByBuyer(int $buyerId): array
+    {
+        return [];
+    }
 }

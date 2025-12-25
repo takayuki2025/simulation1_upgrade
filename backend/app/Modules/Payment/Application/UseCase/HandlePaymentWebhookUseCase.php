@@ -12,9 +12,13 @@ use App\Modules\Payment\Domain\Event\DomainPaymentEventType;
 use App\Modules\Payment\Domain\Service\StripeEventMapper;
 use App\Modules\Payment\Domain\Enum\PaymentMethod;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use App\Modules\Order\Domain\Event\OrderPaid;
 
 final class HandlePaymentWebhookUseCase
 {
+    private ?OrderPaid $orderPaidEvent = null;
+
     public function __construct(
         private PaymentQueryRepository $webhookEvents,
         private PaymentRepository $payments,
@@ -34,35 +38,12 @@ final class HandlePaymentWebhookUseCase
         $paymentId = null;
         $orderId   = null;
 
-        /* ============================================
-           ① 冪等ロック（Webhook は常に 200）
-        ============================================ */
-        $reserved = $this->safeReserve($input);
-
-        if ($reserved === false) {
-            \Log::info('[Webhook Skipped Already Reserved]', [
-                'event_id' => $input->eventId,
-            ]);
-            return;
-        }
-
-        if ($reserved === null) {
-            \Log::error('[Webhook Reserve Failed - Swallowed]', [
-                'event_id' => $input->eventId,
-            ]);
+        if ($this->safeReserve($input) !== true) {
             return;
         }
 
         try {
-            /* ============================================
-               ② Stripe Event → Domain Event
-            ============================================ */
             $domainEvent = $this->mapper->map($input);
-
-            \Log::info('[Domain Event Mapped]', [
-                'event_type' => $domainEvent->type->value,
-                'provider_payment_id' => $domainEvent->providerPaymentId,
-            ]);
 
             if ($domainEvent->type === DomainPaymentEventType::IGNORED) {
                 $this->safeComplete($input, 'ignored', null, null, null);
@@ -74,104 +55,74 @@ final class HandlePaymentWebhookUseCase
                 return;
             }
 
-            /* ============================================
-               ③ Domain 更新（トランザクション）
-            ============================================ */
-            DB::transaction(function () use ($input, $domainEvent, &$paymentId, &$orderId) {
+            DB::transaction(function () use ($domainEvent, &$paymentId, &$orderId) {
 
                 $payment = $this->payments
                     ->findByProviderPaymentId($domainEvent->providerPaymentId);
 
                 if (! $payment) {
-                    \Log::warning('[Webhook Payment Not Found]', [
-                        'provider_payment_id' => $domainEvent->providerPaymentId,
-                    ]);
+                    // Webhook は常に 200 で返す想定なので、ここでは例外にしない
                     return;
                 }
 
-                // ★ SUCCEEDED 以降は上書き禁止
+                // ---- 例外的救済：instructions が未保存なら埋めてよい（null のときだけ）----
+                // ※ mapper が instructions を持てるようにした場合に有効
+                if (
+                    $payment->instructions() === null
+                    && property_exists($domainEvent, 'instructions')
+                    && !empty($domainEvent->instructions)
+                ) {
+                    $payment = $payment->withInstructions($domainEvent->instructions);
+                }
+
+                // ---- status 遷移 ----
+                // SUCCEEDED の冪等：すでに SUCCEEDED なら status は触らない（上書きしない）
                 if ($payment->status() === PaymentStatus::SUCCEEDED) {
-                    \Log::info('[Webhook Payment Already Succeeded]', [
-                        'payment_id' => $payment->id(),
-                    ]);
                     $paymentId = $payment->id();
                     $orderId   = $payment->orderId();
+
+                    // instructions 救済で変更があった可能性があるので save
+                    $this->payments->save($payment);
                     return;
                 }
 
-                /* ============================================
-                   SUCCEEDED
-                ============================================ */
+                // REQUIRES_ACTION / FAILED / SUCCEEDED を反映
+                if ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
+                    $payment = $payment->markRequiresAction([
+                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
+                    ]);
+                    $this->payments->save($payment);
+                }
+
+                if ($domainEvent->type === DomainPaymentEventType::FAILED) {
+                    $payment = $payment->markFailed([
+                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
+                        'reason'      => $domainEvent->reason ?? null,
+                    ]);
+                    $this->payments->save($payment);
+                }
+
                 if ($domainEvent->type === DomainPaymentEventType::SUCCEEDED) {
 
-                    \Log::info('[Webhook SUCCEEDED ENTER]', [
-                        'payment_id' => $payment->id(),
-                        'before_status' => $payment->status()->value,
+                    $payment = $payment->markSucceeded([
+                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
                     ]);
 
-                    $methodDetails = $payment->methodDetails();
-                    if (!is_array($methodDetails)) {
-                        $methodDetails = [];
-                    }
-
-                    if (
-                        $payment->method() === PaymentMethod::CARD
-                        && empty($methodDetails['receipt_number'])
-                    ) {
-                        $methodDetails['receipt_number']
-                            = $domainEvent->providerPaymentId;
-                    }
-
-                    $payment = $payment
-                        ->markSucceeded([
-                            'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
-                        ])
-                        ->withMethodDetails($methodDetails);
-
-                    \Log::info('[Webhook SUCCEEDED AFTER]', [
-                        'after_status' => $payment->status()->value,
-                        'method_details' => $payment->methodDetails(),
-                    ]);
-                }
-
-                /* ============================================
-                   FAILED
-                ============================================ */ elseif ($domainEvent->type === DomainPaymentEventType::FAILED) {
-
-                    $payment = $payment->markFailed([
-                        'reason' => $domainEvent->reason,
-                    ]);
-                }
-
-                /* ============================================
-                   REQUIRES_ACTION
-                ============================================ */ elseif ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
-
-                    $payment = $payment->markRequiresAction();
-                }
-
-                /* ============================================
-                   永続化
-                ============================================ */
-                $this->payments->save($payment);
-
-                \Log::info('[Payment Saved]', [
-                    'payment_id' => $payment->id(),
-                    'status' => $payment->status()->value,
-                    'method_details' => $payment->methodDetails(),
-                ]);
-
-                $paymentId = $payment->id();
-                $orderId   = $payment->orderId();
-
-                /* ============================================
-                   Order / Ledger
-                ============================================ */
-                if ($payment->status() === PaymentStatus::SUCCEEDED) {
+                    $this->payments->save($payment);
 
                     $order = $this->orders->findById($payment->orderId());
                     if ($order) {
-                        $this->orders->save($order->markPaid());
+                        $paidOrder = $order->markPaid();
+                        $this->orders->save($paidOrder);
+
+                        // Shipment 作成は「カード決済のみ」
+                        if ($payment->method() === PaymentMethod::CARD) {
+                            $this->orderPaidEvent = new OrderPaid(
+                                orderId: $paidOrder->id(),
+                                shopId: $paidOrder->shopId(),
+                                userId: $paidOrder->userId(),
+                            );
+                        }
                     }
 
                     $this->ledgers->recordSale(
@@ -183,28 +134,17 @@ final class HandlePaymentWebhookUseCase
                         occurredAt: $domainEvent->occurredAt,
                     );
                 }
+
+                $paymentId = $payment->id();
+                $orderId   = $payment->orderId();
             });
 
-            /* ============================================
-               ④ 完了記録
-            ============================================ */
-            if ($paymentId === null) {
-                $this->safeComplete($input, 'payment_not_found', null, null, null);
-                return;
+            // トランザクション外で dispatch
+            if ($this->orderPaidEvent) {
+                Event::dispatch($this->orderPaidEvent);
             }
 
-            $this->safeComplete(
-                $input,
-                'succeeded',
-                $paymentId,
-                $orderId,
-                null
-            );
-
-            \Log::info('[Webhook Completed]', [
-                'event_id' => $input->eventId,
-                'payment_id' => $paymentId,
-            ]);
+            $this->safeComplete($input, 'ok', $paymentId, $orderId, null);
 
         } catch (\Throwable $e) {
 
@@ -216,18 +156,12 @@ final class HandlePaymentWebhookUseCase
                 $e->getMessage()
             );
 
-            \Log::error('[Webhook Exception - Swallowed]', [
+            \Log::error('[Webhook Exception]', [
                 'event_id' => $input->eventId,
-                'message' => $e->getMessage(),
+                'message'  => $e->getMessage(),
             ]);
-
-            return;
         }
     }
-
-    /* ============================================================
-       Safe Helpers
-    ============================================================ */
 
     private function safeReserve(HandlePaymentWebhookInput $input): bool|null
     {
@@ -241,7 +175,7 @@ final class HandlePaymentWebhookUseCase
         } catch (\Throwable $e) {
             \Log::error('[Webhook Reserve Failed]', [
                 'event_id' => $input->eventId,
-                'message' => $e->getMessage(),
+                'message'  => $e->getMessage(),
             ]);
             return null;
         }
@@ -266,8 +200,8 @@ final class HandlePaymentWebhookUseCase
         } catch (\Throwable $e) {
             \Log::error('[Webhook Complete Failed]', [
                 'event_id' => $input->eventId,
-                'status' => $status,
-                'message' => $e->getMessage(),
+                'status'   => $status,
+                'message'  => $e->getMessage(),
             ]);
         }
     }
