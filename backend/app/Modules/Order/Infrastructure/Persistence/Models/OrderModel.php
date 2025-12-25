@@ -8,6 +8,8 @@ final class OrderModel extends Model
 {
     protected $table = 'orders';
 
+    protected $guarded = [];
+
     public $timestamps = true;
 
     protected $fillable = [
@@ -22,6 +24,7 @@ final class OrderModel extends Model
 
     protected $casts = [
         'items_snapshot' => 'array',
-        'meta'           => 'array',
+        'meta' => 'array',
+        'address_snapshot_at' => 'datetime',
     ];
 }

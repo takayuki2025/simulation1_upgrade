@@ -15,6 +15,12 @@ final class GetOrderDetailOutput
         public readonly string $orderStatus,
         public readonly int $totalAmount,
         public readonly string $currency,
+
+        // ===== Address =====
+        public readonly ?array $shippingAddress,
+        public readonly ?string $addressSnapshotAt,
+
+        // ===== Relations =====
         public readonly ?array $payment,
         public readonly ?array $shipment,
     ) {
@@ -32,6 +38,16 @@ final class GetOrderDetailOutput
             orderStatus: $order->status()->value,
             totalAmount: $order->totalAmount(),
             currency: $order->currency(),
+
+            // ===== Address =====
+            shippingAddress: $order->shippingAddress()
+                ? $order->shippingAddress()->toArray()
+                : null,
+            addressSnapshotAt: $order->addressSnapshotAt()
+                ? $order->addressSnapshotAt()->format('Y-m-d H:i:s')
+                : null,
+
+            // ===== Payment =====
             payment: $payment ? [
                 'payment_id' => $payment->id(),
                 'method' => $payment->method()->value,
@@ -39,6 +55,8 @@ final class GetOrderDetailOutput
                 'instructions' => $payment->instructions(),
                 'method_details' => $payment->methodDetails(),
             ] : null,
+
+            // ===== Shipment =====
             shipment: $shipment ? [
                 'shipment_id' => $shipment->id(),
                 'status' => $shipment->status()->value,
@@ -56,6 +74,10 @@ final class GetOrderDetailOutput
             'order_status' => $this->orderStatus,
             'total_amount' => $this->totalAmount,
             'currency' => $this->currency,
+
+            'shipping_address' => $this->shippingAddress,
+            'address_snapshot_at' => $this->addressSnapshotAt,
+
             'payment' => $this->payment,
             'shipment' => $this->shipment,
         ];

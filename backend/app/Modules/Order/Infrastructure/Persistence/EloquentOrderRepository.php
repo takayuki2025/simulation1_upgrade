@@ -5,59 +5,122 @@ namespace App\Modules\Order\Infrastructure\Persistence;
 use App\Modules\Order\Domain\Entity\Order;
 use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Order\Domain\Repository\OrderRepository;
+use App\Modules\Order\Domain\ValueObject\Address;
 use App\Modules\Order\Application\Dto\OrderItemSnapshot;
 use App\Modules\Order\Infrastructure\Persistence\Models\OrderModel;
-use Illuminate\Support\Facades\DB;
-
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 final class EloquentOrderRepository implements OrderRepository
 {
+    public function findById(int $orderId): Order
+    {
+        $model = OrderModel::findOrFail($orderId);
+
+        return $this->reconstituteOrder($model);
+    }
+
+    public function findDraftByUser(int $orderId, int $userId): Order
+    {
+        $model = OrderModel::where('id', $orderId)
+            ->where('user_id', $userId)
+            ->where('status', OrderStatus::PENDING_PAYMENT->value)
+            ->firstOrFail();
+
+        return $this->reconstituteOrder($model);
+    }
+
     public function save(Order $order): Order
     {
-        if ($order->id() === null) {
-            $model = OrderModel::create([
-                'shop_id'        => $order->shopId(),
-                'user_id'        => $order->userId(),
-                'status'         => $order->status()->value,
-                'total_amount'   => $order->totalAmount(),
-                'currency'       => $order->currency(),
-                'items_snapshot' => array_map(
-                    fn (OrderItemSnapshot $s) => $s->toArray(),
-                    $order->items()
-                ),
-                'meta' => $order->meta(),
-            ]);
+        $model = $order->id()
+            ? OrderModel::findOrFail($order->id())
+            : new OrderModel();
 
-            return $this->toEntity($model);
+        $model->shop_id = $order->shopId();
+        $model->user_id = $order->userId();
+        $model->status = $order->status()->value;
+        $model->total_amount = $order->totalAmount();
+        $model->currency = $order->currency();
+
+        $model->items_snapshot = array_map(
+            fn (OrderItemSnapshot $item) => $item->toArray(),
+            $order->items()
+        );
+
+        $model->meta = $order->meta();
+
+        // Address snapshot（あれば）
+        if ($order->shippingAddress()) {
+            $address = $order->shippingAddress();
+
+            $model->shipping_postal_code = $address->postalCode;
+            $model->shipping_prefecture = $address->prefecture;
+            $model->shipping_city = $address->city;
+            $model->shipping_address_line1 = $address->addressLine1;
+            $model->shipping_address_line2 = $address->addressLine2;
+            $model->shipping_recipient_name = $address->recipientName;
+            $model->shipping_phone = $address->phone;
+            $model->address_snapshot_at = $order->addressSnapshotAt();
         }
 
-        $model = OrderModel::findOrFail($order->id());
+        $model->save();
 
-        $model->update([
-            'status' => $order->status()->value,
-            'meta'   => $order->meta(),
-        ]);
-
-        return $this->toEntity($model);
+        // ★ ここが重要：保存後に reconstitute して返す
+        return Order::reconstitute(
+            id: $model->id,
+            shopId: $model->shop_id,
+            userId: $model->user_id,
+            status: OrderStatus::from($model->status),
+            totalAmount: $model->total_amount,
+            currency: $model->currency,
+            items: array_map(
+                fn (array $row) => OrderItemSnapshot::fromArray($row),
+                $model->items_snapshot
+            ),
+            meta: $model->meta,
+        );
     }
 
-    public function findById(int $orderId): ?Order
+    // ==========================
+    // Reconstitution（復元）
+    // ==========================
+    private function reconstituteOrder(OrderModel $model): Order
     {
-        $model = OrderModel::find($orderId);
+        $items = array_map(
+            fn (array $row) => OrderItemSnapshot::fromArray($row),
+            $model->items_snapshot
+        );
 
-        return $model ? $this->toEntity($model) : null;
-    }
+        $address = null;
+        $snapshotAt = null;
 
-    /**
-     * ★ MyPage Bought 用（正解）
-     */
-    public function findByBuyer(int $userId): array
-    {
-        return OrderModel::where('user_id', $userId)
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn (OrderModel $model) => $this->toEntity($model))
-            ->all();
+        if ($model->shipping_postal_code) {
+            $address = new Address(
+                postalCode: $model->shipping_postal_code,
+                prefecture: $model->shipping_prefecture,
+                city: $model->shipping_city,
+                addressLine1: $model->shipping_address_line1,
+                addressLine2: $model->shipping_address_line2,
+                recipientName: $model->shipping_recipient_name,
+                phone: $model->shipping_phone,
+            );
+
+            $snapshotAt = $model->address_snapshot_at
+                ? $model->address_snapshot_at->toDateTimeImmutable()
+                : null;
+        }
+
+        return Order::reconstitute(
+            id: $model->id,
+            shopId: $model->shop_id,
+            userId: $model->user_id,
+            status: OrderStatus::from($model->status),
+            totalAmount: $model->total_amount,
+            currency: $model->currency,
+            items: $items,
+            meta: $model->meta,
+            shippingAddress: $address,
+            addressSnapshotAt: $snapshotAt,
+        );
     }
 
     private function toEntity(OrderModel $model): Order

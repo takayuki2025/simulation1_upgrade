@@ -44,6 +44,12 @@ final class StartPaymentUseCase
 
             $method = PaymentMethod::from($input->method);
 
+
+
+            if ($order->shippingAddress() === null) {
+                throw new \DomainException('Shipping address must be confirmed before payment.');
+            }
+
             /* ============================================
                ② Gateway 呼び出し（★先に PI を作る）
                - provider_payment_id (= payment_intent.id) を必ず取得

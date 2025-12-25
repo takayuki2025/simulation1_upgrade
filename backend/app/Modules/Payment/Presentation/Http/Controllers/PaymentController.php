@@ -31,13 +31,30 @@ final class PaymentController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $input = new StartPaymentInput(
-            orderId: (int)$request->input('order_id'),
-            method: (string)$request->input('method'),
-        );
+        try {
+            $input = new StartPaymentInput(
+                orderId: (int)$request->input('order_id'),
+                method: (string)$request->input('method'),
+            );
 
-        $out = $this->startPayment->handle($input, (int)$user->id);
+            $out = $this->startPayment->handle($input, (int)$user->id);
 
-        return response()->json($out->toArray(), 200);
+            return response()->json($out->toArray(), 200);
+
+        } catch (\DomainException $e) {
+            // ★ ビジネスルール違反
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+
+        } catch (\Throwable $e) {
+            \Log::error('[Payment Start Failed]', [
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'message' => 'Payment start failed',
+            ], 500);
+        }
     }
 }

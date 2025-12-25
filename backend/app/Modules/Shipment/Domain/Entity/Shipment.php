@@ -31,15 +31,14 @@ final class Shipment
     {
         return new self(
             id: null,
-            shopId: $shopId,
-            orderId: $orderId,
+            shopId: $input->shopId,
+            orderId: $input->orderId,
             status: ShipmentStatus::CREATED,
-            originAddress: [],
-            destinationAddress: [],
+            originAddress: $input->originAddress,
+            destinationAddress: $input->destinationAddress,
             eta: null,
         );
     }
-
     /* ============================
        State Transitions
     ============================ */

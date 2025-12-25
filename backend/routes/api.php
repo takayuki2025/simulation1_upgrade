@@ -260,7 +260,6 @@ use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\AdminShipmentKpiController;
 use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentController;
 
-
 /*
 |--------------------------------------------------------------------------
 | Shipment (FlexVelocity_v1)
@@ -318,4 +317,22 @@ use App\Modules\Order\Presentation\Http\Controllers\OrderReadController;
 Route::middleware(['auth.jwt'])->group(function () {
     Route::get('/me/orders', [MeOrderController::class, 'index']);
     Route::get('/me/orders/{orderId}', [OrderReadController::class, 'show']);
+});
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\OrderDetailController;
+
+Route::middleware(['auth.jwt'])
+    ->get('/orders/{orderId}', OrderDetailController::class);
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\ConfirmOrderAddressController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::post(
+        '/orders/{orderId}/confirm-address',
+        ConfirmOrderAddressController::class
+    );
 });

@@ -14,4 +14,9 @@ interface PaymentGatewayPort
     ): array;
 
     public function parseWebhook(string $payload, string $signature): array;
+
+    public function createPaymentIntent(
+        PaymentMethod $method,
+        array $payload,
+    ): array;
 }

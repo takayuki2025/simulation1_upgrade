@@ -4,6 +4,8 @@ namespace App\Modules\Order\Domain\Entity;
 
 use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Order\Application\Dto\OrderItemSnapshot;
+use App\Modules\Order\Domain\ValueObject\Address;
+use DomainException;
 
 final class Order
 {
@@ -19,6 +21,8 @@ final class Order
         private string $currency,
         private array $items,
         private ?array $meta,
+        private ?Address $shippingAddress = null,
+        private ?\DateTimeImmutable $addressSnapshotAt = null,
     ) {
         if ($this->totalAmount < 0) {
             throw new \InvalidArgumentException('totalAmount must be >= 0');
@@ -69,7 +73,9 @@ final class Order
         int $totalAmount,
         string $currency,
         array $items,
-        ?array $meta = null
+        ?array $meta = null,
+        ?Address $shippingAddress = null,
+        ?\DateTimeImmutable $addressSnapshotAt = null,
     ): self {
         return new self(
             id: $id,
@@ -79,7 +85,9 @@ final class Order
             totalAmount: $totalAmount,
             currency: $currency,
             items: $items,
-            meta: $meta
+            meta: $meta,
+            shippingAddress: $shippingAddress,
+            addressSnapshotAt: $addressSnapshotAt,
         );
     }
 
@@ -166,5 +174,29 @@ final class Order
             items: $this->items,
             meta: $this->meta
         );
+    }
+
+    public function confirmAddress(
+        Address $address,
+        \DateTimeImmutable $now
+    ): void {
+        if ($this->status !== OrderStatus::PENDING_PAYMENT) {
+            throw new DomainException(
+                'Address can only be fixed before payment'
+            );
+        }
+
+        $this->shippingAddress = $address;
+        $this->addressSnapshotAt = $now;
+    }
+
+    public function shippingAddress(): ?Address
+    {
+        return $this->shippingAddress;
+    }
+
+    public function addressSnapshotAt(): ?\DateTimeImmutable
+    {
+        return $this->addressSnapshotAt;
     }
 }

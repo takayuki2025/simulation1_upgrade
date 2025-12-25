@@ -20,20 +20,14 @@ final class CreateShipmentUseCase
             'order_id' => $input->orderId,
         ]);
 
-        $existing = $this->shipments->findByOrderId($input->orderId);
-
-        if ($existing) {
+        if ($this->shipments->findByOrderId($input->orderId)) {
             \Log::info('[Shipment] already exists, skip', [
                 'order_id' => $input->orderId,
-                'shipment_id' => $existing->id,
             ]);
             return;
         }
 
-        $shipment = Shipment::createInitial(
-            shopId: $input->shopId,
-            orderId: $input->orderId,
-        );
+        $shipment = Shipment::createFromOrder($input);
 
         $this->shipments->save($shipment);
 

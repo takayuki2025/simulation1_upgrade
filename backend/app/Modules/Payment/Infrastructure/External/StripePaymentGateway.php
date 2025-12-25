@@ -128,4 +128,29 @@ final class StripePaymentGateway implements PaymentGatewayPort
             'status' => $pi->status,
         ];
     }
+
+    public function createPaymentIntent(
+        PaymentMethod $method,
+        array $payload
+    ): array {
+        /**
+         * payload は Application 層で構築済み
+         * [
+         *   amount,
+         *   currency,
+         *   shipping,
+         *   metadata,
+         * ]
+         */
+
+        // StripeClient にそのまま渡す
+        $pi = $this->stripe->paymentIntents->create($payload);
+
+        return [
+            'provider_payment_id' => $pi->id,
+            'client_secret' => $pi->client_secret,
+            'requires_action' => $pi->status === 'requires_action',
+            'status' => $pi->status,
+        ];
+    }
 }

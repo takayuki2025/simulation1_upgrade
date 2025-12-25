@@ -49,6 +49,8 @@ use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Order\Infrastructure\Persistence\EloquentOrderRepository;
 use App\Modules\Order\Domain\Event\OrderPaid;
 use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaidListener;
+use App\Shared\Domain\Clock\Clock;
+use App\Shared\Domain\Clock\SystemClock;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -127,6 +129,10 @@ class AppServiceProvider extends ServiceProvider
             OrderRepository::class,
             EloquentOrderRepository::class
         );
+
+
+        $this->app->bind(Clock::class, SystemClock::class);
+
 
 
 

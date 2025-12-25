@@ -29,6 +29,17 @@ return new class () extends Migration {
             // Optional metadata for future
             $table->json('meta')->nullable();
 
+
+            $table->string('shipping_postal_code', 20)->nullable();
+            $table->string('shipping_prefecture', 50)->nullable();
+            $table->string('shipping_city', 100)->nullable();
+            $table->string('shipping_address_line1', 255)->nullable();
+            $table->string('shipping_address_line2', 255)->nullable();
+            $table->string('shipping_recipient_name', 100)->nullable();
+            $table->string('shipping_phone', 30)->nullable();
+            $table->timestamp('address_snapshot_at')->nullable();
+
+
             $table->timestamps();
         });
     }
