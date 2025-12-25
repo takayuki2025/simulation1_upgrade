@@ -13,7 +13,7 @@ import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { createHttpClient } from "@/infrastructure/auth/HttpClient";
 import { TokenRefreshService } from "@/application/auth/TokenRefreshService";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
-import type { AuthUser } from "@/domain/auth/AuthUser";
+import type { AuthUser } from "@/types/auth";
 import type {
   AuthContextType,
   RegisterResult,
@@ -30,7 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const laravelApiRef = useRef<LaravelAuthApi | null>(null);
   const refreshServiceRef = useRef<TokenRefreshService | null>(null);
 
-  /** 初期化（1回だけ） */
+  /* =========================
+     初期化（1回だけ）
+  ========================= */
   useEffect(() => {
     const firebase = new FirebaseAuthClient();
 
@@ -48,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         TokenStorage.save(tokens);
+
+        // 🔴 refresh 後も必ず /me
         const u = await api.me();
         setUser(u);
       }),
@@ -80,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  /** login */
+  /* =========================
+     login（★最重要）
+  ========================= */
   async function login({
     email,
     password,
@@ -89,16 +95,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
   }): Promise<LoginResult> {
     const auth = authServiceRef.current;
-    if (!auth) throw new Error("AuthService not ready");
+    const api = laravelApiRef.current;
+
+    if (!auth || !api) {
+      throw new Error("AuthService not ready");
+    }
 
     setIsLoading(true);
+
+    // ① login_or_register（トークン発行）
     const result = await auth.login({ email, password });
-    setUser(result.user);
+
+    // ② 🔴 user は絶対に /me で確定
+    const freshUser = await api.me();
+    setUser(freshUser);
+
     setIsLoading(false);
 
-    return result;
+    return {
+      user: freshUser,
+      isFirstLogin: result.isFirstLogin,
+    };
   }
 
+  /* =========================
+     register
+  ========================= */
   async function register(args: {
     name: string;
     email: string;
@@ -109,6 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return auth.register(args.name, args.email, args.password);
   }
 
+  /* =========================
+     logout
+  ========================= */
   async function logout() {
     const auth = authServiceRef.current;
     if (!auth) return;
@@ -116,9 +141,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  /* =========================
+     reloadUser（/me 再取得）
+  ========================= */
   async function reloadUser() {
     const api = laravelApiRef.current;
     if (!api) return;
+
     try {
       const u = await api.me();
       setUser(u);

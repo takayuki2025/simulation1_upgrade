@@ -29,10 +29,6 @@ Route::post('/auth/refresh', [TokenController::class, 'refresh']);
 
 
 
-
-
-
-
 use App\Modules\Shop\Presentation\Http\Controllers\ShopController;
 
 Route::middleware(['auth.jwt'])->group(function () {

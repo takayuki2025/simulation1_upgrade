@@ -3,7 +3,7 @@ import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
 import { getDeviceId } from "@/utils/deviceId";
 import type { User } from "firebase/auth";
-import type { AuthUser } from "@/domain/auth/AuthUser";
+import type { AuthUser } from "@/types/auth";
 import { sendEmailVerification, updateProfile } from "firebase/auth";
 
 export type LoginResult = {

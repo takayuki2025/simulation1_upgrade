@@ -1,4 +1,4 @@
-import type { AuthUser } from "@/domain/auth/AuthUser";
+import type { AuthUser } from "@/types/auth";
 
 export type RegisterResult = {
   needsEmailVerification: boolean;

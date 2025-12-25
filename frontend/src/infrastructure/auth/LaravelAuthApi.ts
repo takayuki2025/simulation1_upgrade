@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { AuthTokens } from "@/domain/auth/AuthTokens";
-import type { AuthUser } from "@/domain/auth/AuthUser";
+import type { AuthUser } from "@/domain/auth/000AuthUser";
 
 /**
  * ★ クラスの外で export type
@@ -51,7 +51,7 @@ export class LaravelAuthApi {
 
   async me(): Promise<AuthUser> {
     const res = await this._client.get("/me");
-    return res.data.user;
+    return res.data;
   }
 
   async logout() {

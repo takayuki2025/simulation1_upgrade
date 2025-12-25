@@ -130,6 +130,11 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
+    public function shopRoles()
+    {
+        return $this->hasMany(RoleUser::class);
+    }
+
     public function rolesForShop(?int $shopId)
     {
         return $this->roles()

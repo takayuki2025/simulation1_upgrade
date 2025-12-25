@@ -122,3 +122,23 @@
     gap: 12px;
   }
 }
+
+.shopHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.dashboardButton {
+  padding: 8px 14px;
+  background-color: #111;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.dashboardButton:hover {
+  background-color: #333;
+}

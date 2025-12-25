@@ -4,39 +4,80 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { useShop } from "./layout"; // 同階層 layout から
+import { useShop } from "./layout";
 import { useItemListByShopSWR } from "@/services/useItemListByShopSWR";
 import { useItemSearchByShopSWR } from "@/services/useItemSearchByShopSWR";
 import { useAuth } from "@/ui/auth/useAuth";
+import type { ShopRole, AuthUser } from "@/types/auth";
+import type { Item } from "@/types/item";
 import { getImageUrl } from "@/utils/utils";
-import styles from "./W-Shop-Home.module.css"; // shop用に分離推奨
+import styles from "./W-Shop-Home.module.css";
 
 export default function ShopHomePage() {
   const { shopCode } = useShop();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
+  /* =========================
+     🔍 検索状態
+  ========================= */
   const currentSearchQuery = useMemo(
     () => searchParams.get("q") || "",
     [searchParams],
   );
   const isSearch = currentSearchQuery.trim().length > 0;
 
+  /* =========================
+     📦 商品取得
+  ========================= */
   const listResult = useItemListByShopSWR(shopCode);
   const searchResult = useItemSearchByShopSWR(shopCode, currentSearchQuery);
 
-  const items = isSearch ? searchResult.items : listResult.items;
+  const items: Item[] = isSearch ? searchResult.items : listResult.items;
+
   const isPageLoading =
     authLoading || (isSearch ? searchResult.isLoading : listResult.isLoading);
 
+  /* =========================
+     🔐 このショップのスタッフか？
+  ========================= */
+  const isShopStaff = useMemo(() => {
+    if (!isAuthenticated || !user?.shop_roles) return false;
+
+    return user.shop_roles.some(
+      (r: ShopRole) =>
+        r.shop_code === shopCode &&
+        (r.role === "owner" || r.role === "manager" || r.role === "staff"),
+    );
+  }, [isAuthenticated, user, shopCode]);
+
+  /* =========================
+     ⏳ Loading
+  ========================= */
   if (isPageLoading) {
     return <div className={styles.loadingBox}>読み込み中...</div>;
   }
-
+console.log("[ME]", user);
+  /* =========================
+     🎨 UI
+  ========================= */
   return (
     <div className={styles.main_contents}>
-      <h1 className={styles.title}>Shop: {shopCode}</h1>
+      {/* ===== ヘッダー ===== */}
+      <div className={styles.shopHeader}>
+        <h1 className={styles.title}>Shop: {shopCode}</h1>
 
+        {isShopStaff && (
+          <Link
+            href={`/shops/${shopCode}/dashboard`}
+            className={styles.dashboardButton}
+          >
+            管理画面
+          </Link>
+        )}
+      </div>
+
+      {/* ===== 商品一覧 ===== */}
       <div className={styles.items_select}>
         {items.map((item) => (
           <div key={item.id} className={styles.items_select_all}>
