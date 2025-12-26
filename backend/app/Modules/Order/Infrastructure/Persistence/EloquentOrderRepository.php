@@ -8,14 +8,12 @@ use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Order\Domain\ValueObject\Address;
 use App\Modules\Order\Application\Dto\OrderItemSnapshot;
 use App\Modules\Order\Infrastructure\Persistence\Models\OrderModel;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 final class EloquentOrderRepository implements OrderRepository
 {
     public function findById(int $orderId): Order
     {
         $model = OrderModel::findOrFail($orderId);
-
         return $this->reconstituteOrder($model);
     }
 
@@ -64,7 +62,6 @@ final class EloquentOrderRepository implements OrderRepository
 
         $model->save();
 
-        // ★ ここが重要：保存後に reconstitute して返す
         return Order::reconstitute(
             id: $model->id,
             shopId: $model->shop_id,
@@ -78,6 +75,21 @@ final class EloquentOrderRepository implements OrderRepository
             ),
             meta: $model->meta,
         );
+    }
+
+    /**
+     * @return Order[]
+     */
+    public function findByBuyer(int $userId): array
+    {
+        $models = OrderModel::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('id')
+            ->get();
+
+        return $models
+            ->map(fn (OrderModel $m) => $this->reconstituteOrder($m))
+            ->all();
     }
 
     // ==========================

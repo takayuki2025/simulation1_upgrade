@@ -22,7 +22,6 @@ final class GetOrderHistoryUseCase
      */
     public function handle(int $userId): array
     {
-        // ★ ここがポイント
         $orders = $this->orders->findByBuyer($userId);
 
         return array_map(
@@ -33,11 +32,23 @@ final class GetOrderHistoryUseCase
 
     private function mapOne(Order $order): OrderHistoryItemOutput
     {
-        $payment  = $this->payments->findLatestByOrderId($order->id());
-        $shipment = $this->shipments->findByOrderId($order->id());
+        $orderId = (int)($order->id() ?? 0);
+        if ($orderId <= 0) {
+            // 永続化済みのみ一覧に出る想定だが、念のため防御
+            return new OrderHistoryItemOutput(
+                orderId: 0,
+                orderStatus: $order->status()->value,
+                paymentStatus: null,
+                paymentMethod: null,
+                hasShipment: false,
+            );
+        }
+
+        $payment  = $this->payments->findLatestByOrderId($orderId);
+        $shipment = $this->shipments->findByOrderId($orderId);
 
         return new OrderHistoryItemOutput(
-            orderId: $order->id(),
+            orderId: $orderId,
             orderStatus: $order->status()->value,
             paymentStatus: $payment?->status()->value,
             paymentMethod: $payment?->method()->value,

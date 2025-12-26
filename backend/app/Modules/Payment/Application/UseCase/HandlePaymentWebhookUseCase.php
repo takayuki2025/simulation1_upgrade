@@ -11,14 +11,12 @@ use App\Modules\Payment\Domain\Enum\PaymentStatus;
 use App\Modules\Payment\Domain\Event\DomainPaymentEventType;
 use App\Modules\Payment\Domain\Service\StripeEventMapper;
 use App\Modules\Payment\Domain\Enum\PaymentMethod;
+use App\Modules\Order\Domain\Event\OrderPaid;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use App\Modules\Order\Domain\Event\OrderPaid;
 
 final class HandlePaymentWebhookUseCase
 {
-    private ?OrderPaid $orderPaidEvent = null;
-
     public function __construct(
         private PaymentQueryRepository $webhookEvents,
         private PaymentRepository $payments,
@@ -42,6 +40,9 @@ final class HandlePaymentWebhookUseCase
             return;
         }
 
+        // ✅ dispatch はトランザクション外で実行するため、一時保持（局所変数）
+        $orderPaidEvent = null;
+
         try {
             $domainEvent = $this->mapper->map($input);
 
@@ -55,7 +56,7 @@ final class HandlePaymentWebhookUseCase
                 return;
             }
 
-            DB::transaction(function () use ($domainEvent, &$paymentId, &$orderId) {
+            DB::transaction(function () use ($domainEvent, &$paymentId, &$orderId, &$orderPaidEvent) {
 
                 $payment = $this->payments
                     ->findByProviderPaymentId($domainEvent->providerPaymentId);
@@ -66,7 +67,6 @@ final class HandlePaymentWebhookUseCase
                 }
 
                 // ---- 例外的救済：instructions が未保存なら埋めてよい（null のときだけ）----
-                // ※ mapper が instructions を持てるようにした場合に有効
                 if (
                     $payment->instructions() === null
                     && property_exists($domainEvent, 'instructions')
@@ -86,7 +86,6 @@ final class HandlePaymentWebhookUseCase
                     return;
                 }
 
-                // REQUIRES_ACTION / FAILED / SUCCEEDED を反映
                 if ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
                     $payment = $payment->markRequiresAction([
                         'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
@@ -117,10 +116,12 @@ final class HandlePaymentWebhookUseCase
 
                         // Shipment 作成は「カード決済のみ」
                         if ($payment->method() === PaymentMethod::CARD) {
-                            $this->orderPaidEvent = new OrderPaid(
-                                orderId: $paidOrder->id(),
-                                shopId: $paidOrder->shopId(),
-                                userId: $paidOrder->userId(),
+                            // ✅ userId は Order Aggregate からのみ取得
+                            // ✅ さらに保険で「位置引数」にする（named arg 事故を根絶）
+                            $orderPaidEvent = new OrderPaid(
+                                $paidOrder->id(),
+                                // $paidOrder->shopId(),境界違反
+                                // $paidOrder->userId(),
                             );
                         }
                     }
@@ -139,9 +140,9 @@ final class HandlePaymentWebhookUseCase
                 $orderId   = $payment->orderId();
             });
 
-            // トランザクション外で dispatch
-            if ($this->orderPaidEvent) {
-                Event::dispatch($this->orderPaidEvent);
+            // ✅ トランザクション外で dispatch
+            if ($orderPaidEvent !== null) {
+                Event::dispatch($orderPaidEvent);
             }
 
             $this->safeComplete($input, 'ok', $paymentId, $orderId, null);

@@ -16,11 +16,11 @@ final class OrderHistoryItemOutput
     public function toArray(): array
     {
         return [
-            'order_id' => $this->orderId,
-            'order_status' => $this->orderStatus,
+            'order_id'       => $this->orderId,
+            'order_status'   => $this->orderStatus,
             'payment_status' => $this->paymentStatus,
             'payment_method' => $this->paymentMethod,
-            'has_shipment' => $this->hasShipment,
+            'has_shipment'   => $this->hasShipment,
         ];
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Modules\Shipment\Application\Listener;
 
-use App\Modules\Order\Domain\Event\OrderPaid; // ★ ここを変更
+use App\Modules\Order\Domain\Event\OrderPaid;
 use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Shipment\Application\Dto\CreateShipmentInput;
 use App\Modules\Shipment\Application\UseCase\CreateShipmentUseCase;
@@ -17,6 +17,7 @@ final class CreateShipmentOnOrderPaidListener
 
     public function handle(OrderPaid $event): void
     {
+        // ✅ Order Aggregate を唯一の情報源として取得
         $order = $this->orders->findById($event->orderId);
 
         $address = $order->shippingAddress();
@@ -24,10 +25,11 @@ final class CreateShipmentOnOrderPaidListener
             throw new \LogicException('Shipping address missing for paid order.');
         }
 
+        // ✅ userId / shopId は Order から取得
         $input = new CreateShipmentInput(
-            orderId: $event->orderId,
-            shopId: $event->shopId,
-            userId: $event->userId,
+            orderId: $order->id(),
+            shopId: $order->shopId(),
+            userId: $order->userId(),
             shippingAddress: $address,
         );
 
