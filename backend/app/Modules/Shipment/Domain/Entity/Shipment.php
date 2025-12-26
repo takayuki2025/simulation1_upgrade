@@ -19,29 +19,27 @@ final class Shipment
     ) {
     }
 
-    /* ============================
-       Factory
-    ============================ */
-
     /**
-     * Webhook（OrderPaid）時点では住所を確定させない。
-     * 住所は後工程（出荷準備）で埋める。
+     * OrderPaid 時点で生成される初期 Shipment
+     * 配送先のみ確定（Order からコピー）
      */
-    public static function createInitial(int $shopId, int $orderId): self
-    {
+    public static function createInitial(
+        int $shopId,
+        int $orderId,
+        array $destinationAddress
+    ): self {
         return new self(
             id: null,
-            shopId: $input->shopId,
-            orderId: $input->orderId,
+            shopId: $shopId,
+            orderId: $orderId,
             status: ShipmentStatus::CREATED,
-            originAddress: $input->originAddress,
-            destinationAddress: $input->destinationAddress,
+            originAddress: [],
+            destinationAddress: $destinationAddress,
             eta: null,
         );
     }
-    /* ============================
-       State Transitions
-    ============================ */
+
+    /* ===== State Transitions ===== */
 
     public function pack(): void
     {

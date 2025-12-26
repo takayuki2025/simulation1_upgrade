@@ -20,12 +20,18 @@ final class ListBoughtItemsUseCase
 
         foreach ($orders as $order) {
             /** @var OrderItemSnapshot $snapshot */
-            foreach ($order->items() as $snapshot) {
+            foreach ($order->items() as $index => $snapshot) {
                 $items[] = [
-                    'id'         => $snapshot->itemId(),
+                    // ★ React key 専用（必ずユニーク）
+                    'row_id'     => $order->id() . '-' . $snapshot->itemId() . '-' . $index,
+
+                    // 表示用
+                    'item_id'    => $snapshot->itemId(),
                     'name'       => $snapshot->name(),
                     'item_image' => $snapshot->imagePath,
-                    'order_id'   => $order->id(), // ★ Amazon型遷移の要
+
+                    // 遷移用
+                    'order_id'   => $order->id(),
                 ];
             }
         }

@@ -10,23 +10,24 @@ import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import styles from "./W-Mypage.module.css";
 
 /**
- * sell: 既存 item の一覧（/item/[id]へ）
- * buy : 購入済み item の一覧だが、ここでは「注文詳細」へ遷移させたい
- *
- * buy 側は API が order_id を返す前提（返さない場合はフォールバック表示）
+ * sell: 出品商品一覧（/item/[item_id]）
+ * buy : 購入商品一覧（/mypage/orders/[order_id]）
  */
 
 type PageMode = "sell" | "buy";
 
+/**
+ * ★ API から返る前提の完成形
+ * - row_id: React key 用（order_id-item_id など）
+ * - item_id: 商品ID
+ * - order_id: 購入時のみ存在
+ */
 type MypageItem = {
-  id: number;
+  row_id: string;
+  item_id: number;
   name: string;
   item_image: string | null;
-
-  // buy のときに必要（APIが返す想定）
   order_id?: number | null;
-
-  // 必要なら今後追加
   price?: number | null;
 };
 
@@ -51,6 +52,9 @@ export default function Mypage() {
   const [items, setItems] = useState<MypageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // =============================
+  // page 判定
+  // =============================
   const page: PageMode = useMemo(() => {
     return searchParams.get("page") === "buy" ? "buy" : "sell";
   }, [searchParams]);
@@ -83,7 +87,6 @@ export default function Mypage() {
     try {
       const endpoint = page === "sell" ? "/mypage/sell" : "/mypage/bought";
       const res: AxiosResponse<any> = await apiClient.get(endpoint);
-
       const list = (res.data?.items ?? []) as MypageItem[];
       setItems(list);
     } finally {
@@ -144,8 +147,6 @@ export default function Mypage() {
           >
             プロフィールを編集
           </button>
-
-          {/* ❌ ここに item を参照する Link を置くと必ず壊れるので置かない */}
         </div>
 
         <div className={styles.profile_header_2}>
@@ -181,17 +182,16 @@ export default function Mypage() {
           items.map((item) => {
             const imgSrc = getImageUrl(item.item_image, IMAGE_TYPE.ITEM);
 
-            // buy のときは「注文詳細」に行きたい（Amazon型）
+            // buy → 注文詳細 / sell → 商品詳細
             const href =
               page === "buy" && item.order_id
                 ? `/mypage/orders/${item.order_id}`
-                : `/item/${item.id}`;
+                : `/item/${item.item_id}`;
 
-            // buy なのに order_id が無い場合は、API側未対応の可能性が高い
             const showMissingOrderHint = page === "buy" && !item.order_id;
 
             return (
-              <div key={item.id} className={styles.items_select_all}>
+              <div key={item.row_id} className={styles.items_select_all}>
                 <Link href={href}>
                   <img src={imgSrc} onError={onImageError} alt={item.name} />
                   <div>{item.name}</div>

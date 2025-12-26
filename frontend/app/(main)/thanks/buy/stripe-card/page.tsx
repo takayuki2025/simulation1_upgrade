@@ -12,7 +12,7 @@ type OrderDetailResponse = {
   order_status: string;
   payment: {
     payment_id: number; // 内部ID
-    provider_payment_id: string | null; // ★ pi_...
+    provider_payment_id: string | null; // pi_...
     method: "card";
     status: string;
     method_details?: {
@@ -78,7 +78,7 @@ export default function StripeThankYouPage() {
       <div className={styles.messageBox}>
         <h1 className={styles.title}>ご購入ありがとうございます！</h1>
 
-        {order.payment && <p>決済番号：{order.payment.provider_payment_id}</p>}
+        <p>決済番号：{order.payment.provider_payment_id}</p>
 
         <p className={styles.message}>
           カード決済が正常に完了しました。
@@ -87,7 +87,11 @@ export default function StripeThankYouPage() {
         </p>
 
         <div className={styles.actions}>
-          <Link href="/me/orders" className={styles.backHomeLink}>
+          {/* ✅ Mypage の購入履歴と完全に同じ遷移 */}
+          <Link
+            href={`/mypage/orders/${orderId}`}
+            className={styles.backHomeLink}
+          >
             注文履歴へ
           </Link>
         </div>

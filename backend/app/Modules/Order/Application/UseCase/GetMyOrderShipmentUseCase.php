@@ -36,10 +36,10 @@ final class GetMyOrderShipmentUseCase
         }
 
         return [
-            'id'     => $shipment->id(),
-            'status' => $shipment->status()->value,
-            'eta'    => $shipment->eta()?->format('Y-m-d'),
-            'timeline' => $shipment->timeline(), // array 前提
+            'id'     => $shipment->id,
+            'status' => $shipment->status->value,
+            'eta'    => $shipment->eta?->format('Y-m-d'),
+            // 'timeline' => $shipment->timeline(), // array 前提
         ];
     }
 }

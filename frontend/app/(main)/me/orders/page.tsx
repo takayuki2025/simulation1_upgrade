@@ -5,12 +5,26 @@ import Link from "next/link";
 import type { AxiosResponse } from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 
+const shipmentStatusLabel: Record<string, string> = {
+  created: "発送準備中",
+  packed: "梱包済み",
+  shipped: "発送済み",
+  in_transit: "配送中",
+  delivered: "配達完了",
+};
+
 type OrderHistoryItem = {
   order_id: number;
   order_status: string;
   payment_status?: string | null;
   payment_method?: string | null;
-  has_shipment: boolean;
+  shipment_status?:
+    | "created"
+    | "packed"
+    | "shipped"
+    | "in_transit"
+    | "delivered"
+    | null;
 };
 
 export default function OrderHistoryPage() {
@@ -41,11 +55,19 @@ export default function OrderHistoryPage() {
         {orders.map((o) => (
           <li key={o.order_id}>
             <Link href={`/me/orders/${o.order_id}`}>注文 #{o.order_id}</Link>
-            <div>状態: {o.order_status}</div>
+
+            <div>注文状態: {o.order_status}</div>
+
             <div>
               支払い: {o.payment_method ?? "-"} / {o.payment_status ?? "-"}
             </div>
-            <div>発送: {o.has_shipment ? "発送準備中" : "未発送"}</div>
+
+            <div>
+              配送:{" "}
+              {o.shipment_status
+                ? shipmentStatusLabel[o.shipment_status]
+                : "未発送"}
+            </div>
           </li>
         ))}
       </ul>

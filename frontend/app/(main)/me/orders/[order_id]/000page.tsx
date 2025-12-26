@@ -7,7 +7,7 @@ import type { AxiosResponse } from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 
 /* =========================
-   DTO（注文詳細・完成版）
+   DTO（注文詳細）
 ========================= */
 type OrderDetailResponse = {
   order_id: number;
@@ -25,13 +25,10 @@ type OrderDetailResponse = {
     status: "created" | "packed" | "shipped" | "in_transit" | "delivered";
     eta?: string;
     address: {
-      post_number?: string | null;
-      prefecture?: string | null;
-      city?: string | null;
-      address_line1?: string | null;
-      address_line2?: string | null;
-      recipient_name?: string | null;
-      phone?: string | null;
+      prefecture: string;
+      city: string;
+      addressLine1: string;
+      addressLine2?: string;
     };
   } | null;
 };
@@ -90,8 +87,6 @@ export default function OrderDetailPage() {
     );
   }
 
-  const addr = order.shipment?.address;
-
   return (
     <div>
       <h1>注文詳細</h1>
@@ -144,25 +139,17 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {addr && (
+          <div>
+            <strong>配送先住所：</strong>
             <div>
-              <strong>配送先住所：</strong>
-
-              {addr.post_number && <div>〒 {addr.post_number}</div>}
-
-              <div>
-                {addr.prefecture}
-                {addr.city}
-                {addr.address_line1}
-              </div>
-
-              {addr.address_line2 && <div>{addr.address_line2}</div>}
-
-              {addr.recipient_name && <div>宛名：{addr.recipient_name}</div>}
-
-              {addr.phone && <div>電話番号：{addr.phone}</div>}
+              {order.shipment.address.prefecture}
+              {order.shipment.address.city}
+              {order.shipment.address.addressLine1}
             </div>
-          )}
+            {order.shipment.address.addressLine2 && (
+              <div>{order.shipment.address.addressLine2}</div>
+            )}
+          </div>
         </>
       )}
 

@@ -4,20 +4,20 @@ namespace App\Modules\Shipment\Application\Listener;
 
 use App\Modules\Order\Domain\Event\OrderPaid;
 use App\Modules\Order\Domain\Repository\OrderRepository;
-use App\Modules\Shipment\Application\Dto\CreateShipmentInput;
-use App\Modules\Shipment\Application\UseCase\CreateShipmentUseCase;
+use App\Modules\Shipment\Domain\Entity\Shipment;
+use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 
 final class CreateShipmentOnOrderPaidListener
 {
     public function __construct(
         private OrderRepository $orders,
-        private CreateShipmentUseCase $useCase,
+        private ShipmentRepository $shipments,
     ) {
     }
 
     public function handle(OrderPaid $event): void
     {
-        // ✅ Order Aggregate を唯一の情報源として取得
+        // Order Aggregate を唯一の情報源とする
         $order = $this->orders->findById($event->orderId);
 
         $address = $order->shippingAddress();
@@ -25,14 +25,13 @@ final class CreateShipmentOnOrderPaidListener
             throw new \LogicException('Shipping address missing for paid order.');
         }
 
-        // ✅ userId / shopId は Order から取得
-        $input = new CreateShipmentInput(
-            orderId: $order->id(),
+        // Shipment を直接生成（UseCase 不要）
+        $shipment = Shipment::createInitial(
             shopId: $order->shopId(),
-            userId: $order->userId(),
-            shippingAddress: $address,
+            orderId: $order->id(),
+            destinationAddress: $address->toArray(),
         );
 
-        $this->useCase->handle($input);
+        $this->shipments->save($shipment);
     }
 }

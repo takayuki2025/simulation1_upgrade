@@ -16,7 +16,7 @@ final class GetOrderDetailOutput
         public readonly int $totalAmount,
         public readonly string $currency,
 
-        // ===== Address =====
+        // ===== Address Snapshot (Order) =====
         public readonly ?array $shippingAddress,
         public readonly ?string $addressSnapshotAt,
 
@@ -39,29 +39,34 @@ final class GetOrderDetailOutput
             totalAmount: $order->totalAmount(),
             currency: $order->currency(),
 
-            // ===== Address =====
-            shippingAddress: $order->shippingAddress()
-                ? $order->shippingAddress()->toArray()
-                : null,
-            addressSnapshotAt: $order->addressSnapshotAt()
-                ? $order->addressSnapshotAt()->format('Y-m-d H:i:s')
-                : null,
+            // ===== Order Address Snapshot =====
+            shippingAddress: $order->shippingAddress()?->toArray(),
+            addressSnapshotAt: $order->addressSnapshotAt()?->format('Y-m-d H:i:s'),
 
             // ===== Payment =====
             payment: $payment ? [
-                'payment_id' => $payment->id(), // 内部ID（表示用ではない）
-                'provider_payment_id' => $payment->providerPaymentId(), // ★ pi_...
+                'payment_id' => $payment->id(),
+                'provider_payment_id' => $payment->providerPaymentId(),
                 'method' => $payment->method()->value,
                 'status' => $payment->status()->value,
-                'instructions' => $payment->instructions(),
-                'method_details' => $payment->methodDetails(),
             ] : null,
 
             // ===== Shipment =====
             shipment: $shipment ? [
-                'shipment_id' => $shipment->id(),
-                'status' => $shipment->status()->value,
-                'eta' => $shipment->eta()?->toAtomString(),
+                'shipment_id' => $shipment->id,
+                'status' => $shipment->status->value,
+                'eta' => $shipment->eta?->toDateString(),
+
+                // ★ 完全な配送先 DTO
+                'address' => [
+                    'post_number'     => $shipment->destinationAddress['postal_code'] ?? null,
+                    'prefecture'      => $shipment->destinationAddress['prefecture'] ?? null,
+                    'city'            => $shipment->destinationAddress['city'] ?? null,
+                    'address_line1'   => $shipment->destinationAddress['address_line1'] ?? null,
+                    'address_line2'   => $shipment->destinationAddress['address_line2'] ?? null,
+                    'recipient_name'  => $shipment->destinationAddress['recipient_name'] ?? null,
+                    'phone'           => $shipment->destinationAddress['phone'] ?? null,
+                ],
             ] : null,
         );
     }
