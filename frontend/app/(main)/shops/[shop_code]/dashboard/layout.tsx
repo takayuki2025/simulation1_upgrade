@@ -1,7 +1,7 @@
 import React from "react";
-import ShopProvider from "./ShopProvider";
+import ShopProvider from "../ShopProvider";
 
-export default function ShopLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;

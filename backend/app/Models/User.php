@@ -138,15 +138,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function rolesForShop(?int $shopId)
     {
         return $this->roles()
-            ->when($shopId, fn ($q) => $q->wherePivot('shop_id', $shopId))
+            ->when(
+                $shopId !== null,
+                fn ($q) => $q->where('role_user.shop_id', $shopId)
+            )
             ->get();
     }
 
     public function hasRole(string $slug, ?int $shopId = null): bool
     {
         return $this->roles()
-            ->where('slug', $slug)
-            ->when($shopId, fn ($q) => $q->wherePivot('shop_id', $shopId))
+            ->where('roles.slug', $slug)
+            ->when(
+                $shopId !== null,
+                fn ($q) => $q->where('role_user.shop_id', $shopId)
+            )
             ->exists();
     }
 

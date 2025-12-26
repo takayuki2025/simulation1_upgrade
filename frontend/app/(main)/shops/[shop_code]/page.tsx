@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { useShop } from "./layout";
+import { useShop } from "./ShopProvider";
 import { useItemListByShopSWR } from "@/services/useItemListByShopSWR";
 import { useItemSearchByShopSWR } from "@/services/useItemSearchByShopSWR";
 import { useAuth } from "@/ui/auth/useAuth";

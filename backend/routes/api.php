@@ -208,7 +208,7 @@ use App\Modules\Order\Presentation\Http\Controllers\OrderController;
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/orders', [OrderController::class, 'create']);
-//     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
+    //     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
 });
 
 
@@ -341,4 +341,16 @@ Route::prefix('shops/{shop_code}')
     ])
     ->group(function () {
         Route::get('/orders', ShopOrderListController::class);
+    });
+
+
+
+
+
+use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+
+Route::prefix('shops/{shop_code}')
+    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+    ->group(function () {
+        Route::get('/shipments', ShopShipmentListController::class);
     });
