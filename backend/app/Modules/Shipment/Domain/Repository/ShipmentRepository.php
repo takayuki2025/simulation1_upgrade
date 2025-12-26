@@ -9,4 +9,6 @@ interface ShipmentRepository
     public function save(Shipment $shipment): Shipment;
 
     public function findByOrderId(int $orderId): ?Shipment;
+
+    public function existsByOrderId(int $orderId): bool;
 }

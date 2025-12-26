@@ -49,6 +49,7 @@ final class GetOrderDetailOutput
                 'provider_payment_id' => $payment->providerPaymentId(),
                 'method' => $payment->method()->value,
                 'status' => $payment->status()->value,
+                'instructions' => $payment->instructions(),
             ] : null,
 
             // ===== Shipment =====

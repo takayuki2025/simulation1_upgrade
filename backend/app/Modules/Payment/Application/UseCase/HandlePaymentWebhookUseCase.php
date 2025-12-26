@@ -86,12 +86,21 @@ final class HandlePaymentWebhookUseCase
                     return;
                 }
 
+
                 if ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
+
+                    // ★ instructions を最優先で保存
+                    if (!empty($domainEvent->instructions)) {
+                        $payment = $payment->withInstructions($domainEvent->instructions);
+                    }
+
                     $payment = $payment->markRequiresAction([
                         'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
                     ]);
+
                     $this->payments->save($payment);
                 }
+
 
                 if ($domainEvent->type === DomainPaymentEventType::FAILED) {
                     $payment = $payment->markFailed([
@@ -101,12 +110,12 @@ final class HandlePaymentWebhookUseCase
                     $this->payments->save($payment);
                 }
 
+
                 if ($domainEvent->type === DomainPaymentEventType::SUCCEEDED) {
 
                     $payment = $payment->markSucceeded([
                         'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
                     ]);
-
                     $this->payments->save($payment);
 
                     $order = $this->orders->findById($payment->orderId());
@@ -114,16 +123,10 @@ final class HandlePaymentWebhookUseCase
                         $paidOrder = $order->markPaid();
                         $this->orders->save($paidOrder);
 
-                        // Shipment 作成は「カード決済のみ」
-                        if ($payment->method() === PaymentMethod::CARD) {
-                            // ✅ userId は Order Aggregate からのみ取得
-                            // ✅ さらに保険で「位置引数」にする（named arg 事故を根絶）
-                            $orderPaidEvent = new OrderPaid(
-                                $paidOrder->id(),
-                                // $paidOrder->shopId(),境界違反
-                                // $paidOrder->userId(),
-                            );
-                        }
+                        // ✅ 決済手段に関係なく OrderPaid を発火
+                        $orderPaidEvent = new OrderPaid(
+                            $paidOrder->id(),
+                        );
                     }
 
                     $this->ledgers->recordSale(
@@ -135,6 +138,7 @@ final class HandlePaymentWebhookUseCase
                         occurredAt: $domainEvent->occurredAt,
                     );
                 }
+
 
                 $paymentId = $payment->id();
                 $orderId   = $payment->orderId();

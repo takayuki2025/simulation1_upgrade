@@ -17,15 +17,24 @@ final class CreateShipmentOnOrderPaidListener
 
     public function handle(OrderPaid $event): void
     {
-        // Order Aggregate を唯一の情報源とする
-        $order = $this->orders->findById($event->orderId);
-
-        $address = $order->shippingAddress();
-        if ($address === null) {
-            throw new \LogicException('Shipping address missing for paid order.');
+        // ① すでに Shipment があれば何もしない（冪等）
+        if ($this->shipments->existsByOrderId($event->orderId)) {
+            return;
         }
 
-        // Shipment を直接生成（UseCase 不要）
+        // ② Order Aggregate を唯一の情報源とする
+        $order = $this->orders->findById($event->orderId);
+        if (! $order) {
+            return;
+        }
+
+        // ③ 住所が無ければ「まだ発送できない」だけなので return
+        $address = $order->shippingAddress();
+        if ($address === null) {
+            return;
+        }
+
+        // ④ Shipment 作成
         $shipment = Shipment::createInitial(
             shopId: $order->shopId(),
             orderId: $order->id(),

@@ -24,9 +24,7 @@ final class EloquentShipmentRepository implements ShipmentRepository
                 'updated_at' => now(),
             ]);
 
-            // immutable に寄せるなら「reconstitute」推奨だが、今の entity は public property なので代入でOK
             $shipment->id = (int) $id;
-
             return $shipment;
         }
 
@@ -59,5 +57,12 @@ final class EloquentShipmentRepository implements ShipmentRepository
             destinationAddress: $row->destination_address ? json_decode($row->destination_address, true) : [],
             eta: $row->eta ? Carbon::parse($row->eta) : null,
         );
+    }
+
+    public function existsByOrderId(int $orderId): bool
+    {
+        return DB::table('shipments')
+            ->where('order_id', $orderId)
+            ->exists();
     }
 }

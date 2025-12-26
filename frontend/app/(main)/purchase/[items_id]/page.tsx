@@ -138,7 +138,7 @@ function PurchaseConfirmPage() {
                 onChange={(e) => setPayment(e.target.value as PaymentMethod)}
               >
                 <option value="">選択してください</option>
-                <option value="convenience">コンビニ支払い</option>
+                <option value="コンビニ支払い">コンビニ支払い</option>
                 <option value="card">クレジットカード支払い</option>
               </select>
             </div>
