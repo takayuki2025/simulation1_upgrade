@@ -94,9 +94,6 @@ Route::middleware('auth.jwt.optional')->group(function () {
 Route::middleware('auth.jwt.optional')
     ->get('/item/{id}', ItemDetailController::class);
 
-// ✅ 詳細（単体）
-// Route::get('/item/{id}', ItemDetailController::class);
-
 
 
 
@@ -151,21 +148,6 @@ Route::withoutMiddleware(['throttle:api'])
 | 🧊 以下は未検証・未使用（削除せずコメント化）
 |--------------------------------------------------------------------------
 */
-
-
-// === 旧 Item Query（廃止予定） ===
-// use App\Modules\Item\Presentation\Http\Controllers\ItemQueryController;
-// Route::get('/item', [ItemQueryController::class, 'index']);
-// Route::get('/items/search/category', [ItemQueryController::class, 'searchByCategory']);
-// Route::get('/items/search/brand', [ItemQueryController::class, 'searchByBrand']);
-
-// === Item Command（登録・更新・削除）===
-// use App\Modules\Item\Presentation\Http\Controllers\ItemCommandController;
-// Route::middleware(['auth.jwt'])->group(function () {
-//     Route::post('/item', [ItemCommandController::class, 'store']);
-//     Route::put('/item/{id}', [ItemCommandController::class, 'update']);
-//     Route::delete('/item/{id}', [ItemCommandController::class, 'destroy']);
-// });
 
 // === Favorite / Comment ===
 
@@ -321,10 +303,6 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 
 
-// use App\Modules\Order\Presentation\Http\Controllers\OrderDetailController;
-
-// Route::middleware(['auth.jwt'])
-//     ->get('/orders/{orderId}', OrderDetailController::class);
 
 
 
@@ -347,3 +325,20 @@ use App\Modules\User\Presentation\Http\Controllers\UserAddressController;
 Route::middleware('auth.jwt')->group(function () {
     Route::get('/me/addresses/primary', [UserAddressController::class, 'primary']);
 });
+
+
+
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
+
+Route::prefix('shops/{shop_code}')
+    ->middleware([
+        'auth.jwt',
+        'tenant',
+        'shop.role:owner,manager,staff',
+    ])
+    ->group(function () {
+        Route::get('/orders', ShopOrderListController::class);
+    });

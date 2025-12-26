@@ -153,4 +153,16 @@ final class EloquentOrderRepository implements OrderRepository
             meta: $model->meta
         );
     }
+
+    public function findByShop(int $shopId): array
+    {
+        $models = OrderModel::query()
+            ->where('shop_id', $shopId)
+            ->orderByDesc('id')
+            ->get();
+
+        return $models
+            ->map(fn (OrderModel $m) => $this->reconstituteOrder($m))
+            ->all();
+    }
 }

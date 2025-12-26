@@ -18,4 +18,6 @@ interface OrderRepository
      * @return Order[]
      */
     public function findByBuyer(int $userId): array;
+
+    public function findByShop(int $shopId): array;
 }
