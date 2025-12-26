@@ -9,13 +9,24 @@ export default function ShopDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) return <div className="p-6">読み込み中...</div>;
+  /* =========================
+     ⏳ Loading
+  ========================= */
+  if (isLoading) {
+    return <div className="p-6">読み込み中...</div>;
+  }
 
+  /* =========================
+     🔐 未ログイン → ログインへ
+  ========================= */
   if (!isAuthenticated) {
     router.replace("/login");
     return null;
   }
 
+  /* =========================
+     🛂 権限チェック
+  ========================= */
   const isShopStaff =
     user?.shop_roles?.some(
       (r) =>
@@ -27,6 +38,9 @@ export default function ShopDashboardPage() {
     return <div className="p-6">アクセス権限がありません。</div>;
   }
 
+  /* =========================
+     🎛 UI
+  ========================= */
   return (
     <div className="p-6 space-y-6">
       <Link href={`/shops/${shop_code}`} className="text-blue-600 underline">

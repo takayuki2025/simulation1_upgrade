@@ -2,19 +2,18 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
-import { useShop } from "./ShopProvider";
 import { useItemListByShopSWR } from "@/services/useItemListByShopSWR";
 import { useItemSearchByShopSWR } from "@/services/useItemSearchByShopSWR";
 import { useAuth } from "@/ui/auth/useAuth";
-import type { ShopRole, AuthUser } from "@/types/auth";
+import type { ShopRole } from "@/types/auth";
 import type { Item } from "@/types/item";
 import { getImageUrl } from "@/utils/utils";
 import styles from "./W-Shop-Home.module.css";
 
 export default function ShopHomePage() {
-  const { shopCode } = useShop();
+  const { shop_code } = useParams<{ shop_code: string }>();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -30,8 +29,8 @@ export default function ShopHomePage() {
   /* =========================
      📦 商品取得
   ========================= */
-  const listResult = useItemListByShopSWR(shopCode);
-  const searchResult = useItemSearchByShopSWR(shopCode, currentSearchQuery);
+  const listResult = useItemListByShopSWR(shop_code);
+  const searchResult = useItemSearchByShopSWR(shop_code, currentSearchQuery);
 
   const items: Item[] = isSearch ? searchResult.items : listResult.items;
 
@@ -46,10 +45,10 @@ export default function ShopHomePage() {
 
     return user.shop_roles.some(
       (r: ShopRole) =>
-        r.shop_code === shopCode &&
+        r.shop_code === shop_code &&
         (r.role === "owner" || r.role === "manager" || r.role === "staff"),
     );
-  }, [isAuthenticated, user, shopCode]);
+  }, [isAuthenticated, user, shop_code]);
 
   /* =========================
      ⏳ Loading
@@ -57,7 +56,7 @@ export default function ShopHomePage() {
   if (isPageLoading) {
     return <div className={styles.loadingBox}>読み込み中...</div>;
   }
-console.log("[ME]", user);
+
   /* =========================
      🎨 UI
   ========================= */
@@ -65,11 +64,11 @@ console.log("[ME]", user);
     <div className={styles.main_contents}>
       {/* ===== ヘッダー ===== */}
       <div className={styles.shopHeader}>
-        <h1 className={styles.title}>Shop: {shopCode}</h1>
+        <h1 className={styles.title}>Shop: {shop_code}</h1>
 
         {isShopStaff && (
           <Link
-            href={`/shops/${shopCode}/dashboard`}
+            href={`/shops/${shop_code}/dashboard`}
             className={styles.dashboardButton}
           >
             管理画面

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
@@ -24,20 +24,32 @@ type ShipmentListItem = {
     address_line2?: string | null;
     recipient_name?: string | null;
     phone?: string | null;
-    // DBの形が違う可能性があるので余裕を持たせる
     [key: string]: any;
   } | null;
 };
 
 export default function ShopShipmentListPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const { apiClient } = useAuth();
+  const router = useRouter();
+  const { apiClient, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [items, setItems] = useState<ShipmentListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  /* =========================
+     🔐 Auth Guard
+  ========================= */
   useEffect(() => {
-    if (!apiClient) return;
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  /* =========================
+     📦 Fetch Shipments
+  ========================= */
+  useEffect(() => {
+    if (!apiClient || !shop_code) return;
 
     setIsLoading(true);
 
@@ -51,6 +63,10 @@ export default function ShopShipmentListPage() {
   }, [apiClient, shop_code]);
 
   const count = useMemo(() => items.length, [items]);
+
+  if (authLoading) {
+    return <div className="p-6">読み込み中...</div>;
+  }
 
   return (
     <div className="p-6 space-y-4">
@@ -112,9 +128,17 @@ export default function ShopShipmentListPage() {
                 ETA: <span className="font-mono">{it.eta ?? "-"}</span>
               </div>
 
-              {/* ②の次（③）で pack/ship/deliver をここにボタン追加 */}
+              <div className="pt-2">
+                <Link
+                  href={`/shops/${shop_code}/dashboard/orders/${it.order_id}`}
+                  className="text-blue-600 underline text-sm"
+                >
+                  詳細を見る →
+                </Link>
+              </div>
+
               <div className="pt-2 text-sm text-gray-500">
-                ※ 発送操作（pack/ship/deliver）は次フェーズで追加
+                ※ 発送操作（pack / ship / deliver）は次フェーズで追加
               </div>
             </div>
           );
