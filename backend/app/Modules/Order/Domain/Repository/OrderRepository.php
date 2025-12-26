@@ -6,7 +6,7 @@ use App\Modules\Order\Domain\Entity\Order;
 
 interface OrderRepository
 {
-    public function findById(int $orderId): Order;
+    public function findById(int $orderId): ?Order;
 
     public function findDraftByUser(int $orderId, int $userId): Order;
 

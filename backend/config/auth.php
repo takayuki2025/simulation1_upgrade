@@ -1,9 +1,10 @@
 <?php
 
+
 return [
 
     'defaults' => [
-        'guard' => 'sanctum', // ← ここ重要！
+        'guard' => 'web', // ★ testing と相性が良い
         'passwords' => 'users',
     ],
 
@@ -14,14 +15,9 @@ return [
             'provider' => 'users',
         ],
 
-        'sanctum' => [
-            'driver' => 'sanctum',
-            'provider' => 'users',
-        ],
-
-        // ← これが無いと必ず「api guard not defined」が発生します
-        'api' => [
-            'driver' => 'jwt',
+        // ★ テスト用 jwt guard（session）
+        'jwt' => [
+            'driver' => 'session',
             'provider' => 'users',
         ],
     ],

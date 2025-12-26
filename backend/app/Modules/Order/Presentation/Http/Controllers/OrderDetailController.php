@@ -14,15 +14,23 @@ final class OrderDetailController extends Controller
     ) {
     }
 
+    /**
+     * GET /api/me/orders/{orderId}
+     * - 認証必須
+     * - 自分の注文のみ閲覧可
+     */
     public function __invoke(Request $request, int $orderId): JsonResponse
     {
-        $userId = (int) $request->user()->id;
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
 
         $output = $this->useCase->handle(
             orderId: $orderId,
-            userId: $userId
+            userId: (int) $user->id,
         );
 
-        return response()->json($output->toArray());
+        return response()->json($output->toArray(), 200);
     }
 }

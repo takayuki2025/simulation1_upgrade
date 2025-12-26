@@ -49,7 +49,8 @@ final class GetOrderDetailOutput
 
             // ===== Payment =====
             payment: $payment ? [
-                'payment_id' => $payment->id(),
+                'payment_id' => $payment->id(), // 内部ID（表示用ではない）
+                'provider_payment_id' => $payment->providerPaymentId(), // ★ pi_...
                 'method' => $payment->method()->value,
                 'status' => $payment->status()->value,
                 'instructions' => $payment->instructions(),

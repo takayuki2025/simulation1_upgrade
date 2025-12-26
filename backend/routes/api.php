@@ -226,7 +226,7 @@ use App\Modules\Order\Presentation\Http\Controllers\OrderController;
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/orders', [OrderController::class, 'create']);
-    Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
+//     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
 });
 
 
@@ -321,10 +321,10 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\OrderDetailController;
+// use App\Modules\Order\Presentation\Http\Controllers\OrderDetailController;
 
-Route::middleware(['auth.jwt'])
-    ->get('/orders/{orderId}', OrderDetailController::class);
+// Route::middleware(['auth.jwt'])
+//     ->get('/orders/{orderId}', OrderDetailController::class);
 
 
 
@@ -335,4 +335,15 @@ Route::middleware(['auth.jwt'])->group(function () {
         '/orders/{orderId}/confirm-address',
         ConfirmOrderAddressController::class
     );
+});
+
+
+
+
+
+
+use App\Modules\User\Presentation\Http\Controllers\UserAddressController;
+
+Route::middleware('auth.jwt')->group(function () {
+    Route::get('/me/addresses/primary', [UserAddressController::class, 'primary']);
 });

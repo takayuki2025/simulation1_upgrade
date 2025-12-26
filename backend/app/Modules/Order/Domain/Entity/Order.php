@@ -143,7 +143,9 @@ final class Order
     public function markPaid(): self
     {
         if ($this->status !== OrderStatus::PENDING_PAYMENT) {
-            throw new \DomainException('Order cannot be marked paid from status: ' . $this->status->value);
+            throw new \DomainException(
+                'Order cannot be marked paid from status: ' . $this->status->value
+            );
         }
 
         return self::reconstitute(
@@ -154,7 +156,9 @@ final class Order
             totalAmount: $this->totalAmount,
             currency: $this->currency,
             items: $this->items,
-            meta: $this->meta
+            meta: $this->meta,
+            shippingAddress: $this->shippingAddress,
+            addressSnapshotAt: $this->addressSnapshotAt,
         );
     }
 
@@ -172,7 +176,9 @@ final class Order
             totalAmount: $this->totalAmount,
             currency: $this->currency,
             items: $this->items,
-            meta: $this->meta
+            meta: $this->meta,
+            shippingAddress: $this->shippingAddress,
+            addressSnapshotAt: $this->addressSnapshotAt,
         );
     }
 

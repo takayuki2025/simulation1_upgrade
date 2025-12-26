@@ -1,10 +1,15 @@
 import useSWR from "swr";
 import { useAuth } from "@/ui/auth/useAuth";
 
-export type UserProfile = {
-  postNumber: string | null;
-  address: string | null;
+export type UserAddress = {
+  id: number;
+  postNumber: string;
+  address: string;
   building: string | null;
+};
+
+export type UserProfile = {
+  address: UserAddress | null;
 };
 
 export function useUserProfileSWR() {
@@ -14,12 +19,31 @@ export function useUserProfileSWR() {
     isAuthenticated && apiClient ? "/mypage/profile" : null,
     async (url) => {
       const res = await apiClient!.get(url);
-      const u = res.data.user ?? res.data;
+
+      /**
+       * バックエンドはこう返す前提：
+       * {
+       *   address: {
+       *     id,
+       *     post_number,
+       *     address,
+       *     building
+       *   }
+       * }
+       */
+      const a = res.data.address ?? null;
+
+      if (!a) {
+        return { address: null };
+      }
 
       return {
-        postNumber: u.post_number ?? null,
-        address: u.address ?? null,
-        building: u.building ?? null,
+        address: {
+          id: a.id,
+          postNumber: a.post_number,
+          address: a.address,
+          building: a.building ?? null,
+        },
       };
     },
   );

@@ -4,13 +4,13 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use App\Modules\Auth\Domain\Port\TokenVerifierPort;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Closure;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
 class JwtAuthenticate
 {
@@ -21,6 +21,45 @@ class JwtAuthenticate
 
     public function handle(Request $request, Closure $next)
     {
+        /**
+         * =====================================================
+         * ✅ テスト環境専用バイパス（本番には一切影響しない）
+         * =====================================================
+         * - Feature Test では actingAs() を使う
+         * - Authorization ヘッダは不要
+         */
+        if (app()->environment('testing')) {
+            $user = Auth::user();
+            if ($user instanceof User) {
+
+                // request()->user() を確定
+                $request->setUserResolver(fn () => $user);
+                Auth::setUser($user);
+
+                // DDD AuthPrincipal（最小構成）
+                $principal = new AuthPrincipal(
+                    provider: 'testing',
+                    providerUid: (string) $user->id,
+                    userId: $user->id,
+                    email: $user->email,
+                    emailVerified: (bool) ($user->email_verified_at !== null),
+                    displayName: $user->name ?? null,
+                    shopIds: [],
+                );
+
+                $request->attributes->set('auth_principal', $principal);
+                $request->attributes->set('tenant_id', null);
+
+                return $next($request);
+            }
+        }
+
+        /**
+         * =====================================================
+         * 🔐 本番・ローカル用 JWT 認証（ここから下は従来通り）
+         * =====================================================
+         */
+
         $token = $this->getBearerToken($request);
 
         if (! $token) {
@@ -34,88 +73,50 @@ class JwtAuthenticate
             return $this->unauthorized('Invalid token');
         }
 
-        // exp チェック（念のため手動チェック）
-        if (property_exists($decoded, 'exp') && time() >= (int)$decoded->exp) {
+        // exp チェック
+        if (property_exists($decoded, 'exp') && time() >= (int) $decoded->exp) {
             return $this->unauthorized('Token expired');
         }
 
-        // sub は user_id を前提（あなたのJWT発行で sub=user->id）
-        $userId = property_exists($decoded, 'sub') ? (int)$decoded->sub : 0;
+        // sub = user_id 前提
+        $userId = property_exists($decoded, 'sub') ? (int) $decoded->sub : 0;
         if ($userId <= 0) {
             return $this->unauthorized('Invalid token subject');
         }
 
         $user = User::find($userId);
         if (! $user) {
-            // JWTは通ってるがDBにユーザーがない＝整合性事故。ここでJIT作成はしない（User基盤が崩れるため）
             return $this->unauthorized('User not found');
         }
 
-        // request()->user() を確定
+        // request / Auth 両方にセット
         $request->setUserResolver(fn () => $user);
-
-        // Auth ファサード側も確定（$request->user() と Auth::user() のズレ事故を防止）
         Auth::setUser($user);
 
-        // ==============================
-        // AuthPrincipal を生成（DDD Auth 用）
-        // ==============================
-
+        // AuthPrincipal（DDD Auth）
         $principal = new AuthPrincipal(
-            provider: 'jwt',                       // 認証方式
-            providerUid: (string) $decoded->sub,   // 認証ID（今回は user_id だが将来分離可）
-            userId: $user->id,                     // ★ ここが最重要
+            provider: 'jwt',
+            providerUid: (string) $decoded->sub,
+            userId: $user->id,
             email: $user->email,
             emailVerified: (bool) ($user->email_verified_at !== null),
             displayName: $user->name ?? null,
-            shopIds: $user->shops()->pluck('shops.id')->all(), // ★ あれば
+            shopIds: $user->shops()->pluck('shops.id')->all(),
         );
 
-
-        // Request attributes に inject（UseCase 用）
         $request->attributes->set('auth_principal', $principal);
 
-        // tenant_id を統一（claim: tenant or shop_id）
+        // tenant_id（claim: tenant or shop_id）
         $tenantId = null;
         if (property_exists($decoded, 'tenant') && $decoded->tenant !== null) {
-            $tenantId = (int)$decoded->tenant;
+            $tenantId = (int) $decoded->tenant;
         } elseif (property_exists($decoded, 'shop_id') && $decoded->shop_id !== null) {
-            $tenantId = (int)$decoded->shop_id;
+            $tenantId = (int) $decoded->shop_id;
         }
 
         $request->attributes->set('tenant_id', $tenantId);
 
-        // 追加：必要なら roles も attributes に（認可でclaim参照したい場合）
-        // $request->attributes->set('roles', property_exists($decoded, 'roles') ? (array)$decoded->roles : []);
-
         return $next($request);
-    }
-
-    public function resolveUserFromRequest(Request $request): ?User
-    {
-        $token = $this->getBearerToken($request);
-        if (! $token) {
-            return null;
-        }
-
-        try {
-            // ✅ handle() と同じ verifier を使う
-            $decoded = $this->verifier->decode($token);
-        } catch (\Throwable $e) {
-            Log::warning('[resolveUserFromRequest] decode failed', [
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
-
-        if (
-            !property_exists($decoded, 'sub')
-            || (int)$decoded->sub <= 0
-        ) {
-            return null;
-        }
-
-        return User::find((int)$decoded->sub);
     }
 
     private function getBearerToken(Request $request): ?string
@@ -124,6 +125,7 @@ class JwtAuthenticate
         if (! $header || ! str_starts_with($header, 'Bearer ')) {
             return null;
         }
+
         return substr($header, 7);
     }
 

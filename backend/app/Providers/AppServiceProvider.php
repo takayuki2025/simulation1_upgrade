@@ -51,6 +51,8 @@ use App\Modules\Order\Domain\Event\OrderPaid;
 use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaidListener;
 use App\Shared\Domain\Clock\Clock;
 use App\Shared\Domain\Clock\SystemClock;
+use App\Modules\User\Domain\Repository\UserAddressRepository;
+use App\Modules\User\Infrastructure\Persistence\Repository\EloquentUserAddressRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -134,6 +136,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(Clock::class, SystemClock::class);
 
 
+
+        $this->app->bind(
+            UserAddressRepository::class,
+            EloquentUserAddressRepository::class
+        );
 
 
 
