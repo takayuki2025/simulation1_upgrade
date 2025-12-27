@@ -12,12 +12,9 @@ interface OrderRepository
 
     public function save(Order $order): Order;
 
-    /**
-     * 購入者（buyer）別の注文一覧（新しい順）
-     *
-     * @return Order[]
-     */
+    /** @return Order[] */
     public function findByBuyer(int $userId): array;
 
+    /** @return Order[] */
     public function findByShop(int $shopId): array;
 }

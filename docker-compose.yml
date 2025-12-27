@@ -131,7 +131,8 @@ services:
     # NEXT_PUBLIC_API_BASE_URL: "/api"
 
     # ★ Next.js は HTTP 3000 で動く（重要）
-    command: sh -c "npm install && npm run dev -- --port 3000"
+    # command: sh -c "npm install && npm run dev -- --port 3000"
+    command: npm run dev -- --port 3000
 
     networks:
       simulation1_network:

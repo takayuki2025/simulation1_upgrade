@@ -1,13 +1,12 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/ui/auth/useAuth";
 
 export default function ShopDashboardPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   /* =========================
      ⏳ Loading
@@ -17,15 +16,7 @@ export default function ShopDashboardPage() {
   }
 
   /* =========================
-     🔐 未ログイン → ログインへ
-  ========================= */
-  if (!isAuthenticated) {
-    router.replace("/login");
-    return null;
-  }
-
-  /* =========================
-     🛂 権限チェック
+     🛂 権限チェック（ログイン済み前提）
   ========================= */
   const isShopStaff =
     user?.shop_roles?.some(

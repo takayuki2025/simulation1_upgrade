@@ -5,11 +5,19 @@ namespace App\Modules\Shipment\Infrastructure\Persistence;
 use App\Modules\Shipment\Domain\Entity\Shipment;
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Shop\Domain\ValueObject\ShopCode;
+use App\Modules\Shop\Domain\Repository\ShopRepository;
+use App\Modules\Shipment\Infrastructure\Persistence\Models\ShipmentModel;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class EloquentShipmentRepository implements ShipmentRepository
 {
+    public function __construct(
+        private ShopRepository $shops, // shop_code -> shop_id 解決用
+    ) {
+    }
+
     public function save(Shipment $shipment): Shipment
     {
         if ($shipment->id === null) {
@@ -65,4 +73,43 @@ final class EloquentShipmentRepository implements ShipmentRepository
             ->where('order_id', $orderId)
             ->exists();
     }
+
+    public function findByShopAndOrder(ShopCode $shopCode, int $orderId): ?array
+    {
+        $shop = $this->shops->findByCode($shopCode);
+        if (!$shop) {
+            return null;
+        }
+
+        $m = ShipmentModel::query()
+            ->where('shop_id', $shop->id())
+            ->where('order_id', $orderId)
+            ->first();
+
+        if (!$m) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $m->id,
+            'status' => (string) $m->status,
+            'eta' => $m->eta?->toDateString(),
+            // 必要なら配送先や履歴も足す
+        ];
+    }
+
+    public function findById(int $shipmentId): ?array
+    {
+        $m = ShipmentModel::find($shipmentId);
+        if (!$m) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $m->id,
+            'status' => (string) $m->status,
+            'eta' => $m->eta?->toDateString(),
+        ];
+    }
+
 }

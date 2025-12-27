@@ -354,3 +354,43 @@ Route::prefix('shops/{shop_code}')
     ->group(function () {
         Route::get('/shipments', ShopShipmentListController::class);
     });
+
+
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
+
+Route::prefix('shops/{shop_code}')
+    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+    ->group(function () {
+        Route::get(
+            '/orders/{orderId}/shipment',
+            ShopOrderShipmentController::class
+        );
+    });
+
+
+
+Route::prefix('shops/{shop_code}')
+    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+    ->group(function () {
+        Route::get(
+            '/orders/{orderId}/shipment',
+            ShopOrderShipmentController::class
+        );
+    });
+
+
+
+Route::prefix('shipments')
+    ->middleware(['auth.jwt', 'tenant'])
+    ->group(function () {
+
+        Route::post('{id}/pack', [ShipmentController::class, 'pack']);
+        Route::post('{id}/ship', [ShipmentController::class, 'ship']);
+        Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
+        Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
+    });
+
+

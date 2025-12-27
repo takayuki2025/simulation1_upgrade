@@ -39,11 +39,11 @@ export default function ShopShipmentListPage() {
   /* =========================
      🔐 Auth Guard
   ========================= */
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [authLoading, isAuthenticated, router]);
+  // useEffect(() => {
+  //   if (!authLoading && !isAuthenticated) {
+  //     router.replace("/login");
+  //   }
+  // }, [authLoading, isAuthenticated, router]);
 
   /* =========================
      📦 Fetch Shipments

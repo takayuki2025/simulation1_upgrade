@@ -55,6 +55,8 @@ use App\Modules\User\Domain\Repository\UserAddressRepository;
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentUserAddressRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentManagementQueryRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentManagementQueryRepository;
+use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -150,6 +152,11 @@ class AppServiceProvider extends ServiceProvider
             DbShipmentManagementQueryRepository::class
         );
 
+
+        $this->app->bind(
+            ShipmentRepository::class,
+            EloquentShipmentRepository::class
+        );
 
 
 

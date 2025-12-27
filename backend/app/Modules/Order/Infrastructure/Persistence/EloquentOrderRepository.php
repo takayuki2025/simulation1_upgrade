@@ -11,9 +11,13 @@ use App\Modules\Order\Infrastructure\Persistence\Models\OrderModel;
 
 final class EloquentOrderRepository implements OrderRepository
 {
-    public function findById(int $orderId): Order
+    public function findById(int $orderId): ?Order
     {
-        $model = OrderModel::findOrFail($orderId);
+        $model = OrderModel::find($orderId);
+        if (!$model) {
+            return null;
+        }
+
         return $this->reconstituteOrder($model);
     }
 
@@ -46,7 +50,6 @@ final class EloquentOrderRepository implements OrderRepository
 
         $model->meta = $order->meta();
 
-        // Address snapshot（あれば）
         if ($order->shippingAddress()) {
             $address = $order->shippingAddress();
 
@@ -62,24 +65,9 @@ final class EloquentOrderRepository implements OrderRepository
 
         $model->save();
 
-        return Order::reconstitute(
-            id: $model->id,
-            shopId: $model->shop_id,
-            userId: $model->user_id,
-            status: OrderStatus::from($model->status),
-            totalAmount: $model->total_amount,
-            currency: $model->currency,
-            items: array_map(
-                fn (array $row) => OrderItemSnapshot::fromArray($row),
-                $model->items_snapshot
-            ),
-            meta: $model->meta,
-        );
+        return $this->reconstituteOrder($model);
     }
 
-    /**
-     * @return Order[]
-     */
     public function findByBuyer(int $userId): array
     {
         $models = OrderModel::query()
@@ -87,9 +75,17 @@ final class EloquentOrderRepository implements OrderRepository
             ->orderByDesc('id')
             ->get();
 
-        return $models
-            ->map(fn (OrderModel $m) => $this->reconstituteOrder($m))
-            ->all();
+        return $models->map(fn (OrderModel $m) => $this->reconstituteOrder($m))->all();
+    }
+
+    public function findByShop(int $shopId): array
+    {
+        $models = OrderModel::query()
+            ->where('shop_id', $shopId)
+            ->orderByDesc('id')
+            ->get();
+
+        return $models->map(fn (OrderModel $m) => $this->reconstituteOrder($m))->all();
     }
 
     // ==========================
@@ -133,36 +129,5 @@ final class EloquentOrderRepository implements OrderRepository
             shippingAddress: $address,
             addressSnapshotAt: $snapshotAt,
         );
-    }
-
-    private function toEntity(OrderModel $model): Order
-    {
-        $items = array_map(
-            fn (array $row) => OrderItemSnapshot::fromArray($row),
-            $model->items_snapshot ?? []
-        );
-
-        return Order::reconstitute(
-            id: (int) $model->id,
-            shopId: (int) $model->shop_id,
-            userId: (int) $model->user_id,
-            status: OrderStatus::from($model->status),
-            totalAmount: (int) $model->total_amount,
-            currency: (string) $model->currency,
-            items: $items,
-            meta: $model->meta
-        );
-    }
-
-    public function findByShop(int $shopId): array
-    {
-        $models = OrderModel::query()
-            ->where('shop_id', $shopId)
-            ->orderByDesc('id')
-            ->get();
-
-        return $models
-            ->map(fn (OrderModel $m) => $this->reconstituteOrder($m))
-            ->all();
     }
 }
