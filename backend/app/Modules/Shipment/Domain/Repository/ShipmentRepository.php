@@ -13,13 +13,12 @@ interface ShipmentRepository
     public function existsByOrderId(int $orderId): bool;
 
     /**
-     * 店舗視点：注文に紐づく Shipment 参照
-     * 返り値は Read 用の配列（Resource/DTO にしてもOK）
+     * 店舗視点：注文に紐づく Shipment 参照（Read 用）
      */
-    public function findByShopAndOrder(ShopCode $shopCode, int $orderId): ?array;
+    public function findByShopAndOrder(string $shopCode, int $orderId): ?array;
 
     /**
-     * アクション後の再取得用（shipment_id から）
+     * shipment_id からの再取得（Read 用）
      */
     public function findById(int $shipmentId): ?array;
 }

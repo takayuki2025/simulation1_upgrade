@@ -1,6 +1,6 @@
 import "./globals.css";
-import { AuthProvider } from "@/ui/auth/AuthProvider";
 import { SWRProvider } from "./SWRProvider";
+import ClientLayout from "./ClientLayout";
 
 export default function RootLayout({
   children,
@@ -11,7 +11,7 @@ export default function RootLayout({
     <html lang="ja">
       <body>
         <SWRProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <ClientLayout>{children}</ClientLayout>
         </SWRProvider>
       </body>
     </html>

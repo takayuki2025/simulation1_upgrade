@@ -5,7 +5,6 @@ namespace App\Modules\Shipment\Infrastructure\Persistence;
 use App\Modules\Shipment\Domain\Entity\Shipment;
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
-use App\Modules\Shop\Domain\ValueObject\ShopCode;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\Models\ShipmentModel;
 use Carbon\Carbon;
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 final class EloquentShipmentRepository implements ShipmentRepository
 {
     public function __construct(
-        private ShopRepository $shops, // shop_code -> shop_id 解決用
+        private ShopRepository $shops // shop_code → shop_id 解決用
     ) {
     }
 
@@ -51,8 +50,11 @@ final class EloquentShipmentRepository implements ShipmentRepository
 
     public function findByOrderId(int $orderId): ?Shipment
     {
-        $row = DB::table('shipments')->where('order_id', $orderId)->first();
-        if (! $row) {
+        $row = DB::table('shipments')
+            ->where('order_id', $orderId)
+            ->first();
+
+        if (!$row) {
             return null;
         }
 
@@ -74,7 +76,7 @@ final class EloquentShipmentRepository implements ShipmentRepository
             ->exists();
     }
 
-    public function findByShopAndOrder(ShopCode $shopCode, int $orderId): ?array
+    public function findByShopAndOrder(string $shopCode, int $orderId): ?array
     {
         $shop = $this->shops->findByCode($shopCode);
         if (!$shop) {
@@ -94,7 +96,6 @@ final class EloquentShipmentRepository implements ShipmentRepository
             'id' => (int) $m->id,
             'status' => (string) $m->status,
             'eta' => $m->eta?->toDateString(),
-            // 必要なら配送先や履歴も足す
         ];
     }
 
@@ -111,5 +112,4 @@ final class EloquentShipmentRepository implements ShipmentRepository
             'eta' => $m->eta?->toDateString(),
         ];
     }
-
 }
