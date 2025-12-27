@@ -385,13 +385,16 @@ Route::prefix('shops/{shop_code}')
     });
 
 
+use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShipShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\InTransitShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\DeliverShipmentController;
 
-Route::prefix('shipments')
+Route::prefix('shipments/{shipmentId}')
     ->middleware(['auth.jwt', 'tenant'])
     ->group(function () {
-
-        Route::post('{id}/pack', [ShipmentController::class, 'pack']);
-        Route::post('{id}/ship', [ShipmentController::class, 'ship']);
-        Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
-        Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
+        Route::post('pack', PackShipmentController::class);
+        Route::post('ship', ShipShipmentController::class);
+        Route::post('in-transit', InTransitShipmentController::class);
+        Route::post('deliver', DeliverShipmentController::class);
     });

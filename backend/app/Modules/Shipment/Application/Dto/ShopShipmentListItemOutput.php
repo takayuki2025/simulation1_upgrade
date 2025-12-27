@@ -10,7 +10,7 @@ final class ShopShipmentListItemOutput
         public readonly int $totalAmount,
         public readonly string $currency,
         public readonly int $buyerUserId,
-        public readonly ?string $addressSnapshotAt,
+        public readonly ?string $addressConfirmedAt, // ✅
         public readonly ?int $shipmentId,
         public readonly ?string $shipmentStatus,
         public readonly ?string $eta,
@@ -26,11 +26,15 @@ final class ShopShipmentListItemOutput
             totalAmount: (int) $row['total_amount'],
             currency: (string) $row['currency'],
             buyerUserId: (int) $row['buyer_user_id'],
-            addressSnapshotAt: $row['address_snapshot_at'] ? (string) $row['address_snapshot_at'] : null,
+            addressConfirmedAt: $row['address_confirmed_at']
+                ? (string) $row['address_confirmed_at']
+                : null,
             shipmentId: $row['shipment_id'] !== null ? (int) $row['shipment_id'] : null,
-            shipmentStatus: $row['shipment_status'] ? (string) $row['shipment_status'] : null,
-            eta: $row['eta'] ? (string) $row['eta'] : null,
-            destinationAddress: is_array($row['destination_address'] ?? null) ? $row['destination_address'] : null,
+            shipmentStatus: $row['shipment_status'] ?: null,
+            eta: $row['eta'] ?: null,
+            destinationAddress: is_array($row['destination_address'] ?? null)
+                ? $row['destination_address']
+                : null,
         );
     }
 
@@ -42,7 +46,7 @@ final class ShopShipmentListItemOutput
             'total_amount' => $this->totalAmount,
             'currency' => $this->currency,
             'buyer_user_id' => $this->buyerUserId,
-            'address_snapshot_at' => $this->addressSnapshotAt,
+            'address_confirmed_at' => $this->addressConfirmedAt,
 
             'shipment_id' => $this->shipmentId,
             'shipment_status' => $this->shipmentStatus,

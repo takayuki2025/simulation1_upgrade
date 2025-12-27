@@ -25,11 +25,11 @@ export default function ShopOrderDetailPage() {
   /* =========================
      🔐 Auth Guard
   ========================= */
-  // useEffect(() => {
-  //   if (!isLoading && !isAuthenticated) {
-  //     router.replace("/login");
-  //   }
-  // }, [isLoading, isAuthenticated, router]);
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   /* =========================
      📦 Fetch Shipment（★修正点）
@@ -67,6 +67,11 @@ export default function ShopOrderDetailPage() {
   if (isLoading || !shipment) {
     return <div className="p-6">読み込み中...</div>;
   }
+
+  if (shipment.status === "created") showPack();
+  if (shipment.status === "packed") showShip();
+  if (shipment.status === "shipped") showInTransit();
+  if (shipment.status === "in_transit") showDeliver();
 
   return (
     <div className="p-6 space-y-4">
