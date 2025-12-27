@@ -7,41 +7,36 @@ use Illuminate\Support\Facades\Schema;
 return new class () extends Migration {
     public function up(): void
     {
+
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
 
-            // Multi-tenant / shop scope
+            // Shop / Tenant
             $table->unsignedBigInteger('shop_id')->index();
 
             // Buyer
             $table->unsignedBigInteger('user_id')->index();
 
             // Status
-            $table->string('status', 50)->index(); // pending_payment, paid, cancelled, payment_failed, expired
+            $table->string('status', 50)->index();
 
-            // Totals (snapshot)
+            // Totals
             $table->unsignedInteger('total_amount');
             $table->string('currency', 10);
 
-            // Snapshot of ordered items (JSON)
+            // Items snapshot
             $table->json('items_snapshot');
 
-            // Optional metadata for future
+            // ★ Address snapshot（確定住所）
+            $table->json('address_snapshot')->nullable();
+            $table->timestamp('address_confirmed_at')->nullable();
+
+            // Optional metadata
             $table->json('meta')->nullable();
-
-
-            $table->string('shipping_postal_code', 20)->nullable();
-            $table->string('shipping_prefecture', 50)->nullable();
-            $table->string('shipping_city', 100)->nullable();
-            $table->string('shipping_address_line1', 255)->nullable();
-            $table->string('shipping_address_line2', 255)->nullable();
-            $table->string('shipping_recipient_name', 100)->nullable();
-            $table->string('shipping_phone', 30)->nullable();
-            $table->timestamp('address_snapshot_at')->nullable();
-
 
             $table->timestamps();
         });
+
     }
 
     public function down(): void

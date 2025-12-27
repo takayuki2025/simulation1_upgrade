@@ -225,7 +225,10 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 // Webhook: no auth (signature)
 
-Route::post('/payments/webhook/stripe', StripeWebhookController::class);
+// Route::post('/payments/webhook/stripe', StripeWebhookController::class);
+
+Route::post('/webhooks/stripe', StripeWebhookController::class);
+
 
 
 
@@ -392,5 +395,3 @@ Route::prefix('shipments')
         Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
         Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
     });
-
-

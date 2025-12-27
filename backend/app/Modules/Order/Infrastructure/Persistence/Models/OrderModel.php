@@ -10,21 +10,10 @@ final class OrderModel extends Model
 
     protected $guarded = [];
 
-    public $timestamps = true;
-
-    protected $fillable = [
-        'shop_id',
-        'user_id',
-        'status',
-        'total_amount',
-        'currency',
-        'items_snapshot',
-        'meta',
-    ];
-
     protected $casts = [
-        'items_snapshot' => 'array',
-        'meta' => 'array',
-        'address_snapshot_at' => 'datetime',
+        'items_snapshot'        => 'array',
+        'meta'                  => 'array',
+        'address_snapshot'      => 'array',
+        'address_confirmed_at'  => 'datetime',
     ];
 }

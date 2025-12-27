@@ -2,38 +2,41 @@
 
 namespace App\Modules\Shipment\Application\UseCase;
 
-use App\Modules\Shipment\Application\Dto\CreateShipmentInput;
-use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Domain\Entity\Shipment;
+use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
+use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Order\Domain\Repository\OrderRepository;
 
 final class CreateShipmentUseCase
 {
     public function __construct(
         private ShipmentRepository $shipments,
+        private OrderRepository $orders,
     ) {
     }
 
-    public function handle(CreateShipmentInput $input): void
+    public function handle(int $orderId, int $shopId): void
     {
-        \Log::info('[Shipment] CreateShipmentUseCase start', [
-            'shop_id' => $input->shopId,
-            'order_id' => $input->orderId,
-        ]);
-
-        if ($this->shipments->findByOrderId($input->orderId)) {
-            \Log::info('[Shipment] already exists, skip', [
-                'order_id' => $input->orderId,
-            ]);
+        // 二重作成防止（超重要）
+        if ($this->shipments->existsByOrderId($orderId)) {
             return;
         }
 
-        $shipment = Shipment::createFromOrder($input);
+        $order = $this->orders->findById($orderId);
+        if (!$order) {
+            return;
+        }
+
+        $shipment = new Shipment(
+            id: null,
+            shopId: $shopId,
+            orderId: $orderId,
+            status: ShipmentStatus::CREATED,
+            originAddress: [],       // 倉庫 or 店舗住所（後で拡張）
+            destinationAddress: $order->shippingAddress(),
+            eta: null,
+        );
 
         $this->shipments->save($shipment);
-
-        \Log::info('[Shipment] created', [
-            'shipment_id' => $shipment->id,
-            'order_id' => $shipment->orderId,
-        ]);
     }
 }

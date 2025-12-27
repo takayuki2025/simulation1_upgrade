@@ -20,20 +20,13 @@ final class EventServiceProvider extends ServiceProvider
             \App\Listeners\RedirectAfterEmailVerified::class,
         ],
 
-        // ★★★ これが最重要 ★★★
+        // ✅ OrderPaid → Shipment 作成（唯一・正）
         OrderPaid::class => [
             CreateShipmentOnOrderPaidListener::class,
         ],
     ];
 
-
-
-    /**
-     * Register any events for your application.
-     *
-     * @return void
-     */
-    public function boot()
+    public function boot(): void
     {
         //
     }

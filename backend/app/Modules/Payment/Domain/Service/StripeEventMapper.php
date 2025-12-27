@@ -10,27 +10,25 @@ final class StripeEventMapper
 {
     public function map(HandlePaymentWebhookInput $input): DomainPaymentEvent
     {
-        $object = $input->payload['data']['object'] ?? [];
+        $payload = $input->payload;
+        $object  = $payload['data']['object'] ?? [];
 
-        // payment_intent 系以外は v1 ではすべて無視
-        if (!str_starts_with($input->eventType, 'payment_intent.')) {
-            return DomainPaymentEvent::ignored($input->occurredAt);
-        }
+        // ✅ event_type ごとに「最終的に payment_intent id (pi_...)」を取り出す
+        $providerPaymentId = $this->extractPaymentIntentId($input->eventType, $object);
 
-        $providerPaymentId = $object['id'] ?? null;
-
-        // payment_intent なのに id が無い = 異常 → 無視
+        // id が取れない場合は無視（500は返さない方針のまま）
         if (!is_string($providerPaymentId) || $providerPaymentId === '') {
             return DomainPaymentEvent::ignored($input->occurredAt);
         }
 
-        // ============================
-        // konbini instructions 抽出
-        // ============================
+        // konbini instructions 抽出（PaymentIntentのときだけ成立する）
         $instructions = $this->extractKonbiniInstructions($object);
 
         return match ($input->eventType) {
 
+            // ============================
+            // PaymentIntent 正系
+            // ============================
             'payment_intent.succeeded' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::SUCCEEDED,
@@ -58,7 +56,7 @@ final class StripeEventMapper
                     $instructions,
                 ),
 
-            // created でも拾える場合がある（イベント順の揺れ対策）
+            // created は揺れ対策（従来通り）
             'payment_intent.created' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::REQUIRES_ACTION,
@@ -68,9 +66,57 @@ final class StripeEventMapper
                     $instructions,
                 ),
 
+            // ============================
+            // ✅ 実運用で来がちな補助イベント
+            // これらも「最終的に pi_... を取れる」なら succeeded 扱いにする
+            // ============================
+            'charge.succeeded' =>
+                new DomainPaymentEvent(
+                    DomainPaymentEventType::SUCCEEDED,
+                    $providerPaymentId,
+                    null,
+                    $input->occurredAt,
+                    null, // charge には konbini details は無い
+                ),
+
+            'checkout.session.completed' =>
+                new DomainPaymentEvent(
+                    DomainPaymentEventType::SUCCEEDED,
+                    $providerPaymentId,
+                    null,
+                    $input->occurredAt,
+                    null,
+                ),
+
             default =>
                 DomainPaymentEvent::ignored($input->occurredAt),
         };
+    }
+
+    /**
+     * event_type と object から「payment_intent id (pi_...)」を抽出する
+     */
+    private function extractPaymentIntentId(string $eventType, array $object): ?string
+    {
+        // payment_intent.* → object.id が pi_...
+        if (str_starts_with($eventType, 'payment_intent.')) {
+            $id = $object['id'] ?? null;
+            return is_string($id) ? $id : null;
+        }
+
+        // charge.succeeded → object.payment_intent が pi_...
+        if ($eventType === 'charge.succeeded') {
+            $pi = $object['payment_intent'] ?? null;
+            return is_string($pi) ? $pi : null;
+        }
+
+        // checkout.session.completed → object.payment_intent が pi_...
+        if ($eventType === 'checkout.session.completed') {
+            $pi = $object['payment_intent'] ?? null;
+            return is_string($pi) ? $pi : null;
+        }
+
+        return null;
     }
 
     private function extractKonbiniInstructions(array $piObject): ?array
