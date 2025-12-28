@@ -3,40 +3,38 @@
 namespace App\Modules\Order\Presentation\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Modules\Order\Application\Query\ShopOrderShipmentQuery;
-use App\Modules\Shop\Domain\Entity\Shop;
+use Illuminate\Routing\Controller;
+use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 
-final class ShopOrderShipmentController
+final class ShopOrderShipmentController extends Controller
 {
     public function __construct(
-        private ShopOrderShipmentQuery $query
+        private ShipmentQueryRepository $shipments
     ) {
     }
 
-    public function __invoke(Request $request, string $orderId)
-    {
-        $orderId = (int) $orderId;
-
-        /** @var Shop|null $shop */
+    public function __invoke(
+        Request $request,
+        string $shop_code,
+        int $orderId
+    ) {
         $shop = $request->attributes->get('currentShop');
-        if (!$shop) {
-            abort(500, 'ShopContext not resolved');
-        }
 
-        $shipment = $this->query->handle(
-            $shop->id(),
-            $orderId
+        $row = $this->shipments->findByShopIdAndOrderId(
+            shopId: $shop->id(),
+            orderId: $orderId
         );
 
-        if (!$shipment) {
+        if (! $row) {
             return response()->json([
-                'exists' => false,
-            ]);
+                'shipment_id' => null,
+            ], 200);
         }
 
         return response()->json([
-            'exists' => true,
-            'shipment' => $shipment,
-        ]);
+            'shipment_id'     => $row['shipment_id'],
+            'shipment_status' => $row['shipment_status'],
+            'eta'             => $row['eta'],
+        ], 200);
     }
 }

@@ -8,7 +8,7 @@ use App\Modules\Shipment\Domain\Event\ShipmentEvent;
 use App\Modules\Shipment\Domain\Event\ShipmentEventType;
 use Illuminate\Support\Facades\DB;
 
-final class ShipShipmentUseCase
+final class InTransitShipmentUseCase
 {
     public function __construct(
         private ShipmentRepository $shipments,
@@ -20,17 +20,17 @@ final class ShipShipmentUseCase
     {
         DB::transaction(function () use ($shipmentId) {
 
-            if ($this->events->exists($shipmentId, ShipmentEventType::SHIPPED)) {
+            if ($this->events->exists($shipmentId, ShipmentEventType::IN_TRANSIT)) {
                 return; // 冪等
             }
 
             $shipment = $this->shipments->findById($shipmentId);
-            $shipment->ship(); // ← 状態遷移チェックは Entity 側
+            $shipment->markInTransit(); // ← Entity に定義
 
             $this->shipments->save($shipment);
 
             $this->events->record(
-                ShipmentEvent::shipped($shipmentId)
+                ShipmentEvent::inTransit($shipmentId)
             );
         });
     }

@@ -36,7 +36,13 @@ final class Shipment
 
     public function pack(): void
     {
-        $this->assertStatus(ShipmentStatus::CREATED);
+        if ($this->status !== ShipmentStatus::CREATED) {
+            throw new DomainException(sprintf(
+                'Invalid shipment state transition: %s → packed',
+                $this->status->value
+            ));
+        }
+
         $this->status = ShipmentStatus::PACKED;
     }
 
@@ -44,6 +50,12 @@ final class Shipment
     {
         $this->assertStatus(ShipmentStatus::PACKED);
         $this->status = ShipmentStatus::SHIPPED;
+    }
+
+    public function markInTransit(): void
+    {
+        $this->assertStatus(ShipmentStatus::SHIPPED);
+        $this->status = ShipmentStatus::IN_TRANSIT;
     }
 
     public function deliver(): void

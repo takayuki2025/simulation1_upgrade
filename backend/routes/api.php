@@ -244,6 +244,7 @@ Route::middleware('auth.jwt.optional')->group(function () {
 use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\AdminShipmentKpiController;
 use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
 
 /*
 |--------------------------------------------------------------------------
@@ -251,19 +252,37 @@ use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentControlle
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('shipments')
-    ->middleware(['auth.jwt']) // shop スコープ前提
+
+// Shop Dashboard（A フェーズの正解）
+Route::prefix('shops/{shop_code}')
+    ->middleware([
+        'auth.jwt',
+        'shop.context',
+        'shop.role:owner,manager,staff'
+    ])
     ->group(function () {
 
-        // Create shipment (OrderEvent::PAID から呼ばれる想定)
-        Route::post('/', [ShipmentController::class, 'store']);
+        Route::get('/shipments', ShopShipmentListController::class);
 
-        // State transitions (Admin / Shop)
-        Route::post('{id}/pack', [ShipmentController::class, 'pack']);
-        Route::post('{id}/ship', [ShipmentController::class, 'ship']);
-        Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
-        Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
+        // ★ 手動作成（A フェーズ唯一の入口）
+        Route::post(
+            '/dashboard/orders/{orderId}/shipment',
+            [ShipmentController::class, 'store']
+        );
     });
+
+
+// Create shipment (OrderEvent::PAID から呼ばれる想定)
+// （Bから一旦コメント化のみ！！！！！！！）
+// Route::prefix('shipments')
+//     ->middleware(['auth.jwt']) // shop スコープ前提
+//     ->group(function () {
+//         Route::post('/', [ShipmentController::class, 'store']);
+//         Route::post('{id}/pack', [ShipmentController::class, 'pack']);
+//         Route::post('{id}/ship', [ShipmentController::class, 'ship']);
+//         Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
+//         Route::post('{id}/deliver', [ShipmentController::class, 'deliver']);
+//     });
 
 
 Route::get('/admin/shipments/kpi', AdminShipmentKpiController::class)
@@ -337,7 +356,7 @@ Route::middleware('auth.jwt')->group(function () {
 
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
-use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+
 
 // === Shop / Public View ===
 Route::prefix('shops/{shop_code}')

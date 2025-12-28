@@ -28,8 +28,13 @@ export default function ShopOrderShipmentPage() {
 
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ★ すべての POST をここでロックする
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  // ----------------------------
+  // Fetch
+  // ----------------------------
   const fetchShipment = async () => {
     if (!apiClient) return;
 
@@ -39,14 +44,17 @@ export default function ShopOrderShipmentPage() {
         `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`,
       );
 
-      // ✅ API は「フラットな shipment」を返す
       const raw = res.data;
 
-      setShipment({
-        id: raw.shipment_id,
-        status: raw.shipment_status as ShipmentStatus,
-        eta: raw.eta ?? null,
-      });
+      if (raw && raw.shipment_id) {
+        setShipment({
+          id: raw.shipment_id,
+          status: raw.shipment_status as ShipmentStatus,
+          eta: raw.eta ?? null,
+        });
+      } else {
+        setShipment(null);
+      }
     } catch {
       setShipment(null);
     } finally {
@@ -59,12 +67,15 @@ export default function ShopOrderShipmentPage() {
     fetchShipment();
   }, [isReady, apiClient, shop_code, order_id]);
 
+  // ----------------------------
+  // Next Action
+  // ----------------------------
   const nextAction = useMemo(() => {
     if (!shipment) return null;
 
     switch (shipment.status) {
       case "created":
-        return { key: "pack", label: "梱包完了" };
+        return { key: "pack", label: "発送準備" };
       case "packed":
         return { key: "ship", label: "発送" };
       case "shipped":
@@ -76,6 +87,9 @@ export default function ShopOrderShipmentPage() {
     }
   }, [shipment]);
 
+  // ----------------------------
+  // State Transition
+  // ----------------------------
   const executeAction = async () => {
     if (!shipment || !apiClient || !nextAction || isActionLoading) return;
 
@@ -88,9 +102,52 @@ export default function ShopOrderShipmentPage() {
     }
   };
 
-  if (isLoading) return <div className="p-6">読み込み中...</div>;
-  if (!shipment) return <div className="p-6">配送情報が見つかりません。</div>;
+  // ----------------------------
+  // Render
+  // ----------------------------
+  if (isLoading) {
+    return <div className="p-6">読み込み中...</div>;
+  }
 
+  // ★ A フェーズ：Shipment 未作成
+  if (!shipment) {
+    return (
+      <div className="p-6 space-y-4">
+        <h1 className="text-xl font-bold">配送管理（注文 #{order_id}）</h1>
+
+        <div className="text-gray-600">まだ配送は作成されていません。</div>
+
+        <button
+          disabled={isActionLoading}
+          onClick={async () => {
+            if (!apiClient || isActionLoading) return;
+
+            setIsActionLoading(true);
+            try {
+              await apiClient.post(
+                `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`,
+              );
+              await fetchShipment();
+            } finally {
+              setIsActionLoading(false);
+            }
+          }}
+          className="px-4 py-2 border rounded disabled:opacity-50"
+        >
+          購入受付/配送準備
+        </button>
+
+        <button
+          onClick={() => router.push(`/shops/${shop_code}/dashboard/orders`)}
+          className="text-blue-600 underline text-sm"
+        >
+          ← 注文一覧へ戻る
+        </button>
+      </div>
+    );
+  }
+
+  // ★ Shipment あり
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-bold">配送管理（注文 #{order_id}）</h1>

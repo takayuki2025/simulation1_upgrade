@@ -58,21 +58,21 @@ final class DbShipmentQueryRepository implements ShipmentQueryRepository
     }
 
 
-    public function findByShopIdAndOrderId(int $shopId, int $orderId): ?array
-    {
+    public function findByShopIdAndOrderId(
+        int $shopId,
+        int $orderId
+    ): ?array {
         $row = DB::table('shipments')
-            ->join('orders', 'orders.id', '=', 'shipments.order_id')
             ->where('shipments.shop_id', $shopId)
-            ->where('orders.id', $orderId)
-            ->select(
-                'shipments.id',
-                'shipments.status',
+            ->where('shipments.order_id', $orderId)
+            ->select([
+                'shipments.id as shipment_id',
+                'shipments.status as shipment_status',
                 'shipments.eta',
-                'shipments.destination_address'
-            )
+            ])
             ->first();
 
-        return $row ? (array) $row : null;
+        return $row ? (array)$row : null;
     }
 
 

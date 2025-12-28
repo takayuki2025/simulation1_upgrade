@@ -34,10 +34,10 @@ final class ShipmentServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // 💡 支払完了イベントを受け取ったら、出荷を作成するリスナーを起動する
-        Event::listen(
-            OrderPaid::class,
-            CreateShipmentOnOrderPaidListener::class
-        );
+        // 💡 支払完了イベントを受け取ったら、出荷を作成するリスナーを起動する（Aでは使用しない）
+        // Event::listen(
+        //     OrderPaid::class,
+        //     CreateShipmentOnOrderPaidListener::class
+        // );
     }
 }
