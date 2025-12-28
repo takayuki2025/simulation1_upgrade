@@ -45,7 +45,7 @@ use App\Modules\Item\Presentation\Http\Controllers\{
 };
 
 Route::prefix('shops/{shop_code}')
-    ->middleware('tenant')
+    ->middleware(['tenant','shop.context',])
     ->group(function () {
         Route::get('/', ShopShowController::class);
         Route::get('/items', ShopItemListController::class);

@@ -5,17 +5,19 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Modules\Shop\Domain\Entity\Shop;
 
-class AddTenantInfoToLogs
+final class AddTenantInfoToLogs
 {
     public function handle(Request $request, Closure $next)
     {
-        $shop = app()->has('currentShop') ? app('currentShop') : null;
+        /** @var Shop|null $shop */
+        $shop = $request->attributes->get('currentShop');
 
         if ($shop) {
             Log::withContext([
-                'shop_id'   => $shop->id,
-                'shop_code' => $shop->shop_code,
+                'shop_id'   => $shop->id(),
+                'shop_code' => $shop->shopCode(),
             ]);
         }
 

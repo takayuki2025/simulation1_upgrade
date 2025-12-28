@@ -5,8 +5,6 @@ namespace App\Modules\Shop\Presentation\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 final class ShopContextMiddleware
 {
@@ -19,23 +17,17 @@ final class ShopContextMiddleware
     {
         $shopCode = $request->route('shop_code');
 
-        if (!$shopCode || !is_string($shopCode)) {
-            throw new NotFoundHttpException('shop_code not found in route');
+        if (!$shopCode) {
+            abort(404, 'shop_code not found in route');
         }
 
         $shop = $this->shops->findByShopCode($shopCode);
 
-        if (!$shop) {
-            throw new NotFoundHttpException('Shop not found');
+        if (!$shop || !$shop->isActive()) {
+            abort(403, 'Shop not found or inactive');
         }
 
-        if (!$shop->isActive()) {
-            throw new AccessDeniedHttpException('Shop is inactive');
-        }
-
-        /**
-         * ✅ 正解：Request に ShopContext を注入
-         */
+        // ★ Request Attribute にセット（ここが重要）
         $request->attributes->set('currentShop', $shop);
 
         return $next($request);

@@ -5,13 +5,16 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use App\Modules\Shop\Domain\Policy\ShopRolePolicy;
+use App\Modules\Shop\Domain\Entity\Shop;
 
 final class EnsureShopRole
 {
     public function handle(Request $request, Closure $next, ...$roles)
     {
         $user = $request->user();
-        $shop = app('currentShop');
+
+        /** @var Shop|null $shop */
+        $shop = $request->attributes->get('currentShop');
 
         if (!$user || !$shop) {
             abort(401);

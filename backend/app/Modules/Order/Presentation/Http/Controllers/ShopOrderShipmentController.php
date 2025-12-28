@@ -4,6 +4,7 @@ namespace App\Modules\Order\Presentation\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Modules\Order\Application\Query\ShopOrderShipmentQuery;
+use App\Modules\Shop\Domain\Entity\Shop;
 
 final class ShopOrderShipmentController
 {
@@ -16,8 +17,12 @@ final class ShopOrderShipmentController
     {
         $orderId = (int) $orderId;
 
-        /** @var \App\Modules\Shop\Domain\Entity\Shop $shop */
-        $shop = app('currentShop');
+        /** @var Shop|null $shop */
+        $shop = $request->attributes->get('currentShop');
+
+        if (!$shop) {
+            abort(500, 'ShopContext not resolved');
+        }
 
         $shipment = $this->query->handle(
             $shop->id(),

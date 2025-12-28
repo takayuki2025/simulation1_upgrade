@@ -17,8 +17,12 @@ final class ShopItemListController extends Controller
 
     public function __invoke(Request $request)
     {
-        /** @var Shop $shop */
-        $shop = app('currentShop');
+        /** @var Shop|null $shop */
+        $shop = $request->attributes->get('currentShop');
+
+        if (!$shop) {
+            abort(500, 'ShopContext not resolved');
+        }
 
         $items = $this->useCase->execute($shop->id());
 
@@ -29,7 +33,7 @@ final class ShopItemListController extends Controller
                 'name' => $shop->name(),
             ],
             'items' => array_map(
-                fn ($item) => ItemPresenter::fromEntity($item),
+                static fn ($item) => ItemPresenter::fromEntity($item),
                 $items
             ),
         ]);

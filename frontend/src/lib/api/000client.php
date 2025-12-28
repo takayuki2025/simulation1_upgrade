@@ -1,3 +1,4 @@
+// src/lib/api/client.tsファイル;
 import axios, {
   AxiosHeaders,
   type AxiosInstance,
