@@ -7,12 +7,14 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+
 import { AuthService } from "@/application/auth/AuthService";
 import { FirebaseAuthClient } from "@/infrastructure/auth/FirebaseAuthClient";
 import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { createHttpClient } from "@/infrastructure/auth/HttpClient";
 import { TokenRefreshService } from "@/application/auth/TokenRefreshService";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
+
 import type { AuthUser } from "@/types/auth";
 import type {
   AuthContextType,
@@ -25,6 +27,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false); // ★ 追加
 
   const authServiceRef = useRef<AuthService | null>(null);
   const laravelApiRef = useRef<LaravelAuthApi | null>(null);
@@ -33,16 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const firebase = new FirebaseAuthClient();
 
-    // ① API を作る（client は後で注入）
+    // ① API（client は後で注入）
     const api = new LaravelAuthApi(null);
 
-    // ② refresh service（api.refresh を呼ぶ）
+    // ② Refresh service
     const refresh = new TokenRefreshService(api);
 
-    // ③ http client（interceptor 内で refresh.refresh() を呼ぶ）
+    // ③ Http client（refresh 連携済）
     const client = createHttpClient(refresh);
 
-    // ④ api に client 注入（unsafe any 禁止）
+    // ④ api に client 注入
     api.setClient(client);
 
     const auth = new AuthService(firebase, api);
@@ -51,10 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authServiceRef.current = auth;
     refreshServiceRef.current = refresh;
 
-    // 起動時 /me
+    // 起動時トークン確認
     const { accessToken } = TokenStorage.load();
+
     if (!accessToken) {
       setIsLoading(false);
+      setIsReady(true); // ★ 重要
       return;
     }
 
@@ -67,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       } finally {
         setIsLoading(false);
+        setIsReady(true); // ★ 初期化完了
       }
     })();
   }, []);
@@ -84,13 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true);
 
-    // ① login_or_register（トークン発行）
     const result = await auth.login({ email, password });
-
-    // ② user は /me で確定
     const freshUser = await api.me();
-    setUser(freshUser);
 
+    setUser(freshUser);
     setIsLoading(false);
 
     return {
@@ -134,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        isReady, // ★ 追加
         login,
         register,
         logout,

@@ -27,8 +27,11 @@ final class ShopContextMiddleware
             abort(403, 'Shop not found or inactive');
         }
 
-        // ★ Request Attribute にセット（ここが重要）
+        // ✅ currentShop
         $request->attributes->set('currentShop', $shop);
+
+        // ✅ tenant_id をここで確定（超重要）
+        $request->attributes->set('tenant_id', $shop->id());
 
         return $next($request);
     }

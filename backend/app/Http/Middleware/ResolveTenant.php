@@ -3,26 +3,18 @@
 namespace App\Http\Middleware;
 
 use Closure;
-use App\Modules\Shop\Domain\Repository\ShopRepository;
+use Illuminate\Http\Request;
 
 final class ResolveTenant
 {
-    public function handle($request, Closure $next)
+    public function handle(Request $request, Closure $next)
     {
-        $shopCode = $request->route('shop_code');
+        $tenantId = $request->attributes->get('tenant_id');
 
-        if (!$shopCode) {
-            abort(400, 'shop_code is required');
+        if (!$tenantId) {
+            // ★ 401 ではなく 400/403
+            abort(400, 'tenant_id not resolved');
         }
-
-        $shop = app(ShopRepository::class)->findByShopCode($shopCode);
-
-        if (!$shop) {
-            abort(404, 'Shop not found');
-        }
-
-        // 🔴 Request スコープに現在の Shop を確定
-        app()->instance('currentShop', $shop);
 
         return $next($request);
     }

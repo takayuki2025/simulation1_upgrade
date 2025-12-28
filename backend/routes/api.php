@@ -45,7 +45,7 @@ use App\Modules\Item\Presentation\Http\Controllers\{
 };
 
 Route::prefix('shops/{shop_code}')
-    ->middleware(['tenant','shop.context',])
+    ->middleware(['shop.context',])
     ->group(function () {
         Route::get('/', ShopShowController::class);
         Route::get('/items', ShopItemListController::class);
@@ -252,7 +252,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentControlle
 */
 
 Route::prefix('shipments')
-    ->middleware(['auth.jwt', 'tenant']) // shop スコープ前提
+    ->middleware(['auth.jwt']) // shop スコープ前提
     ->group(function () {
 
         // Create shipment (OrderEvent::PAID から呼ばれる想定)
@@ -334,27 +334,39 @@ Route::middleware('auth.jwt')->group(function () {
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+
+// === Shop / Public View ===
+Route::prefix('shops/{shop_code}')
+    ->middleware(['shop.context'])
+    ->group(function () {
+        Route::get('/', ShopShowController::class);
+        Route::get('/items', ShopItemListController::class);
+    });
+
+// =======================================================
+// 🏪 Shop Dashboard / Management（★確定ルート）
+// =======================================================
 Route::prefix('shops/{shop_code}')
     ->middleware([
         'auth.jwt',
-        'tenant',
-        'shop.role:owner,manager,staff',
+        'shop.context',
+        'shop.role:owner,manager,staff'
     ])
     ->group(function () {
-        Route::get('/orders', ShopOrderListController::class);
-    });
 
+        // ---- Dashboard ----
+        Route::get('/dashboard/orders', ShopOrderListController::class);
 
+        Route::get(
+            '/dashboard/orders/{orderId}/shipment',
+            ShopOrderShipmentController::class
+        );
 
-
-
-use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
-
-Route::prefix('shops/{shop_code}')
-    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-    ->group(function () {
+        // ---- Shipment ----
         Route::get('/shipments', ShopShipmentListController::class);
     });
 
@@ -362,8 +374,35 @@ Route::prefix('shops/{shop_code}')
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
+// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 
+// Route::prefix('shops/{shop_code}')
+//     ->middleware([
+//         'auth.jwt',
+//         'tenant',
+//         'shop.role:owner,manager,staff',
+//     ])
+//     ->group(function () {
+//         Route::get('/orders', ShopOrderListController::class);
+//     });
+
+
+
+
+
+// use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+
+// Route::prefix('shops/{shop_code}')
+//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+//     ->group(function () {
+//         Route::get('/shipments', ShopShipmentListController::class);
+//     });
+
+
+
+
+
+// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
 // Route::prefix('shops/{shop_code}')
 //     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
 //     ->group(function () {
@@ -391,7 +430,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\InTransitShipmentControll
 use App\Modules\Shipment\Presentation\Http\Controllers\DeliverShipmentController;
 
 Route::prefix('shipments/{shipmentId}')
-    ->middleware(['auth.jwt', 'tenant'])
+    ->middleware(['auth.jwt'])
     ->group(function () {
         Route::post('pack', PackShipmentController::class);
         Route::post('ship', ShipShipmentController::class);
@@ -405,16 +444,15 @@ Route::prefix('shipments/{shipmentId}')
 
 
 
-Route::prefix('shops/{shop_code}')
-    ->middleware([
-        'auth.jwt',
-        'shop.context',
-        // 'shop.role'（v1.1 で追加）
-    ])
-    ->group(function () {
-        Route::get(
-            'orders/{orderId}/shipment',
-            \App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController::class
-        );
-    });
-
+// Route::prefix('shops/{shop_code}')
+//     ->middleware([
+//         'auth.jwt',
+//         'shop.context',
+//         // 'shop.role'（v1.1 で追加）
+//     ])
+//     ->group(function () {
+//         Route::get(
+//             'orders/{orderId}/shipment',
+//             \App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController::class
+//         );
+//     });

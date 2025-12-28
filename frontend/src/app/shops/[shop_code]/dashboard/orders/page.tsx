@@ -10,12 +10,14 @@ type ShipmentListItem = {
   order_status: string;
   total_amount: number;
   currency: string;
+
   buyer_user_id: number;
   address_confirmed_at: string | null;
 
   shipment_id: number | null;
   shipment_status: string | null;
   eta: string | null;
+
   destination_address: {
     postal_code?: string | null;
     prefecture?: string | null;
@@ -24,28 +26,27 @@ type ShipmentListItem = {
     address_line2?: string | null;
     recipient_name?: string | null;
     phone?: string | null;
-    [key: string]: any;
   } | null;
 };
 
 export default function ShopShipmentListPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const { apiClient } = useAuth();
+  const { apiClient, isReady } = useAuth();
 
   const [items, setItems] = useState<ShipmentListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!apiClient || !shop_code) return;
-    setIsLoading(true);
+    if (!isReady || !apiClient || !shop_code) return;
 
+    setIsLoading(true);
     apiClient
       .get(`/shops/${shop_code}/shipments`)
-      .then((res: any) => {
-        setItems((res?.data?.shipments ?? []) as ShipmentListItem[]);
+      .then((res) => {
+        setItems(res.data.shipments ?? []);
       })
       .finally(() => setIsLoading(false));
-  }, [apiClient, shop_code]);
+  }, [isReady, apiClient, shop_code]);
 
   const count = useMemo(() => items.length, [items]);
 
@@ -55,7 +56,7 @@ export default function ShopShipmentListPage() {
         <h1 className="text-2xl font-bold">注文・配送管理</h1>
         <Link
           href={`/shops/${shop_code}/dashboard`}
-          className="text-blue-600 underline"
+          className="text-blue-600 underline text-sm"
         >
           ← 店舗ダッシュボードへ戻る
         </Link>
@@ -67,50 +68,64 @@ export default function ShopShipmentListPage() {
         <div className="text-sm text-gray-600">件数: {count}</div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {items.map((it) => {
           const addr = it.destination_address;
-          const addrText = addr
-            ? `${addr.prefecture ?? ""}${addr.city ?? ""}${addr.address_line1 ?? ""} ${addr.address_line2 ?? ""}`.trim()
-            : "（配送先未確定）";
 
-          const recipient = addr?.recipient_name ?? "（宛名なし）";
+          const addressText = addr
+            ? `〒${addr.postal_code ?? ""} ${addr.prefecture ?? ""}${addr.city ?? ""}${addr.address_line1 ?? ""} ${addr.address_line2 ?? ""}`
+            : "（配送先未確定）";
 
           return (
             <div
               key={`${it.order_id}-${it.shipment_id ?? "none"}`}
               className="border rounded p-4 space-y-2"
             >
-              <div className="flex items-center justify-between">
-                <div className="font-semibold">
-                  注文 #{it.order_id} / ¥{it.total_amount} {it.currency}
-                </div>
-
-                <div className="text-sm text-gray-700">
-                  Order: <span className="font-mono">{it.order_status}</span>
-                  {" / "}
-                  Shipment:{" "}
-                  <span className="font-mono">
-                    {it.shipment_status ?? "not_created"}
-                  </span>
+              {/* 上段 */}
+              <div className="flex justify-between items-start">
+                <div className="font-semibold text-lg">注文 #{it.order_id}</div>
+                <div className="text-sm text-right">
+                  <div>{it.order_status}</div>
+                  <div>{it.shipment_status ?? "not_created"}</div>
                 </div>
               </div>
 
-              <div className="text-sm text-gray-700">
-                購入者 user_id:{" "}
-                <span className="font-mono">{it.buyer_user_id}</span>
+              {/* 金額 */}
+              <div className="text-sm">
+                金額：¥{it.total_amount} {it.currency}
               </div>
 
-              <div className="text-sm text-gray-700">
-                配送先: {recipient} / {addrText}
+              {/* 住所確定 */}
+              {it.address_confirmed_at && (
+                <div className="text-sm text-gray-500">
+                  住所確定日時：
+                  {new Date(it.address_confirmed_at).toLocaleString()}
+                </div>
+              )}
+
+              {/* 購入者 */}
+              <div className="text-sm">
+                購入者ユーザーID：
+                <span className="ml-1 font-mono">{it.buyer_user_id}</span>
               </div>
 
+              {/* 配送先 */}
+              <div className="text-sm">
+                配送先：
+                <div className="ml-2">
+                  <div>宛名：{addr?.recipient_name ?? "（未設定）"}</div>
+                  <div>{addressText}</div>
+                  {addr?.phone && <div>TEL: {addr.phone}</div>}
+                </div>
+              </div>
+
+              {/* 導線 */}
               <div className="pt-2">
                 <Link
-                  href={`/shops/${shop_code}/dashboard/orders/${it.order_id}`}
+                  href={`/shops/${shop_code}/dashboard/orders/${it.order_id}/shipment`}
                   className="text-blue-600 underline text-sm"
                 >
-                  詳細を見る →
+                  配送詳細を見る →
                 </Link>
               </div>
             </div>

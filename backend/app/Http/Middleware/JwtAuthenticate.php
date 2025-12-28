@@ -21,6 +21,12 @@ class JwtAuthenticate
 
     public function handle(Request $request, Closure $next)
     {
+
+        Log::info('[JwtAuthenticate] headers check', [
+            'authorization_header' => $request->header('Authorization'),
+            'server_http_authorization' => $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+        ]);
+
         /**
          * =====================================================
          * ✅ テスト環境専用バイパス（本番には一切影響しない）
@@ -121,12 +127,19 @@ class JwtAuthenticate
 
     private function getBearerToken(Request $request): ?string
     {
-        $header = $request->header('Authorization');
-        if (! $header || ! str_starts_with($header, 'Bearer ')) {
-            return null;
+        // Laravel 標準（内部で server / header 両方見る）
+        $token = $request->bearerToken();
+        if ($token) {
+            return $token;
         }
 
-        return substr($header, 7);
+        // フォールバック（Nginx 事故対策）
+        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+        if ($header && str_starts_with($header, 'Bearer ')) {
+            return substr($header, 7);
+        }
+
+        return null;
     }
 
     private function unauthorized(string $message): JsonResponse

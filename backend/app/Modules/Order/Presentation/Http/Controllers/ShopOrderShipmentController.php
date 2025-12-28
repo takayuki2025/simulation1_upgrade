@@ -19,7 +19,6 @@ final class ShopOrderShipmentController
 
         /** @var Shop|null $shop */
         $shop = $request->attributes->get('currentShop');
-
         if (!$shop) {
             abort(500, 'ShopContext not resolved');
         }
@@ -30,9 +29,14 @@ final class ShopOrderShipmentController
         );
 
         if (!$shipment) {
-            return response()->json(null, 404);
+            return response()->json([
+                'exists' => false,
+            ]);
         }
 
-        return response()->json($shipment);
+        return response()->json([
+            'exists' => true,
+            'shipment' => $shipment,
+        ]);
     }
 }
