@@ -15,14 +15,18 @@ final class SearchItemResource extends JsonResource
         /** @var Item $item */
         $item = $this->resource;
 
-        return [
-            'id'         => $item->getId()?->getValue(),     // ✅
-            'name'       => $item->getName(),
-            'price'      => $item->getPrice()->getValue(),
-            'remain'     => $item->getRemain()->getValue(),
+        $price = $item->getPrice();
+        $image = $item->getItemImage(); // ← ★これが抜けていた
 
-            // 🔹 ValueObject は必ず getValue()
-            'item_image' => $item->getItemImage()?->Value(), // ✅
+        return [
+            'id'   => $item->getId()?->getValue(),
+            'name' => $item->getName(),
+            'price'      => $item->getPrice()->amount(),
+            'remain' => $item->getRemain()->getValue(),
+            // Domain は path、Presentation が URL 化
+            'item_image' => $image
+                ? asset('storage/' . $image->value())
+                : null,
         ];
     }
 }

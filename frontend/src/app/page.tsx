@@ -38,7 +38,7 @@ export default function Home() {
   const isSearch = currentSearchQuery.trim().length > 0;
 
   /* =========================
-     📦 Hooks（必ず全呼び）
+     📦 Hooks
   ========================= */
   const listResult = useItemListSWR();
   const searchResult = useItemSearchSWR(currentSearchQuery);
@@ -68,7 +68,6 @@ export default function Home() {
   ========================= */
   return (
     <div className={styles.main_contents}>
-      {/* ローディング */}
       {isPageLoading && (
         <div className={styles.loadingBox}>
           <div className={styles.spinner}></div>
@@ -76,7 +75,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* ショップボタン */}
       <div className={styles.shopButtons}>
         {["a", "b", "c", "d"].map((code) => (
           <button
@@ -91,7 +89,6 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
-          {/* 🔖 タブ */}
           <div className={styles.main_select}>
             <Link
               href={{
@@ -115,7 +112,6 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* 商品一覧 */}
           <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => (
@@ -135,8 +131,10 @@ export default function Home() {
 
                     <div className={styles.item_info}>
                       <p className={styles.item_name}>{item.name}</p>
+
+                      {/* ✅ number 前提の安全な価格表示 */}
                       <p className={styles.item_price}>
-                        ¥{item.price?.toLocaleString()}
+                        ¥{item.price.toLocaleString()}
                       </p>
                     </div>
                   </Link>

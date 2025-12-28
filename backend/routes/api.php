@@ -154,8 +154,12 @@ Route::withoutMiddleware(['throttle:api'])
 use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
 use App\Modules\Comment\Presentation\Http\Controllers\PostCommentController;
 
+
+Route::get('/items/favorite', [FavoriteController::class, 'index']);
+
+
 Route::middleware(['auth.jwt'])->group(function () {
-    Route::get('/items/favorite', [FavoriteController::class, 'index']);
+    
     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
 });

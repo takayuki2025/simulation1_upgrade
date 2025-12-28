@@ -8,6 +8,8 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 use Illuminate\Support\Facades\Auth;
 use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 use Illuminate\Http\Request; // ★ 削除: use文があってもエラーになるため、完全修飾名を使用します
+use App\Auth\UserResolver;
+use App\Auth\JwtUserResolver;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -33,7 +35,7 @@ class AuthServiceProvider extends ServiceProvider
             $userProvider = Auth::createUserProvider($config['provider'] ?? null);
             $firebaseAuth = $app->make(FirebaseAuth::class);
 
-            // ★ 修正: Requestクラスの完全修飾名を使用 (\Illuminate\Http\Request::class) 
+            // ★ 修正: Requestクラスの完全修飾名を使用 (\Illuminate\Http\Request::class)
             $request = $app->make(\Illuminate\Http\Request::class);
 
             // カスタム作成したFirebaseGuardのインスタンスを生成して返す

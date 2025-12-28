@@ -11,16 +11,23 @@ use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
 
 final class FavoriteController extends Controller
 {
-    public function index(ListFavoriteUseCase $useCase, Request $request)
+    public function index()
     {
-        $userId = $request->user()->id;
-        $favorites = $useCase->execute($userId);
+        $userId = auth()->id();
 
+        if (!$userId) {
+            return response()->json([
+                'items' => [],
+            ], 200); // or 401（設計次第）
+        }
+
+        $items = $this->favorites->findByUserId($userId);
 
         return response()->json([
-            'items' => $favorites,
+            'items' => $items,
         ]);
     }
+
 
     public function add(AddFavoriteUseCase $add, CountFavoritesUseCase $count, Request $request, int $itemId)
     {
