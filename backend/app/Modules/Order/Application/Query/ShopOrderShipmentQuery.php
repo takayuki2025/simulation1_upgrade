@@ -2,23 +2,19 @@
 
 namespace App\Modules\Order\Application\Query;
 
-use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+
+use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 
 final class ShopOrderShipmentQuery
 {
     public function __construct(
-        private ShipmentRepository $shipments
+        private ShipmentQueryRepository $shipments,
     ) {
     }
 
-    /**
-     * 店舗視点：注文に紐づく Shipment 取得
-     */
-    public function findByShopAndOrder(string $shopCode, int $orderId): ?array
+    public function handle(int $shopId, int $orderId): ?array
     {
-        return $this->shipments->findByShopAndOrder(
-            $shopCode,
-            $orderId
-        );
+        return $this->shipments
+            ->findByShopIdAndOrderId($shopId, $orderId);
     }
 }

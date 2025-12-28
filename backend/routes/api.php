@@ -364,25 +364,25 @@ Route::prefix('shops/{shop_code}')
 
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
 
-Route::prefix('shops/{shop_code}')
-    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-    ->group(function () {
-        Route::get(
-            '/orders/{orderId}/shipment',
-            ShopOrderShipmentController::class
-        );
-    });
+// Route::prefix('shops/{shop_code}')
+//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+//     ->group(function () {
+//         Route::get(
+//             '/orders/{orderId}/shipment',
+//             ShopOrderShipmentController::class
+//         );
+//     });
 
 
 
-Route::prefix('shops/{shop_code}')
-    ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-    ->group(function () {
-        Route::get(
-            '/orders/{orderId}/shipment',
-            ShopOrderShipmentController::class
-        );
-    });
+// Route::prefix('shops/{shop_code}')
+//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
+//     ->group(function () {
+//         Route::get(
+//             '/orders/{orderId}/shipment',
+//             ShopOrderShipmentController::class
+//         );
+//     });
 
 
 use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
@@ -398,3 +398,23 @@ Route::prefix('shipments/{shipmentId}')
         Route::post('in-transit', InTransitShipmentController::class);
         Route::post('deliver', DeliverShipmentController::class);
     });
+
+
+// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
+
+
+
+
+Route::prefix('shops/{shop_code}')
+    ->middleware([
+        'auth.jwt',
+        'shop.context',
+        // 'shop.role'（v1.1 で追加）
+    ])
+    ->group(function () {
+        Route::get(
+            'orders/{orderId}/shipment',
+            \App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController::class
+        );
+    });
+

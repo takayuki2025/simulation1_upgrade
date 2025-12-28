@@ -1,17 +1,44 @@
 <?php
 
-
 namespace App\Modules\Shipment\Domain\Event;
-
-use Carbon\Carbon;
 
 final class ShipmentEvent
 {
-    public function __construct(
-        public int $shipmentId,
-        public string $type,
-        public array $payload,
-        public Carbon $occurredAt,
+    private function __construct(
+        public readonly int $shipmentId,
+        public readonly string $type,
+        public readonly array $payload,
+        public readonly \DateTimeImmutable $occurredAt,
     ) {
+    }
+
+    public static function packed(int $shipmentId): self
+    {
+        return new self(
+            $shipmentId,
+            ShipmentEventType::PACKED->value,
+            [],
+            new \DateTimeImmutable()
+        );
+    }
+
+    public static function shipped(int $shipmentId): self
+    {
+        return new self(
+            $shipmentId,
+            ShipmentEventType::SHIPPED->value,
+            [],
+            new \DateTimeImmutable()
+        );
+    }
+
+    public static function delivered(int $shipmentId): self
+    {
+        return new self(
+            $shipmentId,
+            ShipmentEventType::DELIVERED->value,
+            [],
+            new \DateTimeImmutable()
+        );
     }
 }

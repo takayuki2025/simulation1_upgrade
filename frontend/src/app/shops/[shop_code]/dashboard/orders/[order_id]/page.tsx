@@ -1,12 +1,12 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
 type Shipment = {
   id: number;
-  status: string;
+  status: "created" | "packed" | "shipped" | "in_transit" | "delivered";
   eta: string | null;
 };
 
@@ -17,61 +17,67 @@ export default function ShopOrderDetailPage() {
   }>();
 
   const router = useRouter();
-  const { apiClient, isAuthenticated, isLoading } = useAuth();
+  const { apiClient } = useAuth();
 
   const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  /* =========================
-     🔐 Auth Guard
-  ========================= */
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  /* =========================
-     📦 Fetch Shipment（★修正点）
-  ========================= */
-  useEffect(() => {
-    if (!apiClient || !shop_code || !order_id) return;
-
-    apiClient
-      .get(`/shops/${shop_code}/orders/${order_id}/shipment`)
-      .then((res) => setShipment(res.data))
-      .catch(() => setShipment(null));
-  }, [apiClient, shop_code, order_id]);
-
-  /* =========================
-     🚚 Shipment Actions
-  ========================= */
-  const action = async (type: "pack" | "ship" | "in-transit" | "deliver") => {
-    if (!shipment || !apiClient) return;
-
-    setIsActionLoading(true);
-
+  const fetchShipment = async () => {
+    if (!apiClient) return;
+    setIsLoading(true);
     try {
-      await apiClient.post(`/shipments/${shipment.id}/${type}`);
-
-      // 再取得
       const res = await apiClient.get(
         `/shops/${shop_code}/orders/${order_id}/shipment`,
       );
       setShipment(res.data);
+    } catch {
+      setShipment(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!apiClient || !shop_code || !order_id) return;
+    fetchShipment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiClient, shop_code, order_id]);
+
+  const nextAction = useMemo(() => {
+    if (!shipment) return null;
+    switch (shipment.status) {
+      case "created":
+        return { key: "pack" as const, label: "梱包完了" };
+      case "packed":
+        return { key: "ship" as const, label: "発送" };
+      case "shipped":
+        return { key: "in-transit" as const, label: "輸送中" };
+      case "in_transit":
+        return { key: "deliver" as const, label: "配達完了" };
+      default:
+        return null;
+    }
+  }, [shipment]);
+
+  const action = async () => {
+    if (!shipment || !apiClient || !nextAction) return;
+    if (isActionLoading) return; // 連打ブロック
+
+    setIsActionLoading(true);
+    try {
+      await apiClient.post(`/shipments/${shipment.id}/${nextAction.key}`);
+      await fetchShipment();
+    } catch {
+      alert("処理に失敗しました（状態が変わっている可能性があります）");
+      await fetchShipment();
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  if (isLoading || !shipment) {
-    return <div className="p-6">読み込み中...</div>;
-  }
-
-  if (shipment.status === "created") showPack();
-  if (shipment.status === "packed") showShip();
-  if (shipment.status === "shipped") showInTransit();
-  if (shipment.status === "in_transit") showDeliver();
+  if (isLoading) return <div className="p-6">読み込み中...</div>;
+  if (!shipment) return <div className="p-6">Shipment が見つかりません。</div>;
 
   return (
     <div className="p-6 space-y-4">
@@ -85,39 +91,19 @@ export default function ShopOrderDetailPage() {
         到着予定: <span className="font-mono">{shipment.eta ?? "-"}</span>
       </p>
 
-      <div className="flex gap-2 flex-wrap">
+      {nextAction ? (
         <button
           disabled={isActionLoading}
-          onClick={() => action("pack")}
+          onClick={action}
           className="px-3 py-2 border rounded disabled:opacity-50"
         >
-          梱包完了
+          {nextAction.label}
         </button>
-
-        <button
-          disabled={isActionLoading}
-          onClick={() => action("ship")}
-          className="px-3 py-2 border rounded disabled:opacity-50"
-        >
-          発送
-        </button>
-
-        <button
-          disabled={isActionLoading}
-          onClick={() => action("in-transit")}
-          className="px-3 py-2 border rounded disabled:opacity-50"
-        >
-          輸送中
-        </button>
-
-        <button
-          disabled={isActionLoading}
-          onClick={() => action("deliver")}
-          className="px-3 py-2 border rounded disabled:opacity-50"
-        >
-          配達完了
-        </button>
-      </div>
+      ) : (
+        <div className="text-sm text-gray-600">
+          これ以上の操作はありません。
+        </div>
+      )}
 
       <div className="pt-4">
         <button

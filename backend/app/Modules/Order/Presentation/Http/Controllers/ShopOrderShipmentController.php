@@ -2,8 +2,8 @@
 
 namespace App\Modules\Order\Presentation\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Modules\Order\Application\Query\ShopOrderShipmentQuery;
-use Illuminate\Http\JsonResponse;
 
 final class ShopOrderShipmentController
 {
@@ -12,21 +12,20 @@ final class ShopOrderShipmentController
     ) {
     }
 
-    /**
-     * GET /api/shops/{shop_code}/orders/{orderId}/shipment
-     */
-    public function __invoke(string $shop_code, int $orderId): JsonResponse
+    public function __invoke(Request $request, string $orderId)
     {
-        $shipment = $this->query->findByShopAndOrder(
-            $shop_code,
+        $orderId = (int) $orderId;
+
+        /** @var \App\Modules\Shop\Domain\Entity\Shop $shop */
+        $shop = app('currentShop');
+
+        $shipment = $this->query->handle(
+            $shop->id(),
             $orderId
         );
 
         if (!$shipment) {
-            return response()->json(
-                ['message' => 'Not found'],
-                404
-            );
+            return response()->json(null, 404);
         }
 
         return response()->json($shipment);

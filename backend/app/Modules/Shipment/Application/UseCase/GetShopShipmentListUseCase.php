@@ -2,15 +2,15 @@
 
 namespace App\Modules\Shipment\Application\UseCase;
 
-use App\Modules\Shipment\Application\Dto\ShopShipmentListItemOutput;
-use App\Modules\Shipment\Application\Dto\ShopShipmentListOutput;
-use App\Modules\Shipment\Domain\Repository\ShipmentManagementQueryRepository;
+use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 use App\Modules\Shop\Domain\Entity\Shop;
+use App\Modules\Shipment\Application\Dto\ShopShipmentListOutput;
+use App\Modules\Shipment\Application\Dto\ShopShipmentListItemOutput;
 
 final class GetShopShipmentListUseCase
 {
     public function __construct(
-        private ShipmentManagementQueryRepository $query,
+        private ShipmentQueryRepository $query,
     ) {
     }
 

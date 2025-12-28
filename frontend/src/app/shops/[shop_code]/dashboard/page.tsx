@@ -1,23 +1,15 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/ui/auth/useAuth";
 
 export default function ShopDashboardPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
   const { user, isLoading } = useAuth();
 
-  /* =========================
-     ⏳ Loading
-  ========================= */
-  if (isLoading) {
-    return <div className="p-6">読み込み中...</div>;
-  }
+  if (isLoading) return <div className="p-6">読み込み中...</div>;
 
-  /* =========================
-     🛂 権限チェック（ログイン済み前提）
-  ========================= */
   const isShopStaff =
     user?.shop_roles?.some(
       (r) =>
@@ -25,13 +17,9 @@ export default function ShopDashboardPage() {
         ["owner", "manager", "staff"].includes(r.role),
     ) ?? false;
 
-  if (!isShopStaff) {
+  if (!isShopStaff)
     return <div className="p-6">アクセス権限がありません。</div>;
-  }
 
-  /* =========================
-     🎛 UI
-  ========================= */
   return (
     <div className="p-6 space-y-6">
       <Link href={`/shops/${shop_code}`} className="text-blue-600 underline">

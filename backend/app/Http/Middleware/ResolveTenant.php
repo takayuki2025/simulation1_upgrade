@@ -15,7 +15,7 @@ final class ResolveTenant
             abort(400, 'shop_code is required');
         }
 
-        $shop = app(ShopRepository::class)->findByCode($shopCode);
+        $shop = app(ShopRepository::class)->findByShopCode($shopCode);
 
         if (!$shop) {
             abort(404, 'Shop not found');

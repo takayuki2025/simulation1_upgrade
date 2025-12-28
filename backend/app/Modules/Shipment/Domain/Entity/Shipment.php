@@ -4,7 +4,6 @@ namespace App\Modules\Shipment\Domain\Entity;
 
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use DomainException;
-use Carbon\Carbon;
 
 final class Shipment
 {
@@ -15,18 +14,14 @@ final class Shipment
         public ShipmentStatus $status,
         public array $originAddress,
         public array $destinationAddress,
-        public ?Carbon $eta,
+        public ?\DateTimeImmutable $eta,
     ) {
     }
 
-    /**
-     * OrderPaid 時点で生成される初期 Shipment
-     * 配送先のみ確定（Order からコピー）
-     */
     public static function createInitial(
         int $shopId,
         int $orderId,
-        array $destinationAddress
+        array $destinationAddress,
     ): self {
         return new self(
             id: null,
@@ -39,8 +34,6 @@ final class Shipment
         );
     }
 
-    /* ===== State Transitions ===== */
-
     public function pack(): void
     {
         $this->assertStatus(ShipmentStatus::CREATED);
@@ -51,12 +44,6 @@ final class Shipment
     {
         $this->assertStatus(ShipmentStatus::PACKED);
         $this->status = ShipmentStatus::SHIPPED;
-    }
-
-    public function markInTransit(): void
-    {
-        $this->assertStatus(ShipmentStatus::SHIPPED);
-        $this->status = ShipmentStatus::IN_TRANSIT;
     }
 
     public function deliver(): void

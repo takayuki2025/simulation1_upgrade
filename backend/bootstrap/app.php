@@ -50,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // 'shop.role'  => \App\Http\Middleware\ShopScopedRoleMiddleware::class,
             // 'shop.role' => \App\Http\Middleware\EnsureShopRole::class,
             'shop.role' => \App\Http\Middleware\CheckShopRole::class,
+            'shop.context' => \App\Modules\Shop\Presentation\Http\Middleware\ShopContextMiddleware::class,
         ]);
 
         $middleware->web(append: []);

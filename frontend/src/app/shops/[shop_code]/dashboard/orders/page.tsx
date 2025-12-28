@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
@@ -11,7 +11,7 @@ type ShipmentListItem = {
   total_amount: number;
   currency: string;
   buyer_user_id: number;
-  address_snapshot_at: string | null;
+  address_confirmed_at: string | null;
 
   shipment_id: number | null;
   shipment_status: string | null;
@@ -30,43 +30,24 @@ type ShipmentListItem = {
 
 export default function ShopShipmentListPage() {
   const { shop_code } = useParams<{ shop_code: string }>();
-  const router = useRouter();
-  const { apiClient, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { apiClient } = useAuth();
 
   const [items, setItems] = useState<ShipmentListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* =========================
-     🔐 Auth Guard
-  ========================= */
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [authLoading, isAuthenticated, router]);
-
-  /* =========================
-     📦 Fetch Shipments
-  ========================= */
   useEffect(() => {
     if (!apiClient || !shop_code) return;
-
     setIsLoading(true);
 
     apiClient
       .get(`/shops/${shop_code}/shipments`)
       .then((res: any) => {
-        const list = (res?.data?.shipments ?? []) as ShipmentListItem[];
-        setItems(list);
+        setItems((res?.data?.shipments ?? []) as ShipmentListItem[]);
       })
       .finally(() => setIsLoading(false));
   }, [apiClient, shop_code]);
 
   const count = useMemo(() => items.length, [items]);
-
-  if (authLoading) {
-    return <div className="p-6">読み込み中...</div>;
-  }
 
   return (
     <div className="p-6 space-y-4">
@@ -124,10 +105,6 @@ export default function ShopShipmentListPage() {
                 配送先: {recipient} / {addrText}
               </div>
 
-              <div className="text-sm text-gray-700">
-                ETA: <span className="font-mono">{it.eta ?? "-"}</span>
-              </div>
-
               <div className="pt-2">
                 <Link
                   href={`/shops/${shop_code}/dashboard/orders/${it.order_id}`}
@@ -135,10 +112,6 @@ export default function ShopShipmentListPage() {
                 >
                   詳細を見る →
                 </Link>
-              </div>
-
-              <div className="pt-2 text-sm text-gray-500">
-                ※ 発送操作（pack / ship / deliver）は次フェーズで追加
               </div>
             </div>
           );

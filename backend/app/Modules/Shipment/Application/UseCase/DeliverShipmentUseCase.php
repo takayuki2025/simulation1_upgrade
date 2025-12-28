@@ -6,7 +6,7 @@ use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentEventRepository;
 use App\Modules\Shipment\Domain\Event\ShipmentEvent;
 
-final class PackShipmentUseCase
+final class DeliverShipmentUseCase
 {
     public function __construct(
         private ShipmentRepository $shipments,
@@ -16,17 +16,10 @@ final class PackShipmentUseCase
 
     public function handle(int $shipmentId): void
     {
-        if ($this->events->exists($shipmentId, ShipmentEventType::PACKED)) {
-            return; // すでに実行済み
-        }
-
         $shipment = $this->shipments->findById($shipmentId);
-        $shipment->pack();
+        $shipment->deliver();
 
         $this->shipments->save($shipment);
-
-        $this->events->record(
-            ShipmentEvent::packed($shipmentId)
-        );
+        $this->events->record(ShipmentEvent::delivered($shipment->id));
     }
 }

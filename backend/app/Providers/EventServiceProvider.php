@@ -24,6 +24,10 @@ final class EventServiceProvider extends ServiceProvider
         OrderPaid::class => [
             CreateShipmentOnOrderPaidListener::class,
         ],
+
+        ShipmentEvent::class => [
+            NotifyShipmentStatusChanged::class,
+        ],
     ];
 
     public function boot(): void

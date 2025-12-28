@@ -67,20 +67,20 @@ final class EloquentShopRepository implements ShopRepository
     /**
      * ✅ ResolveTenant 用（最重要）
      */
-    public function findByCode(string $shopCode): ?Shop
+    public function findByShopCode(string $shopCode): ?Shop
     {
-        $model = ShopModel::where('shop_code', $shopCode)->first();
+        $row = ShopModel::where('shop_code', $shopCode)->first();
 
-        if (! $model) {
+        if (!$row) {
             return null;
         }
 
         return new Shop(
-            id: $model->id,
-            shopCode: $model->shop_code,
-            ownerUserId: $model->owner_user_id,
-            name: $model->name,
-            status: ShopStatus::from($model->status),
+            id: $row->id,
+            shopCode: $row->shop_code,
+            ownerUserId: $row->owner_user_id,
+            name: $row->name,
+            status: ShopStatus::from($row->status),
         );
     }
 }

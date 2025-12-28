@@ -1,33 +1,30 @@
 <?php
 
-namespace App\Modules\Shipment\Infrastructure\Persistence;
+namespace App\Modules\Shipment\Infrastructure\Persistence\Repository;
 
+use App\Models\ShipmentEvent as ShipmentEventModel;
 use App\Modules\Shipment\Domain\Event\ShipmentEvent;
+use App\Modules\Shipment\Domain\Event\ShipmentEventType;
 use App\Modules\Shipment\Domain\Repository\ShipmentEventRepository;
-use Illuminate\Support\Facades\DB;
 
 final class EloquentShipmentEventRepository implements ShipmentEventRepository
 {
     public function record(ShipmentEvent $event): void
     {
-        DB::table('shipment_events')->insert([
+        ShipmentEventModel::create([
             'shipment_id' => $event->shipmentId,
-            'type' => $event->type,
-            'payload' => json_encode($event->payload),
+            'type'        => $event->type,
+            'payload'     => $event->payload,
             'occurred_at' => $event->occurredAt,
         ]);
     }
 
-    public function timeline(int $shipmentId): array
-    {
-        return DB::table('shipment_events')
-            ->where('shipment_id', $shipmentId)
-            ->orderBy('occurred_at')
-            ->get()
-            ->map(fn ($row) => [
-                'type' => $row->type,
-                'at' => $row->occurred_at,
-            ])
-            ->toArray();
+    public function exists(
+        int $shipmentId,
+        ShipmentEventType $type
+    ): bool {
+        return ShipmentEventModel::where('shipment_id', $shipmentId)
+            ->where('type', $type->value)
+            ->exists();
     }
 }

@@ -54,9 +54,10 @@ use App\Shared\Domain\Clock\SystemClock;
 use App\Modules\User\Domain\Repository\UserAddressRepository;
 use App\Modules\User\Infrastructure\Persistence\Repository\EloquentUserAddressRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentManagementQueryRepository;
-use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentManagementQueryRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentRepository;
+use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
+use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentQueryRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -149,7 +150,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(
             ShipmentManagementQueryRepository::class,
-            DbShipmentManagementQueryRepository::class
+            DbShipmentQueryRepository::class
         );
 
 
@@ -158,6 +159,11 @@ class AppServiceProvider extends ServiceProvider
             EloquentShipmentRepository::class
         );
 
+
+        $this->app->bind(
+            ShipmentQueryRepository::class,
+            DbShipmentQueryRepository::class
+        );
 
 
 
