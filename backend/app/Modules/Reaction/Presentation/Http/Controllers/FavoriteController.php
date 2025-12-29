@@ -11,47 +11,66 @@ use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
 
 final class FavoriteController extends Controller
 {
-    public function index()
-    {
-        $userId = auth()->id();
+    public function __construct(
+        private ListFavoriteUseCase $listFavorites,
+    ) {
+    }
 
-        if (!$userId) {
+    /**
+     * GET /api/items/favorite
+     * auth.jwt.optional 前提
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
             return response()->json([
                 'items' => [],
-            ], 200); // or 401（設計次第）
+            ], 200);
         }
 
-        $items = $this->favorites->findByUserId($userId);
+        $items = $this->listFavorites->execute($user->id);
 
         return response()->json([
             'items' => $items,
         ]);
     }
 
-
-    public function add(AddFavoriteUseCase $add, CountFavoritesUseCase $count, Request $request, int $itemId)
-    {
+    /**
+     * POST /api/items/{itemId}/favorite
+     */
+    public function add(
+        AddFavoriteUseCase $add,
+        CountFavoritesUseCase $count,
+        Request $request,
+        int $itemId
+    ) {
         $userId = $request->user()->id;
 
-        // shop_id が必要なら request から解決（Itemから取得する場合は後で改善）
-        $add->execute($userId, $itemId, $request->input('shop_id'));
+        $add->execute($userId, $itemId);
 
         return response()->json([
             'favorited' => true,
-            'message' => 'お気に入りに追加しました',
             'favorites_count' => $count->execute($itemId),
         ]);
     }
 
-    public function remove(RemoveFavoriteUseCase $remove, CountFavoritesUseCase $count, Request $request, int $itemId)
-    {
+    /**
+     * DELETE /api/items/{itemId}/favorite
+     */
+    public function remove(
+        RemoveFavoriteUseCase $remove,
+        CountFavoritesUseCase $count,
+        Request $request,
+        int $itemId
+    ) {
         $userId = $request->user()->id;
 
         $remove->execute($userId, $itemId);
 
         return response()->json([
             'favorited' => false,
-            'message' => 'お気に入りを削除しました',
             'favorites_count' => $count->execute($itemId),
         ]);
     }

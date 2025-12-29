@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
+        App\Providers\AuthContextServiceProvider::class,
         App\Modules\Shipment\Infrastructure\Providers\ShipmentServiceProvider::class,
     ])
 
@@ -41,9 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'sanctum.auth' => \Laravel\Sanctum\Http\Middleware\Authenticate::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-
             'tenant' => \App\Http\Middleware\ResolveTenant::class,
-
             'auth.jwt'   => \App\Http\Middleware\JwtAuthenticate::class,
             'auth.jwt.optional' => \App\Http\Middleware\OptionalJwtAuth::class,
             'role'       => \App\Http\Middleware\RoleMiddleware::class,
@@ -79,14 +78,23 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             // ① AuthenticationException（あなたの既存仕様）
-            if ($e instanceof AuthenticationException) {
-                return response()->json([
-                    'error_type' => 'AuthenticationException',
-                    'message' => 'Unauthenticated or Token Expired. Please refresh token.',
-                    'status_code_override' => No401Redirect::UNAUTHENTICATED_CODE, // 801
-                    'authenticated' => false,
-                ], Response::HTTP_OK);
-            }
+            // if ($e instanceof AuthenticationException) {
+            //     return response()->json([
+            //         'error_type' => 'AuthenticationException',
+            //         'message' => 'Unauthenticated or Token Expired. Please refresh token.',
+            //         'status_code_override' => No401Redirect::UNAUTHENTICATED_CODE, // 801
+            //         'authenticated' => false,
+            //     ], Response::HTTP_OK);
+            // }
+
+            
+if ($e instanceof AuthenticationException) {
+    return response()->json([
+        'error_type' => 'AuthenticationException',
+        'message' => 'Unauthenticated',
+    ], 401);
+}
+
 
             // ② ★追加：DomainException は 422 に落とす（今回の本命）
             if ($e instanceof \DomainException) {

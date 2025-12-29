@@ -7,7 +7,6 @@ use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Command\CreateItemDraftUseCase;
 use App\Modules\Item\Application\Dto\Item\CreateItemDraftInput;
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
 final class CreateItemDraftController extends Controller
 {
@@ -16,17 +15,9 @@ final class CreateItemDraftController extends Controller
     ) {
     }
 
-
     public function __invoke(Request $request): JsonResponse
     {
-
-
         logger()->info('[CreateItemDraftController] raw request', [
-            'seller_id' => $request->input('seller_id'),
-            'explain'   => $request->input('explain'),
-            'condition' => $request->input('condition'),
-            'category'  => $request->input('category'),
-            'category_type' => gettype($request->input('category')),
             'all' => $request->all(),
         ]);
 
@@ -36,20 +27,16 @@ final class CreateItemDraftController extends Controller
             'price_amount'   => ['required', 'integer', 'min:0'],
             'price_currency' => ['required', 'string', 'size:3'],
             'brand'          => ['nullable', 'string'],
-
-            // ★ 追加
             'explain'        => ['nullable', 'string'],
             'condition'      => ['nullable', 'string'],
             'category'       => ['nullable', 'array'],
         ]);
 
-        $principal = $request->attributes->get('auth_principal');
-
-        if (! $principal instanceof AuthPrincipal) {
-            abort(401, 'Authentication required');
+        /** ★ A フェーズの正解：auth()->user() */
+        $user = auth()->user();
+        if (! $user) {
+            abort(401, 'Unauthenticated');
         }
-
-        $tenantId = $request->attributes->get('tenant_id');
 
         $input = new CreateItemDraftInput(
             sellerId: $validated['seller_id'],
@@ -57,8 +44,6 @@ final class CreateItemDraftController extends Controller
             priceAmount: $validated['price_amount'],
             priceCurrency: $validated['price_currency'],
             brandRaw: $validated['brand'] ?? null,
-
-            // ★ Draft 用
             explain: $validated['explain'] ?? null,
             condition: $validated['condition'] ?? null,
             category: $validated['category'] ?? null,
@@ -66,8 +51,7 @@ final class CreateItemDraftController extends Controller
 
         $output = $this->useCase->execute(
             $input,
-            $principal,
-            $tenantId
+            $user->id   // ★ userId だけ渡す
         );
 
         return response()->json([

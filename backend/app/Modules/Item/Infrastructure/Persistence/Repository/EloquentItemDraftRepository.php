@@ -12,7 +12,6 @@ use App\Modules\Item\Domain\ValueObject\{
     Money,
     BrandName,
     ItemStatus,
-    CategoryList,
     ItemImagePath,
     StockCount
 };
@@ -30,8 +29,16 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
             ?? new EloquentItemDraft();
 
         $model->id = $draft->id()->value();
-        $model->shop_id = $draft->sellerId()->id(); // ★ 常に shop_id
-        $model->user_id = null;
+
+        // ===== Aフェーズ：individual 出品のみ =====
+        if ($draft->sellerId()->isIndividual()) {
+            $model->user_id = $draft->sellerId()->id(); // ★ int
+            $model->shop_id = null;
+        } else {
+            // 将来拡張（Bフェーズ）
+            $model->user_id = null;
+            $model->shop_id = $draft->sellerId()->id();
+        }
 
         $model->name = $draft->name()->value();
         $model->price = $draft->price()->amount();
@@ -39,7 +46,7 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
         $model->status = $draft->status()->value;
         $model->explain = $draft->explain();
         $model->condition = $draft->condition();
-        $model->category = $draft->category()?->toArray();
+        $model->category = $draft->category()->toArray();
         $model->remain = $draft->remain()->getValue();
         $model->item_image = $draft->itemImage()?->value();
 
@@ -54,11 +61,10 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
             return null;
         }
 
-        $sellerId = $model->shop_id
-            ? SellerId::shop($model->shop_id)
-            : SellerId::user($model->user_id);
+        // ===== Aフェーズ：user 固定 =====
+        $sellerId = SellerId::user((int) $model->user_id);
 
-        $draft = ItemDraft::reconstruct(
+        return ItemDraft::reconstruct(
             id: ItemDraftId::restore($model->id),
             sellerId: $sellerId,
             name: new ItemName($model->name),
@@ -67,16 +73,11 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
             status: ItemStatus::from($model->status),
             explain: $model->explain,
             condition: $model->condition,
-            category: $model->category,
+            category: $model->category ?? [],
             remain: new StockCount($model->remain),
+            itemImage: $model->item_image
+                ? ItemImagePath::fromRaw($model->item_image)
+                : null,
         );
-
-        if ($model->item_image) {
-            $draft->attachImage(
-                ItemImagePath::fromRaw($model->item_image)
-            );
-        }
-
-        return $draft;
     }
 }

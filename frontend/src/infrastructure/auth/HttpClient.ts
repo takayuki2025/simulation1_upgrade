@@ -10,30 +10,40 @@ export function createHttpClient(
     withCredentials: true,
   });
 
-  // ===== Request =====
+  /* ======================
+     Request
+  ====================== */
   client.interceptors.request.use((config) => {
-    // 🔴 refresh API には Authorization を付けない
+    // refresh API は常に素通し
     if (config.url?.includes("/auth/refresh")) {
+      delete config.headers?.Authorization;
       return config;
     }
 
     const { accessToken } = TokenStorage.load();
-    if (accessToken) {
+
+    if (accessToken && accessToken.trim() !== "") {
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${accessToken}`;
+    } else {
+      // ★ 最重要：空 or undefined の場合は必ず削除
+      if (config.headers) {
+        delete config.headers.Authorization;
+      }
     }
 
     return config;
   });
 
-  // ===== Response =====
+  /* ======================
+     Response
+  ====================== */
   client.interceptors.response.use(
     (res) => res,
     async (error: AxiosError) => {
       const status = error.response?.status;
       const original = error.config as any;
 
-      // 🔴 refresh API 自体は interceptor 対象外
       if (original?.url?.includes("/auth/refresh")) {
         return Promise.reject(error);
       }

@@ -2,53 +2,62 @@
 
 namespace App\Modules\Item\Application\UseCase\Item\Command;
 
-use App\Modules\Item\Application\Dto\Item\{
-    CreateItemDraftInput,
-    CreateItemDraftOutput
-};
+use App\Modules\Item\Application\Dto\Item\CreateItemDraftInput;
+use App\Modules\Item\Application\Dto\Item\CreateItemDraftOutput;
 use App\Modules\Item\Domain\Entity\ItemDraft;
 use App\Modules\Item\Domain\Repository\ItemDraftRepository;
-use App\Modules\Item\Domain\Service\SellerResolver;
 use App\Modules\Item\Domain\ValueObject\{
     ItemName,
     Money,
     BrandName,
-    ItemStatus
+    ItemStatus,
+    SellerId
 };
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use App\Modules\Auth\Application\Service\AssignSellerRoleService;
 
 final class CreateItemDraftUseCase
 {
     public function __construct(
         private ItemDraftRepository $draftRepository,
-        private SellerResolver $sellerResolver,
+        private AssignSellerRoleService $assignSellerRoleService,
     ) {
     }
 
     public function execute(
         CreateItemDraftInput $input,
-        AuthPrincipal $principal,
-        ?int $tenantId,
+        int $userId,
     ): CreateItemDraftOutput {
 
-        // ★ 正しい呼び出し
-        $sellerId = $this->sellerResolver->resolve(
-            $input->sellerId,
-            $principal,
-            $tenantId
-        );
+        /**
+         * A フェーズ：individual 出品のみ
+         */
+        $sellerId = SellerId::user($userId);
+
+        /**
+         * 初回出品時に seller ロール付与
+         */
+        $this->assignSellerRoleService->assignIndividualIfNotExists($userId);
 
         $draftId = $this->draftRepository->nextIdentity();
 
+        /**
+         * ★ ここが今回の修正ポイント
+         * UseCaseで必ず ValueObject 化する
+         */
         $draft = ItemDraft::create(
-            $draftId,
-            $sellerId,
-            new ItemName($input->name),
-            new Money($input->priceAmount, $input->priceCurrency),
-            $input->brandRaw ? new BrandName($input->brandRaw) : null,
-            $input->explain,
-            $input->condition,
-            $input->category,
+            id: $draftId,
+            sellerId: $sellerId,
+            name: new ItemName($input->name),
+            price: new Money(
+                $input->priceAmount,
+                $input->priceCurrency
+            ),
+            brandRaw: $input->brandRaw
+                ? new BrandName($input->brandRaw)
+                : null,
+            explain: $input->explain,
+            condition: $input->condition,
+            category: $input->category,
         );
 
         $this->draftRepository->save($draft);

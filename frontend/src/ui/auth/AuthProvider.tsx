@@ -14,6 +14,7 @@ import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { createHttpClient } from "@/infrastructure/auth/HttpClient";
 import { TokenRefreshService } from "@/application/auth/TokenRefreshService";
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
+import { useRouter } from "next/navigation";
 
 import type { AuthUser } from "@/types/auth";
 import type {
@@ -130,6 +131,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     }
   }
+
+  const router = useRouter();
+
+  useEffect(() => {
+    // 初期化未完了・ローディング中は何もしない
+    if (!isReady || isLoading) return;
+    if (!user) return;
+
+    /**
+     * 🔹 将来の導線分岐ポイント
+     * 今は「何もしない」でOK
+     */
+    if (user.has_shop === false) {
+      // 例（今はコメントアウト）:
+      // router.replace("/sell/start");
+    }
+  }, [isReady, isLoading, user, router]);
 
   return (
     <AuthContext.Provider

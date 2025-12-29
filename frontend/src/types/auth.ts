@@ -10,7 +10,7 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-
+  has_shop: boolean;
   /** 旧互換（将来削除可） */
   shop_id?: number | null;
 

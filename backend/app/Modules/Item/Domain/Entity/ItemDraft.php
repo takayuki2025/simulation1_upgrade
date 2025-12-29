@@ -16,7 +16,7 @@ use App\Modules\Item\Domain\ValueObject\{
 
 final class ItemDraft
 {
-    private ?ItemImagePath $itemImage = null;
+    private ?ItemImagePath $itemImage;
 
     private function __construct(
         private ItemDraftId $id,
@@ -27,10 +27,14 @@ final class ItemDraft
         private ItemStatus $status,
         private string $explain,
         private string $condition,
-        private ?CategoryList $category,
+        private CategoryList $category,
         private StockCount $remain,
+        ?ItemImagePath $itemImage,
     ) {
+        $this->itemImage = $itemImage;
     }
+
+    /* ===== Factory（新規作成）===== */
 
     public static function create(
         ItemDraftId $id,
@@ -51,11 +55,15 @@ final class ItemDraft
             status: ItemStatus::DRAFT,
             explain: $explain ?? '',
             condition: $condition ?? '',
-            category: $category ? new CategoryList($category) : new CategoryList([]),
+            category: new CategoryList($category ?? []),
             remain: new StockCount(1),
+            itemImage: null, // ★ 追加（これだけ）
         );
     }
 
+    /**
+     * ★ Repository 専用（DB → Entity 復元）
+     */
     public static function reconstruct(
         ItemDraftId $id,
         SellerId $sellerId,
@@ -63,22 +71,24 @@ final class ItemDraft
         Money $price,
         ?BrandName $brandRaw,
         ItemStatus $status,
-        ?string $explain,
-        ?string $condition,
-        ?array $category,
+        string $explain,
+        string $condition,
+        array $category,
         StockCount $remain,
+        ?ItemImagePath $itemImage,
     ): self {
         return new self(
-            $id,
-            $sellerId,
-            $name,
-            $price,
-            $brandRaw,
-            $status,
-            $explain ?? '',
-            $condition ?? '',
-            $category ? new CategoryList($category) : new CategoryList([]),
-            $remain,
+            id: $id,
+            sellerId: $sellerId,
+            name: $name,
+            price: $price,
+            brandRaw: $brandRaw,
+            status: $status,
+            explain: $explain,
+            condition: $condition,
+            category: new CategoryList($category),
+            remain: $remain,
+            itemImage: $itemImage,
         );
     }
 
@@ -116,7 +126,7 @@ final class ItemDraft
     {
         return $this->condition;
     }
-    public function category(): ?CategoryList
+    public function category(): CategoryList
     {
         return $this->category;
     }
@@ -125,12 +135,12 @@ final class ItemDraft
         return $this->remain;
     }
 
+    /* ===== Image ===== */
+
     public function itemImage(): ?ItemImagePath
     {
         return $this->itemImage;
     }
-
-    /* ========= Domain Logic ========= */
 
     public function attachImage(ItemImagePath $path): void
     {
@@ -142,6 +152,8 @@ final class ItemDraft
         return $this->itemImage !== null;
     }
 
+    /* ===== Publish Rule ===== */
+
     public function isPublishableV1(): bool
     {
         return $this->status === ItemStatus::DRAFT
@@ -152,9 +164,4 @@ final class ItemDraft
     {
         $this->status = ItemStatus::PUBLISHED;
     }
-
-    // public function setId(ItemDraftId $id): void
-    // {
-    //     $this->id = $id;
-    // }
 }

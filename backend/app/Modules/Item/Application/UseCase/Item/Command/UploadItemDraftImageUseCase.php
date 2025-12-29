@@ -5,39 +5,33 @@ namespace App\Modules\Item\Application\UseCase\Item\Command;
 use App\Modules\Item\Domain\Repository\ItemDraftRepository;
 use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
-use Illuminate\Http\UploadedFile;
+use DomainException;
 
 final class UploadItemDraftImageUseCase
 {
     public function __construct(
-        private ItemDraftRepository $draftRepository,
-    ) {}
+        private ItemDraftRepository $drafts,
+    ) {
+    }
 
-    public function execute(
+    public function handle(
         string $draftId,
-        UploadedFile $file,
+        ItemImagePath $imagePath,
         AuthPrincipal $principal,
-    ): string {
-        $draft = $this->draftRepository->findById($draftId);
+    ): void {
+        $draft = $this->drafts->findById($draftId);
 
         if (! $draft) {
-            throw new \DomainException('Draft not found');
+            throw new DomainException('Draft not found');
         }
 
-        // 認可（本人のみ）
+        // ★ 正しい所有者チェック
         if (! $draft->sellerId()->belongsTo($principal)) {
-            throw new \DomainException('Forbidden');
+            throw new DomainException('You do not own this draft');
         }
 
-        // 保存
-        $storedPath = $file->store('item-drafts', 'public');
-
-        // ★ ValueObject に変換
-        $imagePath = ItemImagePath::fromRaw($storedPath);
         $draft->attachImage($imagePath);
 
-        $this->draftRepository->save($draft);
-
-        return $imagePath->value();
+        $this->drafts->save($draft);
     }
 }

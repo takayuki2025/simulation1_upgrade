@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Modules\Auth\Application\Service\JwtUserResolver;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,22 +17,32 @@ final class JwtAuthenticate
 
     public function handle(Request $request, Closure $next)
     {
-        // testing bypass（今のままでOK）
-        if (app()->environment('testing') && Auth::user()) {
-            return $next($request);
-        }
+        \Log::info('[JwtAuthenticate] called', [
+            'has_authorization' => $request->hasHeader('Authorization'),
+            'auth_header'       => $request->header('Authorization'),
+        ]);
 
         $resolved = $this->resolver->resolve($request);
 
-        if (!$resolved) {
+        if (! $resolved) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        Auth::setUser($resolved['user']);
-        $request->setUserResolver(fn () => $resolved['user']);
+        /**
+         * resolver は以下を返す前提：
+         * [
+         *   'user' => User,
+         *   'principal' => AuthPrincipal
+         * ]
+         */
+        $user = $resolved['user'];
+        $principal = $resolved['principal'];
 
-        $request->attributes->set('auth_principal', $resolved['principal']);
-        $request->attributes->set('tenant_id', $resolved['tenant_id']);
+        Auth::setUser($user);
+        $request->setUserResolver(fn () => $user);
+
+        // ★ DDD 用（これが無かった）
+        $request->attributes->set('auth_principal', $principal);
 
         return $next($request);
     }

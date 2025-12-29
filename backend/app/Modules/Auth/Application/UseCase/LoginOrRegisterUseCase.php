@@ -2,6 +2,7 @@
 
 namespace App\Modules\Auth\Application\UseCase;
 
+use App\Models\User;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterInput;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterOutput;
 use App\Modules\Auth\Infrastructure\External\FirebaseProvider;
@@ -23,30 +24,22 @@ final class LoginOrRegisterUseCase
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
         // ① Firebase 検証（SSOT）
-
         $verified = $this->firebase->verifyToken($input->firebaseIdToken);
-
 
         \Log::info('[LoginOrRegister] firebase verified', [
             'keys' => array_keys($verified),
             'verified' => $verified,
         ]);
 
-
-
         $firebaseUid = $verified['sub'];
-
-
 
         \Log::info('[LoginOrRegister] firebase uid resolved', [
             'firebaseUid' => $firebaseUid,
         ]);
 
-
         $email = $verified['email'] ?? null;
         $emailVerified = (bool) ($verified['email_verified'] ?? false);
         $displayName = $verified['name'] ?? null;
-
 
         // ② AuthPrincipal（※ userId はまだ不要）
         $principal = new AuthPrincipal(
@@ -62,14 +55,12 @@ final class LoginOrRegisterUseCase
         // ③ User 側で provision（user 作成 or 取得）
         $provisioned = $this->userProvisioning->provision($principal);
 
-
         \Log::info('[LoginOrRegister] provisioned user', [
             'userId'        => $provisioned->userId,
             'email'         => $provisioned->email,
             'shopIds'       => $provisioned->shopIds ?? [],
             'isFirstLogin'  => $provisioned->isFirstLogin,
         ]);
-
 
         // ④ principal を「確定版」に更新（※ 重要）
         $principal = new AuthPrincipal(
@@ -85,7 +76,6 @@ final class LoginOrRegisterUseCase
         // ⑤ Access Token 発行
         $accessToken = $this->tokenIssuer->issue($provisioned);
 
-
         \Log::info('[LoginOrRegister] issuing token with principal', [
             'userId'   => $principal->userId,
             'provider' => $principal->provider,
@@ -93,8 +83,16 @@ final class LoginOrRegisterUseCase
             'shopIds'  => $principal->shopIds,
         ]);
 
+        /**
+         * ⑥ Refresh Token（A フェーズ安定化）
+         * - 既存 RefreshToken を revoke
+         * - 新しい refresh を 1 本だけ発行
+         */
+        $user = User::find($provisioned->userId);
+        if ($user) {
+            $this->refreshTokens->revokeAllForUser($user);
+        }
 
-        // ⑥ Refresh Token
         $refresh = $this->refreshTokens->issueByUserId(
             $provisioned->userId,
             request()->ip(),

@@ -141,7 +141,8 @@ use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
 // Route::get('/items/{itemId}', [ItemReadController::class, 'show']);
 
 Route::withoutMiddleware(['throttle:api'])
-    ->get('/items/{itemId}', [ItemReadController::class, 'show']);
+    ->get('/items/{itemId}', [ItemReadController::class, 'show'])
+    ->whereNumber('itemId');
 
 /*
 |--------------------------------------------------------------------------
@@ -154,12 +155,14 @@ Route::withoutMiddleware(['throttle:api'])
 use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
 use App\Modules\Comment\Presentation\Http\Controllers\PostCommentController;
 
+Route::middleware('auth.jwt.optional')->group(function () {
+    Route::get('/items/favorite', [FavoriteController::class, 'index']);
+});
 
-Route::get('/items/favorite', [FavoriteController::class, 'index']);
 
 
 Route::middleware(['auth.jwt'])->group(function () {
-    
+
     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
 });
@@ -227,9 +230,7 @@ Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/payments/start', [PaymentController::class, 'start']);
 });
 
-// Webhook: no auth (signature)
 
-// Route::post('/payments/webhook/stripe', StripeWebhookController::class);
 
 Route::post('/webhooks/stripe', StripeWebhookController::class);
 
@@ -361,7 +362,6 @@ Route::middleware('auth.jwt')->group(function () {
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 
-
 // === Shop / Public View ===
 Route::prefix('shops/{shop_code}')
     ->middleware(['shop.context'])
@@ -397,54 +397,7 @@ Route::prefix('shops/{shop_code}')
 
 
 
-// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 
-// Route::prefix('shops/{shop_code}')
-//     ->middleware([
-//         'auth.jwt',
-//         'tenant',
-//         'shop.role:owner,manager,staff',
-//     ])
-//     ->group(function () {
-//         Route::get('/orders', ShopOrderListController::class);
-//     });
-
-
-
-
-
-// use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
-
-// Route::prefix('shops/{shop_code}')
-//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-//     ->group(function () {
-//         Route::get('/shipments', ShopShipmentListController::class);
-//     });
-
-
-
-
-
-// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
-// Route::prefix('shops/{shop_code}')
-//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-//     ->group(function () {
-//         Route::get(
-//             '/orders/{orderId}/shipment',
-//             ShopOrderShipmentController::class
-//         );
-//     });
-
-
-
-// Route::prefix('shops/{shop_code}')
-//     ->middleware(['auth.jwt', 'tenant', 'shop.role:owner,manager,staff'])
-//     ->group(function () {
-//         Route::get(
-//             '/orders/{orderId}/shipment',
-//             ShopOrderShipmentController::class
-//         );
-//     });
 
 
 use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
@@ -460,22 +413,3 @@ Route::prefix('shipments/{shipmentId}')
         Route::post('in-transit', InTransitShipmentController::class);
         Route::post('deliver', DeliverShipmentController::class);
     });
-
-
-// use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
-
-
-
-
-// Route::prefix('shops/{shop_code}')
-//     ->middleware([
-//         'auth.jwt',
-//         'shop.context',
-//         // 'shop.role'（v1.1 で追加）
-//     ])
-//     ->group(function () {
-//         Route::get(
-//             'orders/{orderId}/shipment',
-//             \App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController::class
-//         );
-//     });

@@ -2,23 +2,25 @@
 
 namespace App\Modules\Auth\Application\Service;
 
-use App\Auth\UserResolver;
 use App\Models\User;
 use App\Modules\Auth\Domain\Port\TokenVerifierPort;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Http\Request;
 
-final class JwtUserResolver implements UserResolver
+final class JwtUserResolver
 {
     public function __construct(
         private TokenVerifierPort $verifier
     ) {
     }
 
-    public function resolve(Request $request): ?User
+    /**
+     * @return array{user: User, principal: AuthPrincipal}|null
+     */
+    public function resolve(Request $request): ?array
     {
         $token = $request->bearerToken();
-        if (!$token) {
+        if (! $token) {
             return null;
         }
 
@@ -28,10 +30,7 @@ final class JwtUserResolver implements UserResolver
             return null;
         }
 
-        if (
-            property_exists($decoded, 'exp') &&
-            time() >= (int) $decoded->exp
-        ) {
+        if (isset($decoded->exp) && time() >= (int) $decoded->exp) {
             return null;
         }
 
@@ -40,34 +39,25 @@ final class JwtUserResolver implements UserResolver
             return null;
         }
 
-        return User::find($userId);
-    }
-
-    /**
-     * 🔹 DDD用途（Optional）
-     */
-    public function resolvePrincipal(Request $request): ?AuthPrincipal
-    {
-        $token = $request->bearerToken();
-        if (!$token) {
+        $user = User::find($userId);
+        if (! $user) {
             return null;
         }
 
-        $decoded = $this->verifier->decode($token);
-
-        $user = User::find((int) $decoded->sub);
-        if (!$user) {
-            return null;
-        }
-
-        return new AuthPrincipal(
+        // ★ DDD の核：AuthPrincipal をここで生成
+        $principal = new AuthPrincipal(
             provider: 'jwt',
-            providerUid: (string) $decoded->sub,
+            providerUid: (string) ($decoded->firebase_uid ?? ''),
             userId: $user->id,
             email: $user->email,
-            emailVerified: (bool) $user->email_verified_at,
+            emailVerified: true,
             displayName: $user->name,
-            shopIds: $user->shops()->pluck('shops.id')->all(),
+            shopIds: $decoded->shop_ids ?? [],
         );
+
+        return [
+            'user'      => $user,
+            'principal' => $principal,
+        ];
     }
 }

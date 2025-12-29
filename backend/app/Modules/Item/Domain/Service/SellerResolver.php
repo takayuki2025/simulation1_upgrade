@@ -76,4 +76,4 @@ final class SellerResolver
 
         return SellerId::shop($shopId);
     }
-}
+} 

@@ -3,6 +3,7 @@
 namespace App\Modules\Item\Domain\ValueObject;
 
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use Illuminate\Support\Facades\DB;
 
 final class SellerId
 {
@@ -53,31 +54,22 @@ final class SellerId
                 $principal->userId === $this->id,
 
             SellerType::SHOP =>
-                // 通常ショップ（role_user）
                 in_array($this->id, $principal->shopIds ?? [], true)
-                // Free Shop（owner 判定）
                 || $this->isOwnedFreeShopBy($principal),
         };
     }
 
     private function isOwnedFreeShopBy(AuthPrincipal $principal): bool
     {
-        return \DB::table('shops')
+        return DB::table('shops')
             ->where('id', $this->id)
             ->where('owner_user_id', $principal->userId)
             ->exists();
     }
 
-    private function isOwnedBy(AuthPrincipal $principal): bool
-    {
-        // Free Shop は shop_code = FREE_{user_id} などで判別しても良い
-        // まずは DB 直参照で OK
-        return \DB::table('shops')
-            ->where('id', $this->id)
-            ->where('owner_user_id', (int)$principal->providerUid)
-            ->exists();
-    }
-
+    /**
+     * デバッグ・ログ用途のみ
+     */
     public function asString(): string
     {
         return sprintf('%s:%d', $this->type->value, $this->id);

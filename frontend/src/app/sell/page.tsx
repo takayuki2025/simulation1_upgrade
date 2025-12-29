@@ -6,20 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/ui/auth/useAuth";
 import styles from "./W-Item-Sell.module.css";
 
-/* =========================
-   型定義
-========================= */
 type SellForm = {
   name: string;
   price: string;
   explain: string;
-  attributes: string; // ★ brand / condition / color をまとめる
+  attributes: string;
   categories: string[];
 };
 
-/* =========================
-   定数
-========================= */
 const CATEGORY_LIST = [
   "ファッション",
   "家電",
@@ -37,7 +31,7 @@ const CATEGORY_LIST = [
 
 export default function ItemSellPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, apiClient } = useAuth();
+  const { isAuthenticated, isLoading, apiClient, user } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -61,6 +55,8 @@ export default function ItemSellPage() {
     router.replace("/login");
     return null;
   }
+
+  if (!user) return null;
 
   /* =========================
      Image Select
@@ -87,14 +83,16 @@ export default function ItemSellPage() {
 
   /* =========================
      Submit（DDD 正式フロー）
-     1. Draft 作成
-     2. Image Upload
-     3. Publish
   ========================= */
   const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!apiClient || !imageFile) {
+    if (!apiClient || !isAuthenticated || !user) {
+      setError("ログイン状態が確認できません");
+      return;
+    }
+
+    if (!imageFile) {
       setError("画像を選択してください");
       return;
     }
@@ -105,17 +103,13 @@ export default function ItemSellPage() {
     try {
       /* =========================
          1. Draft 作成
-         ※ attributes を brand として送信
       ========================= */
       const draftRes = await apiClient.post("/items/drafts", {
-        seller_id: "individual:2", // v1 仮
+        seller_id: `individual:${user.id}`, // ★ 修正点
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
-
-        // ★ AtlasKernel 解析対象
         brand: form.attributes || null,
-
         explain: form.explain || null,
         category: form.categories.length ? form.categories : null,
       });
@@ -137,7 +131,7 @@ export default function ItemSellPage() {
       ========================= */
       await apiClient.post(`/items/drafts/${draftId}/publish`);
 
-      router.push("/"); // or /mypage/sell
+      router.push("/");
     } catch (e) {
       setError("商品の出品に失敗しました");
     } finally {
@@ -199,7 +193,9 @@ export default function ItemSellPage() {
 
         {/* ★ brand / condition / color 統合入力 */}
         <div className={styles.formGroup}>
-          <label>ブランド・状態・色（まとめて入力可能でどのような複雑なデーターでも処理できる開発をしています。）</label>
+          <label>
+            ブランド・状態・色（まとめて入力可能でどのような複雑なデーターでも処理できる開発をしています。）
+          </label>
           <input
             type="text"
             placeholder="例：Apple ほぼ新品 黒（スペース、コンマなど有無でも可能）"
@@ -209,7 +205,7 @@ export default function ItemSellPage() {
             }
           />
           <small className={styles.hint}>
-            ※ 入力内容は自動で解析・正規化されます 
+            ※ 入力内容は自動で解析・正規化されます
             ※企業判断や成長企画や実績に未来再利用可能な形で蓄積するエンジン開発のプロトタイプです。
           </small>
         </div>

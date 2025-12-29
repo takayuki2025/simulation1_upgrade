@@ -2,6 +2,9 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
+use Illuminate\Http\UploadedFile;
+use InvalidArgumentException;
+
 final class ItemImagePath
 {
     private function __construct(
@@ -11,6 +14,9 @@ final class ItemImagePath
         $this->path = ltrim($this->path, '/');
     }
 
+    /**
+     * DB / JSON / API から来る raw 値
+     */
     public static function fromRaw(?string $raw): ?self
     {
         if (!$raw) {
@@ -23,13 +29,39 @@ final class ItemImagePath
         return new self($path);
     }
 
+    /**
+     * Repository / internal 用
+     */
     public static function fromInternal(string $path): self
     {
-        // ★ ここが重要：internal でも必ず正規化
+        // ★ internal でも必ず正規化
         $path = preg_replace('#^/?storage/#', '', $path);
         $path = ltrim($path, '/');
 
         return new self($path);
+    }
+
+    /**
+     * ★ 今回追加するメソッド（これが足りなかった）
+     * UploadedFile → 保存 → ValueObject
+     */
+    public static function fromUploadedFile(
+        UploadedFile $file,
+        string $disk = 'public'
+    ): self {
+        if (! $file->isValid()) {
+            throw new InvalidArgumentException('Invalid image upload');
+        }
+
+        // 保存（Draft 専用ディレクトリ）
+        $storedPath = $file->store('item-drafts', $disk);
+
+        if (! $storedPath) {
+            throw new InvalidArgumentException('Failed to store image');
+        }
+
+        // ★ 既存ロジックを再利用して正規化
+        return self::fromInternal($storedPath);
     }
 
     public function value(): string
