@@ -3,76 +3,80 @@
 namespace App\Modules\User\Application\Service;
 
 use App\Models\User;
-use App\Models\Role;
+use Illuminate\Support\Facades\DB;
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 
 final class UserProvisioningService implements UserProvisioningPort
 {
-    public function provision(AuthPrincipal $principal): ProvisionedUser
-    {
-        // 1) provider_uid（firebase uid）で検索 → fallback で email
-        $user = User::where('firebase_uid', $principal->providerUid)->first()
-            ?? ($principal->email
-                ? User::where('email', $principal->email)->first()
-                : null);
+    public function provisionFromFirebase(
+        string $firebaseUid,
+        ?string $email,
+        bool $emailVerified,
+        ?string $displayName,
+    ): ProvisionedUser {
 
-        $wasCreated = false;
+        if (! $email) {
+            throw new \DomainException('Email is required for user provisioning.');
+        }
 
-        // 2) なければ作成
-        if (! $user) {
-            $user = new User([
-                'email'        => $principal->email,
-                'name'         => $principal->displayName,
-                'firebase_uid' => $principal->providerUid,
-                'password'     => bcrypt(str()->random(32)),
-                'shop_id'      => null,
-            ]);
+        return DB::transaction(function () use (
+            $email,
+            $emailVerified,
+            $displayName
+        ) {
+            /* =====================================================
+             * 1. User 解決 or 作成（email が唯一のキー）
+             * ===================================================== */
+            $user = User::where('email', $email)->first();
 
-            if ($principal->emailVerified) {
-                $user->email_verified_at = now();
+            $isFirstLogin = false;
+
+            if (! $user) {
+                $user = User::create([
+                    'name'              => $displayName ?? 'User',
+                    'email'             => $email,
+                    'email_verified_at' => $emailVerified ? now() : null,
+                ]);
+
+                $isFirstLogin = true;
             }
 
-            $user->save();
-            $wasCreated = true;
+            /* =====================================================
+             * 2. 所属ショップ解決（role_user）
+             * ===================================================== */
+            $shopIds = DB::table('role_user')
+                ->where('user_id', $user->id)
+                ->pluck('shop_id')
+                ->filter()
+                ->values()
+                ->all();
 
-            // 初期ロール付与
-            $customerRoleId = Role::where('slug', 'customer')->value('id');
-            if ($customerRoleId) {
-                $user->roles()->attach($customerRoleId, ['shop_id' => null]);
-            }
-        }
+            /* =====================================================
+             * 3. tenantId（現在選択中 shop）
+             * ===================================================== */
+            $tenantId = $shopIds[0] ?? null;
 
-        // 3) email_verified 同期
-        if (! $user->email_verified_at && $principal->emailVerified) {
-            $user->email_verified_at = now();
-            $user->save();
-        }
+            /* =====================================================
+             * 4. roles
+             * ===================================================== */
+            $roles = DB::table('role_user')
+                ->where('user_id', $user->id)
+                ->pluck('role_id')
+                ->values()
+                ->all();
 
-        // 4) 初回ログイン
-        $isFirstLogin = is_null($user->first_login_at);
-        if ($isFirstLogin) {
-            $user->first_login_at = now();
-            $user->save();
-        }
-
-        // 5) roles DTO 化
-        $roles = collect($user->formattedRoles())
-            ->pluck('slug')
-            ->values()
-            ->all();
-
-
-        return new ProvisionedUser(
-            userId: $user->id,
-            email: $user->email,
-            externalId: $user->firebase_uid,
-            roles: $roles,
-            tenantId: $user->shop_id,
-            isFirstLogin: $isFirstLogin,
-            emailVerified: (bool) $principal->emailVerified,
-        );
-
+            /* =====================================================
+             * 5. ProvisionedUser
+             * ===================================================== */
+            return new ProvisionedUser(
+                userId: $user->id,
+                email: $user->email,
+                roles: $roles,
+                shopIds: $shopIds,
+                tenantId: $tenantId,
+                isFirstLogin: $isFirstLogin,
+            );
+        });
     }
 }

@@ -30,12 +30,13 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
 
         $model->id = $draft->id()->value();
 
-        // ===== Aフェーズ：individual 出品のみ =====
+        /**
+         * ★ Repository は「決まった sellerId」を保存するだけ
+         */
         if ($draft->sellerId()->isIndividual()) {
-            $model->user_id = $draft->sellerId()->id(); // ★ int
+            $model->user_id = $draft->sellerId()->id();
             $model->shop_id = null;
         } else {
-            // 将来拡張（Bフェーズ）
             $model->user_id = null;
             $model->shop_id = $draft->sellerId()->id();
         }
@@ -56,13 +57,16 @@ final class EloquentItemDraftRepository implements ItemDraftRepository
     public function findById(string $draftId): ?ItemDraft
     {
         $model = EloquentItemDraft::find($draftId);
-
         if (! $model) {
             return null;
         }
 
-        // ===== Aフェーズ：user 固定 =====
-        $sellerId = SellerId::user((int) $model->user_id);
+        /**
+         * ★ DB の事実から sellerId を復元するだけ
+         */
+        $sellerId = $model->shop_id !== null
+            ? SellerId::shop((int) $model->shop_id)
+            : SellerId::user((int) $model->user_id);
 
         return ItemDraft::reconstruct(
             id: ItemDraftId::restore($model->id),

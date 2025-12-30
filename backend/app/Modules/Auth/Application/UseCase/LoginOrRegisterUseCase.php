@@ -23,49 +23,31 @@ final class LoginOrRegisterUseCase
 
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
-        // ① Firebase 検証（SSOT）
+        /* =====================================================
+         * ① Firebase 検証（SSOT）
+         * ===================================================== */
         $verified = $this->firebase->verifyToken($input->firebaseIdToken);
 
-        \Log::info('[LoginOrRegister] firebase verified', [
-            'keys' => array_keys($verified),
-            'verified' => $verified,
-        ]);
-
-        $firebaseUid = $verified['sub'];
-
-        \Log::info('[LoginOrRegister] firebase uid resolved', [
-            'firebaseUid' => $firebaseUid,
-        ]);
-
-        $email = $verified['email'] ?? null;
+        $firebaseUid   = (string) $verified['sub'];
+        $email         = $verified['email'] ?? null;
         $emailVerified = (bool) ($verified['email_verified'] ?? false);
-        $displayName = $verified['name'] ?? null;
+        $displayName   = $verified['name'] ?? null;
 
-        // ② AuthPrincipal（※ userId はまだ不要）
-        $principal = new AuthPrincipal(
-            provider: 'firebase',
-            providerUid: $firebaseUid,
-            userId: 0,                 // ★ 仮（次で確定）
+        /* =====================================================
+         * ② User Provisioning（Firebase 専用）
+         * ===================================================== */
+        $provisioned = $this->userProvisioning->provisionFromFirebase(
+            firebaseUid: $firebaseUid,
             email: $email,
             emailVerified: $emailVerified,
             displayName: $displayName,
-            shopIds: [],               // ★ 仮（次で確定）
         );
 
-        // ③ User 側で provision（user 作成 or 取得）
-        $provisioned = $this->userProvisioning->provision($principal);
-
-        \Log::info('[LoginOrRegister] provisioned user', [
-            'userId'        => $provisioned->userId,
-            'email'         => $provisioned->email,
-            'shopIds'       => $provisioned->shopIds ?? [],
-            'isFirstLogin'  => $provisioned->isFirstLogin,
-        ]);
-
-        // ④ principal を「確定版」に更新（※ 重要）
-        $principal = new AuthPrincipal(
-            provider: 'firebase',
-            providerUid: $firebaseUid,
+        /* =====================================================
+         * ③ AuthPrincipal（確定版を1回だけ生成）
+         * ===================================================== */
+        $principal = AuthPrincipal::fromFirebase(
+            firebaseUid: $firebaseUid,
             userId: $provisioned->userId,
             email: $provisioned->email,
             emailVerified: $emailVerified,
@@ -73,23 +55,18 @@ final class LoginOrRegisterUseCase
             shopIds: $provisioned->shopIds ?? [],
         );
 
-        // ⑤ Access Token 発行
-        $accessToken = $this->tokenIssuer->issue($provisioned);
+        /* =====================================================
+         * ④ Access Token（✅ principal を渡す）
+         * ===================================================== */
+        $accessToken = $this->tokenIssuer->issue(
+            user: $provisioned,
+            principal: $principal,
+        );
 
-        \Log::info('[LoginOrRegister] issuing token with principal', [
-            'userId'   => $principal->userId,
-            'provider' => $principal->provider,
-            'uid'      => $principal->providerUid,
-            'shopIds'  => $principal->shopIds,
-        ]);
-
-        /**
-         * ⑥ Refresh Token（A フェーズ安定化）
-         * - 既存 RefreshToken を revoke
-         * - 新しい refresh を 1 本だけ発行
-         */
-        $user = User::find($provisioned->userId);
-        if ($user) {
+        /* =====================================================
+         * ⑤ Refresh Token
+         * ===================================================== */
+        if ($user = User::find($provisioned->userId)) {
             $this->refreshTokens->revokeAllForUser($user);
         }
 

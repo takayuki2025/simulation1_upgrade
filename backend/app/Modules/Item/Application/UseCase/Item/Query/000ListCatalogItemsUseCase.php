@@ -35,5 +35,5 @@ final class ListCatalogItemsUseCase
             excludeSellerId: $excludeSellerId
         );
     }
-}
+} 
 

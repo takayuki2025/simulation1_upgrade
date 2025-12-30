@@ -11,8 +11,11 @@ final class PublicCatalogItemDto
         public readonly ?string $brandPrimary,
         public readonly ?string $conditionName,
         public readonly ?string $colorName,
-        public readonly ?string $itemImagePath, // storage 相対 path（例: item_images/xxx.jpg）
+        public readonly ?string $itemImagePath, // storage 相対 path
         public readonly \DateTimeInterface $publishedAt,
+
+        // ★ 表示専用フラグ（自分の個人出品）
+        public readonly bool $isOwnPersonalItem,
     ) {
     }
 }

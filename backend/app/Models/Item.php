@@ -14,7 +14,7 @@ class Item extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
+        'created_by_user_id',
         'name',
         'price',
         'explain',

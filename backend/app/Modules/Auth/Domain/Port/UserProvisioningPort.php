@@ -2,10 +2,17 @@
 
 namespace App\Modules\Auth\Domain\Port;
 
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 
 interface UserProvisioningPort
 {
-    public function provision(AuthPrincipal $principal): ProvisionedUser;
+    /**
+     * Firebase 認証後に User / Role / Shop を確定する
+     */
+    public function provisionFromFirebase(
+        string $firebaseUid,
+        ?string $email,
+        bool $emailVerified,
+        ?string $displayName,
+    ): ProvisionedUser;
 }

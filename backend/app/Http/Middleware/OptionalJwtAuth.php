@@ -15,17 +15,16 @@ final class OptionalJwtAuth
 
     public function handle(Request $request, Closure $next)
     {
-        // Authorization が無ければ何もしない
         if (! $request->hasHeader('Authorization')) {
             return $next($request);
         }
 
-        $user = $this->resolver->resolve($request);
+        $resolved = $this->resolver->resolve($request);
 
-        // ★ Auth::setUser は絶対に呼ばない
-        if ($user) {
-            // Request attribute にだけ載せる
-            $request->attributes->set('jwt_user', $user);
+        if ($resolved) {
+            // 🔑 JwtAuthenticate と完全に同じ契約
+            $request->attributes->set('auth_principal', $resolved['principal']);
+            $request->attributes->set('jwt_user', $resolved['user']);
         }
 
         return $next($request);

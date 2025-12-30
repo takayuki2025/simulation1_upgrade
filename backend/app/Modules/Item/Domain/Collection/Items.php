@@ -3,54 +3,42 @@
 namespace App\Modules\Item\Domain\Collection;
 
 use App\Modules\Item\Domain\Entity\Item;
-use App\Models\Item as EloquentItem;
-use Illuminate\Support\Collection;
-use App\Modules\Item\Domain\ValueObject\Money;
-use App\Modules\Item\Domain\ValueObject\{
-    ItemId,
-    Price,
-    StockCount,
-    CategoryList,
-    ItemImagePath
-};
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use ArrayIterator;
 
-final class Items
+final class Items implements IteratorAggregate, Countable
 {
     /** @var Item[] */
     private array $items;
 
+    /**
+     * @param Item[] $items
+     */
     public function __construct(array $items)
     {
         $this->items = $items;
     }
 
+    /**
+     * Repository / UseCase 用
+     */
     public static function fromArray(array $items): self
     {
         return new self($items);
     }
 
     /**
-     * Controller / Resource 用
+     * Repository から Eloquent Collection を受ける場合
+     * ※ Repository 側で toDomain 済みが前提
      */
-    public function toArray(): array
+    public static function fromEloquent($models): self
     {
-        return $this->items;
-    }
-
-    public static function fromEloquent(Collection $eloquentItems): self
-    {
-        return new self(
-            $eloquentItems
-                ->map(fn (EloquentItem $model) => self::toDomain($model))
-                ->all()
-        );
+        return new self($models->all());
     }
 
     /**
-     * Domain Item 配列を返す（Controller / Resource 用）
+     * Controller / Resource 用
      *
      * @return Item[]
      */
@@ -75,38 +63,8 @@ final class Items
         return count($this->items);
     }
 
-    /**
-     * Eloquent → Domain 変換
-     */
-    private static function toDomain(EloquentItem $model): Item
-    {
-        // ★ category を必ず array に正規化
-        $categories = [];
-
-        if (is_string($model->category)) {
-            $decoded = json_decode($model->category, true);
-            $categories = is_array($decoded) ? $decoded : [];
-        } elseif (is_array($model->category)) {
-            $categories = $model->category;
-        }
-
-        return Item::reconstitute(
-            new ItemId($model->id),
-            $model->shop_id,
-            $model->name,
-            new Money($model->price, 'JPY'),
-            $model->explain,
-            $model->condition,
-            new CategoryList($categories),   // ← ここが修正点
-            ItemImagePath::fromRaw($model->item_image),
-            new StockCount($model->remain),
-        );
-    }
-
-
     public function isEmpty(): bool
     {
         return empty($this->items);
     }
-
 }

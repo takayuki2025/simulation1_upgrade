@@ -51,4 +51,5 @@ interface ItemRepository
     ): void;
 
     public function findPublicByShopId(int $shopId): array;
+
 }

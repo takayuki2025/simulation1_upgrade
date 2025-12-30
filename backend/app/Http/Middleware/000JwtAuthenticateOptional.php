@@ -7,7 +7,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-final class JwtAuthenticate
+final class JwtAuthenticateOptional
 {
     public function __construct(
         private JwtUserResolver $resolver
@@ -16,28 +16,31 @@ final class JwtAuthenticate
 
     public function handle(Request $request, Closure $next)
     {
-        \Log::info('[JwtAuthenticate] called', [
+        \Log::info('[JwtAuthenticateOptional] called', [
             'has_authorization' => $request->hasHeader('Authorization'),
         ]);
 
         $resolved = $this->resolver->resolve($request);
 
+        // 🔑 未ログインでも通す
         if (! $resolved) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            return $next($request);
         }
 
         /**
-         * @var \App\Models\User $user
-         * @var \App\Modules\Auth\Domain\ValueObject\AuthPrincipal $principal
+         * [
+         *   'user' => User,
+         *   'principal' => AuthPrincipal
+         * ]
          */
         $user = $resolved['user'];
         $principal = $resolved['principal'];
 
-        // Laravel Auth（互換用）
+        // Laravel 標準
         Auth::setUser($user);
         $request->setUserResolver(fn () => $user);
 
-        // ✅ DDD 用 Principal（唯一の正）
+        // ★ ここが最重要（あなたの設計の核）
         $request->attributes->set('auth_principal', $principal);
 
         return $next($request);

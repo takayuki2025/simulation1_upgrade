@@ -15,6 +15,7 @@ class Shop extends Model
         'shop_code',
         'owner_user_id',
         'name',
+        'type',
         'status',
         'description',
         'logo',

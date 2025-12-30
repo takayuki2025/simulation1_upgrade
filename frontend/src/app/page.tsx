@@ -8,7 +8,9 @@ import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
-import type { Item } from "@/types/item";
+// ✅ Public(ReadModel) 用
+import type { PublicItem } from "@/types/publicItem";
+
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
@@ -47,12 +49,12 @@ export default function Home() {
   /* =========================
      🧠 表示切り替え
   ========================= */
-  const items: Item[] =
+  const items: PublicItem[] =
     currentTab === "mylist"
-      ? favoriteResult.items
+      ? (favoriteResult.items as PublicItem[])
       : isSearch
-        ? searchResult.items
-        : listResult.items;
+        ? (searchResult.items as PublicItem[])
+        : (listResult.items as PublicItem[]);
 
   const isItemsLoading =
     currentTab === "mylist"
@@ -113,26 +115,27 @@ export default function Home() {
           </div>
 
           <div className={styles.items_select}>
-            {items.length > 0 ? (
+            {items && items.length > 0 ? (
               items.map((item) => (
                 <div key={item.id} className={styles.items_select_all}>
                   <Link href={`/item/${item.id}`} className={styles.cardLink}>
                     <div className={styles.itemImageWrapper}>
                       <img
-                        src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
+                        src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
                         alt={item.name}
                         className={styles.itemImage}
                         onError={onImageError}
                       />
-                      {item.remain === 0 && (
-                        <div className={styles.sold_text}>SOLD</div>
+
+                      {/* ✅ ここに「あなたの出品」バッジを追加 */}
+                      {item.isOwnPersonalItem && (
+                        <span className={styles.badge}>思い入れの商品をもっと良く売る</span>
                       )}
                     </div>
 
                     <div className={styles.item_info}>
                       <p className={styles.item_name}>{item.name}</p>
 
-                      {/* ✅ number 前提の安全な価格表示 */}
                       <p className={styles.item_price}>
                         ¥{item.price.toLocaleString()}
                       </p>

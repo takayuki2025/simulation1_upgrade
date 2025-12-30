@@ -21,9 +21,14 @@ return new class () extends Migration {
             // 店舗のオーナーとなるユーザー
             // ★ 修正: foreignId を使用しているため、constrained('users') を有効化し、外部キー制約を設定
             $table->foreignId('owner_user_id')
-                  ->nullable()
+                ->nullable()
                   ->constrained('users') // 外部キー制約を有効化
                   ->cascadeOnDelete();   // 関連ユーザー削除時にショップも削除されるように設定
+
+
+            $table->enum('type', ['personal', 'business'])
+                ->default('personal');
+
 
             // 店舗ステータス
             $table->enum('status', ['active', 'inactive'])->default('active');

@@ -16,16 +16,17 @@ class CreateItemsTable extends Migration
         Schema::create('items', function (Blueprint $table) {
             $table->id();
 
+            // 店舗出品のみ入る
+            $table->foreignId('shop_id')
+                ->nullable()
+                ->constrained('shops')
+                ->nullOnDelete();
 
-            $table->foreignId('shop_id')->nullable() // 💡 ここを追加
-                ->constrained()
-                ->cascadeOnDelete();
-
-
-            $table->foreignId('user_id')
-                    ->nullable()
-                    ->constrained()
-                    ->nullOnDelete();
+            // 出品したユーザー（個人・店舗共通）
+            $table->foreignId('created_by_user_id')
+                ->nullable()
+                ->constrained('users') // ← ★ここが重要
+                ->nullOnDelete();
 
             $table->string('name', 20);
             $table->integer('price');
@@ -35,7 +36,6 @@ class CreateItemsTable extends Migration
             $table->json('category');
             $table->string('item_image')->nullable();
             $table->integer('remain');
-
 
             $table->timestamps();
         });

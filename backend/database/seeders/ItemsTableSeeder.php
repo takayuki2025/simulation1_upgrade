@@ -25,16 +25,12 @@ final class ItemsTableSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         /* =====================================================
-         * 1. shop_id 解決
+         * 1. shop 解決
          * ===================================================== */
-        $shops = Shop::orderBy('id')->pluck('id')->toArray();
-        if (empty($shops)) {
-            Log::error('[ItemsSeeder] No shops found.');
-            return;
-        }
+        $shops = Shop::orderBy('id')->pluck('id')->values();
 
         /* =====================================================
-         * 2. user_id 解決
+         * 2. user 解決
          * ===================================================== */
         $userEmails = [
             'valid.email@example.com',
@@ -50,7 +46,7 @@ final class ItemsTableSeeder extends Seeder
         $fallbackUserId = $userIds['valid.email@example.com'] ?? User::min('id');
 
         /* =====================================================
-         * 3. Seeder データ（完全統合・重複なし）
+         * 3. Seeder データ（※一切変更なし）
          * ===================================================== */
         $items = [
             // shop 1
@@ -178,25 +174,31 @@ final class ItemsTableSeeder extends Seeder
         $atlasKernel = app(AtlasKernelService::class);
 
         foreach ($items as $data) {
-            $userId = $userIds[$data['email']] ?? $fallbackUserId;
-            $shopId = $shops[$data['shop']] ?? $shops[0];
+            $createdByUserId = $userIds[$data['email']] ?? $fallbackUserId;
+
+            // ★ ここが重要：個人出品なら shop_id = null
+            $shopId = null;
+            if ($data['shop'] !== null && isset($shops[$data['shop']])) {
+                $shopId = $shops[$data['shop']];
+            }
 
             $item = Item::create([
-                'user_id' => $userId,
-                'shop_id' => $shopId,
-                'name' => $data['name'],
-                'price' => $data['price'],
-                'brand' => $data['brand'],
-                'explain' => $data['explain'],
-                'condition' => $data['condition'],
-                'category' => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
-                'item_image' => $data['image'],
-                'remain' => 1,
+                'created_by_user_id' => $createdByUserId,
+                'shop_id'            => $shopId,
+                'name'               => $data['name'],
+                'price'              => $data['price'],
+                'brand'              => $data['brand'],
+                'explain'            => $data['explain'],
+                'condition'          => $data['condition'],
+                'category'           => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
+                'item_image'         => $data['image'],
+                'remain'             => 1,
             ]);
 
             Log::info('[Seeder][ItemCreated]', [
                 'item_id' => $item->id,
-                'brand' => $item->brand,
+                'shop_id' => $item->shop_id,
+                'created_by_user_id' => $item->created_by_user_id,
             ]);
 
             $atlasKernel->analyzeItem(

@@ -41,18 +41,23 @@ final class SellerResolver
         ];
     }
 
+    /**
+     * individual:2 でも shop を必ず返す（personal shop）
+     * - ここで personal shop を作らない方針なら "findOrFail" で落としてOK
+     * - ただし今回の仕様は「一般ユーザーも shop を持つ」なので、作成してしまうのが自然
+     */
     private function resolveIndividual(
         int $userId,
         AuthPrincipal $principal,
     ): SellerId {
-
-
         if ($principal->userId !== $userId) {
             throw new \DomainException('Cannot sell as another user.');
         }
 
+        $personalShopId = $this->resolveOrCreatePersonalShopId($userId);
 
-        return SellerId::user($userId);
+        // ✅ 出品主体は personal shop
+        return SellerId::shop($personalShopId);
     }
 
     private function resolveShop(
@@ -60,7 +65,6 @@ final class SellerResolver
         AuthPrincipal $principal,
         ?int $tenantId,
     ): SellerId {
-
         if ($tenantId !== null && $tenantId !== $shopId) {
             throw new \DomainException('Tenant mismatch.');
         }
@@ -76,4 +80,27 @@ final class SellerResolver
 
         return SellerId::shop($shopId);
     }
-} 
+
+    private function resolveOrCreatePersonalShopId(int $userId): int
+    {
+        $shop = Shop::query()
+            ->where('owner_user_id', $userId)
+            ->where('type', 'personal')
+            ->first();
+
+        if ($shop) {
+            return (int) $shop->id;
+        }
+
+        // ✅ personal shop を自動生成（運用ポリシーに合わせて調整可）
+        $shop = Shop::create([
+            'name' => "Personal Shop {$userId}",
+            'shop_code' => 'personal-' . $userId,
+            'owner_user_id' => $userId,
+            'type' => 'personal',
+            'status' => 'active',
+        ]);
+
+        return (int) $shop->id;
+    }
+}

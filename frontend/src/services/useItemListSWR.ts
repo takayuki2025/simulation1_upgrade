@@ -1,42 +1,33 @@
 import useSWR from "swr";
 import axios from "axios";
+import { PublicItem } from "@/types/publicItem";
 import { useAuth } from "@/ui/auth/useAuth";
-import { Item } from "@/types/item";
 
-type ItemListResponse = {
-  items: Item[];
+type Response = {
+  items: PublicItem[];
 };
 
 export const useItemListSWR = () => {
-  const { user, apiClient, isLoading: authLoading } = useAuth();
+  const { apiClient, isLoading } = useAuth();
 
-  // 🔑 auth が確定するまで fetch しない
-  const url = !authLoading ? (user ? "/items/public" : "/items") : null;
-
-  const fetcher = async () => {
-    if (!url) return null;
-
-    if (user && apiClient) {
-      const res = await apiClient.get(url);
+  const fetcher = async (): Promise<Response> => {
+    if (apiClient) {
+      const res = await apiClient.get("/items/public");
       return res.data;
     }
-
-    const res = await axios.get(`/api${url}`);
+    const res = await axios.get("/api/items/public");
     return res.data;
   };
 
-  // 🔑 SWR key に user.id を含める
-  const swrKey = url
-    ? user
-      ? ["items", "public", user.id]
-      : ["items", "public", "guest"]
-    : null;
-
-  const { data, error, isLoading } = useSWR<ItemListResponse>(swrKey, fetcher);
+  const {
+    data,
+    error,
+    isLoading: swrLoading,
+  } = useSWR<Response>("public-items", fetcher);
 
   return {
     items: data?.items ?? [],
-    isLoading: isLoading || authLoading,
+    isLoading: isLoading || swrLoading,
     error,
   };
 };

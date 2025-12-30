@@ -30,10 +30,12 @@ final class JwtUserResolver
             return null;
         }
 
+        // exp チェック
         if (isset($decoded->exp) && time() >= (int) $decoded->exp) {
             return null;
         }
 
+        // JWT sub = 内部 user_id 前提
         $userId = (int) ($decoded->sub ?? 0);
         if ($userId <= 0) {
             return null;
@@ -44,15 +46,20 @@ final class JwtUserResolver
             return null;
         }
 
-        // ★ DDD の核：AuthPrincipal をここで生成
-        $principal = new AuthPrincipal(
-            provider: 'jwt',
-            providerUid: (string) ($decoded->firebase_uid ?? ''),
+        /**
+         * ✅ AuthPrincipal は factory 経由で生成
+         * - providerUid = JWT sub（firebase_uid ではない）
+         * - shopIds = JWT claim（無ければ空配列）
+         */
+        $principal = AuthPrincipal::fromJwt(
             userId: $user->id,
+            providerUid: (string) $decoded->sub,
             email: $user->email,
-            emailVerified: true,
+            emailVerified: true, // JWT 発行時点で保証されている前提
             displayName: $user->name,
-            shopIds: $decoded->shop_ids ?? [],
+            shopIds: is_array($decoded->shop_ids ?? null)
+                ? $decoded->shop_ids
+                : [],
         );
 
         return [

@@ -1,9 +1,9 @@
 import useSWR from "swr";
 import axios from "axios";
-import { Item } from "@/types/item";
+import { PublicItem } from "@/types/publicItem";
 
 type ItemSearchResponse = {
-  items: Item[];
+  items: PublicItem[];
 };
 
 export const useItemSearchSWR = (query: string) => {
@@ -15,8 +15,6 @@ export const useItemSearchSWR = (query: string) => {
     );
     return res.data;
   };
-
-  console.log("[useItemSearchSWR] fired:", query);
 
   const { data, error, isLoading } = useSWR<ItemSearchResponse>(key, fetcher);
 

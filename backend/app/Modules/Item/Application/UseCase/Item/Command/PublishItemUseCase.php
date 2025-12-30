@@ -12,13 +12,14 @@ use App\Modules\Item\Domain\Repository\{
     ItemRepository
 };
 use App\Modules\Item\Domain\Service\{
-    SellerResolver,
+    // SellerResolver,
     AtlasKernelService
 };
 use App\Modules\Item\Domain\ValueObject\{
     ItemStatus,
     ItemImagePath,
-    CategoryList
+    CategoryList,
+    SellerType
 };
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ final class PublishItemUseCase
     public function __construct(
         private ItemDraftRepository $draftRepo,
         private ItemRepository $itemRepo,
-        private SellerResolver $sellerResolver,
+        // private SellerResolver $sellerResolver,
         private AtlasKernelService $atlasKernel,
     ) {
     }
@@ -58,13 +59,30 @@ final class PublishItemUseCase
                 throw new \DomainException('Draft is not publishable.');
             }
 
+            /* =====================================================
+             * 3. 出品主体の正規化（重要）
+             * ===================================================== */
+
+            /**
+             * draft->sellerId() は SellerId(ValueObject) を返す前提
+             * - individual の場合：id は user_id（items.shop_id に入れると FK が壊れる）
+             * - shop の場合：id は shop_id（items.shop_id に入れてOK）
+             */
+            $sellerId = $draft->sellerId();
+
+            // ✅ items.shop_id は「店舗出品」のときだけ入れる（個人出品なら null）
+            $shopId = null;
+            if ($sellerId->type() === SellerType::SHOP) {
+                $shopId = $sellerId->id();
+            }
 
             /* =====================================================
-             * 3. Draft → Item（INSERT は一度だけ）
+             * 4. Draft → Item（INSERT は一度だけ）
              * ===================================================== */
             $item = Item::reconstitute(
                 id: null,
-                shopId: $draft->sellerId()->id(),
+                shopId: $shopId,                      // ✅ 出品主体（shop のときだけ）
+                createdByUserId: $principal->userId,   // ✅ 操作者（常に user）
                 name: $draft->name()->value(),
                 price: $draft->price(),
                 explain: $draft->explain(),
@@ -77,10 +95,9 @@ final class PublishItemUseCase
             $itemId = $this->itemRepo->save($item);
 
             /* =====================================================
-             * 4. Draft Image → Public Image（UPDATE）
+             * 5. Draft Image → Public Image（UPDATE）
              * ===================================================== */
             if ($draft->itemImage()) {
-
                 $draftPath = $draft->itemImage()->value();
 
                 $publicFilename = Str::uuid() . '.' . pathinfo($draftPath, PATHINFO_EXTENSION);
@@ -98,7 +115,7 @@ final class PublishItemUseCase
             }
 
             /* =====================================================
-             * 5. AtlasKernel（この item_id で一度だけ）
+             * 6. AtlasKernel（この item_id で一度だけ）
              * ===================================================== */
             $this->atlasKernel->analyzeItem(
                 itemId: $itemId->getValue(),
@@ -106,15 +123,14 @@ final class PublishItemUseCase
                 tenantId: $tenantId,
             );
 
-
             /* =====================================================
-             * 6. Draft → Published
+             * 7. Draft → Published
              * ===================================================== */
             $draft->markPublished();
             $this->draftRepo->save($draft);
 
             /* =====================================================
-             * 7. 完了
+             * 8. 完了
              * ===================================================== */
             return new PublishItemOutput(
                 itemId: $itemId->getValue(),
