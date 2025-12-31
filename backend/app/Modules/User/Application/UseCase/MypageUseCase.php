@@ -2,9 +2,9 @@
 
 namespace App\Modules\User\Application\UseCase;
 
-use App\Modules\User\Domain\Repository\MypageRepository; // MypageRepositoryはDomain Rootにいると仮定
+use App\Modules\User\Domain\Repository\MypageRepository;
 
-class MypageUseCase
+final class MypageUseCase
 {
     public function __construct(
         private MypageRepository $mypages
@@ -12,7 +12,7 @@ class MypageUseCase
     }
 
     /**
-     * 出品した商品一覧
+     * 出品した商品一覧（自分のものだけ）
      */
     public function listSellItems(int $userId): array
     {
@@ -27,17 +27,11 @@ class MypageUseCase
         return $this->mypages->listBoughtItems($userId);
     }
 
-    /**
-     * 購入前の住所フォーム用データ取得
-     */
     public function getAddressForm(int $userId, int $itemId): array
     {
         return $this->mypages->findAddressForm($userId, $itemId);
     }
 
-    /**
-     * 購入時の住所更新
-     */
     public function updateAddress(
         int $userId,
         int $itemId,

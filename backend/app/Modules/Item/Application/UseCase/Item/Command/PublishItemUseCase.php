@@ -2,25 +2,15 @@
 
 namespace App\Modules\Item\Application\UseCase\Item\Command;
 
-use App\Modules\Item\Application\Dto\Item\{
-    PublishItemInput,
-    PublishItemOutput
-};
+use App\Modules\Item\Application\Dto\Item\PublishItemInput;
+use App\Modules\Item\Application\Dto\Item\PublishItemOutput;
 use App\Modules\Item\Domain\Entity\Item;
-use App\Modules\Item\Domain\Repository\{
-    ItemDraftRepository,
-    ItemRepository
-};
-use App\Modules\Item\Domain\Service\{
-    // SellerResolver,
-    AtlasKernelService
-};
-use App\Modules\Item\Domain\ValueObject\{
-    ItemStatus,
-    ItemImagePath,
-    CategoryList,
-    SellerType
-};
+use App\Modules\Item\Domain\Repository\ItemDraftRepository;
+use App\Modules\Item\Domain\Repository\ItemRepository;
+use App\Modules\Item\Domain\Service\AtlasKernelService;
+use App\Modules\Item\Domain\ValueObject\ItemImagePath;
+use App\Modules\Item\Domain\ValueObject\ItemStatus;
+use App\Modules\Item\Domain\ValueObject\StockCount;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +21,6 @@ final class PublishItemUseCase
     public function __construct(
         private ItemDraftRepository $draftRepo,
         private ItemRepository $itemRepo,
-        // private SellerResolver $sellerResolver,
         private AtlasKernelService $atlasKernel,
     ) {
     }
@@ -41,7 +30,6 @@ final class PublishItemUseCase
         AuthPrincipal $principal,
         ?int $tenantId,
     ): PublishItemOutput {
-
         return DB::transaction(function () use ($input, $principal, $tenantId) {
 
             /* =====================================================
@@ -60,47 +48,68 @@ final class PublishItemUseCase
             }
 
             /* =====================================================
-             * 3. 出品主体の正規化（重要）
+             * 3. item_origin 整合性チェック（Draft と Publish の一致）
              * ===================================================== */
-
-            /**
-             * draft->sellerId() は SellerId(ValueObject) を返す前提
-             * - individual の場合：id は user_id（items.shop_id に入れると FK が壊れる）
-             * - shop の場合：id は shop_id（items.shop_id に入れてOK）
-             */
-            $sellerId = $draft->sellerId();
-
-            // ✅ items.shop_id は「店舗出品」のときだけ入れる（個人出品なら null）
-            $shopId = null;
-            if ($sellerId->type() === SellerType::SHOP) {
-                $shopId = $sellerId->id();
+            if (method_exists($draft, 'itemOrigin')) {
+                if ($draft->itemOrigin() !== $input->itemOrigin) {
+                    throw new \DomainException('item_origin mismatch.');
+                }
             }
 
             /* =====================================================
-             * 4. Draft → Item（INSERT は一度だけ）
+             * 4. 出品主体の確定（Fact）
              * ===================================================== */
-            $item = Item::reconstitute(
-                id: null,
-                shopId: $shopId,                      // ✅ 出品主体（shop のときだけ）
-                createdByUserId: $principal->userId,   // ✅ 操作者（常に user）
+            $itemOrigin = $input->itemOrigin;
+
+            $shopId = null;
+            $createdByUserId = null;
+
+            if ($itemOrigin === 'USER_PERSONAL') {
+                $shopId = null;
+                $createdByUserId = $principal->userId(); // ✅ メソッド呼び出し
+            } elseif ($itemOrigin === 'SHOP_MANAGED') {
+                if (! $input->shopId) {
+                    throw new \DomainException('shop_id is required for SHOP_MANAGED.');
+                }
+                $shopId = (int) $input->shopId;
+                $createdByUserId = null;
+            } else {
+                throw new \DomainException('Invalid item_origin.');
+            }
+
+            /* =====================================================
+             * 5. Draft → Item（INSERT は一度だけ）
+             * ===================================================== */
+            // ✅ 新規生成：reconstitute ではなく createNew を使う
+            // （もし createNew が未実装なら Item 側に追加してください）
+
+            $item = Item::createNew(
+                itemOrigin: $input->itemOrigin,
+                shopId: $input->itemOrigin === 'SHOP_MANAGED'
+                    ? $input->shopId
+                    : null,
+                createdByUserId: $input->itemOrigin === 'USER_PERSONAL'
+                    ? $principal->userId()
+                    : null,
                 name: $draft->name()->value(),
                 price: $draft->price(),
                 explain: $draft->explain(),
                 condition: $draft->condition(),
-                category: $draft->category() ?? new CategoryList([]),
-                itemImage: null, // ← ここではまだ入れない
-                remain: $draft->remain(),
+                category: $draft->category(),
+                itemImage: null,
+                remain: new StockCount(1),
             );
 
             $itemId = $this->itemRepo->save($item);
 
+
             /* =====================================================
-             * 5. Draft Image → Public Image（UPDATE）
+             * 6. Draft Image → Public Image（UPDATE）
              * ===================================================== */
             if ($draft->itemImage()) {
                 $draftPath = $draft->itemImage()->value();
 
-                $publicFilename = Str::uuid() . '.' . pathinfo($draftPath, PATHINFO_EXTENSION);
+                $publicFilename = (string) Str::uuid() . '.' . pathinfo($draftPath, PATHINFO_EXTENSION);
                 $publicPath = 'item_images/' . $publicFilename;
 
                 Storage::disk('public')->put(
@@ -115,7 +124,7 @@ final class PublishItemUseCase
             }
 
             /* =====================================================
-             * 6. AtlasKernel（この item_id で一度だけ）
+             * 7. AtlasKernel（この item_id で一度だけ）
              * ===================================================== */
             $this->atlasKernel->analyzeItem(
                 itemId: $itemId->getValue(),
@@ -124,13 +133,13 @@ final class PublishItemUseCase
             );
 
             /* =====================================================
-             * 7. Draft → Published
+             * 8. Draft → Published
              * ===================================================== */
             $draft->markPublished();
             $this->draftRepo->save($draft);
 
             /* =====================================================
-             * 8. 完了
+             * 9. 完了
              * ===================================================== */
             return new PublishItemOutput(
                 itemId: $itemId->getValue(),

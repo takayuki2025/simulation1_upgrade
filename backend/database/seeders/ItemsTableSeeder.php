@@ -173,47 +173,67 @@ final class ItemsTableSeeder extends Seeder
          * ===================================================== */
         $atlasKernel = app(AtlasKernelService::class);
 
-
         foreach ($items as $data) {
 
+            /**
+             * ★ 出品起源判定（新規追加）
+             */
             $isSeederItem = $data['shop'] !== null;
 
+            $itemOrigin = $isSeederItem
+                ? 'SHOP_MANAGED'
+                : 'USER_PERSONAL';
+
+            /**
+             * ★ 個人出品者（Seeder は必ず null）
+             */
             $createdByUserId = $isSeederItem
-                ? null                               // ⭐️ シーダーは必ず NULL
+                ? null
                 : ($userIds[$data['email']] ?? $fallbackUserId);
 
+            /**
+             * shop_id 解決（既存ロジック維持）
+             */
             $shopId = null;
             if ($isSeederItem && isset($shops[$data['shop']])) {
                 $shopId = $shops[$data['shop']];
             }
 
+            /**
+             * ★ Item 作成（item_origin 追加）
+             */
             $item = Item::create([
+                'item_origin'        => $itemOrigin,
                 'created_by_user_id' => $createdByUserId,
                 'shop_id'            => $shopId,
-                'name'               => $data['name'],
-                'price'              => $data['price'],
-                'brand'              => $data['brand'],
-                'explain'            => $data['explain'],
-                'condition'          => $data['condition'],
-                'category'           => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
-                'item_image'         => $data['image'],
-                'remain'             => 1,
+
+                'name'       => $data['name'],
+                'price'      => $data['price'],
+                'brand'      => $data['brand'],
+                'explain'    => $data['explain'],
+                'condition'  => $data['condition'],
+                'category'   => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
+                'item_image' => $data['image'],
+                'remain'     => 1,
             ]);
 
             Log::info('[Seeder][ItemCreated]', [
-                'item_id' => $item->id,
-                'shop_id' => $item->shop_id,
-                'created_by_user_id' => $item->created_by_user_id,
-                'is_seeder' => $isSeederItem,
+                'item_id'             => $item->id,
+                'item_origin'         => $item->item_origin,
+                'shop_id'             => $item->shop_id,
+                'created_by_user_id'  => $item->created_by_user_id,
+                'is_seeder'           => $isSeederItem,
             ]);
 
+            /**
+             * AtlasKernel（既存）
+             */
             $atlasKernel->analyzeItem(
                 itemId: $item->id,
                 rawText: $item->brand ?? '',
                 tenantId: null
             );
         }
-
 
         Log::info('[ItemsSeeder] completed with AtlasKernel.');
     }

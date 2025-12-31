@@ -14,6 +14,8 @@ type SellForm = {
   categories: string[];
 };
 
+type ItemOrigin = "USER_PERSONAL" | "SHOP_MANAGED";
+
 const CATEGORY_LIST = [
   "ファッション",
   "家電",
@@ -43,14 +45,13 @@ export default function ItemSellPage() {
     categories: [],
   });
 
+  const [itemOrigin, setItemOrigin] = useState<ItemOrigin>("USER_PERSONAL");
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  /* =========================
-     Guard
-  ========================= */
   if (!isLoading && !isAuthenticated) {
     router.replace("/login");
     return null;
@@ -58,9 +59,6 @@ export default function ItemSellPage() {
 
   if (!user) return null;
 
-  /* =========================
-     Image Select
-  ========================= */
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -69,9 +67,6 @@ export default function ItemSellPage() {
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  /* =========================
-     Category Toggle
-  ========================= */
   const toggleCategory = (category: string) => {
     setForm((prev) => ({
       ...prev,
@@ -81,13 +76,10 @@ export default function ItemSellPage() {
     }));
   };
 
-  /* =========================
-     Submit（DDD 正式フロー）
-  ========================= */
   const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!apiClient || !isAuthenticated || !user) {
+    if (!apiClient || !user) {
       setError("ログイン状態が確認できません");
       return;
     }
@@ -101,11 +93,12 @@ export default function ItemSellPage() {
     setError("");
 
     try {
-      /* =========================
-         1. Draft 作成
-      ========================= */
+      // 1. Draft
       const draftRes = await apiClient.post("/items/drafts", {
-        seller_id: `individual:${user.id}`, // ★ 修正点
+        seller_id:
+          itemOrigin === "USER_PERSONAL"
+            ? `individual:${user.id}`
+            : `shop:managed`,
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
@@ -116,38 +109,66 @@ export default function ItemSellPage() {
 
       const draftId: string = draftRes.data.draft_id;
 
-      /* =========================
-         2. Image Upload
-      ========================= */
+      // 2. Image
       const imageData = new FormData();
       imageData.append("image", imageFile);
 
       await apiClient.post(`/items/drafts/${draftId}/image`, imageData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      console.log("DEBUG publish payload", {
+        item_origin: itemOrigin,
+        shop_id: itemOrigin === "SHOP_MANAGED" ? (user as any).shop_id : null,
+        user,
+      });
 
-      /* =========================
-         3. Publish
-      ========================= */
-      await apiClient.post(`/items/drafts/${draftId}/publish`);
+      // 3. Publish
+      await apiClient.post(`/items/drafts/${draftId}/publish`, {
+        item_origin: itemOrigin,
+        // shop_id: itemOrigin === "SHOP_MANAGED" ? (user.shop_id ?? null) : null,
+        shop_id: itemOrigin === "SHOP_MANAGED" ? 2 : null,
+      });
 
       router.push("/");
-    } catch (e) {
+    } catch {
       setError("商品の出品に失敗しました");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <div className={styles.wrapper}>
       <h2 className={`${styles.title} ${styles.centerTitle}`}>商品の出品</h2>
 
       <form onSubmit={submitItem} className={styles.form}>
-        {/* 画像 */}
+        {/* 出品名義 */}
+        <div className={styles.formGroup}>
+          <label>出品名義</label>
+          <div className={styles.radioGroup}>
+            <label>
+              <input
+                type="radio"
+                checked={itemOrigin === "USER_PERSONAL"}
+                onChange={() => setItemOrigin("USER_PERSONAL")}
+              />
+              個人出品
+            </label>
+
+            <label>
+              <input
+                type="radio"
+                checked={itemOrigin === "SHOP_MANAGED"}
+                onChange={() => setItemOrigin("SHOP_MANAGED")}
+              />
+              ショップ管理商品（準備中）
+            </label>
+          </div>
+        </div>
+
+        {/* =========================
+            画像
+        ========================= */}
         <div className={styles.imageBoxWide}>
           <div className={styles.imageInner}>
             {previewUrl && <img src={previewUrl} className={styles.preview} />}
@@ -170,7 +191,9 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* カテゴリー */}
+        {/* =========================
+            カテゴリー
+        ========================= */}
         <div className={styles.formGroup}>
           <label>カテゴリー（複数選択）</label>
           <div className={styles.categoryButtons}>
@@ -191,14 +214,12 @@ export default function ItemSellPage() {
           </div>
         </div>
 
-        {/* ★ brand / condition / color 統合入力 */}
+        {/* brand / condition / color */}
         <div className={styles.formGroup}>
-          <label>
-            ブランド・状態・色（まとめて入力可能でどのような複雑なデーターでも処理できる開発をしています。）
-          </label>
+          <label>ブランド・状態・色（まとめて入力）</label>
           <input
             type="text"
-            placeholder="例：Apple ほぼ新品 黒（スペース、コンマなど有無でも可能）"
+            placeholder="例：Apple ほぼ新品 黒"
             value={form.attributes}
             onChange={(e) =>
               setForm((v) => ({ ...v, attributes: e.target.value }))
@@ -206,7 +227,6 @@ export default function ItemSellPage() {
           />
           <small className={styles.hint}>
             ※ 入力内容は自動で解析・正規化されます
-            ※企業判断や成長企画や実績に未来再利用可能な形で蓄積するエンジン開発のプロトタイプです。
           </small>
         </div>
 
@@ -221,7 +241,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* 商品説明 ★ 先に表示 */}
+        {/* 商品説明 */}
         <div className={styles.formGroup}>
           <label>商品説明</label>
           <textarea
@@ -233,7 +253,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* 価格 ★ 後に表示 */}
+        {/* 価格 */}
         <div className={styles.formGroup}>
           <label>価格</label>
           <input
@@ -244,6 +264,7 @@ export default function ItemSellPage() {
             required
           />
         </div>
+
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.actions}>

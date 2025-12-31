@@ -34,8 +34,9 @@ final class ItemDraft
         $this->itemImage = $itemImage;
     }
 
-    /* ===== Factory（新規作成）===== */
-
+    /* =========================
+       Factory（新規 Draft 作成）
+    ========================= */
     public static function create(
         ItemDraftId $id,
         SellerId $sellerId,
@@ -57,13 +58,13 @@ final class ItemDraft
             condition: $condition ?? '',
             category: new CategoryList($category ?? []),
             remain: new StockCount(1),
-            itemImage: null, // ★ 追加（これだけ）
+            itemImage: null,
         );
     }
 
-    /**
-     * ★ Repository 専用（DB → Entity 復元）
-     */
+    /* =========================
+       Repository 再構築用
+    ========================= */
     public static function reconstruct(
         ItemDraftId $id,
         SellerId $sellerId,
@@ -92,7 +93,9 @@ final class ItemDraft
         );
     }
 
-    /* ===== Getter ===== */
+    /* =========================
+       Getter
+    ========================= */
 
     public function id(): ItemDraftId
     {
@@ -135,7 +138,9 @@ final class ItemDraft
         return $this->remain;
     }
 
-    /* ===== Image ===== */
+    /* =========================
+       Image
+    ========================= */
 
     public function itemImage(): ?ItemImagePath
     {
@@ -152,7 +157,9 @@ final class ItemDraft
         return $this->itemImage !== null;
     }
 
-    /* ===== Publish Rule ===== */
+    /* =========================
+       Publish Rule
+    ========================= */
 
     public function isPublishableV1(): bool
     {

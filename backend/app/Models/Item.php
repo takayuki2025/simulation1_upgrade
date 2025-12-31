@@ -14,16 +14,17 @@ class Item extends Model
     use HasFactory;
 
     protected $fillable = [
+        'item_origin',
+        'shop_id',
         'created_by_user_id',
         'name',
         'price',
+        'brand',
         'explain',
         'condition',
         'category',
         'item_image',
-        'brand',
         'remain',
-        'shop_id',
     ];
 
     protected $casts = [
@@ -39,7 +40,7 @@ class Item extends Model
     /** 出品者 */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     /** ⭐ お気に入り */
@@ -97,5 +98,19 @@ class Item extends Model
             ItemEntityTag::class,
             'item_id'
         );
+    }
+
+    /* =====================
+     * Semantic Helpers（重要）
+     * ===================== */
+
+    public function isUserPersonal(): bool
+    {
+        return $this->item_origin === 'USER_PERSONAL';
+    }
+
+    public function isShopManaged(): bool
+    {
+        return $this->item_origin === 'SHOP_MANAGED';
     }
 }

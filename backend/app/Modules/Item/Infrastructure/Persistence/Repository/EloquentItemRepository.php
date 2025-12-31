@@ -8,7 +8,6 @@ use App\Models\Item as EloquentItem;
 use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Domain\Repository\ItemRepository;
-use Illuminate\Support\Facades\DB;
 use App\Modules\Item\Domain\ValueObject\{
     ItemId,
     Money,
@@ -32,27 +31,29 @@ final class EloquentItemRepository implements ItemRepository
         }
 
         $imagePath = null;
-        if (!empty($model->item_image)) {
+        if (! empty($model->item_image)) {
             $imagePath = ItemImagePath::fromRaw($model->item_image);
         }
 
         return Item::reconstitute(
             id: new ItemId($model->id),
+            itemOrigin: $model->item_origin,
             shopId: $model->shop_id,
-            createdByUserId: $model->created_by_user_id, // ✅ 正式カラム
+            createdByUserId: $model->created_by_user_id,
             name: $model->name,
-            price: new Money($model->price, 'JPY'),
-            explain: $model->explain,
-            condition: $model->condition,
+            price: new Money((int) $model->price, 'JPY'),
+            explain: (string) $model->explain,
+            condition: (string) $model->condition,
             category: new CategoryList($categories),
             itemImage: $imagePath,
-            remain: new StockCount($model->remain),
+            remain: new StockCount((int) $model->remain),
         );
     }
 
     public function findById(int $id): ?Item
     {
         $model = EloquentItem::find($id);
+
         return $model ? $this->toDomain($model) : null;
     }
 
@@ -70,10 +71,15 @@ final class EloquentItemRepository implements ItemRepository
             $model = new EloquentItem();
         }
 
-        // ✅ 出品主体
-        $model->shop_id = $item->getShopId();
+        // ==================================================
+        // ✅ Fact only（ここが重要）
+        // - shop_id / created_by_user_id が「事実」
+        // - item_origin は Domain には持たせない
+        // ==================================================
 
-        // ✅ 操作者（常に user）
+        $model->item_origin = $item->getItemOrigin();
+
+        $model->shop_id = $item->getShopId();
         $model->created_by_user_id = $item->getCreatedByUserId();
 
         $model->name = $item->getName();
@@ -110,7 +116,8 @@ final class EloquentItemRepository implements ItemRepository
 
     /**
      * Public 用（Domain）
-     * ※ shop_id 単位で除外（店舗出品のみ）
+     * ※ 現時点では item_origin は使わない
+     * ※ excludeShopId が指定されている場合のみ、その shop の商品を除外する（既存仕様維持）
      */
     public function findPublicItems(
         int $limit,
@@ -171,9 +178,6 @@ final class EloquentItemRepository implements ItemRepository
         if ($keyword) {
             $query->where('name', 'like', "%{$keyword}%");
         }
-
-        // ❌ 個人出品は除外しない（UX 要件）
-        // → ここでは user_id 条件は入れない
 
         $paginator = $query
             ->orderByDesc('created_at')

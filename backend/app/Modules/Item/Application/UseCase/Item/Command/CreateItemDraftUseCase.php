@@ -29,21 +29,19 @@ final class CreateItemDraftUseCase
     ): CreateItemDraftOutput {
 
         /**
-         * A フェーズ：individual 出品のみ
+         * Draft フェーズでは出品主体を確定しない
+         * → 常に「操作ユーザー」を seller として扱う
          */
         $sellerId = SellerId::user($userId);
 
         /**
-         * 初回出品時に seller ロール付与
+         * 初回出品時に seller ロール付与（個人）
          */
-        $this->assignSellerRoleService->assignIndividualIfNotExists($userId);
+        $this->assignSellerRoleService
+            ->assignIndividualIfNotExists($userId);
 
         $draftId = $this->draftRepository->nextIdentity();
 
-        /**
-         * ★ ここが今回の修正ポイント
-         * UseCaseで必ず ValueObject 化する
-         */
         $draft = ItemDraft::create(
             id: $draftId,
             sellerId: $sellerId,

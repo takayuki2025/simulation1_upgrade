@@ -9,13 +9,15 @@ use App\Modules\Item\Domain\ValueObject\{
     ItemImagePath,
     StockCount
 };
+use DomainException;
 
 final class Item
 {
     private function __construct(
         private ?ItemId $id,
+        private string $itemOrigin,
         private ?int $shopId,
-        private ?int $createdByUserId,   // ✅ 正式カラム
+        private ?int $createdByUserId,
         private string $name,
         private Money $price,
         private string $explain,
@@ -26,12 +28,61 @@ final class Item
     ) {
     }
 
-    /* =====================================================
-       Factory（再構築専用）
-    ===================================================== */
+    /* =================================================
+       ✅ 新規生成（Fact + Rule を保証）
+    ================================================= */
+    public static function createNew(
+        string $itemOrigin,
+        ?int $shopId,
+        ?int $createdByUserId,
+        string $name,
+        Money $price,
+        string $explain,
+        string $condition,
+        CategoryList $category,
+        ?ItemImagePath $itemImage,
+        StockCount $remain,
+    ): self {
+        // 🔒 Rule enforcement
+        if ($itemOrigin === 'USER_PERSONAL') {
+            if ($createdByUserId === null) {
+                throw new DomainException('USER_PERSONAL requires createdByUserId.');
+            }
+            if ($shopId !== null) {
+                throw new DomainException('USER_PERSONAL must not have shopId.');
+            }
+        }
 
+        if ($itemOrigin === 'SHOP_MANAGED') {
+            if ($shopId === null) {
+                throw new DomainException('SHOP_MANAGED requires shopId.');
+            }
+            if ($createdByUserId !== null) {
+                throw new DomainException('SHOP_MANAGED must not have createdByUserId.');
+            }
+        }
+
+        return new self(
+            id: null,
+            itemOrigin: $itemOrigin,
+            shopId: $shopId,
+            createdByUserId: $createdByUserId,
+            name: $name,
+            price: $price,
+            explain: $explain,
+            condition: $condition,
+            category: $category,
+            itemImage: $itemImage,
+            remain: $remain,
+        );
+    }
+
+    /* =================================================
+       Repository 用（復元）
+    ================================================= */
     public static function reconstitute(
         ?ItemId $id,
+        string $itemOrigin,
         ?int $shopId,
         ?int $createdByUserId,
         string $name,
@@ -44,6 +95,7 @@ final class Item
     ): self {
         return new self(
             id: $id,
+            itemOrigin: $itemOrigin,
             shopId: $shopId,
             createdByUserId: $createdByUserId,
             name: $name,
@@ -52,13 +104,14 @@ final class Item
             condition: $condition,
             category: $category,
             itemImage: $itemImage,
-            remain: $remain
+            remain: $remain,
         );
     }
 
-    /* =====================================================
-       Getters（Repository / UseCase 用）
-    ===================================================== */
+
+    /* =========================
+       Getters
+    ========================= */
 
     public function getId(): ?ItemId
     {
@@ -70,9 +123,6 @@ final class Item
         return $this->shopId;
     }
 
-    /**
-     * ★ 追加：Repository / ReadModel 判定用
-     */
     public function getCreatedByUserId(): ?int
     {
         return $this->createdByUserId;
@@ -113,49 +163,14 @@ final class Item
         return $this->remain;
     }
 
-    /* =====================================================
-       Domain Mutation（不変オブジェクト）
-    ===================================================== */
-
-    public function withItemImage(ItemImagePath $image): self
+    public function getItemOrigin(): string
     {
-        return self::reconstitute(
-            id: $this->id,
-            shopId: $this->shopId,
-            createdByUserId: $this->createdByUserId,
-            name: $this->name,
-            price: $this->price,
-            explain: $this->explain,
-            condition: $this->condition,
-            category: $this->category,
-            itemImage: $image,
-            remain: $this->remain
-        );
+        return $this->itemOrigin;
     }
 
-    public function decreaseStock(int $quantity): self
-    {
-        if ($this->remain->getValue() < $quantity) {
-            throw new \DomainException('在庫が不足しています');
-        }
-
-        return self::reconstitute(
-            id: $this->id,
-            shopId: $this->shopId,
-            createdByUserId: $this->createdByUserId,
-            name: $this->name,
-            price: $this->price,
-            explain: $this->explain,
-            condition: $this->condition,
-            category: $this->category,
-            itemImage: $this->itemImage,
-            remain: $this->remain->decrease($quantity)
-        );
-    }
-
-    /* =====================================================
+    /* =========================
        Domain Logic
-    ===================================================== */
+    ========================= */
 
     public function isSoldOut(): bool
     {

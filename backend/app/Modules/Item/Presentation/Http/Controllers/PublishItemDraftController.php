@@ -5,38 +5,36 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use App\Modules\Item\Application\UseCase\Item\Command\PublishItemUseCase;
-use App\Modules\Item\Application\Dto\Item\PublishItemInput;
+use App\Modules\Item\Application\UseCase\Item\Command\PublishItemDraftUseCase;
+use App\Modules\Item\Application\Dto\Item\PublishItemDraftInput;
 use App\Modules\Auth\Application\Service\AuthContext;
 
-final class PublishItemController extends Controller
+final class PublishItemDraftController extends Controller
 {
     public function __construct(
-        private PublishItemUseCase $useCase,
+        private PublishItemDraftUseCase $useCase,
         private AuthContext $authContext,
     ) {
     }
 
-    public function __invoke(Request $request, string $draftId): JsonResponse
-    {
+    public function __invoke(
+        Request $request,
+        string $draftId,
+        PublishItemDraftUseCase $useCase,
+        AuthContext $auth,
+    ) {
         $validated = $request->validate([
             'item_origin' => ['required', 'in:USER_PERSONAL,SHOP_MANAGED'],
             'shop_id'     => ['nullable', 'integer'],
         ]);
 
-        $input = new PublishItemInput(
+        $input = new PublishItemDraftInput(
             draftId: $draftId,
             itemOrigin: $validated['item_origin'],
-            shopId: $validated['item_origin'] === 'SHOP_MANAGED'
-                ? $validated['shop_id']
-                : null,
+            shopId: $validated['shop_id'] ?? null,
         );
 
-        $this->useCase->execute(
-            $input,
-            $this->authContext->principal(),
-            null, // tenantId（今は未使用）
-        );
+        $useCase->handle($input, $auth);
 
         return response()->json(['status' => 'ok']);
     }

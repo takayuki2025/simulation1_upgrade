@@ -13,21 +13,37 @@ class CreateItemsTable extends Migration
      */
     public function up()
     {
+
         Schema::create('items', function (Blueprint $table) {
             $table->id();
 
-            // 店舗出品のみ入る
+            /**
+             * 出品起源（★最重要）
+             */
+            $table->enum('item_origin', [
+                'USER_PERSONAL',   // 個人出品
+                'SHOP_MANAGED',    // ショップ / 運営管理下商品（Seeder含む）
+            ]);
+
+            /**
+             * ショップに属する場合のみ入る
+             * SHOP_MANAGED でも将来 null の可能性があるため nullable
+             */
             $table->foreignId('shop_id')
                 ->nullable()
                 ->constrained('shops')
                 ->nullOnDelete();
 
-            // 出品したユーザー（個人・店舗共通）
+            /**
+             * 個人出品者
+             * USER_PERSONAL のみ入る
+             */
             $table->foreignId('created_by_user_id')
                 ->nullable()
-                ->constrained('users') // ← ★ここが重要
+                ->constrained('users')
                 ->nullOnDelete();
 
+            // 商品情報
             $table->string('name', 20);
             $table->integer('price');
             $table->string('brand', 20)->nullable();
@@ -39,6 +55,7 @@ class CreateItemsTable extends Migration
 
             $table->timestamps();
         });
+
     }
 
     /**

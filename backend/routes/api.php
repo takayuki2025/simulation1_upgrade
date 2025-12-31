@@ -90,7 +90,6 @@ Route::prefix('search')->group(function () {
 
 use App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController;
 
-
 Route::get(
     '/items/public',
     PublicCatalogController::class
@@ -249,12 +248,12 @@ Route::middleware(['auth.jwt'])->group(function () {
 // === MyPage / User ===
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
 
-Route::middleware(['auth.jwt'])->group(function () {
-    Route::get('/mypage/profile', [MypageController::class, 'profile']);
-    Route::get('/mypage/sell', [MypageController::class, 'sellItems']);
-    // Route::get('/mypage/bought', [MypageController::class, 'boughtItems']);
-});
 
+Route::middleware('auth.jwt')->prefix('mypage')->group(function () {
+    Route::get('/profile', [MypageController::class, 'profile']);
+    Route::get('/sell', [MypageController::class, 'sellItems']);
+    Route::get('/bought', [MypageController::class, 'boughtItems']);
+});
 
 
 
@@ -371,10 +370,6 @@ Route::get('/me/shipments/{id}', [CustomerShipmentController::class, 'show'])
 
 
 
-use App\Modules\User\Presentation\Http\Controllers\MypageBoughtController;
-
-Route::middleware(['auth.jwt'])
-    ->get('/mypage/bought', MypageBoughtController::class);
 
 
 
