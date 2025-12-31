@@ -2,47 +2,33 @@
 
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { mutate } from "swr";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
-import { mutate as globalMutate } from "swr";
 
 import styles from "./W-ItemDetailView.module.css";
 
-/**
- * 将来の拡張に備えて「brand が string / string[] どちらでも」扱えるようにする
- * さらに、string の場合は " / | ・ , 、 空白" などを許容して分割する。
- */
+/* =========================
+   util（変更なし）
+========================= */
 function toTokenList(input: unknown): string[] {
   if (!input) return [];
-
   if (Array.isArray(input)) {
     return input.map((v) => String(v ?? "").trim()).filter(Boolean);
   }
-
   const s = String(input).trim();
   if (!s) return [];
-
-  // 区切り候補を多めに許容（将来の複雑入力や複数属性にも耐える）
-  // 例: "ROLEX|SWISS|Ref:123", "ROLEX / SWISS", "ROLEX,SWISS", "ROLEX・SWISS"
-  const parts = s
-    .split(/[|/,\u3001\u30fb]+/) // | / , 、 ・
+  return s
+    .split(/[|/,\u3001\u30fb]+/)
     .map((v) => v.trim())
     .filter(Boolean);
-
-  // 分割できなければ単体扱い
-  return parts.length ? parts : [s];
 }
 
-/**
- * UI用：ボタンに載せる短いラベル
- * 長い場合は省略（必要なら後で tooltip などへ）
- */
 function shortenLabel(s: string, max = 14): string {
   const t = s.trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max) + "…";
+  return t.length <= max ? t : t.slice(0, max) + "…";
 }
 
 export default function ItemDetailPage() {
@@ -50,41 +36,29 @@ export default function ItemDetailPage() {
   const router = useRouter();
   const auth = useAuth();
 
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   /* =========================
-     itemId 解決
+     itemId
   ========================= */
   const itemId = useMemo(() => {
     const raw = (params as any).items_id;
     if (!raw) return null;
     const id = Array.isArray(raw) ? raw[0] : raw;
     const n = Number(id);
-    console.log("purchaseBefore params:", params);
-    // console.log("purchaseBefore itemId:", itemId);
     return Number.isNaN(n) ? null : n;
   }, [params]);
 
   /* =========================
-     Query
+     SWR（初期取得のみ）
   ========================= */
-  const {
-    item,
-    comments,
-    isFavorited,
-    favoritesCount,
-    isLoading,
-    isError,
-    mutate,
-  } = useItemDetailSWR(itemId);
+  const { item, comments, isFavorited, favoritesCount, isLoading, isError } =
+    useItemDetailSWR(itemId);
 
   /* =========================
-     Optimistic UI State
+     ★ FIX: 表示の真実は local state
   ========================= */
-  const [localFavorited, setLocalFavorited] = useState<boolean | null>(null);
-  const [localCount, setLocalCount] = useState<number | null>(null);
 
-  /* =========================
-     Comment Local State
-  ========================= */
+
   const [newComment, setNewComment] = useState("");
   const [commentErrors, setCommentErrors] = useState<string[]>([]);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -92,51 +66,86 @@ export default function ItemDetailPage() {
   const isAuthenticated = auth.isAuthenticated;
   const user = auth.user;
 
-  const isOwner = isAuthenticated && user?.id === item?.user_id;
+  /* =========================
+     Guard
+  ========================= */
+  if (isLoading) {
+    return <p className={styles.loadingText}>商品情報を読み込み中...</p>;
+  }
+
+  if (isError || !item) {
+    return <p className={styles.notFoundText}>商品が見つかりませんでした。</p>;
+  }
+
+  const isOwner = isAuthenticated && user?.id === item.user_id;
   const canInteract = isAuthenticated && !isOwner;
-  const isSoldOut = item?.remain === 0;
+  const isSoldOut = item.remain === 0;
 
+  // ✅ local state は廃止：表示は常に SWR の値（唯一の真実）
+  const displayedFavorited = isFavorited;
+  const displayedCount = favoritesCount;
+
+
+  
   /* =========================
-     表示用 Reaction 状態
+     ❤️ Favorite（確定版）
   ========================= */
-  const displayedFavorited =
-    localFavorited !== null ? localFavorited : isFavorited;
 
-  const displayedCount = localCount !== null ? localCount : favoritesCount;
+  const submitFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  /* =========================
-     Favorite Command
-  ========================= */
-  const submitFavorite = async () => {
-    if (!item) return;
-
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !auth.apiClient) {
       router.push("/login");
       return;
     }
+    if (isTogglingFavorite) return;
 
-    const next = !displayedFavorited;
+    setIsTogglingFavorite(true);
 
-    // optimistic update
-    setLocalFavorited(next);
-    setLocalCount((prev) => (prev ?? favoritesCount) + (next ? 1 : -1));
+    const next = !isFavorited;
+
+    // ✅ useItemDetailSWR と完全に同じ key を使う（ここが最重要）
+    const detailKey = ["item-detail", item.id, "auth"] as const;
+
+    // ✅ optimistic update（GET を発生させない）
+    mutate(
+      detailKey,
+      (current: any) => {
+        if (!current) return current;
+        return {
+          ...current,
+          is_favorited: next,
+          favorites_count: Math.max(
+            0,
+            (current.favorites_count ?? 0) + (next ? 1 : -1),
+          ),
+        };
+      },
+      false,
+    );
 
     try {
-      await auth.apiClient(`/items/${item.id}/favorite`, {
-        method: next ? "POST" : "DELETE",
-      });
+      if (next) {
+        await auth.apiClient.post(`/reactions/items/${item.id}/favorite`);
+      } else {
+        await auth.apiClient.delete(`/reactions/items/${item.id}/favorite`);
+      }
 
-      // 🔥 両方同期
-      mutate(); // item detail
-      globalMutate((key) => Array.isArray(key) && key[0] === "favorite-items");
+      // Favorite 一覧だけ再検証
+      if (user) {
+        mutate(["favorite-items", user.id]);
+      }
     } catch {
-      setLocalFavorited(isFavorited);
-      setLocalCount(favoritesCount);
+      // ✅ rollback（直前のキャッシュに戻す）
+      mutate(detailKey);
+    } finally {
+      setIsTogglingFavorite(false);
     }
   };
 
   /* =========================
-     Comment Command
+     💬 Comment
   ========================= */
   const submitComment = async () => {
     if (!item) return;
@@ -146,7 +155,7 @@ export default function ItemDetailPage() {
       return;
     }
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !auth.apiClient) {
       router.push("/login");
       return;
     }
@@ -161,7 +170,6 @@ export default function ItemDetailPage() {
       });
 
       setNewComment("");
-      mutate();
     } catch {
       setCommentErrors(["コメント投稿に失敗しました"]);
     } finally {
@@ -169,66 +177,36 @@ export default function ItemDetailPage() {
     }
   };
 
-  const navigateToPurchase = () => {
-    if (!item) return;
-    router.push(`/purchase/${item.id}`);
-  };
-
-  /**
-   * v2対応：
-   * API が tags を返す場合は必ずそれを優先する
-   */
-  const tagBrandTokens: string[] =
-    (item as any)?.tags?.brand?.map((b: any) => b.name) ?? [];
-
-  const tagCondition = (item as any)?.tags?.condition?.[0]?.name ?? null;
-
-  const tagColor = (item as any)?.tags?.color?.[0]?.name ?? null;
-
   /* =========================
-     Guard
+     表示用派生
   ========================= */
-  if (isLoading) {
-    return <p className={styles.loadingText}>商品情報を読み込み中...</p>;
-  }
+  const brandTokens: string[] = Array.isArray(item.brands)
+    ? item.brands
+    : item.brand
+      ? toTokenList(item.brand)
+      : [];
 
-  if (isError || !item) {
-    return <p className={styles.notFoundText}>商品が見つかりませんでした。</p>;
-  }
+  const categoryTokens: string[] =
+    (item as any)?.tags?.category?.map((c: any) => c.display_name) ??
+    (Array.isArray(item.category) ? item.category : []);
 
-  const itemCategories = Array.isArray(item.category) ? item.category : [];
-
-  /**
-   * ブランドを「複数表示」するためのトークン化。
-   * 優先順：
-   * 1) item.brand_tokens（将来APIが返すならここ）
-   * 2) item.brand（string / string[] どちらでも）
-   */
-  const brandTokens: string[] = Array.isArray(item.brands) ? item.brands : [];
-
-  /**
-   * condition / color も将来 raw と display を分けられるように準備
-   * - raw: items テーブル由来（例: "良好"）
-   * - display: entity 由来（例: "ほぼ新品"）
-   * 現状APIが display しか返さないなら raw=display で表示されるだけ（壊れない）
-   */
   const rawCondition =
     (item as any).raw_condition ??
     (item as any).original_condition ??
-    item.condition;
-
-  const displayCondition = item.condition ?? null;
+    item.condition ??
+    null;
 
   const rawColor =
     (item as any).raw_color ??
     (item as any).original_color ??
-    (item as any).color;
+    (item as any).color ??
+    null;
 
   const displayColor = item.color ?? null;
 
-  const categoryTokens: string[] =
-    (item as any)?.tags?.category?.map((c: any) => c.display_name) ?? [];
-
+  const navigateToPurchase = () => {
+    router.push(`/purchase/${item.id}`);
+  };
   /* =========================
      JSX
   ========================= */
@@ -313,8 +291,9 @@ export default function ItemDetailPage() {
               <div className={styles.favoriteBlock}>
                 {canInteract ? (
                   <button
-                    onClick={submitFavorite}
+                    type="button"
                     className={styles.favoriteBtn}
+                    onClick={(e) => submitFavorite(e)}
                   >
                     <span
                       className={`${styles.favoriteIcon} ${
@@ -340,6 +319,7 @@ export default function ItemDetailPage() {
             {/* 購入ボタン */}
             <div className="item_detail_form pt-4">
               <button
+                type="button" // ★ 必須
                 onClick={() => {
                   if (isOwner) {
                     router.push("/mypage");
@@ -479,6 +459,7 @@ export default function ItemDetailPage() {
                     />
 
                     <button
+                      type="button" // ★ 必須
                       className={styles.submitBtn}
                       onClick={submitComment}
                       disabled={isSubmittingComment}

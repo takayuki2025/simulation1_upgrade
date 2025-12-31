@@ -146,37 +146,87 @@ Route::get('/entity-kpis', EntityKpiController::class);
 
 
 
-//データー加工後表示
-use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
-
-// Route::get('/items/{itemId}', [ItemReadController::class, 'show']);
-
-Route::withoutMiddleware(['throttle:api'])
-    ->get('/items/{itemId}', [ItemReadController::class, 'show'])
-    ->whereNumber('itemId');
-
 /*
 |--------------------------------------------------------------------------
 | 🧊 以下は未検証・未使用（削除せずコメント化）
 |--------------------------------------------------------------------------
 */
 
+// use App\Modules\Item\Presentation\Http\Controllers\ItemDetailController;
+
+// use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
 // === Favorite / Comment ===
 
 use App\Modules\Reaction\Presentation\Http\Controllers\FavoriteController;
 use App\Modules\Comment\Presentation\Http\Controllers\PostCommentController;
 
-Route::middleware('auth.jwt.optional')->group(function () {
-    Route::get('/items/favorite', [FavoriteController::class, 'index']);
+// item detail（ログインでもゲストでも見れる）
+
+Route::get('/items/{itemId}', ItemDetailController::class)
+    ->whereNumber('itemId')
+    ->middleware('auth.jwt.optional');
+
+
+// mylist（ログイン必須にして事故を避ける）
+Route::get('/items/favorite', [FavoriteController::class, 'index'])
+    ->middleware('auth.jwt');
+
+// reactions は API 専用 prefix
+Route::middleware('auth.jwt')->group(function () {
+    Route::post('/reactions/items/{itemId}/favorite', [FavoriteController::class, 'add'])
+        ->whereNumber('itemId');
+
+    Route::delete('/reactions/items/{itemId}/favorite', [FavoriteController::class, 'remove'])
+        ->whereNumber('itemId');
 });
 
 
+// Route::middleware('auth.jwt.optional')->group(function () {
+//     Route::get('/items/favorite', [FavoriteController::class, 'index']);
+// });
 
-Route::middleware(['auth.jwt'])->group(function () {
 
-    Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
-    Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
-});
+
+
+// Route::middleware('auth.jwt.optional')->group(function () {
+//     Route::get('/items/favorite', [FavoriteController::class, 'index']);
+//     // Route::get('/items/{itemId}', [ItemReadController::class, 'show']);
+// });
+
+// Route::middleware('auth.jwt')->group(function () {
+//     Route::post('/items/{itemId}/favorite', [FavoriteController::class, 'add']);
+//     Route::delete('/items/{itemId}/favorite', [FavoriteController::class, 'remove']);
+// });
+// Route::middleware('auth.jwt.optional')->group(function () {
+//     Route::get('/items/{itemId}/favorite', [FavoriteController::class, 'show']);
+// });
+
+
+// use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
+
+// Route::get('/items/{itemId}', [ItemReadController::class, 'show']);
+
+
+
+// Route::prefix('items')->group(function () {
+//     Route::get('{item}', [ItemReadController::class, 'show']);
+// });
+
+// Route::get('/items/{itemId}', [ItemReadController::class, 'show'])
+//     ->middleware('auth.jwt.optional');
+
+
+
+//データー加工後表示
+// use App\Modules\Item\Presentation\Http\Controllers\ItemReadController;
+
+// Route::withoutMiddleware(['throttle:api'])
+//     ->get('/items/{itemId}', [ItemReadController::class, 'show'])
+//     ->whereNumber('itemId');
+
+
+
+
 
 
 Route::middleware(['auth.jwt'])->group(function () {

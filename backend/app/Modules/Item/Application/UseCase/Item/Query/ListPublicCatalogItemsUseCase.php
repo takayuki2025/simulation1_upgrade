@@ -16,14 +16,14 @@ final class ListPublicCatalogItemsUseCase
         int $limit,
         int $page,
         ?string $keyword,
-        ?int $viewerShopId,
+        array $viewerShopIds,
         ?int $viewerUserId,
     ): PublicCatalogItemCollection {
         return $this->readRepo->paginate(
             limit: $limit,
             page: $page,
             keyword: $keyword,
-            viewerShopId: $viewerShopId,
+            viewerShopIds: $viewerShopIds,
             viewerUserId: $viewerUserId,
         );
     }

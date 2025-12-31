@@ -2,10 +2,10 @@
 
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
 use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
+use Illuminate\Http\Request;
 
 final class ItemDetailController extends Controller
 {
@@ -14,15 +14,18 @@ final class ItemDetailController extends Controller
         Request $request,
         GetItemDetailUseCase $useCase
     ) {
-        $viewerUserId = $request->user()?->id;
+        /** @var \App\Modules\Auth\Domain\ValueObject\AuthPrincipal|null $principal */
+        $principal = $request->attributes->get('auth_principal');
+
+        $viewerUserId = $principal?->userId;
 
         $output = $useCase->execute($id, $viewerUserId);
 
         return response()->json([
-            'item'           => ItemDetailResource::fromReadModel($output->itemRow),
-            'comments'       => $output->comments,
-            'isFavorited'    => $output->isFavorited,
-            'favoritesCount' => $output->favoritesCount,
+            'item'            => ItemDetailResource::fromReadModel($output->item),
+            'comments'        => $output->comments,
+            'is_favorited'    => $output->isFavorited,
+            'favorites_count' => $output->favoritesCount,
         ]);
     }
 }

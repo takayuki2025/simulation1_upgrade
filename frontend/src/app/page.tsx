@@ -8,7 +8,6 @@ import { useItemListSWR } from "@/services/useItemListSWR";
 import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
-// ✅ Public(ReadModel) 用
 import type { PublicItem } from "@/types/publicItem";
 
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
@@ -47,14 +46,34 @@ export default function Home() {
   const favoriteResult = useFavoriteItemsSWR();
 
   /* =========================
-     🧠 表示切り替え
+     🧠 PublicItem に正規化（★型安全）
   ========================= */
-  const items: PublicItem[] =
-    currentTab === "mylist"
-      ? (favoriteResult.items as PublicItem[])
-      : isSearch
-        ? (searchResult.items as PublicItem[])
-        : (listResult.items as PublicItem[]);
+  const items: PublicItem[] = useMemo(() => {
+    const rawItems =
+      currentTab === "mylist"
+        ? favoriteResult.items
+        : isSearch
+          ? searchResult.items
+          : listResult.items;
+
+    return rawItems.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      itemImagePath: item.itemImagePath ?? item.item_image ?? null,
+      brandPrimary: item.brandPrimary ?? null,
+      conditionName: item.conditionName ?? null,
+      colorName: item.colorName ?? null,
+      publishedAt: item.publishedAt ?? null,
+      isOwnPersonalItem: item.isOwnPersonalItem ?? false,
+    }));
+  }, [
+    currentTab,
+    isSearch,
+    favoriteResult.items,
+    searchResult.items,
+    listResult.items,
+  ]);
 
   const isItemsLoading =
     currentTab === "mylist"
@@ -91,6 +110,7 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
+          {/* ===== Tabs ===== */}
           <div className={styles.main_select}>
             <Link
               href={{
@@ -114,33 +134,49 @@ export default function Home() {
             </Link>
           </div>
 
+          {/* ===== Items ===== */}
           <div className={styles.items_select}>
-            {items && items.length > 0 ? (
+            {items.length > 0 ? (
               items.map((item) => (
                 <div key={item.id} className={styles.items_select_all}>
-                  <Link href={`/item/${item.id}`} className={styles.cardLink}>
+                  {/* ★ Link を使わない（GET誤爆防止） */}
+                  <div
+                    className={styles.cardLink}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/item/${item.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        router.push(`/item/${item.id}`);
+                      }
+                    }}
+                  >
                     <div className={styles.itemImageWrapper}>
+                      {item.isOwnPersonalItem && (
+                        <span
+                          className={styles.ownStar}
+                          title="あなたの出品"
+                          aria-label="あなたの出品"
+                        >
+                          💫
+                        </span>
+                      )}
+
                       <img
                         src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
                         alt={item.name}
                         className={styles.itemImage}
                         onError={onImageError}
                       />
-
-                      {/* ✅ ここに「あなたの出品」バッジを追加 */}
-                      {item.isOwnPersonalItem && (
-                        <span className={styles.badge}>思い入れの商品をもっと良く売る</span>
-                      )}
                     </div>
 
                     <div className={styles.item_info}>
                       <p className={styles.item_name}>{item.name}</p>
-
                       <p className={styles.item_price}>
                         ¥{item.price.toLocaleString()}
                       </p>
                     </div>
-                  </Link>
+                  </div>
                 </div>
               ))
             ) : (

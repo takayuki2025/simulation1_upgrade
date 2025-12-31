@@ -13,7 +13,7 @@ final class PublicCatalogItemReadRepository
         int $limit,
         int $page,
         ?string $keyword,
-        ?int $viewerShopId,
+        array $viewerShopIds,
         ?int $viewerUserId
     ): PublicCatalogItemCollection {
 
@@ -45,13 +45,13 @@ final class PublicCatalogItemReadRepository
         }
 
         /**
-         * ✅ 除外は「自分の shop の商品」のみ
-         * 個人出品は除外しない
+         * ✅ 正解条件（あなたが提示したもの）
+         * 自社ショップ商品を Public から完全除外
          */
-        if ($viewerShopId !== null) {
-            $query->where(function ($q) use ($viewerShopId) {
+        if (!empty($viewerShopIds)) {
+            $query->where(function ($q) use ($viewerShopIds) {
                 $q->whereNull('items.shop_id')
-                  ->orWhere('items.shop_id', '!=', $viewerShopId);
+                  ->orWhereNotIn('items.shop_id', $viewerShopIds);
             });
         }
 
@@ -62,7 +62,11 @@ final class PublicCatalogItemReadRepository
 
         $items = $rows->map(function ($row) use ($viewerUserId) {
 
-            // ✅ ★ここが抜けていた定義
+
+            \Log::info('[🔥PublicCatalog] viewerUserId', [
+                'viewerUserId' => $viewerUserId,
+            ]);
+
             $isOwnPersonalItem =
                 $viewerUserId !== null
                 && (int) $row->created_by_user_id === $viewerUserId
@@ -92,8 +96,6 @@ final class PublicCatalogItemReadRepository
 
         $path = preg_replace('#^https?://[^/]+/#', '', trim($raw));
         $path = preg_replace('#^/?storage/#', '', $path);
-        $path = ltrim($path, '/');
-
-        return $path !== '' ? $path : null;
+        return ltrim($path, '/');
     }
 }

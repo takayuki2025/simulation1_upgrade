@@ -109,10 +109,10 @@
 .itemImageWrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;   /* 正方形カード */
+  aspect-ratio: 1 / 1; /* 正方形カード */
   overflow: hidden;
   border-radius: 8px;
-  background: #f5f5f5;  /* 仮背景（画像ロード前） */
+  background: #f5f5f5; /* 仮背景（画像ロード前） */
 }
 
 .itemImage {
@@ -171,4 +171,25 @@
   width: 100%;
   padding: 40px 0;
   color: #777;
+}
+
+/* 自分の商品 */
+.itemImageWrapper {
+  position: relative;
+}
+
+.ownStar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  font-size: 20px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 9999px;
+  padding: 4px 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.ownStar:hover {
 }

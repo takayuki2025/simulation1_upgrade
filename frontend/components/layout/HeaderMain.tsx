@@ -25,7 +25,10 @@ export default function HeaderMain() {
   return (
     <header className="bg-black h-[70px] shadow-md">
       <div className="flex items-center p-[20px_15px] h-full mx-auto max-w-[1300px]">
-        <Link href="/" className="relative w-[250px] h-[50px] flex-shrink-0">
+        <div
+          className="relative w-[250px] h-[50px] flex-shrink-0 cursor-pointer"
+          onClick={() => router.push("/")}
+        >
           <Image
             src="/image_icon/logo.svg"
             alt="会社名"
@@ -33,7 +36,7 @@ export default function HeaderMain() {
             className="object-contain"
             priority
           />
-        </Link>
+        </div>
 
         {/* 🔍 検索フォーム */}
         <form onSubmit={handleSearch} className="ml-[50px] flex items-center">
@@ -49,10 +52,7 @@ export default function HeaderMain() {
         <div className="flex items-center ml-auto space-x-2">
           {isLoading ? null : isAuthenticated ? (
             <>
-              <button
-                onClick={logout}
-                className="text-white"
-              >
+              <button onClick={logout} className="text-white">
                 ログアウト
               </button>
               <Link href="/mypage?page=sell" className="text-white">

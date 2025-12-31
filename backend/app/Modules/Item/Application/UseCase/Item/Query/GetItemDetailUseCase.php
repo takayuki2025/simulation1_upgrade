@@ -43,7 +43,7 @@ final class GetItemDetailUseCase
         $favoritesCount = $this->countFavorites->execute($itemId);
 
         return new ItemDetailOutputDto(
-            itemRow: $itemRow,
+            item: $itemRow,
             comments: $comments,
             isFavorited: $isFavorited,
             favoritesCount: $favoritesCount,

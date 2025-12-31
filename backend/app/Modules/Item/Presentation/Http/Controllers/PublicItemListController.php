@@ -16,14 +16,15 @@ final class PublicItemListController extends Controller
         /** @var AuthPrincipal|null $principal */
         $principal = $request->attributes->get('auth_principal');
 
-        $viewerShopId = $principal?->shopId ?? null;
-        $viewerUserId = $principal?->userId ?? null;
+        // ✅ 修正：単数 shopId は使わない
+        $viewerShopIds = $principal?->shopIds ?? [];
+        $viewerUserId  = $principal?->userId ?? null;
 
         $collection = $useCase->execute(
             limit: 20,
             page: (int) $request->query('page', 1),
             keyword: $request->query('keyword'),
-            viewerShopId: $viewerShopId,
+            viewerShopIds: $viewerShopIds,
             viewerUserId: $viewerUserId,
         );
 
@@ -38,7 +39,6 @@ final class PublicItemListController extends Controller
                     'colorName' => $dto->colorName,
                     'itemImagePath' => $dto->itemImagePath,
                     'publishedAt' => $dto->publishedAt->format(DATE_ATOM),
-                    // ✅ 修正ポイント
                     'isOwnPersonalItem' => $dto->isOwnPersonalItem,
                 ],
                 $collection->all()

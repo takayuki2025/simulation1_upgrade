@@ -3,34 +3,45 @@
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
+use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
 use App\Modules\Item\Infrastructure\Persistence\Query\ItemReadRepository;
 use App\Modules\Item\Presentation\Http\Resources\ItemReadResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 
 final class ItemReadController extends Controller
 {
     public function __construct(
-        private ItemReadRepository $itemReadRepository
+        private ItemReadRepository $itemReadRepository,
     ) {
     }
 
-    public function show(string $id)
-    {
-        $itemId = (int) $id;
+    public function show(
+        string $itemId,
+        Request $request,
+        GetItemDetailUseCase $useCase
+    ): JsonResponse {
 
-        $row = $this->itemReadRepository->findWithDisplayEntities($itemId);
+        /** @var AuthPrincipal|null $principal */
+        $principal = $request->attributes->get('auth_principal');
 
-        if (! $row) {
-            abort(404);
-        }
+        $viewerUserId = $principal?->userId;
 
-        return response()->json(
-            ItemReadResource::fromRow($row)
+        $result = $useCase->execute(
+            itemId: (int) $itemId,
+            viewerUserId: $viewerUserId
         );
+
+        return response()->json([
+            'item'            => ItemDetailResource::fromReadModel($result->item),
+            'comments'        => $result->comments,
+            'is_favorited'    => $result->isFavorited,
+            'favorites_count' => $result->favoritesCount,
+        ]);
     }
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $items = $this->itemReadRepository->paginateWithDisplayBrand(
             limit: 20,

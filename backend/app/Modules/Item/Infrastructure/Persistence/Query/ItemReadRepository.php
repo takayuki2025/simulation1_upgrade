@@ -198,4 +198,14 @@ final class ItemReadRepository
             'tags' => $tagRepo->getGroupedByItemId($itemId),
         ];
     }
+
+    public function withFavorite(bool $isFavorited): array
+    {
+        return array_merge(
+            $this->toArray(),
+            [
+                'isFavorited' => $isFavorited,
+            ]
+        );
+    }
 }
