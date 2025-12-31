@@ -11,11 +11,9 @@ final class PublicCatalogItemDto
         public readonly ?string $brandPrimary,
         public readonly ?string $conditionName,
         public readonly ?string $colorName,
-        public readonly ?string $itemImagePath, // storage 相対 path
+        public readonly ?string $itemImagePath,
         public readonly \DateTimeInterface $publishedAt,
-
-        // ★ 表示専用フラグ（自分の個人出品）
-        public readonly bool $isOwnPersonalItem,
+        public readonly ?string $displayType, // 'STAR' | 'COMET' | null
     ) {
     }
 }

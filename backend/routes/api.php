@@ -74,7 +74,6 @@ use App\Modules\Item\Presentation\Http\Controllers\{
     //  ItemSearchController,
     ItemDetailController
 };
-use App\Modules\Item\Presentation\Http\Controllers\PublicItemListController;
 use App\Modules\Search\Presentation\Http\Controllers\PublicItemSearchController;
 
 // ✅ 新：一覧 / 検索（DDD 分離済）
@@ -87,9 +86,20 @@ Route::prefix('search')->group(function () {
     Route::get('/items', PublicItemSearchController::class);
 });
 
-Route::middleware('auth.jwt.optional')->group(function () {
-    Route::get('/items/public', PublicItemListController::class);
-});
+
+
+use App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController;
+
+
+Route::get(
+    '/items/public',
+    PublicCatalogController::class
+)->middleware('auth.jwt.optional');
+
+
+// Route::middleware('auth.jwt.optional')->group(function () {
+//     Route::get('/items/public', PublicItemListController::class);
+// });
 
 Route::middleware('auth.jwt.optional')
     ->get('/item/{id}', ItemDetailController::class);

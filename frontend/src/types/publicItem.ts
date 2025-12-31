@@ -2,10 +2,10 @@ export type PublicItem = {
   id: number;
   name: string;
   price: number;
+  itemImagePath: string | null;
   brandPrimary: string | null;
   conditionName: string | null;
   colorName: string | null;
-  itemImagePath: string | null;
-  publishedAt: string; // ISO string
-  isOwnPersonalItem?: boolean;
+  publishedAt: string | null;
+  displayType: "STAR" | "COMET" | null;
 };

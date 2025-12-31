@@ -9,21 +9,22 @@ final class PublicCatalogItemResource
     public static function fromDto(PublicCatalogItemDto $dto): array
     {
         return [
-            'id' => $dto->id,
-            'name' => $dto->name,
+            'id'    => $dto->id,
+            'name'  => $dto->name,
             'price' => $dto->price,
 
-            // entity 優先結果
-            'brand_primary' => $dto->brandPrimary,
-            'condition' => $dto->conditionName,
-            'color' => $dto->colorName,
+            'brandPrimary'  => $dto->brandPrimary,
+            'conditionName' => $dto->conditionName,
+            'colorName'    => $dto->colorName,
 
-            // 画像（public 前提）
-            'item_image' => $dto->itemImagePath
+            'itemImagePath' => $dto->itemImagePath
                 ? asset('storage/' . $dto->itemImagePath)
                 : null,
 
-            'published_at' => $dto->publishedAt->format('c'),
+            'publishedAt'  => $dto->publishedAt->format(DATE_ATOM),
+
+            // ★ UI 用
+            'displayType'  => $dto->displayType, // 'STAR' | 'COMET' | null
         ];
     }
 }

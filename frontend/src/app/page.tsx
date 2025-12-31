@@ -65,7 +65,9 @@ export default function Home() {
       conditionName: item.conditionName ?? null,
       colorName: item.colorName ?? null,
       publishedAt: item.publishedAt ?? null,
-      isOwnPersonalItem: item.isOwnPersonalItem ?? false,
+
+      // ★ Backend を信じる
+      displayType: item.displayType ?? null,
     }));
   }, [
     currentTab,
@@ -152,13 +154,21 @@ export default function Home() {
                     }}
                   >
                     <div className={styles.itemImageWrapper}>
-                      {item.isOwnPersonalItem && (
+                      {item.displayType && (
                         <span
                           className={styles.ownStar}
-                          title="あなたの出品"
-                          aria-label="あなたの出品"
+                          title={
+                            item.displayType === "STAR"
+                              ? "オーナー出品"
+                              : "あなたの出品"
+                          }
+                          aria-label={
+                            item.displayType === "STAR"
+                              ? "オーナー出品"
+                              : "あなたの出品"
+                          }
                         >
-                          💫
+                          {item.displayType === "STAR" ? "⭐️" : "💫"}
                         </span>
                       )}
 

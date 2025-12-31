@@ -5,6 +5,8 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Modules\Item\Application\UseCase\Catalog\Query\ListPublicCatalogItemsUseCase;
+use App\Modules\Item\Presentation\Http\Resources\PublicCatalogItemResource;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
 final class PublicCatalogController extends Controller
 {
@@ -12,16 +14,22 @@ final class PublicCatalogController extends Controller
         Request $request,
         ListPublicCatalogItemsUseCase $useCase
     ) {
+        /** @var AuthPrincipal|null $principal */
+        $principal = $request->attributes->get('auth_principal');
+
         $collection = $useCase->execute(
             limit: 20,
             page: (int) $request->query('page', 1),
             keyword: $request->query('keyword'),
-            viewerShopId: $request->user()?->shop_id
+            viewerShopIds: $principal?->shopIds ?? [],
+            viewerUserId: $principal?->userId,
         );
 
-        // ★ DTO はそのまま返す（Resource 不要）
         return response()->json([
-            'items' => $collection->toArray(),
+            'items' => array_map(
+                fn ($dto) => PublicCatalogItemResource::fromDto($dto),
+                $collection->all()
+            ),
         ]);
     }
 }

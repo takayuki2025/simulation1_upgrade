@@ -173,12 +173,17 @@ final class ItemsTableSeeder extends Seeder
          * ===================================================== */
         $atlasKernel = app(AtlasKernelService::class);
 
-        foreach ($items as $data) {
-            $createdByUserId = $userIds[$data['email']] ?? $fallbackUserId;
 
-            // ★ ここが重要：個人出品なら shop_id = null
+        foreach ($items as $data) {
+
+            $isSeederItem = $data['shop'] !== null;
+
+            $createdByUserId = $isSeederItem
+                ? null                               // ⭐️ シーダーは必ず NULL
+                : ($userIds[$data['email']] ?? $fallbackUserId);
+
             $shopId = null;
-            if ($data['shop'] !== null && isset($shops[$data['shop']])) {
+            if ($isSeederItem && isset($shops[$data['shop']])) {
                 $shopId = $shops[$data['shop']];
             }
 
@@ -199,6 +204,7 @@ final class ItemsTableSeeder extends Seeder
                 'item_id' => $item->id,
                 'shop_id' => $item->shop_id,
                 'created_by_user_id' => $item->created_by_user_id,
+                'is_seeder' => $isSeederItem,
             ]);
 
             $atlasKernel->analyzeItem(
@@ -207,6 +213,7 @@ final class ItemsTableSeeder extends Seeder
                 tenantId: null
             );
         }
+
 
         Log::info('[ItemsSeeder] completed with AtlasKernel.');
     }
