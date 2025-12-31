@@ -37,7 +37,7 @@ class CreateUsersTable extends Migration
 
 
             // Laravel パスワード（Firebaseログイン時は使わないが必要）
-            $table->string('password');
+            $table->string('password')->nullable();
 
             /* ============================================================
                🏠 住所情報

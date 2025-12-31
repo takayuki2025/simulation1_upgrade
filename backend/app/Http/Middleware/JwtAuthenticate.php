@@ -16,28 +16,20 @@ final class JwtAuthenticate
 
     public function handle(Request $request, Closure $next)
     {
-        \Log::info('[JwtAuthenticate] called', [
-            'has_authorization' => $request->hasHeader('Authorization'),
-        ]);
-
         $resolved = $this->resolver->resolve($request);
 
         if (! $resolved) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        /**
-         * @var \App\Models\User $user
-         * @var \App\Modules\Auth\Domain\ValueObject\AuthPrincipal $principal
-         */
         $user = $resolved['user'];
         $principal = $resolved['principal'];
 
-        // Laravel Auth（互換用）
+        // Laravel 互換（既存コード保護）
         Auth::setUser($user);
         $request->setUserResolver(fn () => $user);
 
-        // ✅ DDD 用 Principal（唯一の正）
+        // DDD 正
         $request->attributes->set('auth_principal', $principal);
 
         return $next($request);

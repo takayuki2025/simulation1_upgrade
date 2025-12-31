@@ -2,7 +2,7 @@
 
 namespace App\Modules\Auth\Application\Dto;
 
-class LoginOrRegisterOutput
+final class LoginOrRegisterOutput
 {
     public function __construct(
         public string $token,
@@ -10,18 +10,18 @@ class LoginOrRegisterOutput
         public string $status,
         public bool $needsEmailVerification,
         public string $refreshToken,
-        public readonly bool $isFirstLogin,
+        public bool $isFirstLogin,
     ) {
     }
 
     public function toArray(): array
     {
         return [
-            'token'                 => $this->token,
-            'refresh_token'         => $this->refreshToken,
-            'user'                  => $this->user,
-            'status'                => $this->status,
+            'token'                  => $this->token,
+            'user'                   => $this->user,
+            'status'                 => $this->status,
             'needsEmailVerification' => $this->needsEmailVerification,
+            'refresh_token'          => $this->refreshToken,
             'isFirstLogin'           => $this->isFirstLogin,
         ];
     }

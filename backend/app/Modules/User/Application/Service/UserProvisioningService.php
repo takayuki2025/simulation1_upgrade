@@ -21,30 +21,49 @@ final class UserProvisioningService implements UserProvisioningPort
         }
 
         return DB::transaction(function () use (
+            $firebaseUid,
             $email,
             $emailVerified,
             $displayName
         ) {
-            /* =====================================================
-             * 1. User 解決 or 作成（email が唯一のキー）
-             * ===================================================== */
-            $user = User::where('email', $email)->first();
+
+            $user = User::where('firebase_uid', $firebaseUid)->first()
+                ?? User::where('email', $email)->first();
 
             $isFirstLogin = false;
 
             if (! $user) {
                 $user = User::create([
+                    'firebase_uid'      => $firebaseUid,
                     'name'              => $displayName ?? 'User',
                     'email'             => $email,
                     'email_verified_at' => $emailVerified ? now() : null,
+                    'first_login_at'    => now(),
                 ]);
 
                 $isFirstLogin = true;
+            } else {
+                $updates = [];
+
+                if (! $user->firebase_uid) {
+                    $updates['firebase_uid'] = $firebaseUid;
+                } elseif ($user->firebase_uid !== $firebaseUid) {
+                    throw new \DomainException('Firebase UID mismatch.');
+                }
+
+                if ($emailVerified && ! $user->email_verified_at) {
+                    $updates['email_verified_at'] = now();
+                }
+
+                if (! $user->first_login_at) {
+                    $updates['first_login_at'] = now();
+                }
+
+                if ($updates) {
+                    $user->update($updates);
+                }
             }
 
-            /* =====================================================
-             * 2. 所属ショップ解決（role_user）
-             * ===================================================== */
             $shopIds = DB::table('role_user')
                 ->where('user_id', $user->id)
                 ->pluck('shop_id')
@@ -52,29 +71,18 @@ final class UserProvisioningService implements UserProvisioningPort
                 ->values()
                 ->all();
 
-            /* =====================================================
-             * 3. tenantId（現在選択中 shop）
-             * ===================================================== */
-            $tenantId = $shopIds[0] ?? null;
-
-            /* =====================================================
-             * 4. roles
-             * ===================================================== */
             $roles = DB::table('role_user')
                 ->where('user_id', $user->id)
                 ->pluck('role_id')
                 ->values()
                 ->all();
 
-            /* =====================================================
-             * 5. ProvisionedUser
-             * ===================================================== */
             return new ProvisionedUser(
                 userId: $user->id,
                 email: $user->email,
                 roles: $roles,
                 shopIds: $shopIds,
-                tenantId: $tenantId,
+                tenantId: $shopIds[0] ?? null,
                 isFirstLogin: $isFirstLogin,
             );
         });

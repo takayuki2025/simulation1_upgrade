@@ -7,7 +7,7 @@ use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 interface UserProvisioningPort
 {
     /**
-     * Firebase 認証後に User / Role / Shop を確定する
+     * Firebase 認証結果から User を確定する
      */
     public function provisionFromFirebase(
         string $firebaseUid,

@@ -1,16 +1,29 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AxiosError } from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const { user, apiClient, isLoading } = useAuth();
+  const { user, apiClient, isLoading, isReady } = useAuth();
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
+
+  /**
+   * ★ 最重要：
+   * すでに認証済みなら、このページに居させない
+   */
+  useEffect(() => {
+    if (!isReady || isLoading) return;
+    if (!user) return;
+
+    if (user.email_verified_at) {
+      router.replace("/"); // or /mypage/profile
+    }
+  }, [isReady, isLoading, user, router]);
 
   const handleResend = async () => {
     if (!apiClient) return;
@@ -29,7 +42,7 @@ export default function VerifyEmailPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isReady) {
     return <div className="mt-20 text-center">読み込み中...</div>;
   }
 
@@ -47,7 +60,7 @@ export default function VerifyEmailPage() {
         <p className="mt-3 text-center text-gray-600">
           メール内のリンクをクリックした後、
           <br />
-          <strong>ログインページからログインしてください。</strong>
+          <strong>再度ログインしてください。</strong>
         </p>
 
         {statusMessage && (

@@ -15,6 +15,9 @@ final class AuthPrincipal
     ) {
     }
 
+    /* =====================================================
+     * JWT
+     * ===================================================== */
     public static function fromJwt(
         int $userId,
         string $providerUid,
@@ -24,54 +27,63 @@ final class AuthPrincipal
         array $shopIds = [],
     ): self {
         return new self(
-            'jwt',
-            $providerUid,
-            $userId,
-            $email,
-            $emailVerified,
-            $displayName,
-            $shopIds,
+            provider: 'jwt',
+            providerUid: $providerUid,
+            userId: $userId,
+            email: $email,
+            emailVerified: $emailVerified,
+            displayName: $displayName,
+            shopIds: $shopIds,
         );
     }
 
+    /* =====================================================
+     * Firebase
+     * ===================================================== */
     public static function fromFirebase(
+        int $userId,
         string $firebaseUid,
-        int $userId,
         ?string $email,
         bool $emailVerified,
         ?string $displayName,
         array $shopIds = [],
     ): self {
         return new self(
-            'firebase',
-            $firebaseUid,
-            $userId,
-            $email,
-            $emailVerified,
-            $displayName,
-            $shopIds,
+            provider: 'firebase',
+            providerUid: $firebaseUid,
+            userId: $userId,
+            email: $email,
+            emailVerified: $emailVerified,
+            displayName: $displayName,
+            shopIds: $shopIds,
         );
     }
 
+    /* =====================================================
+     * Cognito
+     * ===================================================== */
     public static function fromCognito(
-        string $sub,
         int $userId,
+        string $sub,
         ?string $email,
         bool $emailVerified,
         ?string $displayName,
         array $shopIds = [],
     ): self {
         return new self(
-            'cognito',
-            $sub,
-            $userId,
-            $email,
-            $emailVerified,
-            $displayName,
-            $shopIds,
+            provider: 'cognito',
+            providerUid: $sub,
+            userId: $userId,
+            email: $email,
+            emailVerified: $emailVerified,
+            displayName: $displayName,
+            shopIds: $shopIds,
         );
     }
 
+    /* =====================================================
+     * Helpers
+     * ===================================================== */
     public function ownsShop(int $shopId): bool
     {
         return in_array($shopId, $this->shopIds, true);

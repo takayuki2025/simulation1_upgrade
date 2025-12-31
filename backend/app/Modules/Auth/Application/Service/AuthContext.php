@@ -12,9 +12,6 @@ final class AuthContext
     ) {
     }
 
-    /**
-     * 現在の認証主体を返す
-     */
     public function principal(): AuthPrincipal
     {
         $principal = $this->request->attributes->get('auth_principal');

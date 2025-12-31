@@ -2,95 +2,79 @@
 
 namespace App\Modules\Auth\Application\UseCase;
 
-use App\Models\User;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterInput;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterOutput;
-use App\Modules\Auth\Infrastructure\External\FirebaseProvider;
-use App\Modules\Auth\Domain\Service\TokenIssuerService;
-use App\Modules\Auth\Domain\Service\RefreshTokenService;
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
+use App\Modules\Auth\Domain\Service\TokenIssuerService;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use App\Modules\Auth\Infrastructure\External\FirebaseProvider;
 
 final class LoginOrRegisterUseCase
 {
     public function __construct(
         private FirebaseProvider $firebase,
-        private UserProvisioningPort $userProvisioning,
+        private UserProvisioningPort $provisioning,
         private TokenIssuerService $tokenIssuer,
-        private RefreshTokenService $refreshTokens,
     ) {
     }
 
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
-        /* =====================================================
-         * ① Firebase 検証（SSOT）
-         * ===================================================== */
-        $verified = $this->firebase->verifyToken($input->firebaseIdToken);
-
-        $firebaseUid   = (string) $verified['sub'];
-        $email         = $verified['email'] ?? null;
-        $emailVerified = (bool) ($verified['email_verified'] ?? false);
-        $displayName   = $verified['name'] ?? null;
-
-        /* =====================================================
-         * ② User Provisioning（Firebase 専用）
-         * ===================================================== */
-        $provisioned = $this->userProvisioning->provisionFromFirebase(
-            firebaseUid: $firebaseUid,
-            email: $email,
-            emailVerified: $emailVerified,
-            displayName: $displayName,
+        /* =========================================
+         * 1. Firebase ID Token 検証
+         * ========================================= */
+        $firebaseUser = $this->firebase->verifyToken(
+            $input->firebaseIdToken
         );
 
-        /* =====================================================
-         * ③ AuthPrincipal（確定版を1回だけ生成）
-         * ===================================================== */
+        /* =========================================
+         * 2. 内部ユーザー確定
+         * ========================================= */
+        $provisioned = $this->provisioning->provisionFromFirebase(
+            firebaseUid: $firebaseUser['sub'],
+            email: $firebaseUser['email'] ?? null,
+            emailVerified: (bool) ($firebaseUser['email_verified'] ?? false),
+            displayName: $input->displayName ?? $firebaseUser['name'] ?? null,
+        );
+
+        /* =========================================
+         * 3. AuthPrincipal 生成
+         * ========================================= */
         $principal = AuthPrincipal::fromFirebase(
-            firebaseUid: $firebaseUid,
+            firebaseUid: $firebaseUser['sub'],
             userId: $provisioned->userId,
-            email: $provisioned->email,
-            emailVerified: $emailVerified,
-            displayName: $displayName,
-            shopIds: $provisioned->shopIds ?? [],
+            email: $firebaseUser['email'] ?? null,
+            emailVerified: (bool) ($firebaseUser['email_verified'] ?? false),
+            displayName: $firebaseUser['name'] ?? null,
+            shopIds: $provisioned->shopIds,
         );
 
-        /* =====================================================
-         * ④ Access Token（✅ principal を渡す）
-         * ===================================================== */
+        /* =========================================
+         * 4. Access Token 発行
+         * ========================================= */
         $accessToken = $this->tokenIssuer->issue(
             user: $provisioned,
             principal: $principal,
         );
 
-        /* =====================================================
-         * ⑤ Refresh Token
-         * ===================================================== */
-        if ($user = User::find($provisioned->userId)) {
-            $this->refreshTokens->revokeAllForUser($user);
-        }
-
-        $refresh = $this->refreshTokens->issueByUserId(
-            $provisioned->userId,
-            request()->ip(),
-            request()->userAgent()
-        );
+        /* =========================================
+         * 5. Output DTO
+         * ========================================= */
 
         return new LoginOrRegisterOutput(
             token: $accessToken,
             user: [
                 'id'                => $provisioned->userId,
-                'name'              => $displayName,
                 'email'             => $provisioned->email,
-                'shop_id'           => $provisioned->tenantId,
-                'email_verified_at' => $emailVerified ? now() : null,
-                'first_login_at'    => $provisioned->isFirstLogin ? now() : null,
-                'roles'             => $provisioned->roles,
+                'email_verified_at' => $firebaseUser['email_verified']
+                    ? now()->toISOString()
+                    : null,
             ],
-            status: 'login_or_register',
-            needsEmailVerification: ! $emailVerified,
-            refreshToken: $refresh,
+            status: 'ok',
+            needsEmailVerification: ! ($firebaseUser['email_verified'] ?? false),
+            refreshToken: '',                 // ★ null → ''
             isFirstLogin: $provisioned->isFirstLogin,
         );
+
     }
 }

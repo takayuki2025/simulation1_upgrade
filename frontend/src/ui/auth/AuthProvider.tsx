@@ -12,7 +12,7 @@ import { AuthService } from "@/application/auth/AuthService";
 import { FirebaseAuthClient } from "@/infrastructure/auth/FirebaseAuthClient";
 import { LaravelAuthApi } from "@/infrastructure/auth/LaravelAuthApi";
 import { createHttpClient } from "@/infrastructure/auth/HttpClient";
-import { TokenRefreshService } from "@/application/auth/TokenRefreshService";
+// import { TokenRefreshService } from "@/application/auth/TokenRefreshService"; // ✅ 今フェーズでは使わない
 import { TokenStorage } from "@/infrastructure/auth/TokenStorage";
 import { useRouter } from "next/navigation";
 
@@ -28,11 +28,10 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isReady, setIsReady] = useState(false); // ★ 追加
+  const [isReady, setIsReady] = useState(false);
 
   const authServiceRef = useRef<AuthService | null>(null);
   const laravelApiRef = useRef<LaravelAuthApi | null>(null);
-  const refreshServiceRef = useRef<TokenRefreshService | null>(null);
 
   useEffect(() => {
     const firebase = new FirebaseAuthClient();
@@ -40,27 +39,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ① API（client は後で注入）
     const api = new LaravelAuthApi(null);
 
-    // ② Refresh service
-    const refresh = new TokenRefreshService(api);
+    // ② Http client（refresh 無効版）
+    const client = createHttpClient(null);
 
-    // ③ Http client（refresh 連携済）
-    const client = createHttpClient(refresh);
-
-    // ④ api に client 注入
+    // ③ api に client 注入
     api.setClient(client);
 
     const auth = new AuthService(firebase, api);
 
     laravelApiRef.current = api;
     authServiceRef.current = auth;
-    refreshServiceRef.current = refresh;
 
     // 起動時トークン確認
     const { accessToken } = TokenStorage.load();
 
     if (!accessToken) {
       setIsLoading(false);
-      setIsReady(true); // ★ 重要
+      setIsReady(true);
       return;
     }
 
@@ -69,11 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = await api.me();
         setUser(u);
       } catch {
+        // ✅ ここは「今の安定フェーズ」なら clear してOK
+        // ただし “無限ループ” の原因は refresh 自動実行だったので、ここではループしない
         TokenStorage.clear();
         setUser(null);
       } finally {
         setIsLoading(false);
-        setIsReady(true); // ★ 初期化完了
+        setIsReady(true);
       }
     })();
   }, []);
@@ -135,16 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // 初期化未完了・ローディング中は何もしない
     if (!isReady || isLoading) return;
     if (!user) return;
 
-    /**
-     * 🔹 将来の導線分岐ポイント
-     * 今は「何もしない」でOK
-     */
     if (user.has_shop === false) {
-      // 例（今はコメントアウト）:
       // router.replace("/sell/start");
     }
   }, [isReady, isLoading, user, router]);
@@ -155,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
-        isReady, // ★ 追加
+        isReady,
         login,
         register,
         logout,
