@@ -58,7 +58,6 @@ export default function ItemDetailPage() {
      ★ FIX: 表示の真実は local state
   ========================= */
 
-
   const [newComment, setNewComment] = useState("");
   const [commentErrors, setCommentErrors] = useState<string[]>([]);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -85,8 +84,6 @@ export default function ItemDetailPage() {
   const displayedFavorited = isFavorited;
   const displayedCount = favoritesCount;
 
-
-  
   /* =========================
      ❤️ Favorite（確定版）
   ========================= */
@@ -170,6 +167,10 @@ export default function ItemDetailPage() {
       });
 
       setNewComment("");
+
+      // ✅ ★ここが最重要修正点★
+      const swrKey = ["item-detail", item.id, "auth"];
+      mutate(swrKey);
     } catch {
       setCommentErrors(["コメント投稿に失敗しました"]);
     } finally {
@@ -178,7 +179,7 @@ export default function ItemDetailPage() {
   };
 
   /* =========================
-     表示用派生
+    表示用派生
   ========================= */
   const brandTokens: string[] = Array.isArray(item.brands)
     ? item.brands

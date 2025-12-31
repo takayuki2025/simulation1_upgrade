@@ -6,19 +6,20 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Modules\Auth\Presentation\Http\Presenters\AuthUserPresenter;
+use App\Modules\Auth\Application\UseCase\GetMyProfileUseCase;
+
 
 final class MeController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __construct(
+        private GetMyProfileUseCase $useCase
+    ) {
+    }
+
+    public function __invoke(): JsonResponse
     {
-        $user = $request->user();
-
-        if (! $user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
         return response()->json(
-            AuthUserPresenter::fromModel($user)
+            $this->useCase->handle()->toArray()
         );
     }
 }

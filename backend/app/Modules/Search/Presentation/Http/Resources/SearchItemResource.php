@@ -3,29 +3,25 @@
 namespace App\Modules\Search\Presentation\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Modules\Item\Domain\Entity\Item;
+use App\Models\Item as EloquentItem;
 
 /**
- * @mixin Item
+ * @mixin EloquentItem
  */
 final class SearchItemResource extends JsonResource
 {
     public function toArray($request): array
     {
-        /** @var Item $item */
+        /** @var EloquentItem $item */
         $item = $this->resource;
 
-        $price = $item->getPrice();
-        $image = $item->getItemImage(); // ← ★これが抜けていた
-
         return [
-            'id'   => $item->getId()?->getValue(),
-            'name' => $item->getName(),
-            'price'      => $item->getPrice()->amount(),
-            'remain' => $item->getRemain()->getValue(),
-            // Domain は path、Presentation が URL 化
-            'item_image' => $image
-                ? asset('storage/' . $image->value())
+            'id'         => $item->id,
+            'name'       => $item->name,
+            'price'      => $item->price,          // ✅ 生カラム
+            'remain'     => $item->remain,
+            'item_image' => $item->item_image
+                ? asset('storage/' . $item->item_image)
                 : null,
         ];
     }
