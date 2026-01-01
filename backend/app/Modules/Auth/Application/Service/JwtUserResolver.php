@@ -2,62 +2,68 @@
 
 namespace App\Modules\Auth\Application\Service;
 
-use App\Models\User;
-use App\Modules\Auth\Domain\Port\TokenVerifierPort;
+use App\Modules\Auth\Domain\Port\UserProvisioningPort;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 final class JwtUserResolver
 {
     public function __construct(
-        private TokenVerifierPort $verifier
+        private UserProvisioningPort $provisioning
     ) {
     }
 
-    /**
-     * @return array{user: User, principal: AuthPrincipal}|null
-     */
     public function resolve(Request $request): ?array
     {
-        $token = $request->bearerToken();
-        if (! $token) {
+        $authHeader = $request->header('Authorization');
+
+        if (! $authHeader || ! str_starts_with($authHeader, 'Bearer ')) {
             return null;
         }
+
+        $token = substr($authHeader, 7);
 
         try {
-            $decoded = $this->verifier->decode($token);
-        } catch (\Throwable) {
+            $payload = JWT::decode(
+                $token,
+                new Key(config('jwt.secret'), 'HS256')
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[JwtUserResolver] JWT decode failed', [
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
 
-        if (isset($decoded->exp) && time() >= (int) $decoded->exp) {
+        if (! isset($payload->sub)) {
             return null;
         }
 
-        $userId = (int) ($decoded->sub ?? 0);
-        if ($userId <= 0) {
+        // ① DB の事実を確定
+        $provisioned = $this->provisioning->provisionFromJwt(
+            userId: (int) $payload->sub
+        );
+
+        // ② Laravel 用 User（互換レイヤー）
+        $eloquentUser = User::find($provisioned->userId);
+        if (! $eloquentUser) {
             return null;
         }
 
-        $user = User::find($userId);
-        if (! $user) {
-            return null;
-        }
-
-        $principal = AuthPrincipal::fromJwt(
-            userId: $user->id,
-            providerUid: (string) $decoded->sub,
-            email: $user->email,
-            emailVerified: true,
-            displayName: $user->name,
-            shopIds: is_array($decoded->shop_ids ?? null)
-                ? $decoded->shop_ids
-                : [],
+        // ③ Domain Principal（唯一の真実）
+        $principal = AuthPrincipal::fromProvisionedUser(
+            user: $provisioned,
+            provider: 'jwt',
+            providerUid: (string) $payload->sub,
         );
 
         return [
-            'user' => $user,
-            'principal' => $principal,
+            'user'      => $eloquentUser, // ✅ User モデル
+            'principal' => $principal,    // ✅ Domain
         ];
     }
 }

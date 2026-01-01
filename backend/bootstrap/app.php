@@ -14,7 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
-        App\Providers\AuthContextServiceProvider::class,
+        // App\Providers\AuthContextServiceProvider::class,
         App\Modules\Shipment\Infrastructure\Providers\ShipmentServiceProvider::class,
     ])
 

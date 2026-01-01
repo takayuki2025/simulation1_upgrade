@@ -8,9 +8,10 @@ final class ProvisionedUser
         public readonly int $userId,
         public readonly ?string $email,
         public readonly array $roles,
-        public readonly array $shopIds,     // ✅ 追加
+        public readonly array $shopIds,
         public readonly ?int $tenantId,
         public readonly bool $isFirstLogin,
+        public readonly bool $emailVerified,
     ) {
     }
 }

@@ -28,4 +28,6 @@ return [
             'model' => App\Models\User::class,
         ],
     ],
+
+    'jwt_secret' => env('JWT_SECRET'),
 ];

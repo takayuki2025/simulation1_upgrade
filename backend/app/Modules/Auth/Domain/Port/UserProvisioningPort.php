@@ -7,12 +7,19 @@ use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 interface UserProvisioningPort
 {
     /**
-     * Firebase 認証結果から User を確定する
+     * Firebase ID Token からの初期プロビジョニング
      */
     public function provisionFromFirebase(
         string $firebaseUid,
         ?string $email,
         bool $emailVerified,
         ?string $displayName,
+    ): ProvisionedUser;
+
+    /**
+     * ✅ JWT（＝すでに User が存在する前提）
+     */
+    public function provisionFromJwt(
+        int $userId
     ): ProvisionedUser;
 }

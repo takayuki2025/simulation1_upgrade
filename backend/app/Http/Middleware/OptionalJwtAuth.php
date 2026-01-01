@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
 
+
 final class OptionalJwtAuth
 {
     public function __construct(
@@ -17,25 +18,22 @@ final class OptionalJwtAuth
 
     public function handle(Request $request, Closure $next)
     {
+        // 初期化
         $request->attributes->set('auth_principal', null);
 
-        if (! $request->hasHeader('Authorization')) {
-            return $next($request);
-        }
-
-        try {
+        if ($request->hasHeader('Authorization')) {
             $resolved = $this->resolver->resolve($request);
 
             if ($resolved) {
-                $user = $resolved['user'];
-                $principal = $resolved['principal'];
+                Auth::setUser($resolved['user']);
+                $request->setUserResolver(fn () => $resolved['user']);
 
-                Auth::setUser($user);
-                $request->setUserResolver(fn () => $user);
-                $request->attributes->set('auth_principal', $principal);
+                // ★ ここが唯一の責務
+                $request->attributes->set(
+                    'auth_principal',
+                    $resolved['principal']
+                );
             }
-        } catch (Throwable) {
-            // optional: ignore
         }
 
         return $next($request);

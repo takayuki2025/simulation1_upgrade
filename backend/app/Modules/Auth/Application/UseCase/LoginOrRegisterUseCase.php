@@ -28,7 +28,7 @@ final class LoginOrRegisterUseCase
         );
 
         /* =========================================
-         * 2. 内部ユーザー確定
+         * 2. DB の事実を確定（唯一の真実）
          * ========================================= */
         $provisioned = $this->provisioning->provisionFromFirebase(
             firebaseUid: $firebaseUser['sub'],
@@ -38,15 +38,13 @@ final class LoginOrRegisterUseCase
         );
 
         /* =========================================
-         * 3. AuthPrincipal 生成
+         * 3. AuthPrincipal（DB → Domain）
          * ========================================= */
-        $principal = AuthPrincipal::fromFirebase(
-            firebaseUid: $firebaseUser['sub'],
-            userId: $provisioned->userId,
-            email: $firebaseUser['email'] ?? null,
-            emailVerified: (bool) ($firebaseUser['email_verified'] ?? false),
+        $principal = AuthPrincipal::fromProvisionedUser(
+            user: $provisioned,
+            provider: 'firebase',
+            providerUid: $firebaseUser['sub'],
             displayName: $firebaseUser['name'] ?? null,
-            shopIds: $provisioned->shopIds,
         );
 
         /* =========================================
@@ -60,21 +58,19 @@ final class LoginOrRegisterUseCase
         /* =========================================
          * 5. Output DTO
          * ========================================= */
-
         return new LoginOrRegisterOutput(
             token: $accessToken,
             user: [
                 'id'                => $provisioned->userId,
                 'email'             => $provisioned->email,
-                'email_verified_at' => $firebaseUser['email_verified']
+                'email_verified_at' => $provisioned->emailVerified
                     ? now()->toISOString()
                     : null,
             ],
             status: 'ok',
-            needsEmailVerification: ! ($firebaseUser['email_verified'] ?? false),
-            refreshToken: '',                 // ★ null → ''
+            needsEmailVerification: ! $provisioned->emailVerified,
+            refreshToken: '',
             isFirstLogin: $provisioned->isFirstLogin,
         );
-
     }
 }

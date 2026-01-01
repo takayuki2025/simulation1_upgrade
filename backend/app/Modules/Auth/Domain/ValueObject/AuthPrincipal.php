@@ -2,6 +2,8 @@
 
 namespace App\Modules\Auth\Domain\ValueObject;
 
+use App\Modules\Auth\Domain\Dto\ProvisionedUser;
+
 final class AuthPrincipal
 {
     private function __construct(
@@ -16,81 +18,35 @@ final class AuthPrincipal
     }
 
     /* =====================================================
-     * JWT
+     * ✅ 唯一の生成口
      * ===================================================== */
-    public static function fromJwt(
-        int $userId,
+    public static function fromProvisionedUser(
+        ProvisionedUser $user,
+        string $provider,
         string $providerUid,
-        ?string $email,
-        bool $emailVerified,
-        ?string $displayName,
-        array $shopIds = [],
+        ?string $displayName = null,
     ): self {
         return new self(
-            provider: 'jwt',
+            provider: $provider,
             providerUid: $providerUid,
-            userId: $userId,
-            email: $email,
-            emailVerified: $emailVerified,
+            userId: $user->userId,
+            email: $user->email,
+            emailVerified: $user->emailVerified,
             displayName: $displayName,
-            shopIds: $shopIds,
+            shopIds: $user->shopIds,
         );
     }
 
-    /* =====================================================
-     * Firebase
-     * ===================================================== */
-    public static function fromFirebase(
-        int $userId,
-        string $firebaseUid,
-        ?string $email,
-        bool $emailVerified,
-        ?string $displayName,
-        array $shopIds = [],
-    ): self {
-        return new self(
-            provider: 'firebase',
-            providerUid: $firebaseUid,
-            userId: $userId,
-            email: $email,
-            emailVerified: $emailVerified,
-            displayName: $displayName,
-            shopIds: $shopIds,
-        );
-    }
-
-    /* =====================================================
-     * Cognito
-     * ===================================================== */
-    public static function fromCognito(
-        int $userId,
-        string $sub,
-        ?string $email,
-        bool $emailVerified,
-        ?string $displayName,
-        array $shopIds = [],
-    ): self {
-        return new self(
-            provider: 'cognito',
-            providerUid: $sub,
-            userId: $userId,
-            email: $email,
-            emailVerified: $emailVerified,
-            displayName: $displayName,
-            shopIds: $shopIds,
-        );
-    }
-
-    /* =====================================================
-     * Helpers
-     * ===================================================== */
-    public function ownsShop(int $shopId): bool
-    {
-        return in_array($shopId, $this->shopIds, true);
-    }
-
+    /* =========================
+       Domain Rules
+    ========================= */
     public function isVerified(): bool
     {
         return $this->emailVerified;
+    }
+
+    public function ownsShop(int $shopId): bool
+    {
+        return in_array($shopId, $this->shopIds, true);
     }
 }

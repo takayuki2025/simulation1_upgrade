@@ -80,6 +80,7 @@ final class UserProvisioningService implements UserProvisioningPort
             return new ProvisionedUser(
                 userId: $user->id,
                 email: $user->email,
+                emailVerified: $user->email_verified_at !== null,
                 roles: $roles,
                 shopIds: $shopIds,
                 tenantId: $shopIds[0] ?? null,
@@ -87,4 +88,40 @@ final class UserProvisioningService implements UserProvisioningPort
             );
         });
     }
+
+    public function provisionFromJwt(int $userId): ProvisionedUser
+    {
+        return DB::transaction(function () use ($userId) {
+
+            $user = User::find($userId);
+
+            if (! $user) {
+                throw new \DomainException('User not found for JWT provisioning.');
+            }
+
+            $shopIds = DB::table('role_user')
+                ->where('user_id', $user->id)
+                ->pluck('shop_id')
+                ->filter()
+                ->values()
+                ->all();
+
+            $roles = DB::table('role_user')
+                ->where('user_id', $user->id)
+                ->pluck('role_id')
+                ->values()
+                ->all();
+
+            return new ProvisionedUser(
+                userId: $user->id,
+                email: $user->email,
+                roles: $roles,
+                shopIds: $shopIds,
+                tenantId: $shopIds[0] ?? null,
+                isFirstLogin: false,
+                emailVerified: (bool) $user->email_verified_at,
+            );
+        });
+    }
+
 }

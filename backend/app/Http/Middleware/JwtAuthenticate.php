@@ -6,6 +6,8 @@ use App\Modules\Auth\Application\Service\JwtUserResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Modules\Auth\Application\Service\AuthContext;
+
 
 final class JwtAuthenticate
 {
@@ -25,11 +27,11 @@ final class JwtAuthenticate
         $user = $resolved['user'];
         $principal = $resolved['principal'];
 
-        // Laravel 互換（既存コード保護）
+        // Laravel 互換
         Auth::setUser($user);
         $request->setUserResolver(fn () => $user);
 
-        // DDD 正
+        // ✅ Request に載せるだけ
         $request->attributes->set('auth_principal', $principal);
 
         return $next($request);

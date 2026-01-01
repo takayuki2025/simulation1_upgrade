@@ -12,14 +12,8 @@ final class AuthContext
     ) {
     }
 
-    public function principal(): AuthPrincipal
+    public function principal(): ?AuthPrincipal
     {
-        $principal = $this->request->attributes->get('auth_principal');
-
-        if (! $principal instanceof AuthPrincipal) {
-            throw new \DomainException('Unauthenticated');
-        }
-
-        return $principal;
+        return $this->request->attributes->get('auth_principal');
     }
 }
