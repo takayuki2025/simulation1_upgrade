@@ -16,6 +16,7 @@ final class ItemDraft extends Model
         'id',          // ★ id も fillable に入れる
         'user_id',
         'shop_id',
+        'seller_id',
         'name',
         'price',
         'brand',

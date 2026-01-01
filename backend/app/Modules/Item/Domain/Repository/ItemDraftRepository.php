@@ -12,4 +12,6 @@ interface ItemDraftRepository
     public function save(ItemDraft $draft): void;
 
     public function findById(string $draftId): ?ItemDraft;
+
+    public function delete(string $draftId): void;
 }

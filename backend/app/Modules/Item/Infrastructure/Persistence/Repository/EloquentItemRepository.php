@@ -60,45 +60,26 @@ final class EloquentItemRepository implements ItemRepository
     /**
      * Item を保存（create / update 両対応）
      */
-    public function save(Item $item): ItemId
-    {
-        $existingId = $item->getId();
+    public function save(Item $item): void
+{
+    $model = new EloquentItem();
 
-        if ($existingId instanceof ItemId) {
-            $model = EloquentItem::query()->find($existingId->getValue())
-                ?? new EloquentItem();
-        } else {
-            $model = new EloquentItem();
-        }
+    $model->item_origin = $item->getItemOrigin();
+    $model->shop_id = $item->getShopId();
+    $model->created_by_user_id = $item->getCreatedByUserId();
+    $model->name = $item->getName();
+    $model->price = $item->getPrice()->amount();
+    $model->explain = $item->getExplain();
+    $model->condition = $item->getCondition();
+    $model->category = json_encode($item->getCategory()->toArray(), JSON_UNESCAPED_UNICODE);
+    $model->item_image = $item->getItemImage()?->value();
+    $model->remain = $item->getRemain()->getValue();
 
-        // ==================================================
-        // ✅ Fact only（ここが重要）
-        // - shop_id / created_by_user_id が「事実」
-        // - item_origin は Domain には持たせない
-        // ==================================================
+    $model->save();
 
-        $model->item_origin = $item->getItemOrigin();
-
-        $model->shop_id = $item->getShopId();
-        $model->created_by_user_id = $item->getCreatedByUserId();
-
-        $model->name = $item->getName();
-        $model->price = $item->getPrice()->amount();
-        $model->explain = $item->getExplain();
-        $model->condition = $item->getCondition();
-
-        $model->category = json_encode(
-            $item->getCategory()->toArray(),
-            JSON_UNESCAPED_UNICODE
-        );
-
-        $model->item_image = $item->getItemImage()?->value();
-        $model->remain = $item->getRemain()->getValue();
-
-        $model->save();
-
-        return new ItemId($model->id);
-    }
+    // ★ ここが最重要
+    $item->setId(new ItemId($model->id));
+}
 
     /* ===== Query 系 ===== */
 

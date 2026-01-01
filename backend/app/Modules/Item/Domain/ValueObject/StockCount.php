@@ -2,7 +2,7 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
-class StockCount
+final class StockCount
 {
     public function __construct(
         private int $value
@@ -12,7 +12,19 @@ class StockCount
         }
     }
 
+    /**
+     * 既存互換（内部用途）
+     */
     public function getValue(): int
+    {
+        return $this->value;
+    }
+
+    /**
+     * Repository / Infrastructure 向け
+     * 👉 明示的に「DB に落とす int」
+     */
+    public function toInt(): int
     {
         return $this->value;
     }

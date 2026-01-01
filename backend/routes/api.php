@@ -126,13 +126,19 @@ Route::middleware('auth.jwt.optional')
 use App\Modules\Item\Presentation\Http\Controllers\CreateItemDraftController;
 use App\Modules\Item\Presentation\Http\Controllers\UploadItemDraftImageController;
 use App\Modules\Item\Presentation\Http\Controllers\PublishItemController;
+use App\Modules\Item\Presentation\Http\Controllers\DeleteItemDraftController;
 
 Route::middleware(['auth.jwt'])->group(function () {
     Route::post('/items/drafts', CreateItemDraftController::class);
     Route::post('/items/drafts/{draftId}/image', UploadItemDraftImageController::class);
     Route::post('/items/drafts/{draftId}/publish', PublishItemController::class);
 });
-
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::delete(
+        '/items/drafts/{draftId}',
+        DeleteItemDraftController::class
+    );
+});
 
 
 
@@ -247,7 +253,6 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 // === MyPage / User ===
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
-
 
 Route::middleware('auth.jwt')->prefix('mypage')->group(function () {
     Route::get('/profile', [MypageController::class, 'profile']);

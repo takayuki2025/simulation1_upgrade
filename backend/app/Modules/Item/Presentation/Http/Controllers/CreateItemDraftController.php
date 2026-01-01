@@ -7,11 +7,13 @@ use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Command\CreateItemDraftUseCase;
 use App\Modules\Item\Application\Dto\Item\CreateItemDraftInput;
+use App\Modules\Auth\Application\Service\AuthContext;
 
 final class CreateItemDraftController extends Controller
 {
     public function __construct(
         private CreateItemDraftUseCase $useCase,
+        private AuthContext $authContext,
     ) {
     }
 
@@ -32,10 +34,9 @@ final class CreateItemDraftController extends Controller
             'category'       => ['nullable', 'array'],
         ]);
 
-        /** ★ A フェーズの正解：auth()->user() */
-        $user = auth()->user();
-        if (! $user) {
-            abort(401, 'Unauthenticated');
+        $principal = $this->authContext->principal();
+        if (! $principal) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
         $input = new CreateItemDraftInput(
@@ -49,10 +50,7 @@ final class CreateItemDraftController extends Controller
             category: $validated['category'] ?? null,
         );
 
-        $output = $this->useCase->execute(
-            $input,
-            $user->id   // ★ userId だけ渡す
-        );
+        $output = $this->useCase->execute($input, $principal);
 
         return response()->json([
             'draft_id' => $output->draftId,

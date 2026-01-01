@@ -2,14 +2,12 @@
 
 namespace App\Modules\Item\Domain\ValueObject;
 
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
-use Illuminate\Support\Facades\DB;
-
 final class SellerId
 {
     private function __construct(
         private SellerType $type,
-        private int $id,
+        private ?int $id,
+        private string $raw, // SoT
     ) {
     }
 
@@ -17,12 +15,40 @@ final class SellerId
 
     public static function user(int $userId): self
     {
-        return new self(SellerType::INDIVIDUAL, $userId);
+        return new self(
+            SellerType::INDIVIDUAL,
+            $userId,
+            'individual:' . $userId
+        );
     }
 
-    public static function shop(int $shopId): self
+    public static function shop(?int $shopId): self
     {
-        return new self(SellerType::SHOP, $shopId);
+        return $shopId === null
+            ? new self(SellerType::SHOP, null, 'shop:managed')
+            : new self(SellerType::SHOP, $shopId, 'shop:' . $shopId);
+    }
+
+    public static function fromRaw(string $raw): self
+    {
+        $raw = trim($raw);
+
+        if (str_starts_with($raw, 'individual:')) {
+            return new self(
+                SellerType::INDIVIDUAL,
+                (int) substr($raw, 11),
+                $raw
+            );
+        }
+
+        if (str_starts_with($raw, 'shop:')) {
+            $tail = substr($raw, 5);
+            return $tail === 'managed'
+                ? new self(SellerType::SHOP, null, $raw)
+                : new self(SellerType::SHOP, (int) $tail, $raw);
+        }
+
+        throw new \DomainException('Invalid seller_id');
     }
 
     /* ========= Getter ========= */
@@ -32,46 +58,24 @@ final class SellerId
         return $this->type;
     }
 
-    public function id(): int
+    public function id(): ?int
     {
         return $this->id;
     }
 
-    public function isIndividual(): bool
+    public function raw(): string
     {
-        return $this->type === SellerType::INDIVIDUAL;
-    }
-
-    public function isShop(): bool
-    {
-        return $this->type === SellerType::SHOP;
-    }
-
-    public function belongsTo(AuthPrincipal $principal): bool
-    {
-        return match ($this->type) {
-            SellerType::INDIVIDUAL =>
-                $principal->userId === $this->id,
-
-            SellerType::SHOP =>
-                in_array($this->id, $principal->shopIds ?? [], true)
-                || $this->isOwnedFreeShopBy($principal),
-        };
-    }
-
-    private function isOwnedFreeShopBy(AuthPrincipal $principal): bool
-    {
-        return DB::table('shops')
-            ->where('id', $this->id)
-            ->where('owner_user_id', $principal->userId)
-            ->exists();
+        return $this->raw;
     }
 
     /**
-     * デバッグ・ログ用途のみ
+     * ID 必須な文脈（Publish 等）
      */
-    public function asString(): string
+    public function requireId(): int
     {
-        return sprintf('%s:%d', $this->type->value, $this->id);
+        if ($this->id === null) {
+            throw new \DomainException('SellerId is not resolved');
+        }
+        return $this->id;
     }
 }

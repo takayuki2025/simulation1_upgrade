@@ -17,28 +17,20 @@ final class PublishItemController extends Controller
     ) {
     }
 
-    public function __invoke(
-        Request $request,
-        string $draftId,
-    ): JsonResponse {
-        // ✅ AuthContext から principal を取得
+    public function __invoke(Request $request, string $draftId): JsonResponse
+    {
         $principal = $this->authContext->principal();
-
         if (! $principal) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // DTO は Controller の責務
+        // ★ Publish では shop_id 必須（SHOP 出品の場合）
         $input = new PublishItemInput(
             draftId: $draftId,
+            shopId: $request->input('shop_id'), // ← ここ
         );
 
-        // ✅ UseCase に明示的に渡す
-        $this->useCase->execute(
-            $input,
-            $principal,
-            null, // tenantId（未使用なら null）
-        );
+        $this->useCase->execute($input, $principal, null);
 
         return response()->json(['status' => 'ok']);
     }

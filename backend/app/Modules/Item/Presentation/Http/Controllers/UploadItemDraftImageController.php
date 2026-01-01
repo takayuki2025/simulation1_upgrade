@@ -3,11 +3,14 @@
 namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Command\UploadItemDraftImageUseCase;
-use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 use App\Modules\Auth\Application\Service\AuthContext;
 
-final class UploadItemDraftImageController
+final class UploadItemDraftImageController extends Controller
 {
     public function __construct(
         private UploadItemDraftImageUseCase $useCase,
@@ -15,25 +18,41 @@ final class UploadItemDraftImageController
     ) {
     }
 
-    public function __invoke(Request $request, string $draftId)
-    {
-        $request->validate([
-            'image' => ['required', 'image', 'max:5120'],
-        ]);
-
+    public function __invoke(
+        Request $request,
+        string $draftId,
+    ): JsonResponse {
         $principal = $this->authContext->principal();
 
-        $path = ItemImagePath::fromUploadedFile(
-            $request->file('image')
+        if (! $principal) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // ✅ 1. file validation
+        $request->validate([
+            'image' => ['required', 'image', 'max:5120'], // 5MB
+        ]);
+
+        // ✅ 2. file 保存（Presentation の責務）
+        $file = $request->file('image');
+
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs(
+            'item_drafts',
+            $filename,
+            'public'
         );
 
-        // ★ handle() を呼ぶ
-        $this->useCase->handle(
+        // ✅ 3. UseCase には「保存済み path」だけ渡す
+        $this->useCase->execute(
             $draftId,
+            $principal,
             $path,
-            $principal
         );
 
-        return response()->json(['status' => 'ok'], 201);
+        return response()->json([
+            'status' => 'ok',
+            'path'   => $path,
+        ]);
     }
 }

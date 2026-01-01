@@ -43,7 +43,7 @@ interface ItemRepository
     ): Items;
 
 
-    public function save(Item $item): ItemId;
+    public function save(Item $item): void;
 
     public function updateItemImage(
         ItemId $itemId,

@@ -11,7 +11,8 @@ use App\Modules\Item\Domain\ValueObject\{
     ItemStatus,
     CategoryList,
     ItemImagePath,
-    StockCount
+    StockCount,
+    ItemOrigin
 };
 
 final class ItemDraft
@@ -21,6 +22,7 @@ final class ItemDraft
     private function __construct(
         private ItemDraftId $id,
         private SellerId $sellerId,
+        private ?int $shopId,              // ✅ 追加：確定した事実
         private ItemName $name,
         private Money $price,
         private ?BrandName $brandRaw,
@@ -40,6 +42,7 @@ final class ItemDraft
     public static function create(
         ItemDraftId $id,
         SellerId $sellerId,
+        ?int $shopId,
         ItemName $name,
         Money $price,
         ?BrandName $brandRaw,
@@ -50,6 +53,7 @@ final class ItemDraft
         return new self(
             id: $id,
             sellerId: $sellerId,
+            shopId: $shopId,
             name: $name,
             price: $price,
             brandRaw: $brandRaw,
@@ -68,6 +72,7 @@ final class ItemDraft
     public static function reconstruct(
         ItemDraftId $id,
         SellerId $sellerId,
+        ?int $shopId,
         ItemName $name,
         Money $price,
         ?BrandName $brandRaw,
@@ -81,6 +86,7 @@ final class ItemDraft
         return new self(
             id: $id,
             sellerId: $sellerId,
+            shopId: $shopId,
             name: $name,
             price: $price,
             brandRaw: $brandRaw,
@@ -92,6 +98,7 @@ final class ItemDraft
             itemImage: $itemImage,
         );
     }
+
 
     /* =========================
        Getter
@@ -105,6 +112,16 @@ final class ItemDraft
     {
         return $this->sellerId;
     }
+    public function shopId(): ?int
+    {
+        return $this->shopId;
+    }
+
+    public function itemOrigin(): ItemOrigin
+    {
+        return ItemOrigin::fromSellerId($this->sellerId);
+    }
+
     public function name(): ItemName
     {
         return $this->name;

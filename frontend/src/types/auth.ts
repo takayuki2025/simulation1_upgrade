@@ -20,6 +20,11 @@ export interface AuthUser {
   /** グローバルロール */
   roles: string[];
 
-  /** 店舗ロール（UI・権限制御の主役） */
-  shop_roles: ShopRole[];
+  shop_roles: {
+    shop_id: number;
+  }[];
+
+  primary_shop?: {
+    shop_id: number;
+  } | null;
 }

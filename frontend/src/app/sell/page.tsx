@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import styles from "./W-Item-Sell.module.css";
 
+/* =========================
+   Types
+========================= */
 type SellForm = {
   name: string;
   price: string;
@@ -16,6 +19,9 @@ type SellForm = {
 
 type ItemOrigin = "USER_PERSONAL" | "SHOP_MANAGED";
 
+/* =========================
+   Constants
+========================= */
 const CATEGORY_LIST = [
   "ファッション",
   "家電",
@@ -31,12 +37,18 @@ const CATEGORY_LIST = [
   "アクセサリー",
 ];
 
+/* =========================
+   Page
+========================= */
 export default function ItemSellPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, apiClient, user } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  /* =========================
+     State
+  ========================= */
   const [form, setForm] = useState<SellForm>({
     name: "",
     price: "",
@@ -47,18 +59,44 @@ export default function ItemSellPage() {
 
   const [itemOrigin, setItemOrigin] = useState<ItemOrigin>("USER_PERSONAL");
 
+  const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+
   const [imageFile, setImageFile] = useState<File | null>(null);
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [error, setError] = useState("");
 
-  if (!isLoading && !isAuthenticated) {
-    router.replace("/login");
-    return null;
-  }
+  /* =========================
+     Auth Guard
+  ========================= */
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
-  if (!user) return null;
+  /* =========================
+     SHOP_MANAGED 初期化
+     SoT: primary_shop
+  ========================= */
+  useEffect(() => {
+    if (!user) return;
 
+    if (itemOrigin === "SHOP_MANAGED") {
+      setSelectedShopId(user.primary_shop?.shop_id ?? null);
+    } else {
+      setSelectedShopId(null);
+    }
+  }, [itemOrigin, user]);
+
+  if (isLoading || !user) return null;
+
+  /* =========================
+     Image Select
+  ========================= */
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -67,6 +105,9 @@ export default function ItemSellPage() {
     setPreviewUrl(URL.createObjectURL(file));
   };
 
+  /* =========================
+     Category Toggle
+  ========================= */
   const toggleCategory = (category: string) => {
     setForm((prev) => ({
       ...prev,
@@ -76,6 +117,9 @@ export default function ItemSellPage() {
     }));
   };
 
+  /* =========================
+     Submit（DDD 正式フロー）
+  ========================= */
   const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,16 +133,23 @@ export default function ItemSellPage() {
       return;
     }
 
+    if (itemOrigin === "SHOP_MANAGED" && !selectedShopId) {
+      setError("出品するショップを選択してください");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
     try {
-      // 1. Draft
+      /* =========================
+         1. Draft 作成
+      ========================= */
       const draftRes = await apiClient.post("/items/drafts", {
         seller_id:
           itemOrigin === "USER_PERSONAL"
             ? `individual:${user.id}`
-            : `shop:managed`,
+            : "shop:managed",
         name: form.name,
         price_amount: Number(form.price),
         price_currency: "JPY",
@@ -109,24 +160,22 @@ export default function ItemSellPage() {
 
       const draftId: string = draftRes.data.draft_id;
 
-      // 2. Image
+      /* =========================
+         2. Image Upload
+      ========================= */
       const imageData = new FormData();
       imageData.append("image", imageFile);
 
       await apiClient.post(`/items/drafts/${draftId}/image`, imageData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      console.log("DEBUG publish payload", {
-        item_origin: itemOrigin,
-        shop_id: itemOrigin === "SHOP_MANAGED" ? (user as any).shop_id : null,
-        user,
-      });
 
-      // 3. Publish
+      /* =========================
+         3. Publish
+         ★ shop_id だけ送るのが正解
+      ========================= */
       await apiClient.post(`/items/drafts/${draftId}/publish`, {
-        item_origin: itemOrigin,
-        // shop_id: itemOrigin === "SHOP_MANAGED" ? (user.shop_id ?? null) : null,
-        shop_id: itemOrigin === "SHOP_MANAGED" ? 2 : null,
+        shop_id: itemOrigin === "SHOP_MANAGED" ? selectedShopId : null,
       });
 
       router.push("/");
@@ -137,6 +186,9 @@ export default function ItemSellPage() {
     }
   };
 
+  /* =========================
+     UI（初期デザイン完全保持）
+  ========================= */
   return (
     <div className={styles.wrapper}>
       <h2 className={`${styles.title} ${styles.centerTitle}`}>商品の出品</h2>
@@ -166,9 +218,26 @@ export default function ItemSellPage() {
           </div>
         </div>
 
-        {/* =========================
-            画像
-        ========================= */}
+        {/* ショップ選択 */}
+        {itemOrigin === "SHOP_MANAGED" && (
+          <div className={styles.formGroup}>
+            <label>出品するショップ</label>
+            <select
+              value={selectedShopId ?? ""}
+              onChange={(e) => setSelectedShopId(Number(e.target.value))}
+              required
+            >
+              <option value="">選択してください</option>
+              {user.shop_roles.map((r) => (
+                <option key={r.shop_id} value={r.shop_id}>
+                  ショップID #{r.shop_id}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* 画像 */}
         <div className={styles.imageBoxWide}>
           <div className={styles.imageInner}>
             {previewUrl && <img src={previewUrl} className={styles.preview} />}
@@ -191,9 +260,7 @@ export default function ItemSellPage() {
           />
         </div>
 
-        {/* =========================
-            カテゴリー
-        ========================= */}
+        {/* カテゴリー */}
         <div className={styles.formGroup}>
           <label>カテゴリー（複数選択）</label>
           <div className={styles.categoryButtons}>
@@ -216,17 +283,23 @@ export default function ItemSellPage() {
 
         {/* brand / condition / color */}
         <div className={styles.formGroup}>
-          <label>ブランド・状態・色（まとめて入力）</label>
+          <label>
+            ブランド・状態・色（まとめて入力可能でどのような複雑なデーターでも処理できる開発をしています。）
+          </label>
           <input
             type="text"
-            placeholder="例：Apple ほぼ新品 黒"
+            placeholder="例：Apple ほぼ新品 黒（スペース、コンマなど有無でも可能）"
             value={form.attributes}
             onChange={(e) =>
-              setForm((v) => ({ ...v, attributes: e.target.value }))
+              setForm((v) => ({
+                ...v,
+                attributes: e.target.value,
+              }))
             }
           />
           <small className={styles.hint}>
             ※ 入力内容は自動で解析・正規化されます
+            ※企業判断や成長企画や実績に未来再利用可能な形で蓄積するエンジン開発のプロトタイプです。
           </small>
         </div>
 
@@ -236,7 +309,12 @@ export default function ItemSellPage() {
           <input
             type="text"
             value={form.name}
-            onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))}
+            onChange={(e) =>
+              setForm((v) => ({
+                ...v,
+                name: e.target.value,
+              }))
+            }
             required
           />
         </div>
@@ -248,7 +326,10 @@ export default function ItemSellPage() {
             rows={6}
             value={form.explain}
             onChange={(e) =>
-              setForm((v) => ({ ...v, explain: e.target.value }))
+              setForm((v) => ({
+                ...v,
+                explain: e.target.value,
+              }))
             }
           />
         </div>
@@ -260,7 +341,12 @@ export default function ItemSellPage() {
             type="number"
             placeholder="¥"
             value={form.price}
-            onChange={(e) => setForm((v) => ({ ...v, price: e.target.value }))}
+            onChange={(e) =>
+              setForm((v) => ({
+                ...v,
+                price: e.target.value,
+              }))
+            }
             required
           />
         </div>

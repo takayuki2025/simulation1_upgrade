@@ -11,8 +11,10 @@ use App\Modules\Item\Domain\ValueObject\{
     Money,
     BrandName,
     ItemStatus,
-    SellerId
+    SellerId,
+    SellerType
 };
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\Auth\Application\Service\AssignSellerRoleService;
 
 final class CreateItemDraftUseCase
@@ -25,31 +27,52 @@ final class CreateItemDraftUseCase
 
     public function execute(
         CreateItemDraftInput $input,
-        int $userId,
+        AuthPrincipal $principal,
     ): CreateItemDraftOutput {
 
-        /**
-         * Draft フェーズでは出品主体を確定しない
-         * → 常に「操作ユーザー」を seller として扱う
-         */
-        $sellerId = SellerId::user($userId);
+        // ✅ 入力 seller_id を Domain 化（SoT）
+        $sellerId = SellerId::fromRaw($input->sellerId);
 
-        /**
-         * 初回出品時に seller ロール付与（個人）
-         */
-        $this->assignSellerRoleService
-            ->assignIndividualIfNotExists($userId);
+        /* =========================================
+         * SHOP 出品の場合のみ shop_id を確定
+         * ========================================= */
+        $shopId = null;
 
+        if ($sellerId->type() === SellerType::SHOP) {
+
+            // shop:2 の場合
+            if ($sellerId->id() !== null) {
+                $shopId = $sellerId->id();
+            }
+            // shop:managed の場合
+            else {
+                $shopId = $principal->shopIds[0] ?? null;
+            }
+
+            if (! $shopId) {
+                throw new \DomainException('shop_id is required');
+            }
+        }
+
+        /* =========================================
+         * 個人出品のみ seller ロール付与
+         * ========================================= */
+        if ($sellerId->type() === SellerType::INDIVIDUAL) {
+            $this->assignSellerRoleService
+                ->assignIndividualIfNotExists($principal->userId);
+        }
+
+        /* =========================================
+         * Draft 作成
+         * ========================================= */
         $draftId = $this->draftRepository->nextIdentity();
 
         $draft = ItemDraft::create(
             id: $draftId,
             sellerId: $sellerId,
+            shopId: $shopId,
             name: new ItemName($input->name),
-            price: new Money(
-                $input->priceAmount,
-                $input->priceCurrency
-            ),
+            price: new Money($input->priceAmount, $input->priceCurrency),
             brandRaw: $input->brandRaw
                 ? new BrandName($input->brandRaw)
                 : null,

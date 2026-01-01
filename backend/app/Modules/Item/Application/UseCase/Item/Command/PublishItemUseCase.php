@@ -3,26 +3,25 @@
 namespace App\Modules\Item\Application\UseCase\Item\Command;
 
 use App\Modules\Item\Application\Dto\Item\PublishItemInput;
-use App\Modules\Item\Application\Dto\Item\PublishItemOutput;
-use App\Modules\Item\Domain\Entity\Item;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\Item\Domain\Repository\ItemDraftRepository;
 use App\Modules\Item\Domain\Repository\ItemRepository;
-use App\Modules\Item\Domain\Service\AtlasKernelService;
-use App\Modules\Item\Domain\ValueObject\ItemImagePath;
-use App\Modules\Item\Domain\ValueObject\ItemStatus;
+use App\Modules\Item\Domain\Entity\Item;
+use App\Modules\Item\Domain\Service\SellerAuthorizationService;
 use App\Modules\Item\Domain\ValueObject\StockCount;
-use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use App\Modules\Item\Domain\ValueObject\SellerType;
+use App\Modules\Item\Domain\ValueObject\ItemOrigin;
+use App\Modules\Item\Domain\Event\ItemPublished;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-
+use DomainException;
 
 final class PublishItemUseCase
 {
     public function __construct(
-        private ItemDraftRepository $draftRepo,
-        private ItemRepository $itemRepo,
-        private AtlasKernelService $atlasKernel,
+        private ItemDraftRepository $draftRepository,
+        private ItemRepository $itemRepository,
+        private SellerAuthorizationService $sellerAuth,
     ) {
     }
 
@@ -30,89 +29,86 @@ final class PublishItemUseCase
         PublishItemInput $input,
         AuthPrincipal $principal,
         ?int $tenantId,
-    ): PublishItemOutput {
+    ): void {
+        DB::transaction(function () use ($input, $principal, $tenantId) {
 
-        return DB::transaction(function () use ($input, $principal, $tenantId) {
+            $draft = $this->draftRepository->findById($input->draftId);
 
-            /* =========================================
-             * 1. Draft 取得
-             * ========================================= */
-            $draft = $this->draftRepo->findById($input->draftId);
-            if (! $draft) {
-                throw new \DomainException('Draft not found.');
+            if (! $draft || ! $draft->isPublishableV1()) {
+                throw new DomainException('Draft is not publishable');
             }
 
-            /* =========================================
-             * 2. Publish 可能チェック
-             * ========================================= */
-            if (! $draft->isPublishableV1()) {
-                throw new \DomainException('Draft is not publishable.');
+            // 出品主体（Draft の SoT）
+            $sellerId = $draft->sellerId();
+
+            // 権限チェック
+            if (! $this->sellerAuth->canOperate($sellerId, $principal)) {
+                throw new DomainException('Not allowed to publish this item');
             }
 
-            /* =========================================
-             * 3. 出品主体の確定（★ここが唯一の真実）
-             * ========================================= */
-            $sellerId = $draft->sellerId(); // SellerId ValueObject
+            // SHOP 出品の shop_id 確定
+            if ($sellerId->type() === SellerType::SHOP) {
+                if ($sellerId->id() === null && $input->shopId === null) {
+                    throw new DomainException('shop_id is required to publish');
+                }
 
-            $itemOrigin = $sellerId->type()->value; // USER_PERSONAL | SHOP_MANAGED
+                if (
+                    $sellerId->id() !== null &&
+                    $input->shopId !== null &&
+                    $sellerId->id() !== $input->shopId
+                ) {
+                    throw new DomainException('shop_id mismatch');
+                }
+            }
 
-            $shopId = $sellerId->isShop()
-                ? $sellerId->id()
-                : null;
-
-            /* =========================================
-             * 4. Draft → Item（INSERT）
-             * ========================================= */
-            $item = Item::reconstitute(
-                id: null,
-                itemOrigin: $itemOrigin,
-                shopId: $shopId,
-                createdByUserId: $principal->userId,
+            // Item 生成（Fact only）
+            $item = Item::createNew(
+                itemOrigin: $sellerId->type() === SellerType::SHOP
+                    ? ItemOrigin::SHOP_MANAGED->value
+                    : ItemOrigin::USER_PERSONAL->value,
+                shopId: $sellerId->type() === SellerType::SHOP
+                    ? ($sellerId->id() ?? $input->shopId)
+                    : null,
+                createdByUserId: $sellerId->type() === SellerType::SHOP
+                    ? null
+                    : $principal->userId,
                 name: $draft->name()->value(),
                 price: $draft->price(),
                 explain: $draft->explain(),
                 condition: $draft->condition(),
                 category: $draft->category(),
-                itemImage: null,
-                remain: $draft->remain(),
+                itemImage: $draft->itemImage(),
+                remain: new StockCount(1),
             );
 
-            $itemId = $this->itemRepo->save($item);
+            // 永続化（★ Entity に ID が注入される）
+            $this->itemRepository->save($item);
 
-            /* =========================================
-             * 5. 画像移動（UPDATE）
-             * ========================================= */
-            if ($draft->itemImage()) {
-                $this->itemRepo->updateItemImage(
-                    $itemId,
-                    ItemImagePath::fromRaw(
-                        $draft->itemImage()->publishToPublic()
-                    )
-                );
-            }
+            // ★ Entity から ID を読む（唯一の正解）
+            $itemId = $item->id();
 
-            /* =========================================
-             * 6. AtlasKernel（1 回だけ）
-             * ========================================= */
-            $this->atlasKernel->analyzeItem(
-                itemId: $itemId->getValue(),
-                rawText: $draft->brand()?->raw() ?? '',
-                tenantId: $tenantId,
+            // rawText を確定（将来再解析できる完全 SoT）
+
+            $rawText = trim(implode(' ', array_filter([
+                $draft->name()->value(),
+                $draft->explain(),
+                method_exists($draft, 'brand')
+                    ? $draft->brand()?->value()
+                    : null,
+                $draft->condition(),
+            ])));
+
+
+            Event::dispatch(
+                new ItemPublished(
+                    itemId: $itemId,
+                    rawText: $rawText,
+                    tenantId: $tenantId,
+                )
             );
 
-            /* =========================================
-             * 7. Draft → Published
-             * ========================================= */
             $draft->markPublished();
-            $this->draftRepo->save($draft);
-
-            /* =========================================
-             * 8. 完了
-             * ========================================= */
-            return new PublishItemOutput(
-                itemId: $itemId->getValue(),
-                status: ItemStatus::PUBLISHED->value
-            );
+            $this->draftRepository->save($draft);
         });
     }
 }

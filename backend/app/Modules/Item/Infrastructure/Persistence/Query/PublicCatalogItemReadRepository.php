@@ -24,7 +24,10 @@ final class PublicCatalogItemReadRepository
             })
             ->select([
                 'items.*',
+                'ie.id as entity_snapshot_id',
                 'ie.brand_entity_id as brand_primary',
+                'ie.condition_entity_id',
+                'ie.color_entity_id',
             ])
             ->orderByDesc('items.id')
             ->limit($limit)

@@ -28,9 +28,7 @@ final class Item
     ) {
     }
 
-    /* =================================================
-       ✅ 新規生成（Fact + Rule を保証）
-    ================================================= */
+    /* ========= 新規生成 ========= */
     public static function createNew(
         string $itemOrigin,
         ?int $shopId,
@@ -43,23 +41,12 @@ final class Item
         ?ItemImagePath $itemImage,
         StockCount $remain,
     ): self {
-        // 🔒 Rule enforcement
-        if ($itemOrigin === 'USER_PERSONAL') {
-            if ($createdByUserId === null) {
-                throw new DomainException('USER_PERSONAL requires createdByUserId.');
-            }
-            if ($shopId !== null) {
-                throw new DomainException('USER_PERSONAL must not have shopId.');
-            }
+        if ($itemOrigin === 'USER_PERSONAL' && $createdByUserId === null) {
+            throw new DomainException('USER_PERSONAL requires createdByUserId');
         }
 
-        if ($itemOrigin === 'SHOP_MANAGED') {
-            if ($shopId === null) {
-                throw new DomainException('SHOP_MANAGED requires shopId.');
-            }
-            if ($createdByUserId !== null) {
-                throw new DomainException('SHOP_MANAGED must not have createdByUserId.');
-            }
+        if ($itemOrigin === 'SHOP_MANAGED' && $shopId === null) {
+            throw new DomainException('SHOP_MANAGED requires shopId');
         }
 
         return new self(
@@ -77,9 +64,7 @@ final class Item
         );
     }
 
-    /* =================================================
-       Repository 用（復元）
-    ================================================= */
+    /* ========= Repository 用 ========= */
     public static function reconstitute(
         ?ItemId $id,
         string $itemOrigin,
@@ -108,14 +93,32 @@ final class Item
         );
     }
 
+    /* ========= ID 管理 ========= */
 
-    /* =========================
-       Getters
-    ========================= */
+    public function setId(ItemId $id): void
+    {
+        if ($this->id !== null) {
+            throw new DomainException('Item ID already set');
+        }
+        $this->id = $id;
+    }
+
+    public function id(): int
+    {
+        if ($this->id === null) {
+            throw new DomainException('Item ID is not initialized');
+        }
+        return $this->id->getValue();
+    }
 
     public function getId(): ?ItemId
     {
         return $this->id;
+    }
+
+    public function origin(): ItemOrigin
+    {
+        return $this->origin;
     }
 
     public function getShopId(): ?int
