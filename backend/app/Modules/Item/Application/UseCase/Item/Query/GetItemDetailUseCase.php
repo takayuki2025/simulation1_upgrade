@@ -24,7 +24,7 @@ final class GetItemDetailUseCase
         ?int $viewerUserId
     ): ItemDetailOutputDto {
 
-        // 🔍 ReadModel（display_brand / condition / color 含む）
+        // 🔍 ReadModel
         $itemRow = $this->itemReadRepository
             ->findWithDisplayEntities($itemId);
 
@@ -35,11 +35,12 @@ final class GetItemDetailUseCase
         // 💬 コメント
         $comments = $this->listComments->execute($itemId);
 
-        // ❤️ お気に入り
-        $isFavorited = $viewerUserId
-            ? $this->isFavorited->execute($itemId, $viewerUserId)
+        // ❤️ お気に入り（★ここが重要）
+        $isFavorited = $viewerUserId !== null
+            ? $this->isFavorited->execute($viewerUserId, $itemId)
             : false;
 
+        // ❤️ お気に入り数
         $favoritesCount = $this->countFavorites->execute($itemId);
 
         return new ItemDetailOutputDto(

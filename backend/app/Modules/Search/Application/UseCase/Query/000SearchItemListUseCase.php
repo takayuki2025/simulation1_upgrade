@@ -1,14 +1,10 @@
 <?php
 
-namespace App\Modules\Item\Application\UseCase\Item\Query;
+namespace App\Modules\Search\Application\UseCase\Query;
 
-use App\Modules\Item\Domain\Repository\ItemRepository;
-use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
-use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
-use App\Modules\Item\Application\Dto\Item\ListItemsOutputDto;
-use App\Modules\Item\Application\Assembler\PublicItemAssembler;
-use App\Modules\Reaction\Domain\ValueObject\ReactorId;
-use App\Modules\Reaction\Domain\ValueObject\FavoriteTargetId;
+use App\Modules\Search\Domain\Repository\ItemSearchRepository;
+use App\Modules\Search\Domain\Collection\SearchItems;
+
 
 final class SearchItemListUseCase
 {
@@ -24,7 +20,7 @@ final class SearchItemListUseCase
             limit: $input->limit,
             page: $input->page,
             keyword: $input->keyword,
-            excludeShopIds: $input->viewerShopIds,
+            excludeShopIds: $input->viewerShopIds, // ★ ここ
         );
 
         $items = collect($paginator->items())->map(function ($model) use ($input) {

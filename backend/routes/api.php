@@ -82,9 +82,17 @@ Route::prefix('items')->group(function () {
     //  Route::get('/search', ItemSearchController::class);  // 検索
 });
 
-Route::prefix('search')->group(function () {
-    Route::get('/items', PublicItemSearchController::class);
+
+Route::middleware(['auth.jwt.optional'])->group(function () {
+
+    // トップページ（一覧）
+    // Route::get('/items/public', \App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController::class);
+
+    // 検索
+    Route::get('/search/items', \App\Modules\Search\Presentation\Http\Controllers\PublicItemSearchController::class);
+
 });
+
 
 
 

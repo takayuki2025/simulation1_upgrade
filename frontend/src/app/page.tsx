@@ -2,6 +2,8 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
+import { mutate } from "swr";
+import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 import { useItemListSWR } from "@/services/useItemListSWR";
@@ -19,11 +21,7 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    isAuthenticated,
-    isLoading: isAuthLoading,
-    apiClient,
-  } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
 
   /* =========================
      🔖 タブ状態
@@ -33,6 +31,14 @@ export default function Home() {
     [searchParams],
   );
 
+  /* =========================
+   ★ FIX：タブ切替時に強制再取得
+========================= */
+  useEffect(() => {
+    if (currentTab === "mylist") {
+      favoriteResult.refetchFavorites();
+    }
+  }, [currentTab]);
   /* =========================
      🔍 検索状態
   ========================= */
@@ -53,42 +59,23 @@ export default function Home() {
   /* =========================
      ❤️ 楽観更新：いいね切替
   ========================= */
-  const toggleFavorite = async (
-    item: PublicItem,
-    isFavorited: boolean,
-  ) => {
+  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
     if (!apiClient) return;
 
-    // ① 楽観更新（即 UI 反映）
-    favoriteResult.mutateFavorites(
-      (current) => {
-        if (!current) return current;
-
-        return {
-          ...current,
-          items: isFavorited
-            ? current.items.filter((i) => i.id !== item.id)
-            : [...current.items, { ...item, displayType: "FAVORITE" }],
-        };
-      },
-      false,
-    );
-
     try {
-      // ② API
       if (isFavorited) {
-        await apiClient.delete(`/items/${item.id}/favorite`);
+        await apiClient.delete(`/reactions/items/${item.id}/favorite`);
+        mutate("/items/favorite");
+
       } else {
-        await apiClient.post(`/items/${item.id}/favorite`);
+        await apiClient.post(`/reactions/items/${item.id}/favorite`);
+        mutate("/items/favorite");
       }
 
-      // ③ 正式同期
-      favoriteResult.mutateFavorites();
-      listResult.mutate();
+      /** ★ 成功したら必ず再取得 */
+      await favoriteResult.refetchFavorites();
     } catch (e) {
-      // ④ ロールバック
-      favoriteResult.mutateFavorites();
-      throw e;
+      console.error(e);
     }
   };
 
@@ -112,7 +99,11 @@ export default function Home() {
       conditionName: item.conditionName ?? null,
       colorName: item.colorName ?? null,
       publishedAt: item.publishedAt ?? null,
+
       displayType: item.displayType ?? null,
+
+      // ❤️ ここ
+      isFavorited: item.isFavorited ?? false,
     }));
   }, [
     currentTab,
@@ -173,7 +164,7 @@ export default function Home() {
           <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => {
-                const isFavorited = item.displayType === "FAVORITE";
+                const isFavorited = item.isFavorited === true;
 
                 return (
                   <div key={item.id} className={styles.items_select_all}>
@@ -206,10 +197,7 @@ export default function Home() {
                         )}
 
                         <img
-                          src={getImageUrl(
-                            item.itemImagePath,
-                            IMAGE_TYPE.ITEM,
-                          )}
+                          src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
                           alt={item.name}
                           className={styles.itemImage}
                           onError={onImageError}

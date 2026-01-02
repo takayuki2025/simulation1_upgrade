@@ -7,6 +7,7 @@ use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
 use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
 use App\Modules\Item\Infrastructure\Persistence\Query\ItemReadRepository;
 use App\Modules\Item\Presentation\Http\Resources\ItemReadResource;
+use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,6 +33,13 @@ final class ItemReadController extends Controller
             itemId: (int) $itemId,
             viewerUserId: $viewerUserId
         );
+
+        \Log::info('[🔥ItemDetail]', [
+            'item_id'          => (int) $itemId,
+            'viewer_user_id'   => $viewerUserId,
+            'is_favorited'     => $result->isFavorited,
+            'favorites_count'  => $result->favoritesCount,
+        ]);
 
         return response()->json([
             'item'            => ItemDetailResource::fromReadModel($result->item),

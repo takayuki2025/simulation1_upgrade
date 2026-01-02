@@ -23,38 +23,37 @@ final class EloquentItemRepository implements ItemRepository
     /* ===============================
        Eloquent -> Domain
     =============================== */
-    
-private function toDomain(EloquentItem $model): Item
-{
-    $categories = $model->category ?? [];
 
-    if (is_string($categories)) {
-        $decoded = json_decode($categories, true);
-        $categories = is_array($decoded) ? $decoded : [];
+    private function toDomain(EloquentItem $model): Item
+    {
+        $categories = $model->category ?? [];
+
+        if (is_string($categories)) {
+            $decoded = json_decode($categories, true);
+            $categories = is_array($decoded) ? $decoded : [];
+        }
+
+        $imagePath = null;
+        if (!empty($model->item_image)) {
+            $imagePath = ItemImagePath::fromRaw($model->item_image);
+        }
+
+        return Item::reconstitute(
+            id: new ItemId($model->id),
+
+            // ★ ここが最重要修正点
+            itemOrigin: ItemOrigin::from($model->item_origin),
+            shopId: $model->shop_id,
+            createdByUserId: $model->created_by_user_id,
+            name: $model->name,
+            price: new Money((int) $model->price, 'JPY'),
+            explain: (string) $model->explain,
+            condition: (string) $model->condition,
+            category: new CategoryList($categories),
+            itemImage: $imagePath,
+            remain: new StockCount((int) $model->remain),
+        );
     }
-
-    $imagePath = null;
-    if (!empty($model->item_image)) {
-        $imagePath = ItemImagePath::fromRaw($model->item_image);
-    }
-
-    return Item::reconstitute(
-        id: new ItemId($model->id),
-
-        // ★ ここが最重要修正点
-        itemOrigin: ItemOrigin::from($model->item_origin),
-
-        shopId: $model->shop_id,
-        createdByUserId: $model->created_by_user_id,
-        name: $model->name,
-        price: new Money((int) $model->price, 'JPY'),
-        explain: (string) $model->explain,
-        condition: (string) $model->condition,
-        category: new CategoryList($categories),
-        itemImage: $imagePath,
-        remain: new StockCount((int) $model->remain),
-    );
-}
     public function findById(int $id): ?Item
     {
         $model = EloquentItem::find($id);
@@ -122,25 +121,13 @@ private function toDomain(EloquentItem $model): Item
             ->orderByDesc('created_at')
             ->paginate($limit, ['*'], 'page', $page);
 
-        $items = collect($paginator->items())->map(function (EloquentItem $model) use ($viewerUserId) {
+        // ★ Domain Item に変換するだけ
+        $domainItems = collect($paginator->items())
+            ->map(fn (EloquentItem $model) => $this->toDomain($model))
+            ->all();
 
-            $isFavorited = $viewerUserId
-                ? Good::where('item_id', $model->id)
-                    ->where('user_id', $viewerUserId)
-                    ->exists()
-                : false;
-
-            return PublicItemAssembler::fromItem(
-                item: $model,
-                viewerUserId: $viewerUserId,
-                viewerShopIds: [],
-                isFavorited: $isFavorited,
-            );
-        });
-
-        return Items::fromArray($items->all());
+        return Items::fromArray($domainItems);
     }
-
     /* ===============================
        Other existing methods（無変更）
     =============================== */
@@ -196,66 +183,73 @@ private function toDomain(EloquentItem $model): Item
     }
 
     public function searchPublicPaginator(
-    int $limit,
-    int $page,
-    ?string $keyword
-) {
-    $query = EloquentItem::query()
-        ->whereNotNull('published_at');
+        int $limit,
+        int $page,
+        ?string $keyword,
+        array $excludeShopIds = []
+    ) {
+        $query = EloquentItem::query()
+            ->whereNotNull('published_at');
 
-    if ($keyword) {
-        $query->where('name', 'LIKE', "%{$keyword}%");
+        if ($keyword) {
+            $query->where('name', 'LIKE', "%{$keyword}%");
+        }
+
+        // ★ ここが本質的な修正
+        if (!empty($excludeShopIds)) {
+            $query->whereNotIn('shop_id', $excludeShopIds);
+        }
+
+        return $query
+            ->orderByDesc('published_at')
+            ->paginate($limit, ['*'], 'page', $page);
     }
 
-    return $query
-        ->orderByDesc('published_at')
-        ->paginate($limit, ['*'], 'page', $page);
-}
-public function findAll(
-    int $limit,
-    int $page,
-    ?string $keyword
-): Items {
-    $query = EloquentItem::query();
+    public function findAll(
+        int $limit,
+        int $page,
+        ?string $keyword
+    ): Items {
+        $query = EloquentItem::query();
 
-    if ($keyword) {
-        $query->where('name', 'LIKE', "%{$keyword}%");
+        if ($keyword) {
+            $query->where('name', 'LIKE', "%{$keyword}%");
+        }
+
+        $models = $query
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->offset(($page - 1) * $limit)
+            ->get();
+
+        return Items::fromEloquent($models);
     }
+    public function findPublicItems(
+        int $limit,
+        int $page,
+        ?string $keyword,
+        ?int $excludeShopId
+    ): Items {
+        $query = EloquentItem::query()
+            ->whereNotNull('published_at');
 
-    $models = $query
-        ->orderByDesc('created_at')
-        ->limit($limit)
-        ->offset(($page - 1) * $limit)
-        ->get();
+        if ($keyword) {
+            $query->where('name', 'LIKE', "%{$keyword}%");
+        }
 
-    return Items::fromEloquent($models);
-}
-public function findPublicItems(
-    int $limit,
-    int $page,
-    ?string $keyword,
-    ?int $excludeShopId
-): Items {
-    $query = EloquentItem::query()
-        ->whereNotNull('published_at');
+        if ($excludeShopId !== null) {
+            $query->where(function ($q) use ($excludeShopId) {
+                $q->whereNull('shop_id')
+                  ->orWhere('shop_id', '!=', $excludeShopId);
+            });
+        }
 
-    if ($keyword) {
-        $query->where('name', 'LIKE', "%{$keyword}%");
+        $models = $query
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->offset(($page - 1) * $limit)
+            ->get();
+
+        return Items::fromEloquent($models);
     }
-
-    if ($excludeShopId !== null) {
-        $query->where(function ($q) use ($excludeShopId) {
-            $q->whereNull('shop_id')
-              ->orWhere('shop_id', '!=', $excludeShopId);
-        });
-    }
-
-    $models = $query
-        ->orderByDesc('created_at')
-        ->limit($limit)
-        ->offset(($page - 1) * $limit)
-        ->get();
-
-    return Items::fromEloquent($models);
-}
 }

@@ -11,35 +11,22 @@ type FavoriteItemsResponse = {
 export const FAVORITE_ITEMS_SWR_KEY = "/items/favorite";
 
 export const useFavoriteItemsSWR = () => {
-  const { apiClient, isAuthenticated, isLoading } = useAuth() as {
-    apiClient: AxiosInstance | null;
-    isAuthenticated: boolean;
-    isLoading: boolean;
-  };
-
-  const fetcher = async (): Promise<FavoriteItemsResponse> => {
-    if (!apiClient) {
-      throw new Error("apiClient is not available");
-    }
-
-    const res = await apiClient.get<FavoriteItemsResponse>(
-      FAVORITE_ITEMS_SWR_KEY,
-    );
-
-    return res.data;
-  };
+  const { apiClient, isAuthenticated, isLoading } = useAuth();
 
   const swrKey =
-    !isLoading && isAuthenticated && apiClient
-      ? FAVORITE_ITEMS_SWR_KEY
-      : null;
+    !isLoading && isAuthenticated && apiClient ? "/items/favorite" : null;
+
+  const fetcher = async () => {
+    const res = await apiClient!.get("/items/favorite");
+    return res.data;
+  };
 
   const {
     data,
     error,
     isLoading: swrLoading,
     mutate,
-  } = useSWR<FavoriteItemsResponse>(swrKey, fetcher, {
+  } = useSWR(swrKey, fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     revalidateIfStale: false,
@@ -50,7 +37,7 @@ export const useFavoriteItemsSWR = () => {
     isLoading: isLoading || swrLoading,
     error,
 
-    // ✅ 追加（これだけ）
-    mutateFavorites: mutate,
+    /** ★ これだけ使う */
+    refetchFavorites: () => mutate(),
   };
 };

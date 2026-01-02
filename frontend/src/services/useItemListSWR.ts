@@ -9,21 +9,21 @@ export const useItemListSWR = () => {
   const { apiClient, user, isLoading } = useAuth();
 
   const fetcher = async (): Promise<Response> => {
-    // 認証済みは apiClient（Bearer付き）だけを使う
-    if (apiClient) {
-      const res = await apiClient.get("/items/public");
+    // 🔐 認証済み
+    if (apiClient && user) {
+      const res = await apiClient.get("/items/public", {
+        params: {
+          viewer_user_id: user.id, // ★ これが本命
+        },
+      });
       return res.data;
     }
-    // ゲストは axios でOK
+
+    // 👤 ゲスト
     const res = await axios.get("/api/items/public");
     return res.data;
   };
 
-  /**
-   * 🔑 最重要：
-   * - isLoading の間は key=null にして SWR を止める
-   *   → ゲスト結果が先にキャッシュされる事故を防ぐ
-   */
   const swrKey = isLoading
     ? null
     : user
@@ -34,11 +34,13 @@ export const useItemListSWR = () => {
     data,
     error,
     isLoading: swrLoading,
+    mutate,
   } = useSWR<Response>(swrKey, fetcher);
 
   return {
     items: data?.items ?? [],
     isLoading: isLoading || swrLoading,
     error,
+    mutateItems: mutate,
   };
 };

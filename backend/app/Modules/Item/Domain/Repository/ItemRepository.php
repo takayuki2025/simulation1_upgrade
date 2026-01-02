@@ -53,8 +53,10 @@ interface ItemRepository
     public function findPublicByShopId(int $shopId): array;
 
     public function searchPublicPaginator(
-    int $limit,
-    int $page,
-    ?string $keyword
-);
+        int $limit,
+        int $page,
+        ?string $keyword,
+        array $excludeShopIds = []
+    );
+
 }

@@ -2,60 +2,43 @@
 
 namespace App\Modules\Item\Application\Assembler;
 
+use App\Models\Item as EloquentItem;
 use App\Modules\Item\Application\Dto\Item\PublicItemDto;
-use App\Modules\Item\Domain\Entity\Item;
 use Carbon\Carbon;
 
 final class PublicItemAssembler
 {
-    public static function fromItem(
-        Item $item,
-        ?string $displayType,
+    public static function fromEloquent(
+        EloquentItem $model,
         ?int $viewerUserId,
         array $viewerShopIds,
         bool $isFavorited,
         int $favoritesCount,
     ): PublicItemDto {
+        $isOwner = $viewerUserId !== null
+            && $model->created_by_user_id === $viewerUserId;
 
-        if ($displayType === 'FAVORITE') {
-            $isOwner   = false;
-            $canManage = false;
-        } else {
-            $isOwner = $viewerUserId !== null
-                && $item->getCreatedByUserId() === $viewerUserId;
-
-            $canManage = $item->getShopId() !== null
-                && in_array($item->getShopId(), $viewerShopIds, true);
-        }
+        $canManage = $model->shop_id !== null
+            && in_array($model->shop_id, $viewerShopIds, true);
 
         return new PublicItemDto(
-    id: $item->getId()->getValue(),
-    name: $item->getName(),
-    price: $item->getPrice()->amount(),
-    itemImagePath: self::resolveImagePath($item),
-
-    // ★ Domain には存在しない → null 固定
-    brandPrimary: null,
-    conditionName: null,
-    colorName: null,
-
-    publishedAt: $item->getPublishedAt(),
-    displayType: $displayType,
-    isOwner: $isOwner,
-    canManage: $canManage,
-    isFavorited: $isFavorited,
-    favoritesCount: $favoritesCount,
-);
-
+            id: $model->id,
+            name: $model->name,
+            price: (int) $model->price,
+            itemImagePath: $model->item_image
+                ? '/storage/' . ltrim($model->item_image, '/')
+                : null,
+            brandPrimary: $model->brand ?? null,
+            conditionName: $model->condition ?? null,
+            colorName: null,
+            publishedAt: $model->published_at
+                ? Carbon::parse($model->published_at)->toISOString()
+                : null,
+            displayType: null,
+            isOwner: $isOwner,
+            canManage: $canManage,
+            isFavorited: $isFavorited,
+            favoritesCount: $favoritesCount,
+        );
     }
-
-    private static function resolveImagePath(Item $item): ?string
-{
-    // ★ Domain Item が持つのは item_image のみ（SoT）
-    if ($item->getItemImage()) {
-        return '/storage/' . ltrim($item->getItemImage()->value(), '/');
-    }
-
-    return null;
-}
 }

@@ -28,7 +28,10 @@ final class PublicCatalogController extends Controller
         $output = $useCase->execute($input);
 
         return response()->json([
-            'items' => $output->items,
+            'items' => array_map(
+                fn ($dto) => $dto->toArray(),
+                $output->items
+            ),
             'meta' => [
                 'page'    => $output->currentPage,
                 'total'   => $output->total,
