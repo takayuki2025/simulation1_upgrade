@@ -67,7 +67,7 @@ final class EloquentItemRepository implements ItemRepository
     {
         $model = new EloquentItem();
 
-        $model->item_origin = $item->getItemOrigin();
+        $model->item_origin = $item->getItemOrigin()->value(); // ★ string
         $model->shop_id = $item->getShopId();
         $model->created_by_user_id = $item->getCreatedByUserId();
         $model->name = $item->getName();
@@ -78,10 +78,17 @@ final class EloquentItemRepository implements ItemRepository
             $item->getCategory()->toArray(),
             JSON_UNESCAPED_UNICODE
         );
-        $model->item_image = $item->getItemImage()?->value();
+
+        // ★★★ ここが最重要 ★★★
+        $model->item_image = $item->getItemImage()
+            ? $item->getItemImage()->value()
+            : null;
+
         $model->remain = $item->getRemain()->getValue();
+        $model->published_at = $item->getPublishedAt()?->format('Y-m-d H:i:s');
 
         $model->save();
+
         $item->setId(new ItemId($model->id));
     }
 

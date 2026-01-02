@@ -6,6 +6,7 @@ use App\Modules\Item\Application\Dto\Item\PublishItemInput;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use App\Modules\Item\Domain\Repository\ItemDraftRepository;
 use App\Modules\Item\Domain\Repository\ItemRepository;
+use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 use App\Modules\Item\Domain\Entity\Item;
 use App\Modules\Item\Domain\Service\SellerAuthorizationService;
 use App\Modules\Item\Domain\ValueObject\StockCount;
@@ -13,8 +14,9 @@ use App\Modules\Item\Domain\ValueObject\SellerType;
 use App\Modules\Item\Domain\ValueObject\ItemOrigin;
 use App\Modules\Item\Domain\Event\ItemPublished;
 use App\Modules\Item\Domain\ValueObject\ItemOrigin as ItemOriginVO;
-use App\Modules\Item\Domain\Enum\ItemOrigin as ItemOriginEnum;
+// use App\Modules\Item\Domain\Enum\ItemOrigin as ItemOriginEnum;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use DomainException;
 
@@ -74,11 +76,39 @@ final class PublishItemUseCase
 
             // Item 生成（Operational Truth）
 
+            // ===== 画像昇格処理 =====
+
+
+            $draftImageVO = $draft->itemImage(); // ItemImagePath|null
+            $itemImage = null;
+
+            if ($draftImageVO !== null) {
+                $draftImagePath = $draftImageVO->value(); // string
+
+                $itemImagePath = str_replace(
+                    'item_drafts/',
+                    'item_images/',
+                    $draftImagePath
+                );
+
+                if (! Storage::disk('public')->exists($itemImagePath)) {
+                    Storage::disk('public')->copy($draftImagePath, $itemImagePath);
+                }
+
+                // ★ 正規ルート（factory 経由）
+                $itemImage = ItemImagePath::fromRaw($itemImagePath);
+            }
+
+
+
+
+
+
             $item = Item::createNew(
                 itemOrigin: ItemOriginVO::from(
                     $sellerId->type() === SellerType::SHOP
-                        ? ItemOriginEnum::SHOP_MANAGED->value
-                        : ItemOriginEnum::USER_PERSONAL->value
+                        ? ItemOriginVO::SHOP_MANAGED
+                        : ItemOriginVO::USER_PERSONAL
                 ),
                 shopId: $sellerId->type() === SellerType::SHOP
                     ? ($sellerId->id() ?? $input->shopId)
@@ -91,13 +121,21 @@ final class PublishItemUseCase
                 explain: $draft->explain(),
                 condition: $draft->condition(),
                 category: $draft->category(),
-                itemImage: $draft->itemImage(),
+                itemImage: $itemImage, // ★ ItemImagePath|null
                 remain: new StockCount(1),
             );
 
 
+
+
+
+
             // ★ publish 時刻を確定
-            $item->markPublished(now());
+
+            $item->markPublished(
+                new \DateTimeImmutable('now')
+            );
+
 
             // 永続化
             $this->itemRepository->save($item);
