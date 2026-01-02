@@ -20,12 +20,12 @@ final class SearchItemListUseCase
 
     public function execute(ListItemsInputDto $input): ListItemsOutputDto
     {
-        // ❌ 除外は一切しない
+        // ❌ 検索では除外しない
         $paginator = $this->itemRepository->searchPublicPaginator(
             limit: $input->limit,
             page: $input->page,
             keyword: $input->keyword,
-            excludeShopIds: [], // ← ★ 必ず空
+            excludeShopIds: [],
         );
 
         $items = collect($paginator->items())->map(function ($model) use ($input) {
@@ -44,7 +44,7 @@ final class SearchItemListUseCase
             return PublicItemAssembler::fromEloquent(
                 model: $model,
                 viewerUserId: $input->viewerUserId,
-                viewerShopIds: [], // ★ Search では使わない
+                viewerShopIds: $input->viewerShopIds,
                 isFavorited: $isFavorited,
                 favoritesCount: $favoritesCount,
             );
