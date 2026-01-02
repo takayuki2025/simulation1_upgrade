@@ -4,7 +4,7 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Application\UseCase\Item\Query\SearchItemListUseCase;
+use App\Modules\Item\Application\UseCase\Item\Query\CatalogItemListUseCase;
 use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 
@@ -12,7 +12,7 @@ final class PublicCatalogController extends Controller
 {
     public function __invoke(
         Request $request,
-        SearchItemListUseCase $useCase
+        CatalogItemListUseCase $useCase
     ) {
         /** @var AuthPrincipal|null $principal */
         $principal = $request->attributes->get('auth_principal');
@@ -20,7 +20,7 @@ final class PublicCatalogController extends Controller
         $input = new ListItemsInputDto(
             limit: 20,
             page: (int) $request->query('page', 1),
-            keyword: $request->query('keyword'),
+            keyword: null,
             viewerUserId: $principal?->userId,
             viewerShopIds: $principal?->shopIds ?? [],
         );
@@ -28,10 +28,7 @@ final class PublicCatalogController extends Controller
         $output = $useCase->execute($input);
 
         return response()->json([
-            'items' => array_map(
-                fn ($dto) => $dto->toArray(),
-                $output->items
-            ),
+            'items' => array_map(fn ($dto) => $dto->toArray(), $output->items),
             'meta' => [
                 'page'    => $output->currentPage,
                 'total'   => $output->total,

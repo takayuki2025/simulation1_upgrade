@@ -74,34 +74,29 @@ use App\Modules\Item\Presentation\Http\Controllers\{
     //  ItemSearchController,
     ItemDetailController
 };
+use App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController;
 use App\Modules\Search\Presentation\Http\Controllers\PublicItemSearchController;
+use App\Modules\Search\Presentation\Http\Controllers\ShopItemSearchController;
 
 // ✅ 新：一覧 / 検索（DDD 分離済）
-Route::prefix('items')->group(function () {
-    // Route::get('/', ItemListController::class);          // 一覧
-    //  Route::get('/search', ItemSearchController::class);  // 検索
-});
+
+
 
 
 Route::middleware(['auth.jwt.optional'])->group(function () {
 
-    // トップページ（一覧）
-    // Route::get('/items/public', \App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController::class);
+    Route::get('/items/public', PublicCatalogController::class);
 
-    // 検索
-    Route::get('/search/items', \App\Modules\Search\Presentation\Http\Controllers\PublicItemSearchController::class);
+    Route::get('/search/items', PublicItemSearchController::class);
 
+    // ★ Shop 専用検索
+    Route::get('/search/shop-items', ShopItemSearchController::class);
 });
 
 
 
 
-use App\Modules\Item\Presentation\Http\Controllers\PublicCatalogController;
 
-Route::get(
-    '/items/public',
-    PublicCatalogController::class
-)->middleware('auth.jwt.optional');
 
 
 // Route::middleware('auth.jwt.optional')->group(function () {

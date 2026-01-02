@@ -252,4 +252,21 @@ final class EloquentItemRepository implements ItemRepository
 
         return Items::fromEloquent($models);
     }
+
+    public function searchByShopCode(
+        string $shopCode,
+        ?string $keyword,
+        int $limit,
+        int $page
+    ) {
+        $query = EloquentItem::query()
+            ->whereHas('shop', fn ($q) => $q->where('code', $shopCode))
+            ->whereNotNull('published_at');
+
+        if ($keyword) {
+            $query->where('name', 'LIKE', "%{$keyword}%");
+        }
+
+        return $query->paginate($limit, ['*'], 'page', $page);
+    }
 }

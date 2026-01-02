@@ -59,4 +59,10 @@ interface ItemRepository
         array $excludeShopIds = []
     );
 
+    public function searchByShopCode(
+        string $shopCode,
+        ?string $keyword,
+        int $limit,
+        int $page
+    );
 }

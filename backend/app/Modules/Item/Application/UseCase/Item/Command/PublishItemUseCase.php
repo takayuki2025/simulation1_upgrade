@@ -12,6 +12,8 @@ use App\Modules\Item\Domain\ValueObject\StockCount;
 use App\Modules\Item\Domain\ValueObject\SellerType;
 use App\Modules\Item\Domain\ValueObject\ItemOrigin;
 use App\Modules\Item\Domain\Event\ItemPublished;
+use App\Modules\Item\Domain\ValueObject\ItemOrigin as ItemOriginVO;
+use App\Modules\Item\Domain\Enum\ItemOrigin as ItemOriginEnum;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
 use DomainException;
@@ -71,10 +73,13 @@ final class PublishItemUseCase
             }
 
             // Item 生成（Operational Truth）
+
             $item = Item::createNew(
-                itemOrigin: $sellerId->type() === SellerType::SHOP
-                    ? ItemOrigin::SHOP_MANAGED->value
-                    : ItemOrigin::USER_PERSONAL->value,
+                itemOrigin: ItemOriginVO::from(
+                    $sellerId->type() === SellerType::SHOP
+                        ? ItemOriginEnum::SHOP_MANAGED->value
+                        : ItemOriginEnum::USER_PERSONAL->value
+                ),
                 shopId: $sellerId->type() === SellerType::SHOP
                     ? ($sellerId->id() ?? $input->shopId)
                     : null,
@@ -82,13 +87,14 @@ final class PublishItemUseCase
                     ? null
                     : $principal->userId,
                 name: $draft->name()->value(),
-                price: $price,               // ★ 必須
+                price: $price,
                 explain: $draft->explain(),
                 condition: $draft->condition(),
                 category: $draft->category(),
                 itemImage: $draft->itemImage(),
                 remain: new StockCount(1),
             );
+
 
             // ★ publish 時刻を確定
             $item->markPublished(now());

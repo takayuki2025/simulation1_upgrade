@@ -1,17 +1,36 @@
 import useSWR from "swr";
 import axios from "axios";
-import { PublicItem } from "@/types/publicItem";
+import { useAuth } from "@/ui/auth/useAuth";
+import type { PublicItem } from "@/types/publicItem";
 
 type ItemSearchResponse = {
   items: PublicItem[];
 };
 
 export const useItemSearchSWR = (query: string) => {
-  const key = query ? ["search", "items", query] : null;
+  const { apiClient, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const fetcher = async () => {
+  const shouldFetch = !authLoading && query.trim().length > 0;
+
+  /**
+   * ★ 超重要：auth 状態で key を分離
+   */
+  const key = shouldFetch
+    ? ["search-items", query, isAuthenticated ? "auth" : "guest"]
+    : null;
+
+  const fetcher = async (): Promise<ItemSearchResponse> => {
+    // 🔑 認証あり
+    if (apiClient) {
+      const res = await apiClient.get(
+        `/search/items?keyword=${encodeURIComponent(query)}`,
+      );
+      return res.data;
+    }
+
+    // 👤 ゲスト（同じエンドポイント）
     const res = await axios.get(
-      `/api/search/items?q=${encodeURIComponent(query)}`,
+      `/api/search/items?keyword=${encodeURIComponent(query)}`,
     );
     return res.data;
   };
@@ -20,7 +39,7 @@ export const useItemSearchSWR = (query: string) => {
 
   return {
     items: data?.items ?? [],
-    isLoading,
+    isLoading: authLoading || isLoading,
     error,
   };
 };

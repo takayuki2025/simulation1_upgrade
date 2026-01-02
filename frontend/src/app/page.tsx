@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { mutate } from "swr";
-import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 import { useItemListSWR } from "@/services/useItemListSWR";
@@ -32,14 +31,6 @@ export default function Home() {
   );
 
   /* =========================
-   ★ FIX：タブ切替時に強制再取得
-========================= */
-  useEffect(() => {
-    if (currentTab === "mylist") {
-      favoriteResult.refetchFavorites();
-    }
-  }, [currentTab]);
-  /* =========================
      🔍 検索状態
   ========================= */
   const currentSearchQuery = useMemo(
@@ -47,6 +38,9 @@ export default function Home() {
     [searchParams],
   );
 
+  /**
+   * ✅ 正解：検索は「ログイン必須」
+   */
   const isSearch = currentSearchQuery.trim().length > 0;
 
   /* =========================
@@ -57,7 +51,16 @@ export default function Home() {
   const favoriteResult = useFavoriteItemsSWR();
 
   /* =========================
-     ❤️ 楽観更新：いいね切替
+     🔄 タブ切替時
+  ========================= */
+  useEffect(() => {
+    if (currentTab === "mylist") {
+      favoriteResult.refetchFavorites();
+    }
+  }, [currentTab]);
+
+  /* =========================
+     ❤️ いいね切替
   ========================= */
   const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
     if (!apiClient) return;
@@ -65,14 +68,11 @@ export default function Home() {
     try {
       if (isFavorited) {
         await apiClient.delete(`/reactions/items/${item.id}/favorite`);
-        mutate("/items/favorite");
-
       } else {
         await apiClient.post(`/reactions/items/${item.id}/favorite`);
-        mutate("/items/favorite");
       }
 
-      /** ★ 成功したら必ず再取得 */
+      mutate("/items/favorite");
       await favoriteResult.refetchFavorites();
     } catch (e) {
       console.error(e);
@@ -80,7 +80,7 @@ export default function Home() {
   };
 
   /* =========================
-     🧠 PublicItem 正規化
+     🧠 表示アイテム決定
   ========================= */
   const items: PublicItem[] = useMemo(() => {
     const rawItems =
@@ -95,14 +95,7 @@ export default function Home() {
       name: item.name,
       price: item.price,
       itemImagePath: item.itemImagePath ?? item.item_image ?? null,
-      brandPrimary: item.brandPrimary ?? null,
-      conditionName: item.conditionName ?? null,
-      colorName: item.colorName ?? null,
-      publishedAt: item.publishedAt ?? null,
-
       displayType: item.displayType ?? null,
-
-      // ❤️ ここ
       isFavorited: item.isFavorited ?? false,
     }));
   }, [
@@ -121,7 +114,6 @@ export default function Home() {
         : listResult.isLoading;
 
   const isPageLoading = isAuthLoading || isItemsLoading;
-
   /* =========================
      🎨 UI
   ========================= */

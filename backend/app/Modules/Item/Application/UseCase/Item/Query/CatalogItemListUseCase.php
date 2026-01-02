@@ -10,7 +10,7 @@ use App\Modules\Item\Application\Assembler\PublicItemAssembler;
 use App\Modules\Reaction\Domain\ValueObject\ReactorId;
 use App\Modules\Reaction\Domain\ValueObject\FavoriteTargetId;
 
-final class SearchItemListUseCase
+final class CatalogItemListUseCase
 {
     public function __construct(
         private ItemRepository $itemRepository,
@@ -20,12 +20,12 @@ final class SearchItemListUseCase
 
     public function execute(ListItemsInputDto $input): ListItemsOutputDto
     {
-        // ❌ 除外は一切しない
+        // ✅ 自分の shopId を除外
         $paginator = $this->itemRepository->searchPublicPaginator(
             limit: $input->limit,
             page: $input->page,
-            keyword: $input->keyword,
-            excludeShopIds: [], // ← ★ 必ず空
+            keyword: null,
+            excludeShopIds: $input->viewerShopIds,
         );
 
         $items = collect($paginator->items())->map(function ($model) use ($input) {
@@ -44,7 +44,7 @@ final class SearchItemListUseCase
             return PublicItemAssembler::fromEloquent(
                 model: $model,
                 viewerUserId: $input->viewerUserId,
-                viewerShopIds: [], // ★ Search では使わない
+                viewerShopIds: $input->viewerShopIds,
                 isFavorited: $isFavorited,
                 favoritesCount: $favoritesCount,
             );

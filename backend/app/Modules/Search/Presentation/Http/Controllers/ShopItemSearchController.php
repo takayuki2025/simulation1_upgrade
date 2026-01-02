@@ -4,21 +4,28 @@ namespace App\Modules\Search\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Item\Application\UseCase\Item\Query\SearchItemListUseCase;
+use App\Modules\Item\Application\UseCase\Item\Query\ShopSearchItemListUseCase;
 use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
 
-final class PublicItemSearchController extends Controller
+final class ShopItemSearchController extends Controller
 {
     public function __invoke(
         Request $request,
-        SearchItemListUseCase $useCase
+        ShopSearchItemListUseCase $useCase
     ) {
+        $shopCode = $request->query('shop_code');
+        $keyword  = $request->query('keyword');
+
+        if (!$shopCode) {
+            abort(400, 'shop_code is required');
+        }
+
         $input = new ListItemsInputDto(
             limit: 20,
             page: (int) $request->query('page', 1),
-            keyword: $request->query('keyword'),
+            keyword: $keyword,
             viewerUserId: null,
-            viewerShopIds: [], // ★ Search では常に空
+            viewerShopIds: [$shopCode], // ★ shopCode を唯一の真実として使う
         );
 
         $output = $useCase->execute($input);
