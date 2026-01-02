@@ -193,6 +193,7 @@ return [
         App\Providers\OrderModuleServiceProvider::class,
         App\Providers\PaymentModuleServiceProvider::class,
         App\Providers\ShopModuleServiceProvider::class,
+        App\Modules\Item\Infrastructure\Providers\ItemEventServiceProvider::class,
     ],
 
     /*

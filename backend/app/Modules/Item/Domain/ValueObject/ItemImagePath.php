@@ -47,20 +47,19 @@ final class ItemImagePath
      */
     public static function fromUploadedFile(
         UploadedFile $file,
+        string $directory = 'item-drafts',
         string $disk = 'public'
     ): self {
         if (! $file->isValid()) {
             throw new InvalidArgumentException('Invalid image upload');
         }
 
-        // 保存（Draft 専用ディレクトリ）
-        $storedPath = $file->store('item-drafts', $disk);
+        $storedPath = $file->store($directory, $disk);
 
         if (! $storedPath) {
             throw new InvalidArgumentException('Failed to store image');
         }
 
-        // ★ 既存ロジックを再利用して正規化
         return self::fromInternal($storedPath);
     }
 

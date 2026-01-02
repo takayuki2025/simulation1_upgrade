@@ -5,8 +5,9 @@ namespace App\Modules\Auth\Infrastructure\External;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Exception\Auth\FailedToVerifyToken;
 use Illuminate\Support\Facades\Log;
+use App\Modules\Auth\Application\Dto\ExternalAuthUser;
 
-class FirebaseProvider
+final class FirebaseProvider
 {
     private $auth = null;
 
@@ -33,15 +34,19 @@ class FirebaseProvider
         return $this->auth;
     }
 
-    public function verifyToken(string $idToken): array
+    /**
+     * Firebase ID Token 検証
+     * Infrastructure → Application 境界
+     */
+    public function verifyToken(string $idToken): ExternalAuthUser
     {
         $auth = $this->getAuth();
 
         try {
-            // ★★★ ここが最重要 ★★★
+            // ★ 実運用で必須の leeway
             $verifiedToken = $auth->verifyIdToken(
                 $idToken,
-                $leewayInSeconds = 60 // ← 30〜120秒が現実解
+                $leewayInSeconds = 60
             );
         } catch (FailedToVerifyToken $e) {
             Log::warning('[Firebase verifyToken failed]', [
@@ -50,14 +55,17 @@ class FirebaseProvider
             throw $e;
         }
 
-        $uid = $verifiedToken->claims()->get('sub');
+        // Firebase UID
+        $uid = (string) $verifiedToken->claims()->get('sub');
+
+        // UserRecord 取得（email / verified / name はこっちが SoT）
         $userRecord = $auth->getUser($uid);
 
-        return [
-            'sub'            => $uid,
-            'email'          => $userRecord->email,
-            'name'           => $userRecord->displayName,
-            'email_verified' => $userRecord->emailVerified,
-        ];
+        return new ExternalAuthUser(
+            uid: $uid,
+            email: $userRecord->email ?? null,
+            emailVerified: (bool) $userRecord->emailVerified,
+            displayName: $userRecord->displayName ?? null,
+        );
     }
 }

@@ -17,6 +17,7 @@ class Item extends Model
         'item_origin',
         'shop_id',
         'created_by_user_id',
+        'published_at',
         'name',
         'price',
         'brand',

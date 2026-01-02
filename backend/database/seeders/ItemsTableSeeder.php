@@ -60,6 +60,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '良好',
                 'category' => ['メンズ'],
                 'image' => 'item_images/Armani+Mens+Clock.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'valid.email@example.com',
@@ -71,6 +72,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '目立った傷や汚れなし',
                 'category' => ['家電'],
                 'image' => 'item_images/HDD+Hard+Disk.jpg',
+                'published_at' => now()
             ],
 
             // shop 2
@@ -84,6 +86,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => 'やや傷や汚れあり',
                 'category' => ['キッチン'],
                 'image' => 'item_images/iLoveIMG+d.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'taro.y@coachtech.com',
@@ -95,6 +98,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '状態が悪い',
                 'category' => ['メンズ'],
                 'image' => 'item_images/Leather+Shoes+Product+Photo.jpg',
+                'published_at' => now()
             ],
 
             // shop 3
@@ -108,6 +112,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '良好',
                 'category' => ['家電'],
                 'image' => 'item_images/Living+Room+Laptop.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'reina.n@coachtech.com',
@@ -119,6 +124,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '目立った傷や汚れなし',
                 'category' => ['家電'],
                 'image' => 'item_images/Music+Mic+4632231.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'reina.n@coachtech.com',
@@ -130,6 +136,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => 'やや傷や汚れあり',
                 'category' => ['レディース'],
                 'image' => 'item_images/Purse+fashion+pocket.jpg',
+                'published_at' => now()
             ],
 
             // shop 4
@@ -143,6 +150,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '状態が悪い',
                 'category' => ['キッチン'],
                 'image' => 'item_images/Tumbler+souvenir.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'tomomi.a@coachtech.com',
@@ -154,6 +162,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '良好',
                 'category' => ['キッチン'],
                 'image' => 'item_images/Waitress+with+Coffee+Grinder.jpg',
+                'published_at' => now()
             ],
             [
                 'email' => 'tomomi.a@coachtech.com',
@@ -165,6 +174,7 @@ final class ItemsTableSeeder extends Seeder
                 'condition' => '目立った傷や汚れなし',
                 'category' => ['レディース'],
                 'image' => 'item_images/外出メイクアップセット.jpg',
+                'published_at' => now()
             ],
         ];
 
@@ -215,6 +225,7 @@ final class ItemsTableSeeder extends Seeder
                 'category'   => json_encode($data['category'], JSON_UNESCAPED_UNICODE),
                 'item_image' => $data['image'],
                 'remain'     => 1,
+                'published_at' => $data['published_at'],
             ]);
 
             Log::info('[Seeder][ItemCreated]', [
@@ -228,7 +239,7 @@ final class ItemsTableSeeder extends Seeder
             /**
              * AtlasKernel（既存）
              */
-            $atlasKernel->analyzeItem(
+            $atlasKernel->analyze(
                 itemId: $item->id,
                 rawText: $item->brand ?? '',
                 tenantId: null

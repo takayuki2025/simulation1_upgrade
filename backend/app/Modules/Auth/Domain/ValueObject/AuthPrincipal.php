@@ -6,19 +6,19 @@ use App\Modules\Auth\Domain\Dto\ProvisionedUser;
 
 final class AuthPrincipal
 {
-    private function __construct(
+    public function __construct(
         public readonly string $provider,
         public readonly string $providerUid,
         public readonly int $userId,
         public readonly ?string $email,
         public readonly bool $emailVerified,
         public readonly ?string $displayName,
-        public readonly array $shopIds,
+        public readonly array $shopIds, // ← ★ 必須
     ) {
     }
 
     /* =====================================================
-     * ✅ 唯一の生成口
+     * ✅ 唯一の正規生成口（Firebase / JWT 共通）
      * ===================================================== */
     public static function fromProvisionedUser(
         ProvisionedUser $user,
@@ -33,7 +33,7 @@ final class AuthPrincipal
             email: $user->email,
             emailVerified: $user->emailVerified,
             displayName: $displayName,
-            shopIds: $user->shopIds,
+            shopIds: $user->shopIds, // ← ★ ここで注入
         );
     }
 

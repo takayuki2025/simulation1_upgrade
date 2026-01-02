@@ -1,16 +1,18 @@
 import useSWR from "swr";
 import type { AxiosInstance } from "axios";
-import { Item } from "@/types/item";
+
 import { useAuth } from "@/ui/auth/useAuth";
+import type { PublicItem } from "@/types/publicItem";
 
 type FavoriteItemsResponse = {
-  items: Item[];
+  items: PublicItem[];
 };
 
+export const FAVORITE_ITEMS_SWR_KEY = "/items/favorite";
+
 export const useFavoriteItemsSWR = () => {
-  const { apiClient, user, isAuthenticated, isLoading } = useAuth() as {
+  const { apiClient, isAuthenticated, isLoading } = useAuth() as {
     apiClient: AxiosInstance | null;
-    user: { id: number } | null;
     isAuthenticated: boolean;
     isLoading: boolean;
   };
@@ -20,14 +22,16 @@ export const useFavoriteItemsSWR = () => {
       throw new Error("apiClient is not available");
     }
 
-    // ✅ backend と一致
-    const res = await apiClient.get<FavoriteItemsResponse>("/items/favorite");
+    const res = await apiClient.get<FavoriteItemsResponse>(
+      FAVORITE_ITEMS_SWR_KEY,
+    );
+
     return res.data;
   };
 
   const swrKey =
-    !isLoading && isAuthenticated && apiClient && user
-      ? ["favorite-items", user.id]
+    !isLoading && isAuthenticated && apiClient
+      ? FAVORITE_ITEMS_SWR_KEY
       : null;
 
   const {
@@ -43,8 +47,10 @@ export const useFavoriteItemsSWR = () => {
 
   return {
     items: data?.items ?? [],
-    isLoading: swrLoading || isLoading,
+    isLoading: isLoading || swrLoading,
     error,
-    mutate,
+
+    // ✅ 追加（これだけ）
+    mutateFavorites: mutate,
   };
 };

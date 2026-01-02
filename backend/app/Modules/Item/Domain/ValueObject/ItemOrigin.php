@@ -7,11 +7,13 @@ enum ItemOrigin: string
     case USER_PERSONAL = 'USER_PERSONAL';
     case SHOP_MANAGED  = 'SHOP_MANAGED';
 
-    public static function fromSellerId(SellerId $sellerId): self
+    public function isUserPersonal(): bool
     {
-        return $sellerId->isShop()
-            ? self::SHOP_MANAGED
-            : self::USER_PERSONAL;
+        return $this === self::USER_PERSONAL;
+    }
+
+    public function isShopManaged(): bool
+    {
+        return $this === self::SHOP_MANAGED;
     }
 }
-

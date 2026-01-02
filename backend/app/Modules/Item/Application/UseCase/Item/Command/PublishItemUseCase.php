@@ -38,15 +38,14 @@ final class PublishItemUseCase
                 throw new DomainException('Draft is not publishable');
             }
 
-            // 出品主体（Draft の SoT）
+            // 出品主体（SoT）
             $sellerId = $draft->sellerId();
 
-            // 権限チェック
             if (! $this->sellerAuth->canOperate($sellerId, $principal)) {
                 throw new DomainException('Not allowed to publish this item');
             }
 
-            // SHOP 出品の shop_id 確定
+            // shop_id 整合性
             if ($sellerId->type() === SellerType::SHOP) {
                 if ($sellerId->id() === null && $input->shopId === null) {
                     throw new DomainException('shop_id is required to publish');
@@ -61,7 +60,17 @@ final class PublishItemUseCase
                 }
             }
 
-            // Item 生成（Fact only）
+            /**
+             * ★ Publish で「事実」を確定させる
+             * - price_amount は必ず int
+             * - published_at は必ず now
+             */
+            $price = $draft->price();
+            if ($price === null) {
+                throw new DomainException('price is required to publish');
+            }
+
+            // Item 生成（Operational Truth）
             $item = Item::createNew(
                 itemOrigin: $sellerId->type() === SellerType::SHOP
                     ? ItemOrigin::SHOP_MANAGED->value
@@ -73,7 +82,7 @@ final class PublishItemUseCase
                     ? null
                     : $principal->userId,
                 name: $draft->name()->value(),
-                price: $draft->price(),
+                price: $price,               // ★ 必須
                 explain: $draft->explain(),
                 condition: $draft->condition(),
                 category: $draft->category(),
@@ -81,23 +90,20 @@ final class PublishItemUseCase
                 remain: new StockCount(1),
             );
 
-            // 永続化（★ Entity に ID が注入される）
-            $this->itemRepository->save($item);
+            // ★ publish 時刻を確定
+            $item->markPublished(now());
 
-            // ★ Entity から ID を読む（唯一の正解）
+            // 永続化
+            $this->itemRepository->save($item);
             $itemId = $item->id();
 
-            // rawText を確定（将来再解析できる完全 SoT）
-
+            // 🔑 rawText を確定（再解析の完全 SoT）
             $rawText = trim(implode(' ', array_filter([
                 $draft->name()->value(),
                 $draft->explain(),
-                method_exists($draft, 'brand')
-                    ? $draft->brand()?->value()
-                    : null,
+                $draft->brand()?->value() ?? null,
                 $draft->condition(),
             ])));
-
 
             Event::dispatch(
                 new ItemPublished(

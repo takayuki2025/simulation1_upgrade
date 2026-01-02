@@ -2,15 +2,14 @@
 
 namespace App\Modules\Item\Application\Dto\Item;
 
-
-
-
 final class ListItemsInputDto
 {
     public function __construct(
-        public int $limit,
-        public int $page,
-        public ?string $keyword,
-        public ?int $viewerUserId = null, // ← 追加
-    ) {}
+        public readonly int $limit,
+        public readonly int $page,
+        public readonly ?string $keyword,
+        public readonly ?int $viewerUserId,
+        public readonly array $viewerShopIds,
+    ) {
+    }
 }

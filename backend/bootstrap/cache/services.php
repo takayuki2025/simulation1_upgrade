@@ -57,10 +57,11 @@
     53 => 'App\\Providers\\OrderModuleServiceProvider',
     54 => 'App\\Providers\\PaymentModuleServiceProvider',
     55 => 'App\\Providers\\ShopModuleServiceProvider',
-    56 => 'App\\Providers\\AppServiceProvider',
-    57 => 'App\\Providers\\AuthServiceProvider',
-    58 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
-    59 => 'App\\Providers\\AppServiceProvider',
+    56 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemEventServiceProvider',
+    57 => 'App\\Providers\\AppServiceProvider',
+    58 => 'App\\Providers\\AuthServiceProvider',
+    59 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
+    60 => 'App\\Providers\\AppServiceProvider',
   ),
   'eager' => 
   array (
@@ -106,10 +107,11 @@
     39 => 'App\\Providers\\OrderModuleServiceProvider',
     40 => 'App\\Providers\\PaymentModuleServiceProvider',
     41 => 'App\\Providers\\ShopModuleServiceProvider',
-    42 => 'App\\Providers\\AppServiceProvider',
-    43 => 'App\\Providers\\AuthServiceProvider',
-    44 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
-    45 => 'App\\Providers\\AppServiceProvider',
+    42 => 'App\\Modules\\Item\\Infrastructure\\Providers\\ItemEventServiceProvider',
+    43 => 'App\\Providers\\AppServiceProvider',
+    44 => 'App\\Providers\\AuthServiceProvider',
+    45 => 'App\\Modules\\Shipment\\Infrastructure\\Providers\\ShipmentServiceProvider',
+    46 => 'App\\Providers\\AppServiceProvider',
   ),
   'deferred' => 
   array (

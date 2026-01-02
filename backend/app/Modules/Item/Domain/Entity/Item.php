@@ -7,15 +7,22 @@ use App\Modules\Item\Domain\ValueObject\{
     Money,
     CategoryList,
     ItemImagePath,
-    StockCount
+    StockCount,
+    ItemOrigin
 };
 use DomainException;
+use DateTimeImmutable;
 
 final class Item
 {
+    /**
+     * 公開日時（Domain 管理）
+     */
+    private ?DateTimeImmutable $publishedAt = null;
+
     private function __construct(
         private ?ItemId $id,
-        private string $itemOrigin,
+        private ItemOrigin $itemOrigin,
         private ?int $shopId,
         private ?int $createdByUserId,
         private string $name,
@@ -30,7 +37,7 @@ final class Item
 
     /* ========= 新規生成 ========= */
     public static function createNew(
-        string $itemOrigin,
+        ItemOrigin $itemOrigin,
         ?int $shopId,
         ?int $createdByUserId,
         string $name,
@@ -41,11 +48,11 @@ final class Item
         ?ItemImagePath $itemImage,
         StockCount $remain,
     ): self {
-        if ($itemOrigin === 'USER_PERSONAL' && $createdByUserId === null) {
+        if ($itemOrigin->isUserPersonal() && $createdByUserId === null) {
             throw new DomainException('USER_PERSONAL requires createdByUserId');
         }
 
-        if ($itemOrigin === 'SHOP_MANAGED' && $shopId === null) {
+        if ($itemOrigin->isShopManaged() && $shopId === null) {
             throw new DomainException('SHOP_MANAGED requires shopId');
         }
 
@@ -67,7 +74,7 @@ final class Item
     /* ========= Repository 用 ========= */
     public static function reconstitute(
         ?ItemId $id,
-        string $itemOrigin,
+        ItemOrigin $itemOrigin,
         ?int $shopId,
         ?int $createdByUserId,
         string $name,
@@ -77,8 +84,9 @@ final class Item
         CategoryList $category,
         ?ItemImagePath $itemImage,
         StockCount $remain,
+        ?DateTimeImmutable $publishedAt = null,
     ): self {
-        return new self(
+        $item = new self(
             id: $id,
             itemOrigin: $itemOrigin,
             shopId: $shopId,
@@ -91,6 +99,10 @@ final class Item
             itemImage: $itemImage,
             remain: $remain,
         );
+
+        $item->publishedAt = $publishedAt;
+
+        return $item;
     }
 
     /* ========= ID 管理 ========= */
@@ -116,9 +128,16 @@ final class Item
         return $this->id;
     }
 
+    /* ========= Getter ========= */
+
     public function origin(): ItemOrigin
     {
-        return $this->origin;
+        return $this->itemOrigin;
+    }
+
+    public function getItemOrigin(): ItemOrigin
+    {
+        return $this->itemOrigin;
     }
 
     public function getShopId(): ?int
@@ -166,9 +185,9 @@ final class Item
         return $this->remain;
     }
 
-    public function getItemOrigin(): string
+    public function getPublishedAt(): ?DateTimeImmutable
     {
-        return $this->itemOrigin;
+        return $this->publishedAt;
     }
 
     /* =========================
@@ -183,5 +202,19 @@ final class Item
     public function canBePurchased(int $quantity = 1): bool
     {
         return $this->remain->getValue() >= $quantity;
+    }
+
+    public function markPublished(DateTimeImmutable $at): void
+    {
+        if ($this->publishedAt !== null) {
+            throw new DomainException('Item is already published');
+        }
+
+        $this->publishedAt = $at;
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->publishedAt !== null;
     }
 }

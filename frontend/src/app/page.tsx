@@ -18,7 +18,12 @@ import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  const {
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    apiClient,
+  } = useAuth();
 
   /* =========================
      🔖 タブ状態
@@ -46,7 +51,49 @@ export default function Home() {
   const favoriteResult = useFavoriteItemsSWR();
 
   /* =========================
-     🧠 PublicItem に正規化（★型安全）
+     ❤️ 楽観更新：いいね切替
+  ========================= */
+  const toggleFavorite = async (
+    item: PublicItem,
+    isFavorited: boolean,
+  ) => {
+    if (!apiClient) return;
+
+    // ① 楽観更新（即 UI 反映）
+    favoriteResult.mutateFavorites(
+      (current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          items: isFavorited
+            ? current.items.filter((i) => i.id !== item.id)
+            : [...current.items, { ...item, displayType: "FAVORITE" }],
+        };
+      },
+      false,
+    );
+
+    try {
+      // ② API
+      if (isFavorited) {
+        await apiClient.delete(`/items/${item.id}/favorite`);
+      } else {
+        await apiClient.post(`/items/${item.id}/favorite`);
+      }
+
+      // ③ 正式同期
+      favoriteResult.mutateFavorites();
+      listResult.mutate();
+    } catch (e) {
+      // ④ ロールバック
+      favoriteResult.mutateFavorites();
+      throw e;
+    }
+  };
+
+  /* =========================
+     🧠 PublicItem 正規化
   ========================= */
   const items: PublicItem[] = useMemo(() => {
     const rawItems =
@@ -65,8 +112,6 @@ export default function Home() {
       conditionName: item.conditionName ?? null,
       colorName: item.colorName ?? null,
       publishedAt: item.publishedAt ?? null,
-
-      // ★ Backend を信じる
       displayType: item.displayType ?? null,
     }));
   }, [
@@ -98,18 +143,6 @@ export default function Home() {
         </div>
       )}
 
-      <div className={styles.shopButtons}>
-        {["a", "b", "c", "d"].map((code) => (
-          <button
-            key={code}
-            onClick={() => router.push(`/shops/shop-${code}`)}
-            className={styles.shopButton}
-          >
-            テストリンク ショップ{code.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
       {!isPageLoading && (
         <>
           {/* ===== Tabs ===== */}
@@ -139,56 +172,60 @@ export default function Home() {
           {/* ===== Items ===== */}
           <div className={styles.items_select}>
             {items.length > 0 ? (
-              items.map((item) => (
-                <div key={item.id} className={styles.items_select_all}>
-                  {/* ★ Link を使わない（GET誤爆防止） */}
-                  <div
-                    className={styles.cardLink}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(`/item/${item.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        router.push(`/item/${item.id}`);
-                      }
-                    }}
-                  >
-                    <div className={styles.itemImageWrapper}>
-                      {item.displayType && (
-                        <span
-                          className={styles.ownStar}
-                          title={
-                            item.displayType === "STAR"
-                              ? "オーナー出品"
-                              : "あなたの出品"
-                          }
-                          aria-label={
-                            item.displayType === "STAR"
-                              ? "オーナー出品"
-                              : "あなたの出品"
-                          }
-                        >
-                          {item.displayType === "STAR" ? "⭐️" : "💫"}
-                        </span>
-                      )}
+              items.map((item) => {
+                const isFavorited = item.displayType === "FAVORITE";
 
-                      <img
-                        src={getImageUrl(item.itemImagePath, IMAGE_TYPE.ITEM)}
-                        alt={item.name}
-                        className={styles.itemImage}
-                        onError={onImageError}
-                      />
-                    </div>
+                return (
+                  <div key={item.id} className={styles.items_select_all}>
+                    <div
+                      className={styles.cardLink}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/item/${item.id}`)}
+                    >
+                      <div className={styles.itemImageWrapper}>
+                        {/* ⭐️ / 💫（FAVORITE では出さない） */}
+                        {item.displayType &&
+                          item.displayType !== "FAVORITE" && (
+                            <span className={styles.ownStar}>
+                              {item.displayType === "STAR" ? "⭐️" : "💫"}
+                            </span>
+                          )}
 
-                    <div className={styles.item_info}>
-                      <p className={styles.item_name}>{item.name}</p>
-                      <p className={styles.item_price}>
-                        ¥{item.price.toLocaleString()}
-                      </p>
+                        {/* ❤️ いいね */}
+                        {isAuthenticated && (
+                          <button
+                            className={styles.favoriteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(item, isFavorited);
+                            }}
+                          >
+                            {isFavorited ? "❤️" : "🤍"}
+                          </button>
+                        )}
+
+                        <img
+                          src={getImageUrl(
+                            item.itemImagePath,
+                            IMAGE_TYPE.ITEM,
+                          )}
+                          alt={item.name}
+                          className={styles.itemImage}
+                          onError={onImageError}
+                        />
+                      </div>
+
+                      <div className={styles.item_info}>
+                        <p className={styles.item_name}>{item.name}</p>
+                        <p className={styles.item_price}>
+                          ¥{item.price.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className={styles.no_items}>
                 {currentTab === "mylist" && !isAuthenticated

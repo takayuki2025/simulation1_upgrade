@@ -4,6 +4,7 @@ namespace App\Modules\Auth\Application\UseCase;
 
 use App\Modules\Auth\Application\Dto\LoginOrRegisterInput;
 use App\Modules\Auth\Application\Dto\LoginOrRegisterOutput;
+use App\Modules\Auth\Application\Dto\ExternalAuthUser;
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
 use App\Modules\Auth\Domain\Service\TokenIssuerService;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
@@ -21,42 +22,49 @@ final class LoginOrRegisterUseCase
     public function handle(LoginOrRegisterInput $input): LoginOrRegisterOutput
     {
         /* =========================================
-         * 1. Firebase ID Token 検証
+         * 1. External IDP 認証（Firebase）
          * ========================================= */
-        $firebaseUser = $this->firebase->verifyToken(
+        $externalUser = $this->firebase->verifyToken(
             $input->firebaseIdToken
         );
+        // ↑ ExternalAuthUser（DTO）
 
         /* =========================================
-         * 2. DB の事実を確定（唯一の真実）
+         * 2. User Provisioning（SoT 確定）
          * ========================================= */
         $provisioned = $this->provisioning->provisionFromFirebase(
-            firebaseUid: $firebaseUser['sub'],
-            email: $firebaseUser['email'] ?? null,
-            emailVerified: (bool) ($firebaseUser['email_verified'] ?? false),
-            displayName: $input->displayName ?? $firebaseUser['name'] ?? null,
+            firebaseUid: $externalUser->uid,
+            email: $externalUser->email,
+            emailVerified: $externalUser->emailVerified,
+            displayName: $externalUser->displayName,
         );
 
         /* =========================================
-         * 3. AuthPrincipal（DB → Domain）
+         * 3. AuthPrincipal 生成
          * ========================================= */
+
         $principal = AuthPrincipal::fromProvisionedUser(
-            user: $provisioned,
-            provider: 'firebase',
-            providerUid: $firebaseUser['sub'],
-            displayName: $firebaseUser['name'] ?? null,
+            $provisioned,          // ProvisionedUser
+            'firebase',             // provider
+            $externalUser->uid,     // providerUid
+            $externalUser->displayName
         );
 
+
         /* =========================================
-         * 4. Access Token 発行
+         * 4. JWT 発行
          * ========================================= */
+
+
         $accessToken = $this->tokenIssuer->issue(
-            user: $provisioned,
-            principal: $principal,
+            $provisioned,   // ① ProvisionedUser
+            $principal      // ② AuthPrincipal
         );
 
+
+
         /* =========================================
-         * 5. Output DTO
+         * 5. Output
          * ========================================= */
         return new LoginOrRegisterOutput(
             token: $accessToken,

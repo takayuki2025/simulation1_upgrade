@@ -43,27 +43,33 @@ final class JwtUserResolver
             return null;
         }
 
-        // ① DB の事実を確定
+        /* =========================================
+         * ① DB の事実を確定（JWT → ProvisionedUser）
+         * ========================================= */
         $provisioned = $this->provisioning->provisionFromJwt(
             userId: (int) $payload->sub
         );
 
-        // ② Laravel 用 User（互換レイヤー）
+        /* =========================================
+         * ② Laravel User（互換レイヤー）
+         * ========================================= */
         $eloquentUser = User::find($provisioned->userId);
         if (! $eloquentUser) {
             return null;
         }
 
-        // ③ Domain Principal（唯一の真実）
+        /* =========================================
+         * ③ AuthPrincipal（唯一の真実）
+         * ========================================= */
         $principal = AuthPrincipal::fromProvisionedUser(
-            user: $provisioned,
-            provider: 'jwt',
-            providerUid: (string) $payload->sub,
+            $provisioned,
+            'jwt',
+            (string) $payload->sub
         );
 
         return [
-            'user'      => $eloquentUser, // ✅ User モデル
-            'principal' => $principal,    // ✅ Domain
+            'user'      => $eloquentUser, // Laravel Auth 用
+            'principal' => $principal,    // Domain 用
         ];
     }
 }

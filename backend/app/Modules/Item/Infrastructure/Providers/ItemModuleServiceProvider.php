@@ -16,13 +16,6 @@ use Illuminate\Support\Facades\Event;
 
 final class ItemModuleServiceProvider extends ServiceProvider
 {
-
-    protected $listen = [
-        \App\Modules\Item\Domain\Event\ItemPublished::class => [
-            \App\Modules\Item\Application\Listener\GenerateItemEntitiesOnItemPublished::class,
-        ],
-    ];
-
     public function register(): void
     {
         // Repository bindings
@@ -41,15 +34,5 @@ final class ItemModuleServiceProvider extends ServiceProvider
             BrandNormalizationPort::class,
             AtlaskernelBrandNormalizer::class
         );
-    }
-
-    public function boot(): void
-    {
-        // イベント登録を有効化
-        foreach ($this->listen as $event => $listeners) {
-            foreach ($listeners as $listener) {
-                Event::listen($event, $listener);
-            }
-        }
     }
 }

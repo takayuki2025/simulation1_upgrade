@@ -3,24 +3,33 @@
 namespace App\Modules\Reaction\Infrastructure\Persistence;
 
 use App\Models\Good;
-use App\Modules\Reaction\Domain\Entity\Favorite;
+use App\Models\Item;
+use App\Modules\Reaction\Domain\Entity\Favorite as FavoriteEntity;
 use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
 use App\Modules\Reaction\Domain\ValueObject\ReactorId;
 use App\Modules\Reaction\Domain\ValueObject\FavoriteTargetId;
 
 final class EloquentFavoriteRepository implements FavoriteRepository
 {
-    public function add(Favorite $favorite): void
+    /**
+     * Favorite を追加（冪等）
+     */
+    public function add(FavoriteEntity $favorite): void
     {
-        // 既に存在するなら何もしない（冪等性）。厳密にしたければ例外に変更可。
-        Good::query()->firstOrCreate([
-            'user_id' => $favorite->reactorId()->value(),
-            'item_id' => $favorite->targetId()->value(),
-        ], [
-            'shop_id' => $favorite->shopId(),
-        ]);
+        Good::query()->firstOrCreate(
+            [
+                'user_id' => $favorite->reactorId()->value(),
+                'item_id' => $favorite->targetId()->value(),
+            ],
+            [
+                'shop_id' => $favorite->shopId(),
+            ]
+        );
     }
 
+    /**
+     * Favorite を削除
+     */
     public function remove(ReactorId $reactorId, FavoriteTargetId $targetId): void
     {
         Good::query()
@@ -29,6 +38,9 @@ final class EloquentFavoriteRepository implements FavoriteRepository
             ->delete();
     }
 
+    /**
+     * Favorite が存在するか
+     */
     public function exists(ReactorId $reactorId, FavoriteTargetId $targetId): bool
     {
         return Good::query()
@@ -37,6 +49,9 @@ final class EloquentFavoriteRepository implements FavoriteRepository
             ->exists();
     }
 
+    /**
+     * 対象 Item の Favorite 数
+     */
     public function countByTarget(FavoriteTargetId $targetId): int
     {
         return Good::query()
@@ -44,15 +59,22 @@ final class EloquentFavoriteRepository implements FavoriteRepository
             ->count();
     }
 
+    /**
+     * ユーザーがお気に入りした Item 一覧
+     *
+     * @return iterable<Item>
+     */
     public function listItemsByUser(ReactorId $reactorId): iterable
     {
-        // 既存の ItemRepository::listByCartUser 相当をここでやるか、
-        // Item を join / eager load する。今回は最低限「item を返せる」形で eager load。
         return Good::query()
-            ->with('item') // Good::item() リレーション前提
+            ->with('item')
             ->where('user_id', $reactorId->value())
+            ->whereHas('item', function ($q) {
+                $q->whereNotNull('published_at'); // ★ publish 済みのみ
+            })
             ->latest()
             ->get()
-            ->map(fn (Good $good) => $good->item);
+            ->map(fn (Good $good) => $good->item)
+            ->filter();
     }
 }

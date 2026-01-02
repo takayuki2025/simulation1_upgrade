@@ -6,14 +6,8 @@ use Illuminate\Support\Facades\Schema;
 
 class CreateItemsTable extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
-
         Schema::create('items', function (Blueprint $table) {
             $table->id();
 
@@ -22,12 +16,11 @@ class CreateItemsTable extends Migration
              */
             $table->enum('item_origin', [
                 'USER_PERSONAL',   // 個人出品
-                'SHOP_MANAGED',    // ショップ / 運営管理下商品（Seeder含む）
+                'SHOP_MANAGED',    // ショップ / 運営管理下商品
             ]);
 
             /**
              * ショップに属する場合のみ入る
-             * SHOP_MANAGED でも将来 null の可能性があるため nullable
              */
             $table->foreignId('shop_id')
                 ->nullable()
@@ -36,33 +29,68 @@ class CreateItemsTable extends Migration
 
             /**
              * 個人出品者
-             * USER_PERSONAL のみ入る
              */
             $table->foreignId('created_by_user_id')
                 ->nullable()
                 ->constrained('users')
                 ->nullOnDelete();
 
-            // 商品情報
+            /* =========================
+             * 商品情報（Fact）
+             * ========================= */
             $table->string('name', 20);
-            $table->integer('price');
+
+            /**
+             * 価格（SoT）
+             * publish 時に必ず確定
+             */
+            $table->integer('price')
+                ->comment('price amount (JPY), NOT NULL on publish');
+
+            /**
+             * 将来の多通貨対応余地
+             */
+            $table->char('price_currency', 3)
+                ->default('JPY');
+
             $table->string('brand', 20)->nullable();
             $table->string('explain', 255);
             $table->string('condition', 20);
             $table->json('category');
+
+            /**
+             * 表示用画像（draft は入れない）
+             */
             $table->string('item_image')->nullable();
+
+            /**
+             * 在庫数
+             */
             $table->integer('remain');
 
-            $table->timestamps();
-        });
+            /* =========================
+             * 公開制御（★今回の核心）
+             * ========================= */
 
+            /**
+             * 公開日時
+             * - null = 下書き / 非公開
+             * - not null = 公開済み
+             */
+            $table->timestamp('published_at')
+                ->nullable()
+                ->index();
+
+            $table->timestamps();
+
+            /* =========================
+             * インデックス
+             * ========================= */
+            $table->index(['item_origin', 'shop_id']);
+            $table->index(['created_by_user_id']);
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down()
     {
         Schema::dropIfExists('items');

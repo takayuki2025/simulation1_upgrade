@@ -71,6 +71,7 @@ services:
       MYSQL_DATABASE: laravel_db
       MYSQL_USER: laravel_user
       MYSQL_PASSWORD: laravel_pass
+      TZ: Asia/Tokyo # 🔥 追加: 明示的にタイムゾーンを設定
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
