@@ -27,33 +27,26 @@ export function getImageUrl(
   path?: string | null,
   type: IMAGE_TYPE = IMAGE_TYPE.OTHER,
 ): string {
-  // --- 未設定 ---
   if (!path) {
-    if (type === IMAGE_TYPE.USER) return DEFAULT_USER_IMAGE;
-    return DEFAULT_ITEM_IMAGE;
+    return type === IMAGE_TYPE.USER ? DEFAULT_USER_IMAGE : DEFAULT_ITEM_IMAGE;
   }
 
-  // --- 完全 URL ---
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
 
-  // --- /storage から始まる ---
   if (path.startsWith("/storage/")) {
     return `${BACKEND_BASE_URL}${path}`;
   }
 
-  // --- pictures_user（storage 不要） ---
-  if (path.startsWith("pictures_user/")) {
-    return `${BACKEND_BASE_URL}/${path}`;
-  }
-
-  // --- item_images / pictures は storage 配下 ---
-  if (path.startsWith("item_images/") || path.startsWith("pictures/")) {
+  if (
+    path.startsWith("pictures_user/") ||
+    path.startsWith("item_images/") ||
+    path.startsWith("pictures/")
+  ) {
     return `${BACKEND_BASE_URL}/storage/${path}`;
   }
 
-  // --- その他（保険） ---
   return `${BACKEND_BASE_URL}/${path}`;
 }
 

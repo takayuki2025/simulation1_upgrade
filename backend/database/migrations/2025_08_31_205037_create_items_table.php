@@ -14,10 +14,12 @@ class CreateItemsTable extends Migration
             /**
              * 出品起源（★最重要）
              */
+
             $table->enum('item_origin', [
-                'USER_PERSONAL',   // 個人出品
-                'SHOP_MANAGED',    // ショップ / 運営管理下商品
+                'user_personal',
+                'shop_managed',
             ]);
+
 
             /**
              * ショップに属する場合のみ入る

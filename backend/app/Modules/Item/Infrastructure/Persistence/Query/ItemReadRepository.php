@@ -97,6 +97,7 @@ final class ItemReadRepository
 
 
 
+
         return [
             'id'        => $item->id,
             'shop_id'   => $item->shop_id,
@@ -105,11 +106,9 @@ final class ItemReadRepository
             'explain'   => $item->explain,
             'remain'    => $item->remain,
 
-            // brand
             'brands'        => array_column($brandTags, 'display_name'),
             'brand_primary' => $item->brand_primary,
 
-            // condition / color
             'condition' => $conditionTags[0]['display_name']
                 ?? $item->condition_name
                 ?? null,
@@ -118,15 +117,14 @@ final class ItemReadRepository
                 ?? $item->color_name
                 ?? null,
 
-            // ★ category（追加）
             'categories' => array_column($categoryTags, 'display_name'),
 
             'tags' => $tags,
 
-            'item_image' => $item->item_image
-                ? asset('storage/' . $item->item_image)
-                : null,
+            // ✅ 生パスのみ（Presentation/Resource側でURL化）
+            'item_image' => $item->item_image ?: null,
         ];
+
 
 
     }

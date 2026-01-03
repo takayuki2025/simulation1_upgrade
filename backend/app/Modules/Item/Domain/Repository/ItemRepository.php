@@ -2,67 +2,21 @@
 
 namespace App\Modules\Item\Domain\Repository;
 
-use App\Modules\Item\Domain\Collection\Items;
 use App\Modules\Item\Domain\Entity\Item;
-use App\Modules\Item\Domain\ValueObject\ItemId;
-use App\Modules\Item\Domain\ValueObject\ItemImagePath;
 
 interface ItemRepository
 {
-    public function findAll(
-        int $limit,
-        int $page,
-        ?string $keyword
-    ): Items;
-
-    public function searchByKeyword(string $keyword): Items;
-
     public function findById(int $id): ?Item;
 
-    /** お気に入り数 */
-    public function favoritesCount(int $itemId): int;
-
-    /** ユーザーがお気に入り済みか */
-    public function isFavorited(int $itemId, int $userId): bool;
-
-    /** コメント一覧（ユーザー込み） */
-    public function listComments(int $itemId): array;
-
-    public function searchPublic(
-        int $limit,
-        int $page,
-        ?string $keyword,
-        ?int $viewerUserId,
-    ): Items;
-
-    public function findPublicItems(
-        int $limit,
-        int $page,
-        ?string $keyword,
-        ?int $excludeSellerId
-    ): Items;
-
-
+    /**
+     * Upsert
+     * - id === null : insert
+     * - id !== null : update
+     */
     public function save(Item $item): void;
 
-    public function updateItemImage(
-        ItemId $itemId,
-        ItemImagePath $path
-    ): void;
-
-    public function findPublicByShopId(int $shopId): array;
-
-    public function searchPublicPaginator(
-        int $limit,
-        int $page,
-        ?string $keyword,
-        array $excludeShopIds = []
-    );
-
-    public function searchByShopCode(
-        string $shopCode,
-        ?string $keyword,
-        int $limit,
-        int $page
-    );
+    /**
+     * Delete（論理 / 物理は運用次第）
+     */
+    public function delete(int $id): void;
 }

@@ -17,12 +17,12 @@ use DateTimeImmutable;
 
 final class EloquentItemRepository implements ItemRepository
 {
-    /* =====================================================
-     * Eloquent → Domain
-     * ===================================================== */
+    /* ===============================
+       Eloquent -> Domain
+    =============================== */
     private function toDomain(EloquentItem $model): Item
     {
-        // category の揺れを吸収（json / array）
+        // category は DB 側の型に揺れがある前提で吸収
         $categories = $model->category ?? [];
         if (is_string($categories)) {
             $decoded = json_decode($categories, true);
@@ -39,38 +39,30 @@ final class EloquentItemRepository implements ItemRepository
         }
 
         return Item::reconstitute(
-            id: new ItemId((int) $model->id),
-            itemOrigin: ItemOrigin::from((string) $model->item_origin),
-            shopId: $model->shop_id !== null ? (int) $model->shop_id : null,
-            createdByUserId: $model->created_by_user_id !== null
-                ? (int) $model->created_by_user_id
-                : null,
-            name: (string) $model->name,
-            price: new Money((int) $model->price, 'JPY'),
-            explain: (string) ($model->explain ?? ''),
-            condition: (string) ($model->condition ?? ''),
+            id: new ItemId((int)$model->id),
+            itemOrigin: ItemOrigin::from((string)$model->item_origin),
+            shopId: $model->shop_id !== null ? (int)$model->shop_id : null,
+            createdByUserId: $model->created_by_user_id !== null ? (int)$model->created_by_user_id : null,
+            name: (string)$model->name,
+            price: new Money((int)$model->price, 'JPY'),
+            explain: (string)($model->explain ?? ''),
+            condition: (string)($model->condition ?? ''),
             category: new CategoryList($categories),
             itemImage: $imagePath,
-            remain: new StockCount((int) ($model->remain ?? 0)),
+            remain: new StockCount((int)($model->remain ?? 0)),
             publishedAt: $publishedAt,
         );
     }
 
-    /* =====================================================
-     * Find
-     * ===================================================== */
     public function findById(int $id): ?Item
     {
         $model = EloquentItem::query()->find($id);
-
-        return $model
-            ? $this->toDomain($model)
-            : null;
+        return $model ? $this->toDomain($model) : null;
     }
 
-    /* =====================================================
-     * Save（Upsert）
-     * ===================================================== */
+    /* ===============================
+       Save (Upsert)
+    =============================== */
     public function save(Item $item): void
     {
         // update or insert
@@ -84,8 +76,8 @@ final class EloquentItemRepository implements ItemRepository
             $model = new EloquentItem();
         }
 
-        // Domain → DB（Fact のみ）
-        $model->item_origin = $item->getItemOrigin()->value();
+        // Domain -> DB
+        $model->item_origin = $item->getItemOrigin()->value(); // string
         $model->shop_id = $item->getShopId();
         $model->created_by_user_id = $item->getCreatedByUserId();
         $model->name = $item->getName();
@@ -109,19 +101,14 @@ final class EloquentItemRepository implements ItemRepository
 
         $model->save();
 
-        // 新規作成時のみ ID を付与
+        // 新規時のみ ID を付与
         if ($item->getId() === null) {
-            $item->setId(new ItemId((int) $model->id));
+            $item->setId(new ItemId((int)$model->id));
         }
     }
 
-    /* =====================================================
-     * Delete
-     * ===================================================== */
     public function delete(int $id): void
     {
-        EloquentItem::query()
-            ->where('id', $id)
-            ->delete();
+        EloquentItem::query()->where('id', $id)->delete();
     }
 }

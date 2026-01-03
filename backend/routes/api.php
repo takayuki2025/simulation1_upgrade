@@ -27,6 +27,15 @@ Route::post('/login_or_register', [FirebaseAuthController::class, 'loginOrRegist
 // Refresh Token
 Route::post('/auth/refresh', [TokenController::class, 'refresh']);
 
+// メール認証の際のメール再送信
+use App\Modules\Auth\Presentation\Http\Controllers\ResendEmailVerificationController;
+
+Route::middleware(['auth.jwt.optional'])
+    ->post(
+        '/email/verification-notification',
+        ResendEmailVerificationController::class
+    );
+
 
 
 use App\Modules\Shop\Presentation\Http\Controllers\ShopController;

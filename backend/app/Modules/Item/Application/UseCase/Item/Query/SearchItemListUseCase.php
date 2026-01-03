@@ -2,7 +2,7 @@
 
 namespace App\Modules\Item\Application\UseCase\Item\Query;
 
-use App\Modules\Item\Domain\Repository\ItemRepository;
+use App\Modules\Item\Application\Query\PublicCatalogQueryService;
 use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
 use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
 use App\Modules\Item\Application\Dto\Item\ListItemsOutputDto;
@@ -13,42 +13,45 @@ use App\Modules\Reaction\Domain\ValueObject\FavoriteTargetId;
 final class SearchItemListUseCase
 {
     public function __construct(
-        private ItemRepository $itemRepository,
+        private PublicCatalogQueryService $catalogQuery,
         private FavoriteRepository $favoriteRepository,
     ) {
     }
 
     public function execute(ListItemsInputDto $input): ListItemsOutputDto
     {
-        // ❌ 検索では除外しない
-        $paginator = $this->itemRepository->searchPublicPaginator(
+        $paginator = $this->catalogQuery->paginate(
             limit: $input->limit,
             page: $input->page,
             keyword: $input->keyword,
-            excludeShopIds: [],
+            excludeShopIds: $input->viewerShopIds,
         );
 
-        $items = collect($paginator->items())->map(function ($model) use ($input) {
+        $items = collect($paginator->items())
+            ->map(function (array $row) use ($input) {
 
-            $favoritesCount = $this->favoriteRepository->countByTarget(
-                new FavoriteTargetId($model->id)
-            );
+                $itemId = (int) ($row['id'] ?? 0);
 
-            $isFavorited = $input->viewerUserId
-                ? $this->favoriteRepository->exists(
-                    new ReactorId($input->viewerUserId),
-                    new FavoriteTargetId($model->id)
-                )
-                : false;
+                $favoritesCount = $this->favoriteRepository->countByTarget(
+                    new FavoriteTargetId($itemId)
+                );
 
-            return PublicItemAssembler::fromEloquent(
-                model: $model,
-                viewerUserId: $input->viewerUserId,
-                viewerShopIds: $input->viewerShopIds,
-                isFavorited: $isFavorited,
-                favoritesCount: $favoritesCount,
-            );
-        });
+                $isFavorited = $input->viewerUserId
+                    ? $this->favoriteRepository->exists(
+                        new ReactorId($input->viewerUserId),
+                        new FavoriteTargetId($itemId)
+                    )
+                    : false;
+
+                return PublicItemAssembler::fromReadModel(
+                    row: $row,
+                    viewerUserId: $input->viewerUserId,
+                    viewerShopIds: $input->viewerShopIds,
+                    isFavorited: $isFavorited,
+                    favoritesCount: $favoritesCount,
+                );
+            })
+            ->values();
 
         return new ListItemsOutputDto(
             items: $items->all(),

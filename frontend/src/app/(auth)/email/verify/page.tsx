@@ -46,6 +46,8 @@ export default function VerifyEmailPage() {
     return <div className="mt-20 text-center">読み込み中...</div>;
   }
 
+  const canResend = !!user;
+
   return (
     <div className="min-h-screen flex justify-center items-start pt-20 bg-gray-50">
       <div className="w-full max-w-xl p-8 bg-white rounded-lg shadow-xl">
@@ -72,8 +74,8 @@ export default function VerifyEmailPage() {
         <div className="mt-8 space-y-3">
           <button
             onClick={handleResend}
-            disabled={isResending}
-            className="w-full bg-indigo-600 text-white py-3 rounded font-bold"
+            disabled={isResending || !canResend}
+            className="w-full bg-indigo-600 text-white py-3 rounded font-bold disabled:opacity-50"
           >
             認証メールを再送
           </button>
@@ -84,6 +86,11 @@ export default function VerifyEmailPage() {
           >
             ログインページへ
           </button>
+          {!user && (
+            <div className="mt-4 p-3 bg-yellow-50 text-yellow-700 text-sm rounded text-center">
+              認証メールを再送するには、一度ログインしてください。
+            </div>
+          )}
         </div>
       </div>
     </div>

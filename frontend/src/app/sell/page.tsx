@@ -213,7 +213,7 @@ export default function ItemSellPage() {
                 checked={itemOrigin === "SHOP_MANAGED"}
                 onChange={() => setItemOrigin("SHOP_MANAGED")}
               />
-              ショップ管理商品（準備中）
+              ショップ管理商品
             </label>
           </div>
         </div>

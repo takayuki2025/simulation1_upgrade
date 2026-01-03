@@ -182,7 +182,7 @@ export default function ProfilePage() {
     formData.append("user_image", file);
 
     try {
-      const res = await apiClient.post("/profile/image", formData, {
+      const res = await apiClient.post("/mypage/profile/image", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -208,7 +208,7 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      const res = await apiClient.patch("/profile", form);
+      const res = await apiClient.patch("/mypage/profile", form);
       initializeProfileFromResponse(res.data);
       setSuccessMessage("プロフィールを更新しました！");
     } catch (err: any) {

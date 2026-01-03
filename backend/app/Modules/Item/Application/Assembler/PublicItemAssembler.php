@@ -8,60 +8,76 @@ use Carbon\Carbon;
 
 final class PublicItemAssembler
 {
-    public static function fromEloquent(
-        EloquentItem $model,
+    public static function fromReadModel(
+        array $row,
         ?int $viewerUserId,
         array $viewerShopIds,
         bool $isFavorited,
         int $favoritesCount,
     ): PublicItemDto {
 
-        $isOwner = $viewerUserId !== null
-            && $model->created_by_user_id === $viewerUserId;
+        $itemId = (int) $row['id'];
+        $shopId = $row['shop_id'] ?? null;
+        $createdByUserId = $row['created_by_user_id'] ?? null;
 
-        $canManage = $model->shop_id !== null
-            && in_array($model->shop_id, $viewerShopIds, true);
+        $isOwner = $viewerUserId !== null
+            && $createdByUserId === $viewerUserId;
+
+        $belongsToAnyShop = !empty($viewerShopIds);
+
+        $canManage = $shopId !== null
+            && in_array($shopId, $viewerShopIds, true);
 
         // =========================
-        // ⭐️ / 💫 表示ルール（Amazon型）
+        // ⭐️ / 💫 表示ルール（修正版）
         // =========================
 
         $displayType = null;
 
-        // 💫：自分の個人出品
-        if ($model->shop_id === null && $isOwner) {
-            $displayType = 'MY_ITEM';
-        }
-
-        // ⭐️：自分が所属するショップの「メンバーの個人出品」
-        elseif (
-            $model->shop_id === null
-            && !empty($viewerShopIds)
-            && $model->created_by_user_id !== null
-            && $model->created_by_user_id !== $viewerUserId
-            && $canManage === true
+        /**
+         * ⭐️ ショップ所属ユーザーの個人出品
+         * - owner であっても
+         * - shop_id === null
+         * - viewer が shop に所属している
+         */
+        if (
+            $shopId === null
+            && $isOwner
+            && $belongsToAnyShop
         ) {
             $displayType = 'STAR';
         }
 
-        // ❤️ FAVORITE は最優先
+        /**
+         * 💫 一般ユーザーの個人出品
+         */
+        elseif (
+            $shopId === null
+            && $isOwner
+            && !$belongsToAnyShop
+        ) {
+            $displayType = 'MY_ITEM';
+        }
+
+        /**
+         * ❤️ FAVORITE は最優先
+         */
         if ($isFavorited) {
             $displayType = 'FAVORITE';
         }
 
-
         return new PublicItemDto(
-            id: $model->id,
-            name: $model->name,
-            price: (int) $model->price,
-            itemImagePath: $model->item_image
-                ? '/storage/' . ltrim($model->item_image, '/')
+            id: $itemId,
+            name: (string) $row['name'],
+            price: (int) $row['price'],
+            itemImagePath: $row['item_image']
+                ? '/storage/' . ltrim($row['item_image'], '/')
                 : null,
-            brandPrimary: $model->brand ?? null,
-            conditionName: $model->condition ?? null,
+            brandPrimary: $row['brand'] ?? null,
+            conditionName: $row['condition'] ?? null,
             colorName: null,
-            publishedAt: $model->published_at
-                ? Carbon::parse($model->published_at)->toISOString()
+            publishedAt: $row['published_at']
+                ? Carbon::parse($row['published_at'])->toISOString()
                 : null,
             displayType: $displayType,
             isOwner: $isOwner,
