@@ -5,9 +5,9 @@ namespace App\Modules\Shipment\Infrastructure\Persistence;
 use App\Modules\Shipment\Domain\Entity\Shipment;
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Order\Domain\ValueObject\Address;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
-use Carbon\Carbon;
 
 final class EloquentShipmentRepository implements ShipmentRepository
 {
@@ -19,49 +19,13 @@ final class EloquentShipmentRepository implements ShipmentRepository
             throw new RuntimeException('Shipment not found');
         }
 
-        return new Shipment(
-            id: (int) $row->id,
-            shopId: (int) $row->shop_id,
-            orderId: (int) $row->order_id,
-            status: ShipmentStatus::from($row->status),
-            originAddress: $this->decodeJson($row->origin_address),
-            destinationAddress: $this->decodeJson($row->destination_address),
-            eta: $row->eta ? Carbon::parse($row->eta) : null,
-        );
-    }
-
-    public function save(Shipment $shipment): Shipment
-    {
-        if ($shipment->id === null) {
-            $id = DB::table('shipments')->insertGetId([
-                'shop_id' => $shipment->shopId,
-                'order_id' => $shipment->orderId,
-                'status' => $shipment->status->value,
-                'origin_address' => json_encode($shipment->originAddress),
-                'destination_address' => json_encode($shipment->destinationAddress),
-                'eta' => $shipment->eta?->toDateTimeString(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $shipment->id = $id;
-            return $shipment;
-        }
-
-        DB::table('shipments')
-            ->where('id', $shipment->id)
-            ->update([
-                'status' => $shipment->status->value,
-                'updated_at' => now(),
-            ]);
-
-        return $shipment;
+        return $this->reconstitute($row);
     }
 
     public function findByOrderId(int $orderId): ?Shipment
     {
         $row = DB::table('shipments')->where('order_id', $orderId)->first();
-        return $row ? $this->findById($row->id) : null;
+        return $row ? $this->reconstitute($row) : null;
     }
 
     public function existsByOrderId(int $orderId): bool
@@ -69,33 +33,44 @@ final class EloquentShipmentRepository implements ShipmentRepository
         return DB::table('shipments')->where('order_id', $orderId)->exists();
     }
 
-    private function decodeJson(mixed $value): array
+    public function save(Shipment $shipment): Shipment
     {
-        if (is_array($value)) {
-            return $value;
+        if ($shipment->id() === null) {
+            $id = DB::table('shipments')->insertGetId([
+                'shop_id' => $shipment->shopId(),
+                'order_id' => $shipment->orderId(),
+                'status' => $shipment->status()->value,
+                'origin_address' => json_encode($shipment->originAddress()->toArray(), JSON_UNESCAPED_UNICODE),
+                'destination_address' => json_encode($shipment->destinationAddress()->toArray(), JSON_UNESCAPED_UNICODE),
+                'eta' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $this->findById($id);
         }
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            return is_array($decoded) ? $decoded : [];
-        }
-        return [];
+
+        DB::table('shipments')
+            ->where('id', $shipment->id())
+            ->update([
+                'status' => $shipment->status()->value,
+                'eta' => $shipment->eta()?->format('Y-m-d H:i:s'),
+                'updated_at' => now(),
+            ]);
+
+        return $this->findById($shipment->id());
     }
 
-    public function createForOrder(
-        int $shopId,
-        int $orderId
-    ): Shipment {
-        $id = DB::table('shipments')->insertGetId([
-            'shop_id' => $shopId,
-            'order_id' => $orderId,
-            'status' => ShipmentStatus::CREATED->value,
-            'origin_address' => json_encode([]),
-            'destination_address' => json_encode([]),
-            'eta' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return $this->findById($id);
+    private function reconstitute(object $row): Shipment
+    {
+        return Shipment::reconstitute(
+            id: (int) $row->id,
+            shopId: (int) $row->shop_id,
+            orderId: (int) $row->order_id,
+            status: ShipmentStatus::from($row->status),
+            originAddress: Address::fromArray(json_decode($row->origin_address, true)),
+            destinationAddress: Address::fromArray(json_decode($row->destination_address, true)),
+            eta: $row->eta ? new \DateTimeImmutable($row->eta) : null,
+        );
     }
 }

@@ -27,133 +27,117 @@ final class HandlePaymentWebhookUseCase
 
     public function handle(HandlePaymentWebhookInput $input): void
     {
-        \Log::info('[Webhook Received]', [
-            'event_id'   => $input->eventId,
+
+
+        \Log::info('[🔥Webhook] handle called', [
+            'provider' => $input->provider,
+            'event_id' => $input->eventId,
             'event_type' => $input->eventType,
         ]);
 
-        $paymentId = null;
-        $orderId   = null;
-
-        // reserve できない（or 例外）なら即 return（Stripe には 2xx を返す想定でも、ここは処理を終える）
         if ($this->safeReserve($input) !== true) {
             return;
         }
 
-        // dispatch はトランザクション外で行うため、イベントを一時保持
+        $paymentId = null;
+        $orderId   = null;
         $orderPaidEvent = null;
 
         try {
             $domainEvent = $this->mapper->map($input);
 
 
-
-
-            \Log::info('[DEBUG] mapped domain event', [
-                'event_id' => $input->eventId,
-                'event_type' => $input->eventType,
-                'mapped_type' => $domainEvent->type->value ?? (string)$domainEvent->type,
-                'provider_payment_id' => $domainEvent->providerPaymentId ?? null,
+            \Log::info('[🔥Webhook] mapped domain event', [
+                'type' => $domainEvent->type->value,
+                'provider_payment_id' => $domainEvent->providerPaymentId,
             ]);
 
 
             if ($domainEvent->type === DomainPaymentEventType::IGNORED) {
-                $this->safeComplete($input, 'ignored', null, null, null);
                 return;
             }
 
-            if (empty($domainEvent->providerPaymentId)) {
-                $this->safeComplete($input, 'missing_provider_payment_id', null, null, null);
-                return;
-            }
-
-            DB::transaction(function () use ($domainEvent, &$paymentId, &$orderId, &$orderPaidEvent) {
-
+            DB::transaction(function () use (
+                $domainEvent,
+                &$paymentId,
+                &$orderId,
+                &$orderPaidEvent
+            ) {
                 $payment = $this->payments
                     ->findByProviderPaymentId($domainEvent->providerPaymentId);
 
-                if (! $payment) {
-
-
-
-
-                    \Log::warning('[DEBUG] payment not found by provider_payment_id', [
-                        'provider_payment_id' => $domainEvent->providerPaymentId,
-                        'event_type' => $input->eventType,
-                        'event_id' => $input->eventId,
-                    ]);
-
-                    // Webhook は 500 を返さない方針：ここでは例外にしない
-                    // ただし complete 側では paymentId/orderId は null のままになる
+                if (!$payment) {
                     return;
                 }
 
-                // ---- 例外的救済：instructions が未保存なら埋めてよい（null のときだけ）----
-                if (
-                    $payment->instructions() === null
-                    && property_exists($domainEvent, 'instructions')
-                    && ! empty($domainEvent->instructions)
-                ) {
-                    $payment = $payment->withInstructions($domainEvent->instructions);
-                }
+                // ----------------------------
+                // Refund（ここが追加点）
+                // ----------------------------
+                if ($domainEvent->type === DomainPaymentEventType::REFUND_SUCCEEDED) {
 
-                // ---- SUCCEEDED の冪等：すでに SUCCEEDED なら status は触らない（上書きしない）----
-                if ($payment->status() === PaymentStatus::SUCCEEDED) {
-                    $paymentId = $payment->id();
-                    $orderId   = $payment->orderId();
+                    $meta = $domainEvent->instructions ?? [];
+                    $refundId = $meta['provider_refund_id'] ?? null;
 
-                    // instructions 救済で変更があった可能性があるので save
-                    $this->payments->save($payment);
-                    return;
-                }
-
-                // ---- イベント種別ごとの status 遷移 ----
-                if ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
-
-                    // instructions を最優先で保存
-                    if (property_exists($domainEvent, 'instructions') && ! empty($domainEvent->instructions)) {
-                        $payment = $payment->withInstructions($domainEvent->instructions);
+                    if (!is_string($refundId)) {
+                        return;
                     }
 
-                    $payment = $payment->markRequiresAction([
-                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
-                    ]);
+                    if ($this->ledgers->existsRefundByProviderRefundId('stripe', $refundId)) {
+                        return; // 冪等
+                    }
 
-                    $this->payments->save($payment);
+                    $this->ledgers->recordRefund(
+                        shopId: $payment->shopId(),
+                        amount: $payment->amount(),
+                        currency: $payment->currency(),
+                        orderId: $payment->orderId(),
+                        paymentId: $payment->id(),
+                        provider: 'stripe',
+                        providerRefundId: $refundId,
+                        reason: $meta['reason'] ?? null,
+                        occurredAt: $domainEvent->occurredAt,
+                    );
+
+                    return;
+                }
+
+                // ----------------------------
+                // 通常の決済フロー
+                // ----------------------------
+                if ($payment->status() === PaymentStatus::SUCCEEDED) {
+                    return;
                 }
 
                 if ($domainEvent->type === DomainPaymentEventType::FAILED) {
-                    $payment = $payment->markFailed([
-                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
-                        'reason'      => $domainEvent->reason ?? null,
-                    ]);
+                    $this->payments->save(
+                        $payment->markFailed(['reason' => $domainEvent->reason])
+                    );
+                    return;
+                }
 
-                    $this->payments->save($payment);
+                if ($domainEvent->type === DomainPaymentEventType::REQUIRES_ACTION) {
+                    $this->payments->save(
+                        $payment->markRequiresAction()
+                    );
+                    return;
                 }
 
                 if ($domainEvent->type === DomainPaymentEventType::SUCCEEDED) {
 
-                    // ① Payment を SUCCEEDED に
-                    $payment = $payment->markSucceeded([
-                        'occurred_at' => $domainEvent->occurredAt->format(DATE_ATOM),
-                    ]);
+                    $payment = $payment->markSucceeded();
                     $this->payments->save($payment);
 
-                    // ② Order を PAID に（Order Aggregate が唯一の情報源）
                     $order = $this->orders->findById($payment->orderId());
                     if ($order) {
                         $paidOrder = $order->markPaid();
                         $this->orders->save($paidOrder);
 
-                        // ✅ dispatch は transaction 外で行う（ここでは Event オブジェクトだけ作る）
-                        // ✅ orderId / shopId を必ず載せる（Listener を強くする）
                         $orderPaidEvent = new OrderPaid(
                             orderId: $paidOrder->id(),
                             shopId: $paidOrder->shopId(),
                         );
                     }
 
-                    // ③ 売上計上（Ledger）
                     $this->ledgers->recordSale(
                         shopId: $payment->shopId(),
                         amount: $payment->amount(),
@@ -163,32 +147,21 @@ final class HandlePaymentWebhookUseCase
                         occurredAt: $domainEvent->occurredAt,
                     );
                 }
-
-                $paymentId = $payment->id();
-                $orderId   = $payment->orderId();
             });
 
-            // ✅ トランザクション外で dispatch（コミット済みの状態を前提に Listener が動ける）
-            if ($orderPaidEvent !== null) {
-                Event::dispatch($orderPaidEvent);
+
+            if ($orderPaidEvent) {
+
+                \Log::info('[🔥Webhook] dispatching OrderPaid (afterCommit)', [
+                    'order_id' => $orderPaidEvent->orderId,
+                ]);
+
+                DB::afterCommit(fn () => Event::dispatch($orderPaidEvent));
             }
 
+
+        } finally {
             $this->safeComplete($input, 'ok', $paymentId, $orderId, null);
-
-        } catch (\Throwable $e) {
-
-            $this->safeComplete(
-                $input,
-                'failed',
-                $paymentId,
-                $orderId,
-                $e->getMessage()
-            );
-
-            \Log::error('[Webhook Exception]', [
-                'event_id' => $input->eventId,
-                'message'  => $e->getMessage(),
-            ]);
         }
     }
 
@@ -201,11 +174,7 @@ final class HandlePaymentWebhookUseCase
                 $input->eventType,
                 $input->payloadHash
             );
-        } catch (\Throwable $e) {
-            \Log::error('[Webhook Reserve Failed]', [
-                'event_id' => $input->eventId,
-                'message'  => $e->getMessage(),
-            ]);
+        } catch (\Throwable) {
             return null;
         }
     }
@@ -226,12 +195,7 @@ final class HandlePaymentWebhookUseCase
                 $orderId,
                 $errorMessage,
             );
-        } catch (\Throwable $e) {
-            \Log::error('[Webhook Complete Failed]', [
-                'event_id' => $input->eventId,
-                'status'   => $status,
-                'message'  => $e->getMessage(),
-            ]);
+        } catch (\Throwable) {
         }
     }
 }

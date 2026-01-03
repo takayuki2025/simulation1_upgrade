@@ -45,4 +45,48 @@ class Profile
             'email_verified_at' => $this->emailVerifiedAt?->format('Y-m-d H:i:s'),
         ];
     }
+
+    // =====================
+    // getters（読み取り専用）
+    // =====================
+
+    public function id(): int
+    {
+        return $this->id;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function email(): string
+    {
+        return $this->email;
+    }
+
+    public function postNumber(): ?string
+    {
+        return $this->postNumber;
+    }
+
+    public function address(): ?string
+    {
+        return $this->address;
+    }
+
+    public function building(): ?string
+    {
+        return $this->building;
+    }
+
+    public function userImage(): ?string
+    {
+        return $this->userImage;
+    }
+
+    public function emailVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerifiedAt;
+    }
 }

@@ -56,6 +56,27 @@ final class CreateOrderUseCase
 
             $saved = $this->orders->save($order);
 
+
+
+            // =============================
+            // ✅ order_items を作成（正規データ）
+            // =============================
+            foreach ($snapshots as $snapshot) {
+                DB::table('order_items')->insert([
+                    'order_id'       => $saved->id(),
+                    'item_id'        => $snapshot->itemId,
+                    'shop_id'        => $saved->shopId(),
+                    'item_name'      => $snapshot->name,
+                    'item_image'     => $snapshot->imagePath,
+                    'price_amount'   => $snapshot->priceAmount,
+                    'price_currency' => $snapshot->priceCurrency,
+                    'quantity'       => $snapshot->quantity,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ]);
+            }
+
+
             $this->history->addEvent(
                 orderId: $saved->id() ?? 0,
                 type: 'created',

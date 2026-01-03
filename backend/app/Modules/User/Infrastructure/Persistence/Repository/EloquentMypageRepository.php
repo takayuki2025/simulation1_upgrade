@@ -4,6 +4,7 @@ namespace App\Modules\User\Infrastructure\Persistence\Repository;
 
 use App\Models\Item;
 use App\Modules\User\Domain\Repository\MypageRepository;
+use Illuminate\Support\Facades\DB;
 
 final class EloquentMypageRepository implements MypageRepository
 {
@@ -37,7 +38,19 @@ final class EloquentMypageRepository implements MypageRepository
      */
     public function listBoughtItems(int $userId): array
     {
-        return [];
+        return DB::table('order_histories')
+            ->where('user_id', $userId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($row) => [
+                'row_id'     => $row->order_id . '-' . $row->item_id,
+                'item_id'    => $row->item_id,
+                'name'       => $row->item_name,      // ✅ 修正
+                'item_image' => $row->item_image,
+                'order_id'   => $row->order_id,
+                'price'      => $row->price_amount,   // ✅ 修正
+            ])
+            ->toArray();
     }
 
     /**

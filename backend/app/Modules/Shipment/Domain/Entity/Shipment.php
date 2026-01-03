@@ -3,71 +3,122 @@
 namespace App\Modules\Shipment\Domain\Entity;
 
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
-use DomainException;
+use App\Modules\Order\Domain\ValueObject\Address;
 
 final class Shipment
 {
-    public function __construct(
-        public ?int $id,
-        public int $shopId,
-        public int $orderId,
-        public ShipmentStatus $status,
-        public array $originAddress,
-        public array $destinationAddress,
-        public ?\DateTimeImmutable $eta,
+    private function __construct(
+        private ?int $id,
+        private int $shopId,
+        private int $orderId,
+        private ShipmentStatus $status,
+        private Address $originAddress,
+        private Address $destinationAddress,
+        private ?\DateTimeImmutable $eta,
     ) {
     }
 
-    public static function createInitial(
+    /* ============================
+       Factory
+    ============================ */
+
+    public static function createDraft(
         int $shopId,
         int $orderId,
-        array $destinationAddress,
+        Address $originAddress,
+        Address $destinationAddress,
     ): self {
         return new self(
             id: null,
             shopId: $shopId,
             orderId: $orderId,
-            status: ShipmentStatus::CREATED,
-            originAddress: [],
+            status: ShipmentStatus::DRAFT,
+            originAddress: $originAddress,
             destinationAddress: $destinationAddress,
             eta: null,
         );
     }
 
-    public function pack(): void
-    {
-        if ($this->status !== ShipmentStatus::CREATED) {
-            throw new DomainException(sprintf(
-                'Invalid shipment state transition: %s → packed',
-                $this->status->value
-            ));
-        }
-
-        $this->status = ShipmentStatus::PACKED;
+    public static function reconstitute(
+        int $id,
+        int $shopId,
+        int $orderId,
+        ShipmentStatus $status,
+        Address $originAddress,
+        Address $destinationAddress,
+        ?\DateTimeImmutable $eta,
+    ): self {
+        return new self(
+            id: $id,
+            shopId: $shopId,
+            orderId: $orderId,
+            status: $status,
+            originAddress: $originAddress,
+            destinationAddress: $destinationAddress,
+            eta: $eta,
+        );
     }
 
-    public function ship(): void
+    /* ============================
+       Getters
+    ============================ */
+
+    public function id(): ?int
     {
-        $this->assertStatus(ShipmentStatus::PACKED);
-        $this->status = ShipmentStatus::SHIPPED;
+        return $this->id;
+    }
+    public function shopId(): int
+    {
+        return $this->shopId;
+    }
+    public function orderId(): int
+    {
+        return $this->orderId;
+    }
+    public function status(): ShipmentStatus
+    {
+        return $this->status;
+    }
+    public function originAddress(): Address
+    {
+        return $this->originAddress;
+    }
+    public function destinationAddress(): Address
+    {
+        return $this->destinationAddress;
+    }
+    public function eta(): ?\DateTimeImmutable
+    {
+        return $this->eta;
     }
 
-    public function markInTransit(): void
+    /* ============================
+       State transitions（将来拡張）
+    ============================ */
+
+    public function markPrepared(): self
     {
-        $this->assertStatus(ShipmentStatus::SHIPPED);
-        $this->status = ShipmentStatus::IN_TRANSIT;
+        return self::reconstitute(
+            id: $this->id ?? 0,
+            shopId: $this->shopId,
+            orderId: $this->orderId,
+            status: ShipmentStatus::PREPARING,
+            originAddress: $this->originAddress,
+            destinationAddress: $this->destinationAddress,
+            eta: $this->eta,
+        );
     }
 
-    public function deliver(): void
+    public function markShipped(\DateTimeImmutable $eta): self
     {
-        $this->assertStatus(ShipmentStatus::IN_TRANSIT);
-        $this->status = ShipmentStatus::DELIVERED;
-    }
-
-    private function assertStatus(ShipmentStatus $expected): void
-    {
-        if ($this->status !== $expected) {
-            throw new DomainException('Invalid shipment state transition');
-        }
+        return self::reconstitute(
+            id: $this->id ?? 0,
+            shopId: $this->shopId,
+            orderId: $this->orderId,
+            status: ShipmentStatus::SHIPPED,
+            originAddress: $this->originAddress,
+            destinationAddress: $this->destinationAddress,
+            eta: $eta,
+        );
     }
 }

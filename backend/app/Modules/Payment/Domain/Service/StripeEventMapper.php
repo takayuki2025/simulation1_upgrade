@@ -13,22 +13,20 @@ final class StripeEventMapper
         $payload = $input->payload;
         $object  = $payload['data']['object'] ?? [];
 
-        // ✅ event_type ごとに「最終的に payment_intent id (pi_...)」を取り出す
+        // payment_intent id を取得
         $providerPaymentId = $this->extractPaymentIntentId($input->eventType, $object);
 
-        // id が取れない場合は無視（500は返さない方針のまま）
         if (!is_string($providerPaymentId) || $providerPaymentId === '') {
             return DomainPaymentEvent::ignored($input->occurredAt);
         }
 
-        // konbini instructions 抽出（PaymentIntentのときだけ成立する）
         $instructions = $this->extractKonbiniInstructions($object);
 
         return match ($input->eventType) {
 
-            // ============================
-            // PaymentIntent 正系
-            // ============================
+            // ----------------------------
+            // PaymentIntent 系
+            // ----------------------------
             'payment_intent.succeeded' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::SUCCEEDED,
@@ -47,16 +45,7 @@ final class StripeEventMapper
                     $instructions,
                 ),
 
-            'payment_intent.requires_action' =>
-                new DomainPaymentEvent(
-                    DomainPaymentEventType::REQUIRES_ACTION,
-                    $providerPaymentId,
-                    null,
-                    $input->occurredAt,
-                    $instructions,
-                ),
-
-            // created は揺れ対策（従来通り）
+            'payment_intent.requires_action',
             'payment_intent.created' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::REQUIRES_ACTION,
@@ -66,19 +55,10 @@ final class StripeEventMapper
                     $instructions,
                 ),
 
-            // ============================
-            // ✅ 実運用で来がちな補助イベント
-            // これらも「最終的に pi_... を取れる」なら succeeded 扱いにする
-            // ============================
-            'charge.succeeded' =>
-                new DomainPaymentEvent(
-                    DomainPaymentEventType::SUCCEEDED,
-                    $providerPaymentId,
-                    null,
-                    $input->occurredAt,
-                    null, // charge には konbini details は無い
-                ),
-
+            // ----------------------------
+            // 補助イベント
+            // ----------------------------
+            'charge.succeeded',
             'checkout.session.completed' =>
                 new DomainPaymentEvent(
                     DomainPaymentEventType::SUCCEEDED,
@@ -88,32 +68,36 @@ final class StripeEventMapper
                     null,
                 ),
 
+            // ----------------------------
+            // ✅ Refund（最重要）
+            // ----------------------------
+            'charge.refunded' =>
+                new DomainPaymentEvent(
+                    DomainPaymentEventType::REFUND_SUCCEEDED,
+                    $providerPaymentId,
+                    null,
+                    $input->occurredAt,
+                    [
+                        'provider' => 'stripe',
+                        'provider_refund_id' =>
+                            $object['refunds']['data'][0]['id'] ?? null,
+                        'reason' => 'stripe_webhook',
+                    ],
+                ),
+
             default =>
                 DomainPaymentEvent::ignored($input->occurredAt),
         };
     }
 
-    /**
-     * event_type と object から「payment_intent id (pi_...)」を抽出する
-     */
     private function extractPaymentIntentId(string $eventType, array $object): ?string
     {
-        // payment_intent.* → object.id が pi_...
         if (str_starts_with($eventType, 'payment_intent.')) {
-            $id = $object['id'] ?? null;
-            return is_string($id) ? $id : null;
+            return $object['id'] ?? null;
         }
 
-        // charge.succeeded → object.payment_intent が pi_...
-        if ($eventType === 'charge.succeeded') {
-            $pi = $object['payment_intent'] ?? null;
-            return is_string($pi) ? $pi : null;
-        }
-
-        // checkout.session.completed → object.payment_intent が pi_...
-        if ($eventType === 'checkout.session.completed') {
-            $pi = $object['payment_intent'] ?? null;
-            return is_string($pi) ? $pi : null;
+        if (in_array($eventType, ['charge.succeeded', 'charge.refunded', 'checkout.session.completed'], true)) {
+            return $object['payment_intent'] ?? null;
         }
 
         return null;
@@ -121,29 +105,19 @@ final class StripeEventMapper
 
     private function extractKonbiniInstructions(array $piObject): ?array
     {
-        // Stripe: payment_intent.next_action.konbini_display_details
         $details = $piObject['next_action']['konbini_display_details'] ?? null;
         if (!is_array($details)) {
             return null;
         }
 
-        $expiresAt = $details['expires_at'] ?? null;
-        $store = $details['store'] ?? null;
-        $confirmationNumber = $details['confirmation_number'] ?? null;
-
-        $storeMap = null;
-        if (is_string($store) && $store !== '' && is_string($confirmationNumber) && $confirmationNumber !== '') {
-            $storeMap = [
-                $store => [
-                    'confirmation_number' => $confirmationNumber,
-                ],
-            ];
-        }
-
         return [
             'type' => 'konbini',
-            'expires_at' => is_int($expiresAt) ? $expiresAt : null,
-            'store' => $storeMap,
+            'expires_at' => $details['expires_at'] ?? null,
+            'store' => [
+                $details['store'] ?? '' => [
+                    'confirmation_number' => $details['confirmation_number'] ?? null,
+                ],
+            ],
         ];
     }
 }

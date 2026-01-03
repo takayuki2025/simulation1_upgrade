@@ -13,9 +13,4 @@ interface ShipmentRepository
     public function findByOrderId(int $orderId): ?Shipment;
 
     public function existsByOrderId(int $orderId): bool;
-
-    public function createForOrder(
-        int $shopId,
-        int $orderId
-    ): Shipment;
 }
