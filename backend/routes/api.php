@@ -261,6 +261,10 @@ Route::middleware('auth.jwt')->prefix('mypage')->group(function () {
     Route::get('/profile', [MypageController::class, 'profile']);
     Route::get('/sell', [MypageController::class, 'sellItems']);
     Route::get('/bought', [MypageController::class, 'boughtItems']);
+
+    Route::patch('/profile', [MypageController::class, 'updateProfile']);
+    Route::post('/profile/image', [MypageController::class, 'updateProfileImage']);
+
 });
 
 
