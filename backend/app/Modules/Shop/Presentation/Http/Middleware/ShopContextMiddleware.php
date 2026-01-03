@@ -3,61 +3,59 @@
 namespace App\Modules\Shop\Presentation\Http\Middleware;
 
 use App\Modules\Shop\Application\Dto\ShopContext;
-use App\Modules\Shop\Domain\Policy\ShopRolePolicy;
-use App\Modules\Shop\Domain\Repository\ShopRepository;
+use App\Modules\Shop\Domain\Repository\ShopQueryRepository;
+use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\Response;
-use Closure;
 
 final class ShopContextMiddleware
 {
     public function __construct(
-        private ShopRepository $shops,
-        private ShopRolePolicy $policy,
+        private ShopQueryRepository $shops,
+        private ShopRoleQueryRepository $shopRoles,
     ) {
     }
 
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next)
     {
-        // ルートパラメータ名：shops/{shop_code}/...
-        $shopCode = (string) $request->route('shop_code');
+        $shopCode = $request->route('shop_code');
 
-        if ($shopCode === '') {
-            abort(404);
-        }
+        \Log::info('[🔥ShopContextMiddleware] called', [
+            'shop_code' => $shopCode,
+        ]);
 
-        // Auth（差し替え前提）
-        $userId = Auth::id();
-        if (!is_int($userId)) {
-            abort(401);
+        if (!$shopCode) {
+            abort(500, 'shop_code missing');
         }
 
         $shop = $this->shops->findByCode($shopCode);
+
         if (!$shop) {
-            abort(404);
+            abort(404, 'Shop not found');
         }
 
-        if (!$shop->isActive()) {
-            abort(404);
+        // 未ログインでも閲覧可能
+        $userId = Auth::id();
+        $roles = [];
+
+        if (is_int($userId)) {
+            $roles = $this->shopRoles->getRoleSlugsForUserInShop(
+                $userId,
+                $shop->id()
+            );
         }
 
-        if (!$this->policy->canAccessShop($userId, $shop->id())) {
-            abort(403);
-        }
-
-        $roles = $this->policy->rolesFor($userId, $shop->id());
-
-        $ctx = new ShopContext(
+        $context = new ShopContext(
             shopId: $shop->id(),
-            shopCode: $shop->code()->value, // ShopCode VO を想定
+            shopCode: $shop->shopCode(),
             shopStatus: $shop->status(),
             ownerUserId: $shop->ownerUserId(),
             roles: $roles,
         );
 
-        // Request scope に注入（UseCase 側は DI で受け取れる）
-        app()->instance(ShopContext::class, $ctx);
+        // ★ Request-scoped Context 注入（唯一の正解）
+        $request->attributes->set(ShopContext::class, $context);
 
         return $next($request);
     }

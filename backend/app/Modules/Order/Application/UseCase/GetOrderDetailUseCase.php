@@ -4,7 +4,7 @@ namespace App\Modules\Order\Application\UseCase;
 
 use App\Modules\Order\Application\Dto\GetOrderDetailOutput;
 use App\Modules\Order\Domain\Repository\OrderRepository;
-use App\Modules\Payment\Domain\Repository\PaymentRepository; // ✅ ここ
+use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use DomainException;
 
@@ -12,20 +12,26 @@ final class GetOrderDetailUseCase
 {
     public function __construct(
         private OrderRepository $orders,
-        private PaymentRepository $payments,   // ✅ 差し替え
+        private PaymentRepository $payments,
         private ShipmentRepository $shipments,
     ) {
     }
 
     public function handle(int $orderId, int $userId): GetOrderDetailOutput
     {
+        // ✅ ① 存在チェック
         $order = $this->orders->findById($orderId);
 
-        if ((int) $order->userId() !== $userId) {
+        if ($order === null) {
+            throw new DomainException('Order not found');
+        }
+
+        // ✅ ② 所有者チェック
+        if ($order->userId() !== $userId) {
             throw new DomainException('Forbidden');
         }
 
-        // ✅ 正しい Repository
+        // ✅ ③ 関連取得
         $payment  = $this->payments->findLatestByOrderId($orderId);
         $shipment = $this->shipments->findByOrderId($orderId);
 

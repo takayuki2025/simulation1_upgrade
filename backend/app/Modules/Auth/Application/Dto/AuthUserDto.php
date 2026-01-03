@@ -3,55 +3,40 @@
 namespace App\Modules\Auth\Application\Dto;
 
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
-use App\Modules\User\Domain\Entity\Profile;
 
 final class AuthUserDto
 {
     public function __construct(
         public int $id,
         public string $email,
-        public ?string $emailVerifiedAt,
+        public bool $emailVerified,   // ★ 追加（意味）
         public bool $hasShop,
         public array $shopRoles,
-        public ?array $primaryShop,
     ) {
     }
 
-    public static function fromProfileAndPrincipal(
-        Profile $profile,
-        AuthPrincipal $principal,
+    public static function fromProfilePrincipalAndRoles(
+        object $profile,
+        AuthPrincipal $principal,     // ★ 型を明示
+        array $shopRoles,
     ): self {
-
-        $shopRoles = array_map(
-            fn (int $shopId) => [
-                'shop_id' => $shopId,
-            ],
-            $principal->shopIds,
-        );
-
-        $primary = $shopRoles[0] ?? null;
-
         return new self(
-            id: $profile->id,
-            email: $profile->email,
-            emailVerifiedAt: $principal->emailVerified
-                ? now()->toISOString()
-                : null,
-            hasShop: ! empty($shopRoles),
+            id: $profile->id(),
+            email: $profile->email(),
+            emailVerified: $principal->emailVerified, // ★ 唯一の正
+            hasShop: !empty($shopRoles),
             shopRoles: $shopRoles,
-            primaryShop: $primary,
         );
     }
 
     public function toArray(): array
     {
         return [
-            'id'                => $this->id,
-            'email'             => $this->email,
-            'email_verified_at' => $this->emailVerifiedAt,
-            'has_shop'          => $this->hasShop,
-            'shop_roles'        => $this->shopRoles,
-            'primary_shop'      => $this->primaryShop,
+            'id'             => $this->id,
+            'email'          => $this->email,
+            'email_verified' => $this->emailVerified, // ★ フロントが見る
+            'has_shop'       => $this->hasShop,
+            'shop_roles'     => $this->shopRoles,
         ];
     }
 }

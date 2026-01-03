@@ -32,4 +32,23 @@ final class EloquentShopRoleQueryRepository implements ShopRoleQueryRepository
             ->where('shop_id', $shopId)
             ->exists();
     }
+
+    public function findByUserId(int $userId): array
+    {
+        return DB::table('shop_roles')
+            ->join('shops', 'shops.id', '=', 'shop_roles.shop_id')
+            ->where('shop_roles.user_id', $userId)
+            ->select([
+                'shop_roles.shop_id',
+                'shops.shop_code',
+                'shop_roles.role',
+            ])
+            ->get()
+            ->map(fn ($r) => [
+                'shop_id'   => (int) $r->shop_id,
+                'shop_code' => (string) $r->shop_code,
+                'role'      => (string) $r->role,
+            ])
+            ->all();
+    }
 }

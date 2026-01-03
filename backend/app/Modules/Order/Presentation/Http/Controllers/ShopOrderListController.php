@@ -4,23 +4,21 @@ namespace App\Modules\Order\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Order\Application\UseCase\GetShopOrdersUseCase;
-use Illuminate\Http\Request;
-use App\Modules\Shop\Domain\Entity\Shop;
+use App\Modules\Shop\Application\Dto\ShopContext;
 
 final class ShopOrderListController extends Controller
 {
     public function __invoke(
-        Request $request,
         GetShopOrdersUseCase $useCase
     ) {
-        /** @var Shop|null $shop */
-        $shop = $request->attributes->get('currentShop');
+        /** @var ShopContext $ctx */
 
-        if (!$shop) {
-            abort(500, 'ShopContext not resolved');
-        }
+        $ctx = $request->attributes->get(ShopContext::class);
 
-        $orders = $useCase->handle($shop->id());
+
+        $orders = $useCase->handle(
+            shopId: $ctx->shopId
+        );
 
         return response()->json([
             'orders' => array_map(

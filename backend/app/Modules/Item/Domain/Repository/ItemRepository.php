@@ -19,4 +19,9 @@ interface ItemRepository
      * Delete（論理 / 物理は運用次第）
      */
     public function delete(int $id): void;
+
+    /**
+     * @return Item[]
+     */
+    public function findPublicByShopId(int $shopId): array;
 }

@@ -18,11 +18,10 @@ use DateTimeImmutable;
 final class EloquentItemRepository implements ItemRepository
 {
     /* =====================================================
-     * Eloquent → Domain
+     * Eloquent → Domain（唯一の変換口）
      * ===================================================== */
     private function toDomain(EloquentItem $model): Item
     {
-        // category の揺れを吸収（json / array）
         $categories = $model->category ?? [];
         if (is_string($categories)) {
             $decoded = json_decode($categories, true);
@@ -33,10 +32,9 @@ final class EloquentItemRepository implements ItemRepository
             ? ItemImagePath::fromRaw($model->item_image)
             : null;
 
-        $publishedAt = null;
-        if (!empty($model->published_at)) {
-            $publishedAt = new DateTimeImmutable($model->published_at);
-        }
+        $publishedAt = $model->published_at
+            ? new DateTimeImmutable($model->published_at)
+            : null;
 
         return Item::reconstitute(
             id: new ItemId((int) $model->id),
@@ -62,29 +60,42 @@ final class EloquentItemRepository implements ItemRepository
     public function findById(int $id): ?Item
     {
         $model = EloquentItem::query()->find($id);
-
-        return $model
-            ? $this->toDomain($model)
-            : null;
+        return $model ? $this->toDomain($model) : null;
     }
 
+    /**
+     * @return Item[]
+     */
+    public function findPublicByShopId(int $shopId): array
+{
+    \Log::info('[Repo] findPublicByShopId called', [
+        'shop_id' => $shopId,
+    ]);
+
+    $rows = EloquentItem::query()
+        ->where('shop_id', $shopId)
+        ->whereNotNull('published_at')
+        ->orderByDesc('created_at')
+        ->get();
+
+    \Log::info('[Repo] items fetched', [
+        'count' => $rows->count(),
+    ]);
+
+    return $rows
+        ->map(fn (EloquentItem $row) => $this->toDomain($row))
+        ->all();
+}
+
     /* =====================================================
-     * Save（Upsert）
+     * Save
      * ===================================================== */
     public function save(Item $item): void
     {
-        // update or insert
-        $model = null;
+        $model = $item->getId()
+            ? EloquentItem::query()->find($item->id())
+            : new EloquentItem();
 
-        if ($item->getId() !== null) {
-            $model = EloquentItem::query()->find($item->id());
-        }
-
-        if (!$model) {
-            $model = new EloquentItem();
-        }
-
-        // Domain → DB（Fact のみ）
         $model->item_origin = $item->getItemOrigin()->value();
         $model->shop_id = $item->getShopId();
         $model->created_by_user_id = $item->getCreatedByUserId();
@@ -96,20 +107,16 @@ final class EloquentItemRepository implements ItemRepository
             $item->getCategory()->toArray(),
             JSON_UNESCAPED_UNICODE
         );
-
         $model->item_image = $item->getItemImage()
             ? $item->getItemImage()->value()
             : null;
-
         $model->remain = $item->getRemain()->toInt();
-
         $model->published_at = $item->getPublishedAt()
             ? $item->getPublishedAt()->format('Y-m-d H:i:s')
             : null;
 
         $model->save();
 
-        // 新規作成時のみ ID を付与
         if ($item->getId() === null) {
             $item->setId(new ItemId((int) $model->id));
         }
@@ -120,8 +127,6 @@ final class EloquentItemRepository implements ItemRepository
      * ===================================================== */
     public function delete(int $id): void
     {
-        EloquentItem::query()
-            ->where('id', $id)
-            ->delete();
+        EloquentItem::query()->where('id', $id)->delete();
     }
 }

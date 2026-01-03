@@ -38,9 +38,6 @@ export default function Home() {
     [searchParams],
   );
 
-  /**
-   * ✅ 正解：検索は「ログイン必須」
-   */
   const isSearch = currentSearchQuery.trim().length > 0;
 
   /* =========================
@@ -114,6 +111,7 @@ export default function Home() {
         : listResult.isLoading;
 
   const isPageLoading = isAuthLoading || isItemsLoading;
+
   /* =========================
      🎨 UI
   ========================= */
@@ -128,7 +126,24 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
-          {/* ===== Tabs ===== */}
+          {/* =========================
+              🏪 テスト用ショップリンク（追加）
+          ========================= */}
+          <div className={styles.shopButtons}>
+            {["a", "b", "c", "d"].map((code) => (
+              <button
+                key={code}
+                onClick={() => router.push(`/shops/shop-${code}`)}
+                className={styles.shopButton}
+              >
+                テストリンク ショップ{code.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* =========================
+              Tabs
+          ========================= */}
           <div className={styles.main_select}>
             <Link
               href={{
@@ -152,7 +167,9 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* ===== Items ===== */}
+          {/* =========================
+              Items
+          ========================= */}
           <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => {
@@ -167,7 +184,6 @@ export default function Home() {
                       onClick={() => router.push(`/item/${item.id}`)}
                     >
                       <div className={styles.itemImageWrapper}>
-                        {/* ⭐️ / 💫（FAVORITE では出さない） */}
                         {item.displayType &&
                           item.displayType !== "FAVORITE" && (
                             <span className={styles.ownStar}>
@@ -175,7 +191,6 @@ export default function Home() {
                             </span>
                           )}
 
-                        {/* ❤️ いいね */}
                         {isAuthenticated && (
                           <button
                             className={styles.favoriteButton}

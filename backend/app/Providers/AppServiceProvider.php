@@ -58,6 +58,10 @@ use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentQueryRepository;
+use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
+use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRoleQueryRepository;
+
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -80,20 +84,13 @@ class AppServiceProvider extends ServiceProvider
             EloquentFavoriteRepository::class
         );
 
-
         // ✅ ItemRepository は Item モジュール内の Eloquent 版を採用
-        $this->app->bind(ItemRepository::class, EloquentItemRepository::class);
-
-
+        // $this->app->bind(ItemRepository::class, EloquentItemRepository::class);
 
         $this->app->bind(
             ItemSearchRepository::class,
             EloquentItemSearchRepository::class
         );
-
-
-
-
 
         // ✅ Mypage は User モジュール内の Eloquent 版を採用
         $this->app->bind(MypageRepository::class, EloquentMypageRepository::class);
@@ -113,14 +110,11 @@ class AppServiceProvider extends ServiceProvider
         // Stripe Payment
         $this->app->bind(StripePaymentPort::class, StripePaymentAdapter::class);
 
-
-
         // ✅ item_entity_tags Write 用
         $this->app->bind(
             ItemEntityTagRepository::class,
             EloquentItemEntityTagRepository::class
         );
-
 
         // ✅ Brand 正規化
         $this->app->bind(
@@ -128,41 +122,38 @@ class AppServiceProvider extends ServiceProvider
             BrandRepositoryImpl::class
         );
 
-
         $this->app->bind(ShopRepository::class, EloquentShopRepository::class);
-
 
         $this->app->bind(
             OrderRepository::class,
             EloquentOrderRepository::class
         );
 
-
         $this->app->bind(Clock::class, SystemClock::class);
-
-
 
         $this->app->bind(
             UserAddressRepository::class,
             EloquentUserAddressRepository::class
         );
 
-
         $this->app->bind(
             ShipmentManagementQueryRepository::class,
             DbShipmentQueryRepository::class
         );
-
 
         $this->app->bind(
             ShipmentRepository::class,
             EloquentShipmentRepository::class
         );
 
-
         $this->app->bind(
             ShipmentQueryRepository::class,
             DbShipmentQueryRepository::class
+        );
+
+        $this->app->bind(
+            ShopRoleQueryRepository::class,
+            EloquentShopRoleQueryRepository::class
         );
 
 

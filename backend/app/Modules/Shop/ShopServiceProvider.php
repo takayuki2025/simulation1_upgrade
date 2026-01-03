@@ -7,6 +7,8 @@ use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
 use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRoleQueryRepository;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
 use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRepository;
+use App\Modules\Shop\Domain\Repository\ShopQueryRepository;
+use App\Modules\Shop\Infrastructure\Persistence\EloquentShopQueryRepository;
 
 final class ShopServiceProvider extends ServiceProvider
 {
@@ -18,6 +20,9 @@ final class ShopServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(ShopRoleQueryRepository::class, EloquentShopRoleQueryRepository::class);
+
+        $this->app->bind(ShopQueryRepository::class,EloquentShopQueryRepository::class);
+
 
     }
 }

@@ -40,13 +40,15 @@ export default function ShopHomePage() {
   /* =========================
      🔐 このショップのスタッフか？
   ========================= */
+  // type Old = { shop_id: number };
+  // type New = { shop_id: number; shop_code: string; role: string };
   const isShopStaff = useMemo(() => {
     if (!isAuthenticated || !user?.shop_roles) return false;
 
     return user.shop_roles.some(
-      (r: ShopRole) =>
+      (r) =>
         r.shop_code === shop_code &&
-        (r.role === "owner" || r.role === "manager" || r.role === "staff"),
+        ["owner", "manager", "staff"].includes(r.role),
     );
   }, [isAuthenticated, user, shop_code]);
 

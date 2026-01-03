@@ -1,173 +1,126 @@
 "use client";
 
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import type { AxiosResponse } from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 
-/* =========================
-   DTO（注文詳細・完成版）
-========================= */
-type OrderDetailResponse = {
+type OrderDetail = {
   order_id: number;
   order_status: string;
+  total_amount: number;
+  currency: string;
+
+  address_snapshot_at: string | null;
+
+  shipping_address: {
+    postal_code?: string;
+    prefecture?: string;
+    city?: string;
+    address_line1?: string;
+    address_line2?: string;
+    recipient_name?: string;
+    phone?: string;
+  } | null;
 
   payment: {
-    payment_id: number;
-    provider_payment_id: string | null;
     method: string;
     status: string;
+    provider_payment_id?: string;
   } | null;
 
   shipment: {
     shipment_id: number;
-    status: "created" | "packed" | "shipped" | "in_transit" | "delivered";
-    eta?: string;
-    address: {
-      post_number?: string | null;
-      prefecture?: string | null;
-      city?: string | null;
-      address_line1?: string | null;
-      address_line2?: string | null;
-      recipient_name?: string | null;
-      phone?: string | null;
-    };
+    status: string;
+    eta: string | null;
   } | null;
 };
 
-/* =========================
-   配送ステータス表示
-========================= */
-const shipmentStatusLabel: Record<string, string> = {
-  created: "発送準備中",
-  packed: "梱包済み",
-  shipped: "発送済み",
-  in_transit: "配送中",
-  delivered: "配達完了",
-};
-
-/* =========================
-   Page Component
-========================= */
 export default function OrderDetailPage() {
-  const { apiClient } = useAuth();
-  const params = useParams();
-  const orderId = params.order_id as string;
+  const { apiClient, isReady } = useAuth();
+  const { order_id } = useParams<{ order_id: string }>();
+  const router = useRouter();
 
-  const [order, setOrder] = useState<OrderDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
 
-  /* =========================
-     Fetch
-  ========================= */
   useEffect(() => {
-    if (!apiClient || !orderId) return;
+    if (!isReady || !apiClient || !order_id) return;
 
     apiClient
-      .get(`/me/orders/${orderId}`)
-      .then((res: AxiosResponse<OrderDetailResponse>) => {
-        setOrder(res.data);
-      })
-      .catch(() => {
-        setError("注文情報の取得に失敗しました。");
-      })
-      .finally(() => setLoading(false));
-  }, [apiClient, orderId]);
+      .get(`/me/orders/${order_id}`)
+      .then((res) => setOrder(res.data))
+      .catch((e) => {
+        if (e.response?.status === 404 || e.response?.status === 403) {
+          router.replace("/mypage?page=buy");
+        }
+      });
+  }, [isReady, apiClient, order_id, router]);
 
-  /* =========================
-     Render
-  ========================= */
-  if (loading) return <p>注文情報を取得中です…</p>;
-
-  if (error || !order) {
-    return (
-      <div>
-        <p>{error ?? "注文情報が見つかりません。"}</p>
-        <Link href="/mypage?page=buy">← 注文履歴へ戻る</Link>
-      </div>
-    );
-  }
-
-  const addr = order.shipment?.address;
+  if (!order) return <div className="p-6">読み込み中...</div>;
 
   return (
-    <div>
-      <h1>注文詳細</h1>
+    <div className="p-6 space-y-6 max-w-2xl mx-auto">
+      <h1 className="text-xl font-bold">注文 #{order.order_id}</h1>
 
-      <h2>注文 #{order.order_id}</h2>
-
-      <div>
-        <strong>注文ステータス：</strong>
-        {order.order_status}
+      {/* 注文概要 */}
+      <div className="border rounded p-4 space-y-1">
+        <div>注文状態：{order.order_status}</div>
+        <div>
+          合計金額：¥{order.total_amount.toLocaleString()} {order.currency}
+        </div>
+        <div>
+          購入日：
+          {order.address_snapshot_at
+            ? new Date(order.address_snapshot_at).toLocaleString()
+            : "不明"}
+        </div>
       </div>
 
-      {/* ===== Payment ===== */}
+      {/* 配送状況 */}
+      <div className="border rounded p-4 space-y-1">
+        <h2 className="font-semibold">配送状況</h2>
+        {order.shipment ? (
+          <>
+            <div>状態：{order.shipment.status}</div>
+            <div>到着予定：{order.shipment.eta ?? "未定"}</div>
+          </>
+        ) : (
+          <div>配送準備中</div>
+        )}
+      </div>
+
+      {/* 配送先 */}
+      {order.shipping_address && (
+        <div className="border rounded p-4 space-y-1">
+          <h2 className="font-semibold">配送先</h2>
+          <div>〒{order.shipping_address.postal_code}</div>
+          <div>
+            {order.shipping_address.prefecture}
+            {order.shipping_address.city}
+          </div>
+          <div>
+            {order.shipping_address.address_line1}
+            {order.shipping_address.address_line2}
+          </div>
+          <div>{order.shipping_address.recipient_name}</div>
+          <div>{order.shipping_address.phone}</div>
+        </div>
+      )}
+
+      {/* 支払い */}
       {order.payment && (
-        <>
-          <hr />
-          <h3>支払い情報</h3>
-
-          <div>
-            <strong>決済ID：</strong>
-            {order.payment.provider_payment_id ?? "-"}
-          </div>
-
-          <div>
-            <strong>支払い方法：</strong>
-            {order.payment.method}
-          </div>
-
-          <div>
-            <strong>支払い状態：</strong>
-            {order.payment.status}
-          </div>
-        </>
+        <div className="border rounded p-4 space-y-1">
+          <h2 className="font-semibold">支払い情報</h2>
+          <div>方法：{order.payment.method}</div>
+          <div>状態：{order.payment.status}</div>
+        </div>
       )}
 
-      {/* ===== Shipment ===== */}
-      {order.shipment && (
-        <>
-          <hr />
-          <h3>配送情報</h3>
-
-          <div>
-            <strong>配送状況：</strong>
-            {shipmentStatusLabel[order.shipment.status]}
-          </div>
-
-          {order.shipment.eta && (
-            <div>
-              <strong>配送予定日：</strong>
-              {order.shipment.eta}
-            </div>
-          )}
-
-          {addr && (
-            <div>
-              <strong>配送先住所：</strong>
-
-              {addr.post_number && <div>〒 {addr.post_number}</div>}
-
-              <div>
-                {addr.prefecture}
-                {addr.city}
-                {addr.address_line1}
-              </div>
-
-              {addr.address_line2 && <div>{addr.address_line2}</div>}
-
-              {addr.recipient_name && <div>宛名：{addr.recipient_name}</div>}
-
-              {addr.phone && <div>電話番号：{addr.phone}</div>}
-            </div>
-          )}
-        </>
-      )}
-
-      <hr />
-      <Link href="/mypage?page=buy">← 注文履歴へ戻る</Link>
+      <button
+        onClick={() => router.push("/mypage?page=buy")}
+        className="text-blue-600 underline text-sm"
+      >
+        ← 購入履歴へ戻る
+      </button>
     </div>
   );
 }

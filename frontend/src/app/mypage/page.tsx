@@ -179,33 +179,35 @@ export default function Mypage() {
               : "購入した商品はありません"}
           </p>
         ) : (
-          items.map((item) => {
-            const imgSrc = getImageUrl(item.item_image, IMAGE_TYPE.ITEM);
+          items.map((item) => (
+            <div key={item.row_id} className={styles.items_select_all}>
+              <Link
+                href={
+                  page === "buy" && item.order_id
+                    ? `/mypage/orders/${item.order_id}`
+                    : `/item/${item.item_id}`
+                }
+              >
+                <img
+                  src={getImageUrl(item.item_image, IMAGE_TYPE.ITEM)}
+                  onError={onImageError}
+                  alt={item.name}
+                />
+                <div>{item.name}</div>
+              </Link>
 
-            // buy → 注文詳細 / sell → 商品詳細
-            const href =
-              page === "buy" && item.order_id
-                ? `/mypage/orders/${item.order_id}`
-                : `/item/${item.item_id}`;
-
-            const showMissingOrderHint = page === "buy" && !item.order_id;
-
-            return (
-              <div key={item.row_id} className={styles.items_select_all}>
-                <Link href={href}>
-                  <img src={imgSrc} onError={onImageError} alt={item.name} />
-                  <div>{item.name}</div>
-
-                  {showMissingOrderHint && (
-                    <div className="text-xs text-red-500 mt-1">
-                      注文IDが未連携です（/mypage/bought が order_id
-                      を返す必要があります）
-                    </div>
-                  )}
-                </Link>
-              </div>
-            );
-          })
+              {page === "buy" && item.order_id && (
+                <div className="mt-1">
+                  <Link
+                    href={`/mypage/orders/${item.order_id}`}
+                    className="text-xs text-blue-600 underline"
+                  >
+                    配送状況を見る
+                  </Link>
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
     </div>

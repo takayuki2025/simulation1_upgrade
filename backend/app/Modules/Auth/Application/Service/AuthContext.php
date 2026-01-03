@@ -3,17 +3,42 @@
 namespace App\Modules\Auth\Application\Service;
 
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
-use Illuminate\Http\Request;
 
 final class AuthContext
 {
-    public function __construct(
-        private Request $request
-    ) {
+    private ?AuthPrincipal $principal = null;
+
+    public function setPrincipal(AuthPrincipal $principal): void
+    {
+        $this->principal = $principal;
     }
 
-    public function principal(): ?AuthPrincipal
+    public function clear(): void
     {
-        return $this->request->attributes->get('auth_principal');
+        $this->principal = null;
+    }
+
+    public function principal(): AuthPrincipal
+    {
+        if ($this->principal === null) {
+            throw new \RuntimeException('AuthPrincipal not set');
+        }
+
+        return $this->principal;
+    }
+
+    public function hasPrincipal(): bool
+    {
+        return $this->principal !== null;
+    }
+
+
+
+    /**
+     * ガード用途（任意）
+     */
+    public function isAuthenticated(): bool
+    {
+        return $this->principal !== null;
     }
 }

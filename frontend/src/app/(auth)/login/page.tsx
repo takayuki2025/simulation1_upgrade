@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const result = await login({ email, password });
 
-      if (!result.user.email_verified_at) {
+      if (!result.user.email_verified) {
         router.replace("/email/verify");
         return;
       }

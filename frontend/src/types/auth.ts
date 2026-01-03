@@ -10,7 +10,9 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
+  email_verified: boolean;
   has_shop: boolean;
+  shop_roles: ShopRole[];
   /** 旧互換（将来削除可） */
   shop_id?: number | null;
 
@@ -20,9 +22,9 @@ export interface AuthUser {
   /** グローバルロール */
   roles: string[];
 
-  shop_roles: {
-    shop_id: number;
-  }[];
+  // shop_roles: {
+  //   shop_id: number;
+  // }[];
 
   primary_shop?: {
     shop_id: number;

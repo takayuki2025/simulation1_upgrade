@@ -1,34 +1,37 @@
 import useSWR from "swr";
-import axios from "axios";
-import { useAuth } from "@/ui/auth/useAuth";
 import type { PublicItem } from "@/types/publicItem";
+import { useAuth } from "@/ui/auth/useAuth";
 
 type ItemSearchResponse = {
   items: PublicItem[];
 };
 
-export const useItemSearchSWR = (query: string) => {
-  const { apiClient, isAuthenticated, isLoading: authLoading } = useAuth();
+export const useItemSearchByShopSWR  = (shopCode?: string) => {
+  const { apiClient, isReady } = useAuth();
 
-  // 🔴 重要：auth が終わるまで「絶対に」fetch しない
   const shouldFetch =
-    !authLoading && isAuthenticated && query.trim().length > 0;
+    typeof shopCode === "string" &&
+    shopCode.length > 0;
 
-  const key = shouldFetch ? ["search", "items", query, "auth"] : null;
+  console.log("[SWR] shouldFetch", {
+    isReady,
+    hasApiClient: !!apiClient,
+    shopCode,
+  });
 
-  const fetcher = async (): Promise<ItemSearchResponse> => {
-    // 🔑 認証必須
-    const res = await apiClient!.get(
-      `/search/items?keyword=${encodeURIComponent(query)}`,
-    );
+  const key = shouldFetch ? ["shop-items", shopCode] : null;
+
+  const fetcher = async () => {
+    console.log("[SWR] fetching shop items", shopCode);
+    const res = await apiClient!.get(`/shops/${shopCode}/items`);
+    console.log("[SWR] response", res.data);
     return res.data;
   };
 
-  const { data, error, isLoading } = useSWR<ItemSearchResponse>(key, fetcher);
+  const { data, isLoading } = useSWR(key, fetcher);
 
   return {
     items: data?.items ?? [],
-    isLoading: authLoading || isLoading,
-    error,
+    isLoading,
   };
 };

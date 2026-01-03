@@ -60,6 +60,46 @@ Route::prefix('shops/{shop_code}')
         Route::get('/items', ShopItemListController::class);
     });
 
+    // =======================================================
+// 🏪 Shop Dashboard / Management（★確定ルート）
+// =======================================================
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
+use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
+// use App\Modules\Order\Presentation\Http\Controllers\ShopShipmentListController;
+
+Route::prefix('shops/{shop_code}')
+    ->middleware([
+        'auth.jwt',
+        'shop.context',
+        'shop.role:owner,manager,staff'
+    ])
+    ->group(function () {
+        // ---- Dashboard ----
+        Route::get('/dashboard/orders', ShopOrderListController::class);
+        Route::get(
+            '/dashboard/orders/{orderId}/shipment',
+            ShopOrderShipmentController::class
+        );
+        // ---- Shipment ----
+        // Route::get('/shipments', ShopShipmentListController::class);
+    });
+
+
+    // ショップ関係者の配送管理処理
+use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShipShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\InTransitShipmentController;
+use App\Modules\Shipment\Presentation\Http\Controllers\DeliverShipmentController;
+
+Route::prefix('shipments/{shipmentId}')
+    ->middleware(['auth.jwt'])
+    ->group(function () {
+        Route::post('pack', PackShipmentController::class);
+        Route::post('ship', ShipShipmentController::class);
+        Route::post('in-transit', InTransitShipmentController::class);
+        Route::post('deliver', DeliverShipmentController::class);
+    });
+
 /*
 |--------------------------------------------------------------------------
 | 🔐 JWT Protected（最低限）
@@ -349,23 +389,23 @@ use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListControlle
 */
 
 
-// Shop Dashboard（A フェーズの正解）
-Route::prefix('shops/{shop_code}')
-    ->middleware([
-        'auth.jwt',
-        'shop.context',
-        'shop.role:owner,manager,staff'
-    ])
-    ->group(function () {
+// // Shop Dashboard（A フェーズの正解）
+// Route::prefix('shops/{shop_code}')
+//     ->middleware([
+//         'auth.jwt',
+//         'shop.context',
+//         'shop.role:owner,manager,staff'
+//     ])
+//     ->group(function () {
 
-        Route::get('/shipments', ShopShipmentListController::class);
+//         Route::get('/shipments', ShopShipmentListController::class);
 
-        // ★ 手動作成（A フェーズ唯一の入口）
-        Route::post(
-            '/dashboard/orders/{orderId}/shipment',
-            [ShipmentController::class, 'store']
-        );
-    });
+//         // ★ 手動作成（A フェーズ唯一の入口）
+//         Route::post(
+//             '/dashboard/orders/{orderId}/shipment',
+//             [ShipmentController::class, 'store']
+//         );
+//     });
 
 
 // Create shipment (OrderEvent::PAID から呼ばれる想定)
@@ -446,57 +486,13 @@ Route::middleware('auth.jwt')->group(function () {
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
-use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
-
-// === Shop / Public View ===
-Route::prefix('shops/{shop_code}')
-    ->middleware(['shop.context'])
-    ->group(function () {
-        Route::get('/', ShopShowController::class);
-        Route::get('/items', ShopItemListController::class);
-    });
-
-// =======================================================
-// 🏪 Shop Dashboard / Management（★確定ルート）
-// =======================================================
-Route::prefix('shops/{shop_code}')
-    ->middleware([
-        'auth.jwt',
-        'shop.context',
-        'shop.role:owner,manager,staff'
-    ])
-    ->group(function () {
-
-        // ---- Dashboard ----
-        Route::get('/dashboard/orders', ShopOrderListController::class);
-
-        Route::get(
-            '/dashboard/orders/{orderId}/shipment',
-            ShopOrderShipmentController::class
-        );
-
-        // ---- Shipment ----
-        Route::get('/shipments', ShopShipmentListController::class);
-    });
 
 
+// // === Shop / Public View ===
+// Route::prefix('shops/{shop_code}')
+//     ->middleware(['shop.context'])
+//     ->group(function () {
+//         Route::get('/', ShopShowController::class);
+//         Route::get('/items', ShopItemListController::class);
+//     });
 
-
-
-
-
-
-use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
-use App\Modules\Shipment\Presentation\Http\Controllers\ShipShipmentController;
-use App\Modules\Shipment\Presentation\Http\Controllers\InTransitShipmentController;
-use App\Modules\Shipment\Presentation\Http\Controllers\DeliverShipmentController;
-
-Route::prefix('shipments/{shipmentId}')
-    ->middleware(['auth.jwt'])
-    ->group(function () {
-        Route::post('pack', PackShipmentController::class);
-        Route::post('ship', ShipShipmentController::class);
-        Route::post('in-transit', InTransitShipmentController::class);
-        Route::post('deliver', DeliverShipmentController::class);
-    });
