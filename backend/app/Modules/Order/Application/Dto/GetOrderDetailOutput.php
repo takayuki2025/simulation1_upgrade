@@ -54,20 +54,12 @@ final class GetOrderDetailOutput
 
             // ===== Shipment =====
             shipment: $shipment ? [
-                'shipment_id' => $shipment->id,
-                'status' => $shipment->status->value,
-                'eta' => $shipment->eta?->toDateString(),
+                'shipment_id' => $shipment->id(),
+                'status'      => $shipment->status()->value,
+                'eta'         => $shipment->eta()?->format('Y-m-d'),
 
-                // ★ 完全な配送先 DTO
-                'address' => [
-                    'post_number'     => $shipment->destinationAddress['postal_code'] ?? null,
-                    'prefecture'      => $shipment->destinationAddress['prefecture'] ?? null,
-                    'city'            => $shipment->destinationAddress['city'] ?? null,
-                    'address_line1'   => $shipment->destinationAddress['address_line1'] ?? null,
-                    'address_line2'   => $shipment->destinationAddress['address_line2'] ?? null,
-                    'recipient_name'  => $shipment->destinationAddress['recipient_name'] ?? null,
-                    'phone'           => $shipment->destinationAddress['phone'] ?? null,
-                ],
+                // Address ValueObject をそのまま DTO 化
+                'address'     => $shipment->destinationAddress()->toArray(),
             ] : null,
         );
     }

@@ -20,14 +20,23 @@ final class InTransitShipmentUseCase
     {
         DB::transaction(function () use ($shipmentId) {
 
-            if ($this->events->exists($shipmentId, ShipmentEventType::IN_TRANSIT)) {
-                return; // 冪等
+
+            if ($shipment->status()->isInTransit()) {
+                return;
             }
 
-            $shipment = $this->shipments->findById($shipmentId);
-            $shipment->markInTransit(); // ← Entity に定義
+            // コメント化したらOKになった
+            // if ($this->events->exists($shipmentId, ShipmentEventType::IN_TRANSIT)) {
+            //     return; // 冪等
+            // }
 
-            $this->shipments->save($shipment);
+            $shipment = $this->shipments->findById($shipmentId);
+
+            // ★ 必ず戻り値を受け取る
+            $inTransitShipment = $shipment->markInTransit();
+
+            // ★ 新しいインスタンスを保存
+            $this->shipments->save($inTransitShipment);
 
             $this->events->record(
                 ShipmentEvent::inTransit($shipmentId)

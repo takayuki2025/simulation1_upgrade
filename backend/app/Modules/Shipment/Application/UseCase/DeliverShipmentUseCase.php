@@ -17,9 +17,15 @@ final class DeliverShipmentUseCase
     public function handle(int $shipmentId): void
     {
         $shipment = $this->shipments->findById($shipmentId);
-        $shipment->deliver();
 
-        $this->shipments->save($shipment);
-        $this->events->record(ShipmentEvent::delivered($shipment->id));
+        // ★ 必ず戻り値を受け取る
+        $deliveredShipment = $shipment->deliver();
+
+        // ★ 新しいインスタンスを保存
+        $this->shipments->save($deliveredShipment);
+
+        $this->events->record(
+            ShipmentEvent::delivered($shipmentId)
+        );
     }
 }

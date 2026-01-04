@@ -135,7 +135,7 @@ final class Shipment
 
     public function markInTransit(): self
     {
-        if ($this->status !== ShipmentStatus::SHIPPED) {
+        if (! $this->status->isShipped()) {
             throw new DomainException(
                 'Cannot mark in_transit from ' . $this->status->value
             );
@@ -146,6 +146,25 @@ final class Shipment
             shopId: $this->shopId,
             orderId: $this->orderId,
             status: ShipmentStatus::IN_TRANSIT,
+            originAddress: $this->originAddress,
+            destinationAddress: $this->destinationAddress,
+            eta: $this->eta, // ← OK（ETAは保持）
+        );
+    }
+
+    public function deliver(): self
+    {
+        if (! $this->status->isInTransit()) {
+            throw new DomainException(
+                'Cannot deliver from ' . $this->status->value
+            );
+        }
+
+        return self::reconstitute(
+            id: $this->id,
+            shopId: $this->shopId,
+            orderId: $this->orderId,
+            status: ShipmentStatus::DELIVERED,
             originAddress: $this->originAddress,
             destinationAddress: $this->destinationAddress,
             eta: $this->eta,
