@@ -9,10 +9,9 @@ final class DbShipmentQueryRepository implements ShipmentQueryRepository
 {
     public function findByShopId(int $shopId): array
     {
-        return DB::table('shipments')
-            ->join('orders', 'orders.id', '=', 'shipments.order_id')
-            ->where('shipments.shop_id', $shopId)
-            ->orderByDesc('shipments.id')
+        return DB::table('orders')
+            ->leftJoin('shipments', 'orders.id', '=', 'shipments.order_id')
+            ->where('orders.shop_id', $shopId)
             ->select([
                 // ===== Order =====
                 'orders.id as order_id',
@@ -43,14 +42,22 @@ final class DbShipmentQueryRepository implements ShipmentQueryRepository
                     : null;
 
                 // 配送先名は Order の address_snapshot から組み立てる
+
                 if ($row['address_snapshot']) {
                     $row['destination_address'] = array_merge(
                         $row['destination_address'] ?? [],
                         [
-                            'name' => $row['address_snapshot']['name'] ?? null,
+                            'recipient_name' => $row['address_snapshot']['name'] ?? null,
+                            'postal_code'    => $row['address_snapshot']['postal_code'] ?? null,
+                            'prefecture'     => $row['address_snapshot']['prefecture'] ?? null,
+                            'city'           => $row['address_snapshot']['city'] ?? null,
+                            'address_line1'  => $row['address_snapshot']['address_line1'] ?? null,
+                            'address_line2'  => $row['address_snapshot']['address_line2'] ?? null,
+                            'phone'          => $row['address_snapshot']['phone'] ?? null,
                         ]
                     );
                 }
+
 
                 return $row;
             })

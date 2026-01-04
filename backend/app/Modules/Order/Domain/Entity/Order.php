@@ -23,6 +23,7 @@ final class Order
         private ?array $meta,
         private ?Address $shippingAddress = null,
         private ?\DateTimeImmutable $addressSnapshotAt = null,
+        private ?\DateTimeImmutable $paidAt = null, // ← 追加
     ) {
         if ($this->totalAmount < 0) {
             throw new \InvalidArgumentException('totalAmount must be >= 0');
@@ -76,6 +77,7 @@ final class Order
         ?array $meta = null,
         ?Address $shippingAddress = null,
         ?\DateTimeImmutable $addressSnapshotAt = null,
+        ?\DateTimeImmutable $paidAt = null, // ← 追加
     ): self {
         return new self(
             id: $id,
@@ -88,6 +90,7 @@ final class Order
             meta: $meta,
             shippingAddress: $shippingAddress,
             addressSnapshotAt: $addressSnapshotAt,
+            paidAt: $paidAt,
         );
     }
 
@@ -140,8 +143,24 @@ final class Order
     // State transitions
     // ========================
 
+
+    public function isPaid(): bool
+    {
+        return $this->status()->value === 'paid';
+        // or: return $this->status() === OrderStatus::PAID;
+    }
+
+    public function paidAt(): ?\DateTimeImmutable
+    {
+        return $this->paidAt;
+    }
+
     public function markPaid(): self
     {
+        if ($this->status === OrderStatus::PAID) {
+            return $this; // 冪等
+        }
+
         if ($this->status !== OrderStatus::PENDING_PAYMENT) {
             throw new \DomainException(
                 'Order cannot be marked paid from status: ' . $this->status->value
@@ -159,6 +178,7 @@ final class Order
             meta: $this->meta,
             shippingAddress: $this->shippingAddress,
             addressSnapshotAt: $this->addressSnapshotAt,
+            paidAt: new \DateTimeImmutable(), // ★ここが決定的
         );
     }
 
@@ -205,4 +225,5 @@ final class Order
     {
         return $this->addressSnapshotAt;
     }
+
 }

@@ -8,7 +8,7 @@ use App\Modules\Shipment\Application\Dto\CreateShipmentDraftInput;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-/**
+/**　復活予定というかディレクトリファイル名も変わる
  * OrderPaid を受けて Shipment Draft を作成する。
  *
  * - Event 駆動（Order -> Shipment）

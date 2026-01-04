@@ -122,22 +122,35 @@ final class HandlePaymentWebhookUseCase
                     return;
                 }
 
+
                 if ($domainEvent->type === DomainPaymentEventType::SUCCEEDED) {
 
+                    // ✅ ① Order を先に取得
+                    $order = $this->orders->findById($payment->orderId());
+                    if (! $order) {
+                        return;
+                    }
+
+                    // ✅ ② すでに Paid なら何もしない（最重要）
+                    if ($order->isPaid()) {
+                        return;
+                    }
+
+                    // ✅ ③ Payment を SUCCEEDED に
                     $payment = $payment->markSucceeded();
                     $this->payments->save($payment);
 
-                    $order = $this->orders->findById($payment->orderId());
-                    if ($order) {
-                        $paidOrder = $order->markPaid();
-                        $this->orders->save($paidOrder);
+                    // ✅ ④ Order を Paid に
+                    $paidOrder = $order->markPaid();
+                    $this->orders->save($paidOrder);
 
-                        $orderPaidEvent = new OrderPaid(
-                            orderId: $paidOrder->id(),
-                            shopId: $paidOrder->shopId(),
-                        );
-                    }
+                    // ✅ ⑤ Domain Event はここで1回だけ
+                    $orderPaidEvent = new OrderPaid(
+                        orderId: $paidOrder->id(),
+                        shopId: $paidOrder->shopId(),
+                    );
 
+                    // ✅ ⑥ Ledger 記録
                     $this->ledgers->recordSale(
                         shopId: $payment->shopId(),
                         amount: $payment->amount(),
@@ -147,6 +160,7 @@ final class HandlePaymentWebhookUseCase
                         occurredAt: $domainEvent->occurredAt,
                     );
                 }
+
             });
 
 

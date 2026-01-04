@@ -22,10 +22,11 @@ final class StripeEventMapper
 
         $instructions = $this->extractKonbiniInstructions($object);
 
+
         return match ($input->eventType) {
 
             // ----------------------------
-            // PaymentIntent 系
+            // PaymentIntent 系（唯一の成功）
             // ----------------------------
             'payment_intent.succeeded' =>
                 new DomainPaymentEvent(
@@ -56,20 +57,14 @@ final class StripeEventMapper
                 ),
 
             // ----------------------------
-            // 補助イベント
+            // 補助イベント（必ず無視）
             // ----------------------------
             'charge.succeeded',
             'checkout.session.completed' =>
-                new DomainPaymentEvent(
-                    DomainPaymentEventType::SUCCEEDED,
-                    $providerPaymentId,
-                    null,
-                    $input->occurredAt,
-                    null,
-                ),
+                DomainPaymentEvent::ignored($input->occurredAt),
 
             // ----------------------------
-            // ✅ Refund（最重要）
+            // Refund（別系統なのでOK）
             // ----------------------------
             'charge.refunded' =>
                 new DomainPaymentEvent(
@@ -88,6 +83,7 @@ final class StripeEventMapper
             default =>
                 DomainPaymentEvent::ignored($input->occurredAt),
         };
+
     }
 
     private function extractPaymentIntentId(string $eventType, array $object): ?string

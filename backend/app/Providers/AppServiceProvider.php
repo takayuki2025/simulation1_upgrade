@@ -60,7 +60,8 @@ use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentQueryRepository;
 use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
 use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRoleQueryRepository;
-
+use App\Modules\Order\Domain\Repository\OrderHistoryQueryRepository;
+use App\Modules\Order\Infrastructure\Persistence\EloquentOrderHistoryQueryRepository;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -157,17 +158,30 @@ class AppServiceProvider extends ServiceProvider
         );
 
 
+        $this->app->bind(
+            OrderHistoryQueryRepository::class,
+            EloquentOrderHistoryQueryRepository::class
+        );
+
+
 
     }
 
 
     public function boot()
     {
+        // ここには一切リスナーなど記入しない。
+        // Event::listen(
+        //     OrderPaid::class,
+        //     CreateShipmentOnOrderPaidListener::class
+        // );
 
-        Event::listen(
-            OrderPaid::class,
-            CreateShipmentOnOrderPaidListener::class
-        );
+
+        // Event::listen(
+        //     OrderPaid::class,
+        //     OnOrderPaidRecordOrderHistory::class
+        // );
+
 
     }
 }

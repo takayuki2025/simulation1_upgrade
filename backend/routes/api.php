@@ -65,13 +65,13 @@ Route::prefix('shops/{shop_code}')
 // =======================================================
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
-// use App\Modules\Order\Presentation\Http\Controllers\ShopShipmentListController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
 
 Route::prefix('shops/{shop_code}')
     ->middleware([
         'auth.jwt',
         'shop.context',
-        'shop.role:owner,manager,staff'
+        // 'shop.role:owner,manager,staff'
     ])
     ->group(function () {
         // ---- Dashboard ----
@@ -81,7 +81,7 @@ Route::prefix('shops/{shop_code}')
             ShopOrderShipmentController::class
         );
         // ---- Shipment ----
-        // Route::get('/shipments', ShopShipmentListController::class);
+        Route::get('/shipments', ShopShipmentListController::class);
     });
 
 
@@ -305,11 +305,12 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 // === MyPage / User ===
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
+use App\Modules\Order\Presentation\Http\Controllers\MyPageBoughtController;
 
 Route::middleware('auth.jwt')->prefix('mypage')->group(function () {
     Route::get('/profile', [MypageController::class, 'profile']);
     Route::get('/sell', [MypageController::class, 'sellItems']);
-    Route::get('/bought', [MypageController::class, 'boughtItems']);
+    Route::get('/bought', MyPageBoughtController::class);
 
     Route::patch('/profile', [MypageController::class, 'updateProfile']);
     Route::post('/profile/image', [MypageController::class, 'updateProfileImage']);
@@ -380,7 +381,7 @@ Route::middleware('auth.jwt.optional')->group(function () {
 use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\AdminShipmentKpiController;
 use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentController;
-use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+
 
 /*
 |--------------------------------------------------------------------------

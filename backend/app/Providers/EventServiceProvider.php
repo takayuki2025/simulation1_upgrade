@@ -8,9 +8,11 @@ use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Auth\Events\Verified;
 // Domain Event
 use App\Modules\Order\Domain\Event\OrderPaid;
+
 // Listeners
-use App\Modules\Shipment\Infrastructure\EventListener\OnOrderPaidCreateShipmentDraft;
+// use App\Modules\Shipment\Infrastructure\EventListener\OnOrderPaidCreateShipmentDraft;
 use App\Modules\Order\Infrastructure\EventListener\OnOrderPaidRecordOrderHistory;
+
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -33,12 +35,12 @@ final class EventServiceProvider extends ServiceProvider
         |--------------------------------------------------------------------------
         | Domain Events（唯一の定義）
         |--------------------------------------------------------------------------
-        | OrderPaid は「支払いが確定した」という業務的事実。
-        | ここから副作用（配送・履歴）を派生させる。
+        | OrderPaid = 支払いが確定したという「業務的事実」
+        | ここから副作用（配送・履歴）を派生させる
         */
         OrderPaid::class => [
-            // OnOrderPaidCreateShipmentDraft::class,   // 配送下書き作成
-            OnOrderPaidRecordOrderHistory::class,   // 購入履歴（Queryモデル）
+            // OnOrderPaidCreateShipmentDraft::class,
+            OnOrderPaidRecordOrderHistory::class,
         ],
     ];
 

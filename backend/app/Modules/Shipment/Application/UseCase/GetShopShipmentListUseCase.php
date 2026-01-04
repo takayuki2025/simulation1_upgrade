@@ -3,7 +3,6 @@
 namespace App\Modules\Shipment\Application\UseCase;
 
 use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
-use App\Modules\Shop\Domain\Entity\Shop;
 use App\Modules\Shipment\Application\Dto\ShopShipmentListOutput;
 use App\Modules\Shipment\Application\Dto\ShopShipmentListItemOutput;
 
@@ -14,9 +13,9 @@ final class GetShopShipmentListUseCase
     ) {
     }
 
-    public function handle(Shop $shop): ShopShipmentListOutput
+    public function handle(int $shopId): ShopShipmentListOutput
     {
-        $rows = $this->query->findByShopId($shop->id());
+        $rows = $this->query->findByShopId($shopId);
 
         $items = array_map(
             fn (array $row) => ShopShipmentListItemOutput::fromRow($row),
