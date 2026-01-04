@@ -35,13 +35,14 @@ final class EloquentShopRoleQueryRepository implements ShopRoleQueryRepository
 
     public function findByUserId(int $userId): array
     {
-        return DB::table('shop_roles')
-            ->join('shops', 'shops.id', '=', 'shop_roles.shop_id')
-            ->where('shop_roles.user_id', $userId)
+        return DB::table('role_user')
+            ->join('roles', 'roles.id', '=', 'role_user.role_id')
+            ->join('shops', 'shops.id', '=', 'role_user.shop_id')
+            ->where('role_user.user_id', $userId)
             ->select([
-                'shop_roles.shop_id',
+                'role_user.shop_id',
                 'shops.shop_code',
-                'shop_roles.role',
+                'roles.slug as role',
             ])
             ->get()
             ->map(fn ($r) => [
@@ -51,4 +52,5 @@ final class EloquentShopRoleQueryRepository implements ShopRoleQueryRepository
             ])
             ->all();
     }
+
 }

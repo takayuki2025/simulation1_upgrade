@@ -1,37 +1,45 @@
 import useSWR from "swr";
+import { publicClient } from "@/infrastructure/http/publicClient";
 import type { PublicItem } from "@/types/publicItem";
-import { useAuth } from "@/ui/auth/useAuth";
 
 type ItemSearchResponse = {
   items: PublicItem[];
 };
 
-export const useItemSearchByShopSWR  = (shopCode?: string) => {
-  const { apiClient, isReady } = useAuth();
-
-  const shouldFetch =
+export function useItemSearchByShopSWR(
+  shopCode?: string,
+  query?: string
+) {
+  const canFetch =
     typeof shopCode === "string" &&
-    shopCode.length > 0;
+    shopCode.length > 0 &&
+    typeof query === "string" &&
+    query.trim().length > 0;
 
-  console.log("[SWR] shouldFetch", {
-    isReady,
-    hasApiClient: !!apiClient,
-    shopCode,
-  });
+  const key = canFetch
+    ? ["shop-item-search", shopCode, query]
+    : null;
 
-  const key = shouldFetch ? ["shop-items", shopCode] : null;
-
-  const fetcher = async () => {
-    console.log("[SWR] fetching shop items", shopCode);
-    const res = await apiClient!.get(`/shops/${shopCode}/items`);
-    console.log("[SWR] response", res.data);
+  const fetcher = async (): Promise<ItemSearchResponse> => {
+    const res = await publicClient.get(
+      `/search/shop-items`,
+      {
+        params: {
+          shop_code: shopCode,
+          keyword: query,
+        },
+      }
+    );
     return res.data;
   };
 
-  const { data, isLoading } = useSWR(key, fetcher);
+  const { data, isLoading, error } = useSWR(key, fetcher, {
+    revalidateOnFocus: false,
+  });
 
   return {
     items: data?.items ?? [],
     isLoading,
+    error,
   };
-};
+}
