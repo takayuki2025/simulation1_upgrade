@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
 /**
@@ -10,19 +10,15 @@ import { useAuth } from "@/ui/auth/useAuth";
  * ============================
  */
 
-type ShipmentStatus =
-  | "not_created"
-  | "created"
-  | "packed"
-  | "shipped"
-  | "in_transit"
-  | "delivered";
-
 type Shipment = {
   id: number | null;
-  status: ShipmentStatus;
+  status: string;
   eta: string | null;
   canCreate: boolean;
+  nextAction: {
+    key: string;
+    label: string;
+  } | null;
 };
 
 /**
@@ -62,9 +58,10 @@ export default function ShopOrderShipmentPage() {
 
       setShipment({
         id: raw.shipment_id ?? null,
-        status: raw.status as ShipmentStatus,
+        status: raw.status,
         eta: raw.eta ?? null,
         canCreate: Boolean(raw.can_create),
+        nextAction: raw.next_action ?? null,
       });
     } catch {
       setShipment(null);
@@ -77,45 +74,6 @@ export default function ShopOrderShipmentPage() {
     if (!isReady || !apiClient || !shop_code || !order_id) return;
     fetchShipment();
   }, [isReady, apiClient, shop_code, order_id]);
-
-  /**
-   * ============================
-   * Next action
-   * ============================
-   */
-  const nextAction = useMemo(() => {
-    if (!shipment) return null;
-
-    switch (shipment.status) {
-      case "created":
-        return { key: "pack", label: "発送準備" };
-      case "packed":
-        return { key: "ship", label: "発送" };
-      case "shipped":
-        return { key: "in-transit", label: "輸送中" };
-      case "in_transit":
-        return { key: "deliver", label: "配達完了" };
-      default:
-        return null;
-    }
-  }, [shipment]);
-
-  /**
-   * ============================
-   * Execute
-   * ============================
-   */
-  const executeAction = async () => {
-    if (!shipment?.id || !nextAction || !apiClient) return;
-
-    setIsActionLoading(true);
-    try {
-      await apiClient.post(`/shipments/${shipment.id}/${nextAction.key}`);
-      await fetchShipment();
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
 
   /**
    * ============================
@@ -133,7 +91,9 @@ export default function ShopOrderShipmentPage() {
     );
   }
 
-  // ---- Aフェーズ：未作成
+  /**
+   * ---- Aフェーズ：未作成（not_created）
+   */
   if (shipment.status === "not_created") {
     return (
       <div className="p-6 space-y-4">
@@ -141,25 +101,28 @@ export default function ShopOrderShipmentPage() {
 
         <div className="text-gray-600">まだ配送は作成されていません。</div>
 
-        {shipment.canCreate && (
+        {shipment.nextAction !== null && apiClient && (
           <button
             disabled={isActionLoading}
             onClick={async () => {
-              if (!apiClient) return;
+              if (!apiClient || !shipment.nextAction) return;
 
               setIsActionLoading(true);
               try {
-                await apiClient.post(
-                  `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`,
-                );
+                const url =
+                  shipment.nextAction.key === "accept"
+                    ? `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`
+                    : `/shipments/${shipment.id}/${shipment.nextAction.key}`;
+
+                await apiClient.post(url);
                 await fetchShipment();
               } finally {
                 setIsActionLoading(false);
               }
             }}
-            className="px-4 py-2 border rounded disabled:opacity-50"
+            className="px-4 py-2 border rounded"
           >
-            購入受付 / 配送準備
+            {shipment.nextAction.label}
           </button>
         )}
 
@@ -173,27 +136,46 @@ export default function ShopOrderShipmentPage() {
     );
   }
 
-  // ---- Shipment あり
+  /**
+   * ---- Shipment あり
+   */
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-bold">配送管理（注文 #{order_id}）</h1>
 
       <div className="space-y-1 text-sm">
         <div>
-          状態：<span className="ml-2 font-mono">{shipment.status}</span>
+          状態：
+          <span className="ml-2 font-mono">{shipment.status}</span>
         </div>
         <div>
-          到着予定：<span className="ml-2">{shipment.eta ?? "未設定"}</span>
+          到着予定：
+          <span className="ml-2">{shipment.eta ?? "未設定"}</span>
         </div>
       </div>
 
-      {nextAction && (
+      {shipment.nextAction !== null && apiClient && (
         <button
           disabled={isActionLoading}
-          onClick={executeAction}
-          className="px-4 py-2 border rounded disabled:opacity-50"
+          onClick={async () => {
+            if (!apiClient || !shipment.nextAction) return;
+
+            setIsActionLoading(true);
+            try {
+              const url =
+                shipment.nextAction.key === "accept"
+                  ? `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`
+                  : `/shipments/${shipment.id}/${shipment.nextAction.key}`;
+
+              await apiClient.post(url);
+              await fetchShipment();
+            } finally {
+              setIsActionLoading(false);
+            }
+          }}
+          className="px-4 py-2 border rounded"
         >
-          {nextAction.label}
+          {shipment.nextAction.label}
         </button>
       )}
 

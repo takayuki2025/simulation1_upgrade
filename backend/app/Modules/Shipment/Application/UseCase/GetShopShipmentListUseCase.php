@@ -3,25 +3,28 @@
 namespace App\Modules\Shipment\Application\UseCase;
 
 use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
-use App\Modules\Shipment\Application\Dto\ShopShipmentListOutput;
-use App\Modules\Shipment\Application\Dto\ShopShipmentListItemOutput;
+use App\Modules\Shipment\Application\Factory\ShopOrderShipmentViewFactory;
 
 final class GetShopShipmentListUseCase
 {
     public function __construct(
-        private ShipmentQueryRepository $query,
+        private ShipmentQueryRepository $shipments,
+        private ShopOrderShipmentViewFactory $factory,
     ) {
     }
 
-    public function handle(int $shopId): ShopShipmentListOutput
+    /**
+     * @return array<\App\Modules\Shipment\Application\Dto\ShopOrderShipmentView>
+     */
+    public function handle(int $shopId): array
     {
-        $rows = $this->query->findByShopId($shopId);
+        // ① raw rows
+        $rows = $this->shipments->findOrderShipmentListByShopId($shopId);
 
-        $items = array_map(
-            fn (array $row) => ShopShipmentListItemOutput::fromRow($row),
+        // ② DTO へ変換
+        return array_map(
+            fn (array $row) => $this->factory->fromRow($row),
             $rows
         );
-
-        return new ShopShipmentListOutput($items);
     }
 }

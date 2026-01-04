@@ -9,6 +9,9 @@ use App\Modules\Shipment\Domain\Repository\ShipmentEventRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentRepository;
 use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentEventRepository;
 use App\Modules\Shipment\Domain\Service\EtaCalculator;
+use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
+use App\Modules\Shipment\Infrastructure\Persistence\EloquentShipmentQueryRepository;
+
 // 💡 イベントとリスナーをインポート
 
 final class ShipmentServiceProvider extends ServiceProvider
@@ -25,6 +28,13 @@ final class ShipmentServiceProvider extends ServiceProvider
             ShipmentEventRepository::class,
             EloquentShipmentEventRepository::class
         );
+
+
+        $this->app->bind(
+            ShipmentQueryRepository::class,
+            EloquentShipmentQueryRepository::class
+        );
+
 
         // Domain Services
         $this->app->singleton(EtaCalculator::class);

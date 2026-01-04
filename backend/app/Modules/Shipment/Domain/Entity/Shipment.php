@@ -96,20 +96,20 @@ final class Shipment
        State transitions（将来拡張）
     ============================ */
 
-    public function markPrepared(): self
+    public function pack(): self
     {
-        if ($this->id === null) {
-            throw new \LogicException('Cannot transition a non-persisted Shipment');
+        if ($this->status !== ShipmentStatus::DRAFT) {
+            throw new DomainException('Cannot pack from ' . $this->status->value);
         }
 
         return self::reconstitute(
             id: $this->id,
             shopId: $this->shopId,
             orderId: $this->orderId,
-            status: ShipmentStatus::PREPARING,
+            status: ShipmentStatus::PACKED,
             originAddress: $this->originAddress,
             destinationAddress: $this->destinationAddress,
-            eta: $this->eta,
+            eta: null,
         );
     }
 

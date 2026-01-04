@@ -62,7 +62,8 @@ use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
 use App\Modules\Shop\Infrastructure\Persistence\EloquentShopRoleQueryRepository;
 use App\Modules\Order\Domain\Repository\OrderHistoryQueryRepository;
 use App\Modules\Order\Infrastructure\Persistence\EloquentOrderHistoryQueryRepository;
-
+use App\Modules\Order\Domain\Repository\OrderQueryRepository;
+use App\Modules\Order\Infrastructure\Persistence\EloquentOrderQueryRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -163,6 +164,11 @@ class AppServiceProvider extends ServiceProvider
             EloquentOrderHistoryQueryRepository::class
         );
 
+
+        $this->app->bind(
+            OrderQueryRepository::class,
+            EloquentOrderQueryRepository::class
+        );
 
 
     }

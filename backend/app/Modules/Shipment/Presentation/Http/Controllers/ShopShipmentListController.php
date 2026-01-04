@@ -8,25 +8,21 @@ use App\Modules\Shop\Application\Dto\ShopContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
+
 final class ShopShipmentListController extends Controller
 {
     public function __invoke(
         Request $request,
-        GetShopShipmentListUseCase $useCase
+        GetShopOrderListUseCase $useCase
     ): JsonResponse {
-        /** @var ShopContext|null $ctx */
+        /** @var ShopContext $ctx */
         $ctx = $request->attributes->get(ShopContext::class);
-
-        if (!$ctx) {
-            abort(500, 'ShopContext is missing');
+        if (! $ctx) {
+            abort(500);
         }
 
-        $output = $useCase->handle(
-            shopId: $ctx->shopId
-        );
-
-        return response()->json(
-            $output->toArray()
-        );
+        return response()->json([
+            'shipments' => $useCase->handle($ctx->shopId),
+        ]);
     }
 }

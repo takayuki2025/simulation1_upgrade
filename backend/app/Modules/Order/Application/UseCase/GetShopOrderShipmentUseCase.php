@@ -2,30 +2,21 @@
 
 namespace App\Modules\Order\Application\UseCase;
 
+use App\Modules\Order\Domain\Repository\OrderQueryRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
-use App\Modules\Order\Application\Dto\ShopOrderShipmentOutput;
+use App\Modules\Shipment\Application\Factory\ShopOrderShipmentViewFactory;
 
-final class GetShopOrderShipmentUseCase
+
+
+final class GetShopOrderListUseCase
 {
     public function __construct(
-        private ShipmentQueryRepository $shipments
+        private OrderQueryRepository $orders
     ) {
     }
 
-    public function handle(
-        int $shopId,
-        int $orderId
-    ): ShopOrderShipmentOutput {
-
-        $row = $this->shipments->findByShopIdAndOrderId(
-            shopId: $shopId,
-            orderId: $orderId
-        );
-
-        if (! $row) {
-            return ShopOrderShipmentOutput::notCreated($orderId);
-        }
-
-        return ShopOrderShipmentOutput::fromRow($row);
+    public function handle(int $shopId): array
+    {
+        return $this->orders->findOrderListWithShipmentByShopId($shopId);
     }
 }
