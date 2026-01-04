@@ -24,20 +24,17 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
             ->select([
                 'orders.id as order_id',
                 'orders.status as order_status',
+                'orders.created_at as order_created_at', // ✅ 追加
 
-                // 支払い
                 DB::raw('payments.id IS NOT NULL as order_paid'),
 
-                // 金額
                 'orders.total_amount',
                 'orders.currency',
 
-                // 配送
                 'shipments.id as shipment_id',
                 'shipments.status as shipment_status',
                 'shipments.eta',
 
-                // 住所スナップショット
                 'orders.address_snapshot as destination_address',
             ])
             ->orderByDesc('orders.id')
@@ -46,6 +43,7 @@ final class EloquentOrderQueryRepository implements OrderQueryRepository
         return $rows->map(fn ($row) => [
             'order_id' => (int) $row->order_id,
             'order_status' => (string) $row->order_status,
+            'order_created_at' => $row->order_created_at, // ✅ 追加
             'order_paid' => (bool) $row->order_paid,
 
             'total_amount' => (int) $row->total_amount,

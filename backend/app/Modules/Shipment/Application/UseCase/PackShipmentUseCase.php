@@ -17,20 +17,22 @@ final class PackShipmentUseCase
 
     public function handle(int $shipmentId): void
     {
-        // ✅ 冪等ガード（これが超重要）
-        if ($this->events->exists($shipmentId, ShipmentEventType::PACKED)) {
+        $shipment = $this->shipments->findById($shipmentId);
+
+        // ✅ Aggregate 基準の冪等ガード
+        if ($shipment->status()->isPacked()) {
             return;
         }
 
-        $shipment = $this->shipments->findById($shipmentId);
+        $packedShipment = $shipment->pack();
 
-        // ここで CREATED 以外なら DomainException
-        $shipment->pack();
+        $this->shipments->save($packedShipment);
 
-        $this->shipments->save($shipment);
-
-        $this->events->record(
-            ShipmentEvent::packed($shipmentId)
-        );
+        // Event は「結果」として記録
+        if (! $this->events->exists($shipmentId, ShipmentEventType::PACKED)) {
+            $this->events->record(
+                ShipmentEvent::packed($shipmentId)
+            );
+        }
     }
 }

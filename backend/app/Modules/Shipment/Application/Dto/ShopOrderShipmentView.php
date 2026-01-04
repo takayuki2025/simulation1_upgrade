@@ -21,11 +21,11 @@ final class ShopOrderShipmentView
     ============================ */
 
     /**
-     * 未作成（未入金・コンビニ等）
+     * 未作成（未入金 or 決済済だが Shipment 未作成）
      */
     public static function notCreated(
         int $orderId,
-        bool $canCreate = false,
+        bool $canCreate,
         ?array $destinationAddress = null
     ): self {
         return new self(
@@ -34,39 +34,40 @@ final class ShopOrderShipmentView
             shipmentId: null,
             eta: null,
             canCreate: $canCreate,
-            nextActionKey: null,
-            nextActionLabel: null,
+            nextActionKey: $canCreate ? 'accept' : null,
+            nextActionLabel: $canCreate ? '配送準備を開始' : null,
             destinationAddress: $destinationAddress,
         );
     }
 
     /**
-     * 入金済み・受付待ち（draft）
+     * Shipment 作成済（draft）
      */
     public static function draft(
-        int $orderId,
-        ?array $destinationAddress
-    ): self {
-        return new self(
-            orderId: $orderId,
-            status: 'draft',
-            shipmentId: null,
-            eta: null,
-            canCreate: true,
-            nextActionKey: 'accept',
-            nextActionLabel: '注文受付 / 在庫確保',
-            destinationAddress: $destinationAddress,
-        );
-    }
-
-    public static function pack(
         int $orderId,
         int $shipmentId,
         ?array $destinationAddress
     ): self {
         return new self(
             orderId: $orderId,
-            status: 'pack',
+            status: 'draft',
+            shipmentId: $shipmentId,
+            eta: null,
+            canCreate: false,
+            nextActionKey: 'pack',
+            nextActionLabel: '梱包完了',
+            destinationAddress: $destinationAddress,
+        );
+    }
+
+    public static function packed(
+        int $orderId,
+        int $shipmentId,
+        ?array $destinationAddress
+    ): self {
+        return new self(
+            orderId: $orderId,
+            status: 'packed',
             shipmentId: $shipmentId,
             eta: null,
             canCreate: false,
@@ -126,30 +127,6 @@ final class ShopOrderShipmentView
             canCreate: false,
             nextActionKey: null,
             nextActionLabel: null,
-            destinationAddress: $destinationAddress,
-        );
-    }
-
-    /**
-     * Shipment あり（通常状態）
-     */
-    public static function fromShipment(
-        int $orderId,
-        int $shipmentId,
-        string $status,
-        ?string $eta,
-        ?string $nextActionKey,
-        ?string $nextActionLabel,
-        ?array $destinationAddress
-    ): self {
-        return new self(
-            orderId: $orderId,
-            status: $status,
-            shipmentId: $shipmentId,
-            eta: $eta,
-            canCreate: false,
-            nextActionKey: $nextActionKey,
-            nextActionLabel: $nextActionLabel,
             destinationAddress: $destinationAddress,
         );
     }

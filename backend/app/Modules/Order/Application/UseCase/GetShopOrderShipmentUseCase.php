@@ -2,21 +2,40 @@
 
 namespace App\Modules\Order\Application\UseCase;
 
-use App\Modules\Order\Domain\Repository\OrderQueryRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 use App\Modules\Shipment\Application\Factory\ShopOrderShipmentViewFactory;
+use App\Modules\Shipment\Application\Dto\ShopOrderShipmentView;
 
-
-
-final class GetShopOrderListUseCase
+final class GetShopOrderShipmentUseCase
 {
     public function __construct(
-        private OrderQueryRepository $orders
+        private ShipmentQueryRepository $shipments,
+        private ShopOrderShipmentViewFactory $factory,
     ) {
     }
 
-    public function handle(int $shopId): array
-    {
-        return $this->orders->findOrderListWithShipmentByShopId($shopId);
+    public function handle(
+        int $shopId,
+        int $orderId
+    ): ShopOrderShipmentView {
+
+        $row = $this->shipments->findByShopIdAndOrderId(
+            shopId: $shopId,
+            orderId: $orderId
+        );
+
+\Log::info('[🔥After pack] Query result', [
+    'row' => $row,
+]);
+
+        if (! $row) {
+            // 未作成（not_created）
+            return ShopOrderShipmentView::notCreated(
+                orderId: $orderId,
+                canCreate: false
+            );
+        }
+
+        return $this->factory->fromRow($row);
     }
 }

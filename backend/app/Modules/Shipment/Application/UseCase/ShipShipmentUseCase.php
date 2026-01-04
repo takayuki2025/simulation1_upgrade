@@ -25,7 +25,10 @@ final class ShipShipmentUseCase
             }
 
             $shipment = $this->shipments->findById($shipmentId);
-            $shipment->ship(); // ← 状態遷移チェックは Entity 側
+
+            $shipment = $shipment->ship(
+                new \DateTimeImmutable('+2 days') // 仮 ETA
+            );
 
             $this->shipments->save($shipment);
 

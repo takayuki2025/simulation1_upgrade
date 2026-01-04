@@ -4,6 +4,7 @@ namespace App\Modules\Shipment\Domain\Entity;
 
 use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
 use App\Modules\Order\Domain\ValueObject\Address;
+use DomainException;
 
 final class Shipment
 {
@@ -29,13 +30,13 @@ final class Shipment
         Address $destinationAddress,
     ): self {
         return new self(
-            id: null,
-            shopId: $shopId,
-            orderId: $orderId,
-            status: ShipmentStatus::DRAFT,
-            originAddress: $originAddress,
-            destinationAddress: $destinationAddress,
-            eta: null,
+            null,
+            $shopId,
+            $orderId,
+            ShipmentStatus::DRAFT,
+            $originAddress,
+            $destinationAddress,
+            null,
         );
     }
 
@@ -49,13 +50,13 @@ final class Shipment
         ?\DateTimeImmutable $eta,
     ): self {
         return new self(
-            id: $id,
-            shopId: $shopId,
-            orderId: $orderId,
-            status: $status,
-            originAddress: $originAddress,
-            destinationAddress: $destinationAddress,
-            eta: $eta,
+            $id,
+            $shopId,
+            $orderId,
+            $status,
+            $originAddress,
+            $destinationAddress,
+            $eta,
         );
     }
 
@@ -79,6 +80,10 @@ final class Shipment
     {
         return $this->status;
     }
+    public function eta(): ?\DateTimeImmutable
+    {
+        return $this->eta;
+    }
     public function originAddress(): Address
     {
         return $this->originAddress;
@@ -87,46 +92,63 @@ final class Shipment
     {
         return $this->destinationAddress;
     }
-    public function eta(): ?\DateTimeImmutable
-    {
-        return $this->eta;
-    }
 
     /* ============================
-       State transitions（将来拡張）
+       State transitions
     ============================ */
 
+    /** DRAFT → PACKED */
     public function pack(): self
     {
         if ($this->status !== ShipmentStatus::DRAFT) {
-            throw new DomainException('Cannot pack from ' . $this->status->value);
+            throw new DomainException("Cannot pack from {$this->status->value}");
         }
 
         return self::reconstitute(
-            id: $this->id,
-            shopId: $this->shopId,
-            orderId: $this->orderId,
-            status: ShipmentStatus::PACKED,
-            originAddress: $this->originAddress,
-            destinationAddress: $this->destinationAddress,
-            eta: null,
+            $this->id,
+            $this->shopId,
+            $this->orderId,
+            ShipmentStatus::PACKED,
+            $this->originAddress,
+            $this->destinationAddress,
+            null,
         );
     }
 
-    public function markShipped(\DateTimeImmutable $eta): self
+    /** PACKED → SHIPPED */
+    public function ship(\DateTimeImmutable $eta): self
     {
-        if ($this->id === null) {
-            throw new \LogicException('Cannot ship a non-persisted Shipment');
+        if ($this->status !== ShipmentStatus::PACKED) {
+            throw new DomainException("Cannot ship from {$this->status->value}");
+        }
+
+        return self::reconstitute(
+            $this->id,
+            $this->shopId,
+            $this->orderId,
+            ShipmentStatus::SHIPPED,
+            $this->originAddress,
+            $this->destinationAddress,
+            $eta,
+        );
+    }
+
+    public function markInTransit(): self
+    {
+        if ($this->status !== ShipmentStatus::SHIPPED) {
+            throw new DomainException(
+                'Cannot mark in_transit from ' . $this->status->value
+            );
         }
 
         return self::reconstitute(
             id: $this->id,
             shopId: $this->shopId,
             orderId: $this->orderId,
-            status: ShipmentStatus::SHIPPED,
+            status: ShipmentStatus::IN_TRANSIT,
             originAddress: $this->originAddress,
             destinationAddress: $this->destinationAddress,
-            eta: $eta,
+            eta: $this->eta,
         );
     }
 }

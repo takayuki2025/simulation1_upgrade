@@ -9,7 +9,7 @@ type OrderShipmentListItem = {
   order_id: number;
   order_status: string;
   order_paid: boolean;
-
+  order_created_at: string;
   total_amount: number;
   currency: string;
 
@@ -79,6 +79,11 @@ export default function ShopOrderListPage() {
                   <div>{it.order_status}</div>
                   <div className="font-mono">{shipmentStatus}</div>
                 </div>
+              </div>
+
+              <div className="text-sm text-gray-500">
+                注文日時：
+                {new Date(it.order_created_at).toLocaleString()}
               </div>
 
               <div className="text-sm">
