@@ -21,7 +21,7 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
-type PaymentMethod = "" | "card" | "convenience";
+type PaymentMethod = "" | "card" | "konbini";
 
 /* ================= Wrapper ================= */
 export default function PurchaseConfirmPageWrapper() {
@@ -51,66 +51,84 @@ function PurchaseConfirmPage() {
 
   const [payment, setPayment] = useState<PaymentMethod>("");
 
-  const canPurchase =
-    isAuthenticated &&
-    !!item &&
-    item.remain > 0 &&
-    payment !== "" &&
-    !!address?.id &&
-    !!stripe &&
-    !!elements;
-
-  const submitPurchase = async () => {
-    if (!canPurchase || !apiClient || !item || !address) return;
-
-    const orderRes = await apiClient.post("/orders", {
-      shop_id: item.shop_id,
-      items: [
-        {
-          item_id: item.id,
-          name: item.name,
-          price_amount: item.price,
-          price_currency: "JPY",
-          quantity: 1,
-          image_path: item.item_image,
-        },
-      ],
-    });
-
-    const orderId = orderRes.data.order_id;
-
-    await apiClient.post(`/orders/${orderId}/confirm-address`, {
-      address_id: address.id,
-    });
-
-    const paymentRes = await apiClient.post("/payments/start", {
-      order_id: orderId,
-      method: payment === "card" ? "card" : "konbini",
-    });
-
-    if (payment === "card") {
-      const card = elements!.getElement(CardElement);
-      const { client_secret } = paymentRes.data;
-
-      const result = await stripe!.confirmCardPayment(client_secret, {
-        payment_method: { card: card! },
-      });
-
-      if (result.error) {
-        alert(result.error.message);
-        return;
-      }
-
-      router.push(`/thanks/buy/stripe-card?order_id=${orderId}`);
-    } else {
-      router.push(`/thanks/buy/konbini?order_id=${orderId}`);
-    }
-  };
-
-  if (isAuthLoading || isItemLoading || isAddressLoading || !item) {
+  /* ================= Early return ================= */
+  if (isAuthLoading || isItemLoading || isAddressLoading) {
     return <div className={styles.loadingOverlay}>購入情報を読み込み中...</div>;
   }
 
+  if (!item) {
+    return <div className={styles.loadingOverlay}>商品が見つかりません</div>;
+  }
+
+  /* ================= canPurchase ================= */
+  const canPurchase =
+    isAuthenticated && item.remain > 0 && payment !== "" && !!address?.id;
+
+  /* ================= submit ================= */
+  const submitPurchase = async () => {
+    if (!canPurchase || !apiClient || !address) return;
+
+    try {
+      // ① Order 作成
+      const orderRes = await apiClient.post("/orders", {
+        shop_id: item.shop_id,
+        items: [
+          {
+            item_id: item.id,
+            name: item.name,
+            price_amount: item.price,
+            price_currency: "JPY",
+            quantity: 1,
+            image_path: item.item_image,
+          },
+        ],
+      });
+
+      const orderId = orderRes.data.order_id;
+
+      // ② 配送先確定
+      await apiClient.post(`/orders/${orderId}/address`, {
+        address_id: address.id,
+      });
+
+      await apiClient.post(`/orders/${orderId}/confirm`);
+
+      // ④ 決済開始
+      const paymentRes = await apiClient.post("/payments/start", {
+        order_id: orderId,
+        method: payment,
+      });
+
+      if (payment === "card") {
+        if (!stripe || !elements) return;
+
+        const card = elements.getElement(CardElement);
+        if (!card) return;
+
+        const { client_secret } = paymentRes.data;
+
+        const result = await stripe.confirmCardPayment(client_secret, {
+          payment_method: { card },
+        });
+
+        if (result.error) {
+          alert(result.error.message);
+          return;
+        }
+
+        router.push(`/thanks/buy/stripe-card?order_id=${orderId}`);
+      } else {
+        router.push(`/thanks/buy/konbini?order_id=${orderId}`);
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(
+        e?.response?.data?.message ?? e?.message ?? "購入処理に失敗しました",
+      );
+    }
+  };
+
+  /* ================= JSX ================= */
   return (
     <div className={styles.item_buy_wrapper}>
       <div className={styles.item_buy_contents}>
@@ -138,58 +156,58 @@ function PurchaseConfirmPage() {
                 onChange={(e) => setPayment(e.target.value as PaymentMethod)}
               >
                 <option value="">選択してください</option>
-                <option value="コンビニ支払い">コンビニ支払い</option>
+                <option value="konbini">コンビニ支払い</option>
                 <option value="card">クレジットカード支払い</option>
               </select>
             </div>
 
             {/* Card */}
-            {payment === "card" && (
+            {payment === "card" && stripe && elements && (
               <div className={styles.item_buy_content_section}>
                 <h4>カード情報</h4>
-                <div style={{ width: "100%" }}>
-                  <CardElement
-                    options={{
-                      style: {
-                        base: {
-                          fontSize: "16px",
-                          color: "#111827",
-                          "::placeholder": { color: "#9ca3af" },
-                        },
-                        invalid: {
-                          color: "#dc2626",
-                        },
-                      },
+
+                <div className={styles.stripeCardWrapper}>
+                  <div
+                    style={{
+                      padding: "12px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "6px",
+                      backgroundColor: "#ffffff",
                     }}
-                  />
+                  >
+                    <CardElement
+                      options={{
+                        hidePostalCode: true,
+                        style: {
+                          base: {
+                            fontSize: "16px",
+                            color: "#111827",
+                            lineHeight: "24px",
+                            "::placeholder": {
+                              color: "#9ca3af",
+                            },
+                          },
+                          invalid: {
+                            color: "#dc2626",
+                          },
+                        },
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
             {/* 配送先 */}
             <div className={styles.item_buy_content_section}>
-              <div className={styles.addressHeader}>
-                <h4>配送先</h4>
-                <button
-                  type="button"
-                  className={styles.linkBtn}
-                  onClick={() => router.push("/purchase/address")}
-                >
-                  変更する
-                </button>
-              </div>
-
+              <h4>配送先</h4>
               {address ? (
-                <div className={styles.addressBody}>
+                <div>
                   <p>〒{address.postNumber}</p>
                   <p>
                     {address.prefecture} {address.city}
                   </p>
                   <p>{address.addressLine1}</p>
-                  {address.addressLine2 && <p>{address.addressLine2}</p>}
-                  <p className={styles.recipientName}>
-                    {address.recipientName}
-                  </p>
                 </div>
               ) : (
                 <p className={styles.warnText}>配送先住所が未登録です</p>
@@ -206,12 +224,6 @@ function PurchaseConfirmPage() {
               <button disabled={!canPurchase} onClick={submitPurchase}>
                 購入する
               </button>
-
-              {!canPurchase && (
-                <p className={styles.warnText}>
-                  支払い方法・配送先を確認してください
-                </p>
-              )}
             </div>
           </div>
         </div>

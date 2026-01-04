@@ -4,7 +4,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
+/**
+ * ============================
+ * Types
+ * ============================
+ */
+
 type ShipmentStatus =
+  | "not_created"
   | "created"
   | "packed"
   | "shipped"
@@ -12,10 +19,17 @@ type ShipmentStatus =
   | "delivered";
 
 type Shipment = {
-  id: number;
+  id: number | null;
   status: ShipmentStatus;
   eta: string | null;
+  canCreate: boolean;
 };
+
+/**
+ * ============================
+ * Page
+ * ============================
+ */
 
 export default function ShopOrderShipmentPage() {
   const { shop_code, order_id } = useParams<{
@@ -28,13 +42,13 @@ export default function ShopOrderShipmentPage() {
 
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // ★ すべての POST をここでロックする
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // ----------------------------
-  // Fetch
-  // ----------------------------
+  /**
+   * ============================
+   * Fetch
+   * ============================
+   */
   const fetchShipment = async () => {
     if (!apiClient) return;
 
@@ -46,15 +60,12 @@ export default function ShopOrderShipmentPage() {
 
       const raw = res.data;
 
-      if (raw && raw.shipment_id) {
-        setShipment({
-          id: raw.shipment_id,
-          status: raw.shipment_status as ShipmentStatus,
-          eta: raw.eta ?? null,
-        });
-      } else {
-        setShipment(null);
-      }
+      setShipment({
+        id: raw.shipment_id ?? null,
+        status: raw.status as ShipmentStatus,
+        eta: raw.eta ?? null,
+        canCreate: Boolean(raw.can_create),
+      });
     } catch {
       setShipment(null);
     } finally {
@@ -67,9 +78,11 @@ export default function ShopOrderShipmentPage() {
     fetchShipment();
   }, [isReady, apiClient, shop_code, order_id]);
 
-  // ----------------------------
-  // Next Action
-  // ----------------------------
+  /**
+   * ============================
+   * Next action
+   * ============================
+   */
   const nextAction = useMemo(() => {
     if (!shipment) return null;
 
@@ -87,11 +100,13 @@ export default function ShopOrderShipmentPage() {
     }
   }, [shipment]);
 
-  // ----------------------------
-  // State Transition
-  // ----------------------------
+  /**
+   * ============================
+   * Execute
+   * ============================
+   */
   const executeAction = async () => {
-    if (!shipment || !apiClient || !nextAction || isActionLoading) return;
+    if (!shipment?.id || !nextAction || !apiClient) return;
 
     setIsActionLoading(true);
     try {
@@ -102,40 +117,51 @@ export default function ShopOrderShipmentPage() {
     }
   };
 
-  // ----------------------------
-  // Render
-  // ----------------------------
+  /**
+   * ============================
+   * Render
+   * ============================
+   */
+
   if (isLoading) {
     return <div className="p-6">読み込み中...</div>;
   }
 
-  // ★ A フェーズ：Shipment 未作成
   if (!shipment) {
+    return (
+      <div className="p-6 text-red-600">配送情報の取得に失敗しました。</div>
+    );
+  }
+
+  // ---- Aフェーズ：未作成
+  if (shipment.status === "not_created") {
     return (
       <div className="p-6 space-y-4">
         <h1 className="text-xl font-bold">配送管理（注文 #{order_id}）</h1>
 
         <div className="text-gray-600">まだ配送は作成されていません。</div>
 
-        <button
-          disabled={isActionLoading}
-          onClick={async () => {
-            if (!apiClient || isActionLoading) return;
+        {shipment.canCreate && (
+          <button
+            disabled={isActionLoading}
+            onClick={async () => {
+              if (!apiClient) return;
 
-            setIsActionLoading(true);
-            try {
-              await apiClient.post(
-                `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`,
-              );
-              await fetchShipment();
-            } finally {
-              setIsActionLoading(false);
-            }
-          }}
-          className="px-4 py-2 border rounded disabled:opacity-50"
-        >
-          購入受付/配送準備
-        </button>
+              setIsActionLoading(true);
+              try {
+                await apiClient.post(
+                  `/shops/${shop_code}/dashboard/orders/${order_id}/shipment`,
+                );
+                await fetchShipment();
+              } finally {
+                setIsActionLoading(false);
+              }
+            }}
+            className="px-4 py-2 border rounded disabled:opacity-50"
+          >
+            購入受付 / 配送準備
+          </button>
+        )}
 
         <button
           onClick={() => router.push(`/shops/${shop_code}/dashboard/orders`)}
@@ -147,13 +173,19 @@ export default function ShopOrderShipmentPage() {
     );
   }
 
-  // ★ Shipment あり
+  // ---- Shipment あり
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-xl font-bold">配送管理（注文 #{order_id}）</h1>
 
-      <div>状態：{shipment.status}</div>
-      <div>到着予定：{shipment.eta ?? "-"}</div>
+      <div className="space-y-1 text-sm">
+        <div>
+          状態：<span className="ml-2 font-mono">{shipment.status}</span>
+        </div>
+        <div>
+          到着予定：<span className="ml-2">{shipment.eta ?? "未設定"}</span>
+        </div>
+      </div>
 
       {nextAction && (
         <button

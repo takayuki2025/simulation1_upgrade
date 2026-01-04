@@ -3,21 +3,23 @@
 namespace App\Modules\Order\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Order\Application\UseCase\ConfirmOrderAddressUseCase;
+use App\Modules\Order\Application\UseCase\ConfirmOrderUseCase;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
-final class ConfirmOrderAddressController extends Controller
+final class ConfirmOrderController extends Controller
 {
     public function __construct(
-        private ConfirmOrderAddressUseCase $useCase
+        private ConfirmOrderUseCase $useCase
     ) {
     }
 
     public function __invoke(Request $request, int $orderId): JsonResponse
     {
-        $request->validate([
-            'address_id' => 'required|integer',
+
+        \Log::info('[ConfirmOrderController] invoked', [
+            'orderId' => $orderId,
+            'userId' => $request->user()?->id,
         ]);
 
         $user = $request->user();
@@ -27,10 +29,9 @@ final class ConfirmOrderAddressController extends Controller
 
         $this->useCase->handle(
             orderId: $orderId,
-            userId: (int) $user->id,
-            addressId: (int) $request->input('address_id')
+            userId: (int) $user->id
         );
 
-        return response()->json(['status' => 'ok'], 200);
+        return response()->json(['status' => 'confirmed'], 200);
     }
 }

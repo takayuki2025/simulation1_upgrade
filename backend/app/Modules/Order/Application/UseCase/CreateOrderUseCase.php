@@ -22,6 +22,26 @@ final class CreateOrderUseCase
     {
         return DB::transaction(function () use ($input) {
 
+            // =========================================
+            // ★ ① 既存の未確定 Order があれば再利用
+            // =========================================
+            $existing = $this->orders->findDraftByUserAndShop(
+                userId: $input->userId,
+                shopId: $input->shopId
+            );
+
+            if ($existing) {
+                return CreateOrderOutput::from(
+                    orderId: $existing->id(),
+                    status: $existing->status(),
+                    totalAmount: $existing->totalAmount(),
+                    currency: $existing->currency()
+                );
+            }
+
+            // =========================================
+            // ★ ② OrderItemSnapshot を構築
+            // =========================================
             $snapshots = array_map(function (array $row) {
                 return OrderItemSnapshot::fromArray([
                     'item_id'        => $row['item_id'],
@@ -35,9 +55,12 @@ final class CreateOrderUseCase
                 ]);
             }, $input->items);
 
-            // totals (simple v1)
+            // =========================================
+            // ★ ③ 金額計算（v1）
+            // =========================================
             $currency = $snapshots[0]->priceCurrency;
             $totalAmount = 0;
+
             foreach ($snapshots as $s) {
                 if ($s->priceCurrency !== $currency) {
                     throw new \DomainException('Mixed currency is not supported in v1');
@@ -45,6 +68,9 @@ final class CreateOrderUseCase
                 $totalAmount += ($s->priceAmount * $s->quantity);
             }
 
+            // =========================================
+            // ★ ④ Order 新規作成
+            // =========================================
             $order = Order::create(
                 shopId: $input->shopId,
                 userId: $input->userId,
@@ -56,11 +82,9 @@ final class CreateOrderUseCase
 
             $saved = $this->orders->save($order);
 
-
-
-            // =============================
-            // ✅ order_items を作成（正規データ）
-            // =============================
+            // =========================================
+            // ★ ⑤ 正規 order_items を作成
+            // =========================================
             foreach ($snapshots as $snapshot) {
                 DB::table('order_items')->insert([
                     'order_id'       => $saved->id(),
@@ -76,9 +100,11 @@ final class CreateOrderUseCase
                 ]);
             }
 
-
+            // =========================================
+            // ★ ⑥ OrderHistory
+            // =========================================
             $this->history->addEvent(
-                orderId: $saved->id() ?? 0,
+                orderId: $saved->id(),
                 type: 'created',
                 payload: [
                     'shop_id'      => $saved->shopId(),
@@ -89,7 +115,7 @@ final class CreateOrderUseCase
             );
 
             return CreateOrderOutput::from(
-                orderId: $saved->id() ?? 0,
+                orderId: $saved->id(),
                 status: $saved->status(),
                 totalAmount: $saved->totalAmount(),
                 currency: $saved->currency()

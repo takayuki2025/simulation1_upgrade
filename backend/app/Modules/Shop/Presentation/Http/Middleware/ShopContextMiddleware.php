@@ -21,10 +21,6 @@ final class ShopContextMiddleware
     {
         $shopCode = $request->route('shop_code');
 
-        \Log::info('[🔥ShopContextMiddleware] called', [
-            'shop_code' => $shopCode,
-        ]);
-
         if (!$shopCode) {
             abort(500, 'shop_code missing');
         }
@@ -35,7 +31,6 @@ final class ShopContextMiddleware
             abort(404, 'Shop not found');
         }
 
-        // 未ログインでも閲覧可能
         $userId = Auth::id();
         $roles = [];
 
@@ -54,7 +49,6 @@ final class ShopContextMiddleware
             roles: $roles,
         );
 
-        // ★ Request-scoped Context 注入（唯一の正解）
         $request->attributes->set(ShopContext::class, $context);
 
         return $next($request);

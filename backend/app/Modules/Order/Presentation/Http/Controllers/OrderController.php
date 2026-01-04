@@ -8,23 +8,19 @@ use App\Modules\Order\Application\UseCase\CreateOrderUseCase;
 use App\Modules\Order\Application\UseCase\GetOrderDetailUseCase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Modules\Order\Application\UseCase\ConfirmOrderAddressUseCase;
 
 final class OrderController extends Controller
 {
     public function __construct(
         private CreateOrderUseCase $createOrder,
         private GetOrderDetailUseCase $getOrderDetail,
+        private ConfirmOrderAddressUseCase $confirmAddress,
     ) {
     }
 
     /**
      * POST /api/orders
-     * body:
-     * {
-     *   "shop_id": 1,
-     *   "items": [{...}],
-     *   "meta": {...}
-     * }
      */
     public function create(Request $request): JsonResponse
     {
@@ -36,9 +32,6 @@ final class OrderController extends Controller
             'items.*.price_amount' => 'required|integer|min:0',
             'items.*.price_currency' => 'required|string|max:10',
             'items.*.quantity' => 'nullable|integer|min:1',
-            'items.*.condition' => 'nullable|string|max:255',
-            'items.*.category' => 'nullable|array',
-            'items.*.image_path' => 'nullable|string|max:1024',
             'meta' => 'nullable|array',
         ]);
 
@@ -71,11 +64,33 @@ final class OrderController extends Controller
 
         $out = $this->getOrderDetail->handle($orderId);
 
-        // v1: authorization basic
         if ((int) $out->userId !== (int) $user->id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         return response()->json($out->toArray(), 200);
+    }
+
+    /**
+     * POST /api/orders/{orderId}/address
+     */
+    public function confirmAddress(Request $request, int $orderId): JsonResponse
+    {
+        $request->validate([
+            'address_id' => 'required|integer',
+        ]);
+
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $this->confirmAddress->handle(
+            orderId: $orderId,
+            userId: (int) $user->id,
+            addressId: (int) $request->input('address_id')
+        );
+
+        return response()->json(['status' => 'ok'], 200);
     }
 }

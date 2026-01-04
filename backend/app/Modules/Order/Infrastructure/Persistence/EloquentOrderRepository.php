@@ -14,11 +14,7 @@ final class EloquentOrderRepository implements OrderRepository
     public function findById(int $orderId): ?Order
     {
         $model = OrderModel::find($orderId);
-        if (! $model) {
-            return null;
-        }
-
-        return $this->reconstituteOrder($model);
+        return $model ? $this->reconstituteOrder($model) : null;
     }
 
     public function findDraftByUser(int $orderId, int $userId): Order
@@ -30,6 +26,18 @@ final class EloquentOrderRepository implements OrderRepository
             ->firstOrFail();
 
         return $this->reconstituteOrder($model);
+    }
+
+    public function findDraftByUserAndShop(int $userId, int $shopId): ?Order
+    {
+        $model = OrderModel::query()
+            ->where('user_id', $userId)
+            ->where('shop_id', $shopId)
+            ->where('status', OrderStatus::PENDING_PAYMENT->value)
+            ->orderByDesc('id')
+            ->first();
+
+        return $model ? $this->reconstituteOrder($model) : null;
     }
 
     public function save(Order $order): Order
@@ -44,7 +52,6 @@ final class EloquentOrderRepository implements OrderRepository
         $model->total_amount = $order->totalAmount();
         $model->currency = $order->currency();
 
-        // Items snapshot
         $model->items_snapshot = array_map(
             fn (OrderItemSnapshot $item) => $item->toArray(),
             $order->items()
@@ -52,20 +59,25 @@ final class EloquentOrderRepository implements OrderRepository
 
         $model->meta = $order->meta();
 
-        // ✅ Address snapshot（唯一の正）
-        if ($order->shippingAddress()) {
-            $model->address_snapshot = $order->shippingAddress()->toArray();
+        // Address snapshot（nullable）
+
+        $address = $order->shippingAddress();
+
+        if ($address !== null) {
+            $model->address_snapshot = $address->toArray();
             $model->address_confirmed_at = $order->addressSnapshotAt();
         } else {
             $model->address_snapshot = null;
             $model->address_confirmed_at = null;
         }
 
+
         $model->save();
 
         return $this->reconstituteOrder($model);
     }
 
+    /** @return Order[] */
     public function findByBuyer(int $userId): array
     {
         return OrderModel::query()
@@ -76,6 +88,7 @@ final class EloquentOrderRepository implements OrderRepository
             ->all();
     }
 
+    /** @return Order[] */
     public function findByShop(int $shopId): array
     {
         return OrderModel::query()
@@ -101,9 +114,7 @@ final class EloquentOrderRepository implements OrderRepository
 
         if ($model->address_snapshot) {
             $address = Address::fromArray($model->address_snapshot);
-            $confirmedAt = $model->address_confirmed_at
-                ? $model->address_confirmed_at->toDateTimeImmutable()
-                : null;
+            $confirmedAt = $model->address_confirmed_at?->toDateTimeImmutable();
         }
 
         return Order::reconstitute(
@@ -116,7 +127,7 @@ final class EloquentOrderRepository implements OrderRepository
             items: $items,
             meta: $model->meta,
             shippingAddress: $address,
-            addressSnapshotAt: $confirmedAt,
+            addressSnapshotAt: $confirmedAt
         );
     }
 }

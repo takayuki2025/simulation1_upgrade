@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             UsersTableSeeder::class,
             UserAddressesTableSeeder::class,
             ShopsTableSeeder::class,
+            ShopAddressesTableSeeder::class,
             RoleUserSeeder::class,
             ItemsTableSeeder::class,
             BrandEntitySeeder::class,

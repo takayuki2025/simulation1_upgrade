@@ -60,32 +60,62 @@ Route::prefix('shops/{shop_code}')
         Route::get('/items', ShopItemListController::class);
     });
 
-    // =======================================================
+// =======================================================
 // 🏪 Shop Dashboard / Management（★確定ルート）
 // =======================================================
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderListController;
 use App\Modules\Order\Presentation\Http\Controllers\ShopOrderShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\ShopShipmentListController;
+use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
 
 Route::prefix('shops/{shop_code}')
     ->middleware([
         'auth.jwt',
         'shop.context',
-        // 'shop.role:owner,manager,staff'
+        // 'shop.role:owner,manager,staff',
     ])
     ->group(function () {
-        // ---- Dashboard ----
+
+        // 注文一覧
         Route::get('/dashboard/orders', ShopOrderListController::class);
+
+        // 配送状態取得（GET）
         Route::get(
             '/dashboard/orders/{orderId}/shipment',
             ShopOrderShipmentController::class
         );
-        // ---- Shipment ----
+        // 配送一覧
         Route::get('/shipments', ShopShipmentListController::class);
+
+
+        // ★ Aフェーズ：配送作成（POST）
+        Route::post(
+            '/dashboard/orders/{orderId}/shipment',
+            [ShipmentController::class, 'store']
+        );
     });
 
 
-    // ショップ関係者の配送管理処理
+
+
+
+use App\Modules\Order\Presentation\Http\Controllers\OrderController;
+
+Route::middleware(['auth.jwt'])->group(function () {
+    Route::post('/orders', [OrderController::class, 'create']);
+    Route::post('/orders/{orderId}/address', [OrderController::class, 'confirmAddress']);
+    Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
+});
+
+use App\Modules\Order\Presentation\Http\Controllers\ConfirmOrderController;
+
+Route::post(
+    '/orders/{orderId}/confirm',
+    ConfirmOrderController::class
+)->middleware('auth.jwt');
+
+
+// ショップ関係者の配送管理処理
 use App\Modules\Shipment\Presentation\Http\Controllers\PackShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\ShipShipmentController;
 use App\Modules\Shipment\Presentation\Http\Controllers\InTransitShipmentController;
@@ -343,12 +373,12 @@ Route::get('/__debug/item/{id}', function ($id) {
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\OrderController;
 
-Route::middleware(['auth.jwt'])->group(function () {
-    Route::post('/orders', [OrderController::class, 'create']);
-    //     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
-});
+
+// Route::middleware(['auth.jwt'])->group(function () {
+//     Route::post('/orders', [OrderController::class, 'create']);
+//     //     Route::get('/orders/{orderId}', [OrderController::class, 'detail']);
+// });
 
 
 
@@ -378,10 +408,9 @@ Route::middleware('auth.jwt.optional')->group(function () {
 
 
 
-use App\Modules\Shipment\Presentation\Http\Controllers\ShipmentController;
+
 use App\Modules\Shipment\Presentation\Http\Controllers\AdminShipmentKpiController;
 use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -399,7 +428,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentControlle
 //     ])
 //     ->group(function () {
 
-//         Route::get('/shipments', ShopShipmentListController::class);
+//         // Route::get('/shipments', ShopShipmentListController::class);
 
 //         // ★ 手動作成（A フェーズ唯一の入口）
 //         Route::post(
@@ -414,7 +443,7 @@ use App\Modules\Shipment\Presentation\Http\Controllers\CustomerShipmentControlle
 // Route::prefix('shipments')
 //     ->middleware(['auth.jwt']) // shop スコープ前提
 //     ->group(function () {
-//         Route::post('/', [ShipmentController::class, 'store']);
+//         // Route::post('/', [ShipmentController::class, 'store']);
 //         Route::post('{id}/pack', [ShipmentController::class, 'pack']);
 //         Route::post('{id}/ship', [ShipmentController::class, 'ship']);
 //         Route::post('{id}/in-transit', [ShipmentController::class, 'markInTransit']);
@@ -461,15 +490,6 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 
 
-use App\Modules\Order\Presentation\Http\Controllers\ConfirmOrderAddressController;
-
-Route::middleware(['auth.jwt'])->group(function () {
-    Route::post(
-        '/orders/{orderId}/confirm-address',
-        ConfirmOrderAddressController::class
-    );
-});
-
 
 
 
@@ -496,4 +516,3 @@ Route::middleware('auth.jwt')->group(function () {
 //         Route::get('/', ShopShowController::class);
 //         Route::get('/items', ShopItemListController::class);
 //     });
-

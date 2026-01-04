@@ -31,10 +31,11 @@
 }
 
 .item_buy_content_section {
-  padding: 40px 0; /* ← 30 → 40 */
+  padding: 40px 0;
   border-bottom: 1px solid #d1d5db;
   display: flex;
-  gap: 24px; /* ← 16 → 24 */
+  flex-direction: column;   /* ← これを追加 */
+  gap: 16px;
 }
 
 .item_buy_content_section select {

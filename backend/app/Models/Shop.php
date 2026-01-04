@@ -21,4 +21,9 @@ class Shop extends Model
         'logo',
         'banner_url',
     ];
+
+    public function shippingAddress()
+    {
+        return $this->hasOne(\App\Models\ShopAddress::class, 'shop_id');
+    }
 }

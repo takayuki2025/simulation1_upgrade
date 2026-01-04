@@ -36,18 +36,30 @@ final class EloquentShipmentRepository implements ShipmentRepository
     public function save(Shipment $shipment): Shipment
     {
         if ($shipment->id() === null) {
+
             $id = DB::table('shipments')->insertGetId([
                 'shop_id' => $shipment->shopId(),
                 'order_id' => $shipment->orderId(),
                 'status' => $shipment->status()->value,
-                'origin_address' => json_encode($shipment->originAddress()->toArray(), JSON_UNESCAPED_UNICODE),
-                'destination_address' => json_encode($shipment->destinationAddress()->toArray(), JSON_UNESCAPED_UNICODE),
+                'origin_address' => json_encode(
+                    $shipment->originAddress()->toArray(),
+                    JSON_UNESCAPED_UNICODE
+                ),
+                'destination_address' => json_encode(
+                    $shipment->destinationAddress()->toArray(),
+                    JSON_UNESCAPED_UNICODE
+                ),
                 'eta' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             return $this->findById($id);
+        }
+
+        // ★ ここで id=null を許さない
+        if ($shipment->id() === null) {
+            throw new RuntimeException('Cannot update Shipment without ID');
         }
 
         DB::table('shipments')
@@ -73,4 +85,5 @@ final class EloquentShipmentRepository implements ShipmentRepository
             eta: $row->eta ? new \DateTimeImmutable($row->eta) : null,
         );
     }
+
 }

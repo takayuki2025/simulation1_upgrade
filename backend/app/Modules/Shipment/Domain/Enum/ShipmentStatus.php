@@ -4,11 +4,9 @@ namespace App\Modules\Shipment\Domain\Enum;
 
 enum ShipmentStatus: string
 {
-    case CREATED = 'created';
-    case PACKED = 'packed';
+    case DRAFT = 'draft';
+    case READY = 'ready';
     case SHIPPED = 'shipped';
-    case IN_TRANSIT = 'in_transit';
     case DELIVERED = 'delivered';
-    case DELAYED = 'delayed';
-    case CANCELLED = 'cancelled';
+    case CANCELED = 'canceled';
 }

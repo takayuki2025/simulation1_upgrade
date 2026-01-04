@@ -194,6 +194,7 @@ return [
         App\Providers\PaymentModuleServiceProvider::class,
         App\Providers\ShopModuleServiceProvider::class,
         App\Modules\Item\Infrastructure\Providers\ItemEventServiceProvider::class,
+        App\Modules\Shop\ShopServiceProvider::class,
     ],
 
     /*

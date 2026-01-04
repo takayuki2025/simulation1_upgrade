@@ -5,13 +5,13 @@ namespace App\Modules\Order\Domain\ValueObject;
 final class Address
 {
     public function __construct(
-        public readonly string $postalCode,
-        public readonly string $prefecture,
-        public readonly string $city,
-        public readonly string $addressLine1,
-        public readonly ?string $addressLine2 = null,
-        public readonly ?string $recipientName = null,
-        public readonly ?string $phone = null,
+        private ?string $postalCode,
+        private ?string $prefecture,
+        private ?string $city,
+        private ?string $addressLine1,
+        private ?string $addressLine2,
+        private ?string $recipientName,
+        private ?string $phone,
     ) {
     }
 

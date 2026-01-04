@@ -98,8 +98,12 @@ final class Shipment
 
     public function markPrepared(): self
     {
+        if ($this->id === null) {
+            throw new \LogicException('Cannot transition a non-persisted Shipment');
+        }
+
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             shopId: $this->shopId,
             orderId: $this->orderId,
             status: ShipmentStatus::PREPARING,
@@ -111,8 +115,12 @@ final class Shipment
 
     public function markShipped(\DateTimeImmutable $eta): self
     {
+        if ($this->id === null) {
+            throw new \LogicException('Cannot ship a non-persisted Shipment');
+        }
+
         return self::reconstitute(
-            id: $this->id ?? 0,
+            id: $this->id,
             shopId: $this->shopId,
             orderId: $this->orderId,
             status: ShipmentStatus::SHIPPED,

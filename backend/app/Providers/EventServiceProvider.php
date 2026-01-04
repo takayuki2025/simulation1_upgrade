@@ -8,11 +8,11 @@ use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Auth\Events\Verified;
 // Domain Event
 use App\Modules\Order\Domain\Event\OrderPaid;
-
 // Listeners
 // use App\Modules\Shipment\Infrastructure\EventListener\OnOrderPaidCreateShipmentDraft;
 use App\Modules\Order\Infrastructure\EventListener\OnOrderPaidRecordOrderHistory;
-
+use App\Modules\Shipment\Application\Listener\CreateShipmentOnOrderPaid;
+use App\Modules\Shop\Infrastructure\Listener\EnsureShopAddressOnOrderPaid;
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -39,8 +39,9 @@ final class EventServiceProvider extends ServiceProvider
         | ここから副作用（配送・履歴）を派生させる
         */
         OrderPaid::class => [
-            // OnOrderPaidCreateShipmentDraft::class,
             OnOrderPaidRecordOrderHistory::class,
+            // CreateShipmentOnOrderPaid::class,
+            EnsureShopAddressOnOrderPaid::class,
         ],
     ];
 

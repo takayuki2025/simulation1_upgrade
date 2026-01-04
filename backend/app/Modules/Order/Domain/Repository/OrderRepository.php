@@ -17,4 +17,6 @@ interface OrderRepository
 
     /** @return Order[] */
     public function findByShop(int $shopId): array;
+
+    public function findDraftByUserAndShop(int $userId, int $shopId): ?Order;
 }

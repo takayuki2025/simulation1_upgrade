@@ -2,41 +2,57 @@
 
 namespace App\Modules\Shipment\Application\UseCase;
 
-use App\Modules\Shipment\Domain\Entity\Shipment;
-use App\Modules\Shipment\Domain\Enum\ShipmentStatus;
-use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Order\Domain\Repository\OrderRepository;
+use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Shop\Domain\Repository\ShopRepository;
+use App\Modules\Shipment\Domain\Entity\Shipment;
+use App\Modules\Shipment\Domain\Exception\ShipmentAlreadyExistsException;
+use App\Modules\Order\Domain\Exception\TenantMismatchException;
 
 final class CreateShipmentUseCase
 {
     public function __construct(
-        private ShipmentRepository $shipments,
         private OrderRepository $orders,
+        private ShipmentRepository $shipments,
+        private ShopRepository $shops,
     ) {
     }
 
-    public function handle(int $orderId, int $shopId): void
+    public function handle(int $orderId, int $shopId): int
     {
-        // 二重作成防止（超重要）
-        if ($this->shipments->existsByOrderId($orderId)) {
-            return;
-        }
+
+        \Log::info('[🔥CreateShipment] input', [
+            'orderId' => $orderId,
+            'shopId'  => $shopId,
+        ]);
 
         $order = $this->orders->findById($orderId);
-        if (!$order) {
-            return;
+        if (! $order) {
+            throw new \DomainException('Order not found');
         }
 
-        $shipment = new Shipment(
-            id: null,
+        if ($order->shopId() !== $shopId) {
+            throw new TenantMismatchException();
+        }
+
+        if ($this->shipments->existsByOrderId($orderId)) {
+            throw new ShipmentAlreadyExistsException();
+        }
+
+        $shop = $this->shops->findById($shopId);
+        if (! $shop) {
+            throw new \DomainException('Shop not found');
+        }
+
+        $shipment = Shipment::createDraft(
             shopId: $shopId,
-            orderId: $orderId,
-            status: ShipmentStatus::CREATED,
-            originAddress: [],       // 倉庫 or 店舗住所（後で拡張）
+            orderId: $order->id(),
+            originAddress: $shop->shippingAddress(),
             destinationAddress: $order->shippingAddress(),
-            eta: null,
         );
 
-        $this->shipments->save($shipment);
+        $saved = $this->shipments->save($shipment);
+
+        return $saved->id();
     }
 }

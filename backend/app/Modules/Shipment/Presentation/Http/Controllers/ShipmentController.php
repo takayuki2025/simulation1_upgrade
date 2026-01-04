@@ -5,6 +5,7 @@ namespace App\Modules\Shipment\Presentation\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use App\Modules\Shipment\Application\UseCase\CreateShipmentUseCase;
+use App\Modules\Shop\Application\Dto\ShopContext;
 
 final class ShipmentController extends Controller
 {
@@ -15,15 +16,19 @@ final class ShipmentController extends Controller
 
     public function store(
         Request $request,
-        string $shop_code,   // ← 必ず受ける
-        int $orderId         // ← int で受ける
+        string $shop_code,
+        string $orderId
     ) {
-        /** @var \App\Modules\Shop\Domain\Entity\Shop $shop */
-        $shop = $request->attributes->get('currentShop');
+        /** @var ShopContext|null $ctx */
+        $ctx = $request->attributes->get(ShopContext::class);
+
+        if (! $ctx) {
+            abort(500, 'ShopContext not resolved');
+        }
 
         $this->useCase->handle(
-            orderId: $orderId,
-            shopId: $shop->id(),
+            orderId: (int) $orderId,
+            shopId: $ctx->shopId,
         );
 
         return response()->json([
