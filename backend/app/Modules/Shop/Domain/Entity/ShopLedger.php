@@ -13,7 +13,7 @@ final class ShopLedger
         public readonly string $currency,
         public readonly ?int $orderId,
         public readonly ?int $paymentId,
-        public readonly array $meta,
+        public readonly ?array $meta,
         public readonly \DateTimeImmutable $occurredAt,
     ) {
     }

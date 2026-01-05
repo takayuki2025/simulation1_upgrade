@@ -16,9 +16,6 @@ final class OnOrderPaidRecordOrderHistory
 {
     public function handle(OrderPaid $event): void
     {
-        \Log::info('[🔥OrderHistory] listener fired', [
-            'order_id' => $event->orderId,
-        ]);
 
         // =========================
         // Order 取得
@@ -76,10 +73,5 @@ final class OnOrderPaidRecordOrderHistory
                 'updated_at'     => now(),
             ]);
         }
-
-        \Log::info('[🔥OrderHistory] inserted', [
-            'order_id' => $event->orderId,
-            'count'    => count($items),
-        ]);
     }
 }
