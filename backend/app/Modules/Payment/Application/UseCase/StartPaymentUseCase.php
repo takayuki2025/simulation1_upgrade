@@ -27,7 +27,7 @@ final class StartPaymentUseCase
         return DB::transaction(function () use ($input, $userId) {
 
             /* ============================================
-               ① Order 検証
+            ① Order 検証
             ============================================ */
             $order = $this->orders->findById($input->orderId);
             if (! $order) {
@@ -51,10 +51,10 @@ final class StartPaymentUseCase
             }
 
             /* ============================================
-               ② Gateway 呼び出し（★先に PI を作る）
-               - provider_payment_id (= payment_intent.id) を必ず取得
+            ② Gateway 呼び出し（★先に PI を作る）
+            - provider_payment_id (= payment_intent.id) を必ず取得
             ============================================ */
-            $res = $this->gateway->start(
+            $res = $this->gateway->createIntent(
                 method: $method,
                 amount: $order->totalAmount(),
                 currency: $order->currency(),
@@ -72,7 +72,7 @@ final class StartPaymentUseCase
             }
 
             /* ============================================
-               ③ Payment 初期作成（★PI を持った状態で作る）
+            ③ Payment 初期作成（★PI を持った状態で作る）
             ============================================ */
             $payment = Payment::initiate(
                 orderId: $order->id(),
@@ -91,7 +91,7 @@ final class StartPaymentUseCase
             $payment = $payment->withProviderPayment($res['provider_payment_id']);
 
             /* ============================================
-               ④ requires_action 遷移
+            ④ requires_action 遷移
             ============================================ */
             if (($res['requires_action'] ?? false) === true) {
                 $payment = $payment->markRequiresAction([
@@ -100,19 +100,19 @@ final class StartPaymentUseCase
             }
 
             /* ============================================
-               ⑤ instructions 反映
+            ⑤ instructions 反映
             ============================================ */
             if (! empty($res['instructions'])) {
                 $payment = $payment->withInstructions($res['instructions']);
             }
 
             /* ============================================
-               ⑥ INSERT（provider_payment_id が必ず入る）
+            ⑥ INSERT（provider_payment_id が必ず入る）
             ============================================ */
             $payment = $this->payments->save($payment);
 
             /* ============================================
-               ⑦ レスポンス
+            ⑦ レスポンス
             ============================================ */
             return new StartPaymentOutput(
                 paymentId: $payment->id(),

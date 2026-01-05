@@ -19,12 +19,6 @@ final class StripeWebhookController extends Controller
     public function __invoke(Request $request): Response
     {
 
-        \Log::info('[🔥StripeWebhookController] received', [
-            'headers' => request()->headers->all(),
-            'payload' => request()->all(),
-        ]);
-
-
         $payload = $request->getContent();
         $sig     = $request->header('Stripe-Signature');
         $secret  = config('services.stripe.webhook_secret');
@@ -58,12 +52,6 @@ final class StripeWebhookController extends Controller
             ]);
             // throw しない
         }
-
-        \Log::info('[🔥Webhook] handle called', [
-            'provider' => $input->provider,
-            'event_id' => $input->eventId,
-            'event_type' => $input->eventType,
-        ]);
 
         return response()->json(['ok' => true], 200);
     }

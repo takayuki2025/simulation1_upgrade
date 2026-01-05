@@ -28,13 +28,6 @@ final class HandlePaymentWebhookUseCase
     public function handle(HandlePaymentWebhookInput $input): void
     {
 
-
-        \Log::info('[🔥Webhook] handle called', [
-            'provider' => $input->provider,
-            'event_id' => $input->eventId,
-            'event_type' => $input->eventType,
-        ]);
-
         if ($this->safeReserve($input) !== true) {
             return;
         }
@@ -45,13 +38,6 @@ final class HandlePaymentWebhookUseCase
 
         try {
             $domainEvent = $this->mapper->map($input);
-
-
-            \Log::info('[🔥Webhook] mapped domain event', [
-                'type' => $domainEvent->type->value,
-                'provider_payment_id' => $domainEvent->providerPaymentId,
-            ]);
-
 
             if ($domainEvent->type === DomainPaymentEventType::IGNORED) {
                 return;
@@ -165,10 +151,6 @@ final class HandlePaymentWebhookUseCase
 
 
             if ($orderPaidEvent) {
-
-                \Log::info('[🔥Webhook] dispatching OrderPaid (afterCommit)', [
-                    'order_id' => $orderPaidEvent->orderId,
-                ]);
 
                 DB::afterCommit(fn () => Event::dispatch($orderPaidEvent));
             }

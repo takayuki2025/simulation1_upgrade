@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Modules\Payment\Domain\Port\PaymentGatewayPort;
-use App\Modules\Payment\Infrastructure\External\StripePaymentGateway;
+use App\Modules\Payment\Infrastructure\Gateway\StripePaymentGateway;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Payment\Domain\Repository\PaymentQueryRepository;
 use App\Modules\Payment\Infrastructure\Persistence\Repository\EloquentPaymentRepository;

@@ -6,14 +6,14 @@ use App\Modules\Payment\Domain\Enum\PaymentMethod;
 
 interface PaymentGatewayPort
 {
-    public function start(
+    public function createIntent(
         PaymentMethod $method,
         int $amount,
         string $currency,
         array $context
     ): array;
 
-    public function parseWebhook(string $payload, string $signature): array;
+    public function handleWebhook(string $payload, string $signature): array;
 
     public function createPaymentIntent(
         PaymentMethod $method,
