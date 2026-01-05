@@ -3,17 +3,17 @@
 namespace App\Modules\Auth\Application\Service;
 
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
+use App\Modules\Auth\Domain\Port\TokenVerifierPort;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 
 final class JwtUserResolver
 {
     public function __construct(
-        private UserProvisioningPort $provisioning
+        private TokenVerifierPort $verifier,
+        private UserProvisioningPort $provisioning,
     ) {
     }
 
@@ -28,12 +28,10 @@ final class JwtUserResolver
         $token = substr($authHeader, 7);
 
         try {
-            $payload = JWT::decode(
-                $token,
-                new Key(config('jwt.secret'), 'HS256')
-            );
+            // ★ Application は署名方式を一切知らない
+            $payload = $this->verifier->decode($token);
         } catch (\Throwable $e) {
-            Log::warning('[JwtUserResolver] JWT decode failed', [
+            Log::warning('[JwtUserResolver] token verification failed', [
                 'error' => $e->getMessage(),
             ]);
             return null;
@@ -44,7 +42,7 @@ final class JwtUserResolver
         }
 
         /* =========================================
-         * ① DB の事実を確定（JWT → ProvisionedUser）
+         * ① DB の事実を確定（Token → ProvisionedUser）
          * ========================================= */
         $provisioned = $this->provisioning->provisionFromJwt(
             userId: (int) $payload->sub
@@ -61,15 +59,17 @@ final class JwtUserResolver
         /* =========================================
          * ③ AuthPrincipal（唯一の真実）
          * ========================================= */
+
         $principal = AuthPrincipal::fromProvisionedUser(
-            $provisioned,
-            'jwt',
-            (string) $payload->sub
+            user: $provisioned,
+            provider: 'token',
+            providerUid: (string) $payload->sub
         );
 
+
         return [
-            'user'      => $eloquentUser, // Laravel Auth 用
-            'principal' => $principal,    // Domain 用
+            'user'      => $eloquentUser,
+            'principal' => $principal,
         ];
     }
 }

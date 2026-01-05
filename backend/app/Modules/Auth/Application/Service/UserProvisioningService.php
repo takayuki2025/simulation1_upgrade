@@ -42,13 +42,17 @@ final class UserProvisioningService implements UserProvisioningPort
             $isFirstLogin = false;
         }
 
+
+
         return new ProvisionedUser(
             userId: $user->id,
             email: $user->email,
             emailVerified: (bool) $user->email_verified_at,
-            isFirstLogin: $isFirstLogin,
+            isFirstLogin: false, // ← JWT は必ず false
             shopIds: $this->resolveShopIds($user),
         );
+
+
     }
 
     /**
@@ -69,13 +73,17 @@ final class UserProvisioningService implements UserProvisioningPort
             throw new DomainException('User not found for JWT provisioning.');
         }
 
+
+
         return new ProvisionedUser(
             userId: $user->id,
             email: $user->email,
             emailVerified: (bool) $user->email_verified_at,
-            isFirstLogin: false,
+            isFirstLogin: false, // ← JWT は必ず false
             shopIds: $this->resolveShopIds($user),
         );
+
+
     }
 
     /**

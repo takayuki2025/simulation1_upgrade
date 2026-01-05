@@ -500,19 +500,3 @@ use App\Modules\User\Presentation\Http\Controllers\UserAddressController;
 Route::middleware('auth.jwt')->group(function () {
     Route::get('/me/addresses/primary', [UserAddressController::class, 'primary']);
 });
-
-
-
-
-
-
-
-
-
-// // === Shop / Public View ===
-// Route::prefix('shops/{shop_code}')
-//     ->middleware(['shop.context'])
-//     ->group(function () {
-//         Route::get('/', ShopShowController::class);
-//         Route::get('/items', ShopItemListController::class);
-//     });

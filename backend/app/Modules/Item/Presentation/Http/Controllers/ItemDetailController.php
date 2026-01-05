@@ -15,7 +15,7 @@ final class ItemDetailController extends Controller
         GetItemDetailUseCase $useCase,
         AuthContext $authContext, // ★ 追加
     ) {
-        $principal = $authContext->principal(); // ★ ここが正解
+        $principal = $authContext->principalOrNull(); // ★ ここが正解
 
         $viewerUserId = $principal?->userId;
 

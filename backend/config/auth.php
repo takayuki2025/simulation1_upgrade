@@ -15,11 +15,11 @@ return [
             'provider' => 'users',
         ],
 
-        // ★ テスト用 jwt guard（session）
-        'jwt' => [
-            'driver' => 'session',
-            'provider' => 'users',
-        ],
+        // ★ テスト用 jwt guard（session）なのでコメント化
+        // 'jwt' => [
+        //     'driver' => 'session',
+        //     'provider' => 'users',
+        // ],
     ],
 
     'providers' => [
