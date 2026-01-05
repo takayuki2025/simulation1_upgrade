@@ -3,16 +3,14 @@
 namespace App\Modules\Order\Application\UseCase;
 
 use App\Modules\Order\Domain\Repository\OrderRepository;
-use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
-
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-
+use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentQueryRepository;
+use App\Modules\Order\Application\Dto\GetOrderDetailOutput;
 
 final class GetMyOrderShipmentUseCase
 {
     public function __construct(
         private OrderRepository $orders,
-        private ShipmentRepository $shipments,
+        private DbShipmentQueryRepository $shipments,
     ) {
     }
 
@@ -24,22 +22,26 @@ final class GetMyOrderShipmentUseCase
             return null;
         }
 
-        // 🔒 自分の注文かチェック（最重要）
+        // 🔒 自分の注文かチェック
         if ($order->userId() !== $userId) {
             return null;
         }
 
-        $shipment = $this->shipments->findByOrderId($orderId);
+        $row = $this->shipments->findByOrderId($orderId);
 
-        if (! $shipment) {
+        if (! $row) {
             return null;
         }
 
-        return [
-            'id'     => $shipment->id,
-            'status' => $shipment->status->value,
-            'eta'    => $shipment->eta?->format('Y-m-d'),
-            // 'timeline' => $shipment->timeline(), // array 前提
-        ];
+
+        $deliveredAt = $this->shipmentQuery->findDeliveredAtByShipmentId($shipment?->id());
+
+        return GetOrderDetailOutput::from(
+            $order,
+            $payment,
+            $shipment,
+            $deliveredAt,
+        );
+
     }
 }

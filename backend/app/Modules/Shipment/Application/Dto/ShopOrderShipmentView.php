@@ -9,6 +9,7 @@ final class ShopOrderShipmentView
         public readonly string $status,
         public readonly ?int $shipmentId,
         public readonly ?string $eta,
+        public readonly ?string $deliveredAt,
         public readonly bool $canCreate,
         public readonly ?string $nextActionKey,
         public readonly ?string $nextActionLabel,
@@ -33,6 +34,7 @@ final class ShopOrderShipmentView
             status: 'not_created',
             shipmentId: null,
             eta: null,
+            deliveredAt: null,
             canCreate: $canCreate,
             nextActionKey: $canCreate ? 'accept' : null,
             nextActionLabel: $canCreate ? '配送準備を開始' : null,
@@ -53,6 +55,7 @@ final class ShopOrderShipmentView
             status: 'draft',
             shipmentId: $shipmentId,
             eta: null,
+            deliveredAt: null,
             canCreate: false,
             nextActionKey: 'pack',
             nextActionLabel: '梱包完了',
@@ -70,6 +73,7 @@ final class ShopOrderShipmentView
             status: 'packed',
             shipmentId: $shipmentId,
             eta: null,
+            deliveredAt: null,
             canCreate: false,
             nextActionKey: 'ship',
             nextActionLabel: '発送',
@@ -88,6 +92,7 @@ final class ShopOrderShipmentView
             status: 'shipped',
             shipmentId: $shipmentId,
             eta: $eta,
+            deliveredAt: null,
             canCreate: false,
             nextActionKey: 'in-transit',
             nextActionLabel: '輸送中',
@@ -106,6 +111,7 @@ final class ShopOrderShipmentView
             status: 'in_transit',
             shipmentId: $shipmentId,
             eta: $eta,
+            deliveredAt: null,
             canCreate: false,
             nextActionKey: 'deliver',
             nextActionLabel: '配達完了',
@@ -117,6 +123,7 @@ final class ShopOrderShipmentView
         int $orderId,
         int $shipmentId,
         ?string $eta,
+        ?string $deliveredAt,
         ?array $destinationAddress
     ): self {
         return new self(
@@ -124,6 +131,7 @@ final class ShopOrderShipmentView
             status: 'delivered',
             shipmentId: $shipmentId,
             eta: $eta,
+            deliveredAt: $deliveredAt,
             canCreate: false,
             nextActionKey: null,
             nextActionLabel: null,
@@ -142,6 +150,7 @@ final class ShopOrderShipmentView
             'shipment_id' => $this->shipmentId,
             'status' => $this->status,
             'eta' => $this->eta,
+            'delivered_at' => $this->deliveredAt,
             'can_create' => $this->canCreate,
             'next_action' => $this->nextActionKey
                 ? [

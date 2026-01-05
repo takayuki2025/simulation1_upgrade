@@ -11,6 +11,10 @@ final class EloquentShipmentEventRepository implements ShipmentEventRepository
 {
     public function record(ShipmentEvent $event): void
     {
+\Log::info('[🔥ShipmentEventRepository] record delivered', [
+    'shipment_id' => $event->shipmentId,
+]);
+
         DB::table('shipment_events')->insert([
             'shipment_id' => $event->shipmentId,
             'type'        => $event->type->value,

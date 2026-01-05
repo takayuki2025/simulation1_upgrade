@@ -22,8 +22,16 @@ final class EloquentShipmentQueryRepository implements ShipmentQueryRepository
                      ->where('payments.status', 'succeeded');
             })
             ->leftJoin('shipments', 'shipments.order_id', '=', 'orders.id')
+
+            // ✅ delivered event join
+            ->leftJoin('shipment_events as delivered_events', function ($join) {
+                $join->on('shipments.id', '=', 'delivered_events.shipment_id')
+                     ->where('delivered_events.type', 'delivered');
+            })
+
             ->where('orders.shop_id', $shopId)
             ->where('orders.id', $orderId)
+
             ->select([
                 'orders.id as order_id',
                 'orders.status as order_status',
@@ -33,9 +41,23 @@ final class EloquentShipmentQueryRepository implements ShipmentQueryRepository
                 'shipments.status as shipment_status',
                 'shipments.eta',
 
+                // ★ Event 由来の delivered_at
+                DB::raw('MAX(delivered_events.occurred_at) as delivered_at'),
+
                 'orders.address_snapshot as destination_address',
             ])
+            ->groupBy(
+                'orders.id',
+                'orders.status',
+                'payments.id',
+                'shipments.id',
+                'shipments.status',
+                'shipments.eta',
+                'orders.address_snapshot'
+            )
             ->first();
+
+\Log::info('[🔥ShipmentQuery row]', $row ? (array) $row : ['row' => null]);
 
         return $row ? $this->normalizeRow($row) : null;
     }
@@ -53,6 +75,13 @@ final class EloquentShipmentQueryRepository implements ShipmentQueryRepository
                      ->where('payments.status', 'succeeded');
             })
             ->leftJoin('shipments', 'shipments.order_id', '=', 'orders.id')
+
+            // ✅ delivered event join
+            ->leftJoin('shipment_events as delivered_events', function ($join) {
+                $join->on('shipments.id', '=', 'delivered_events.shipment_id')
+                     ->where('delivered_events.type', 'delivered');
+            })
+
             ->where('orders.shop_id', $shopId)
             ->select([
                 'orders.id as order_id',
@@ -63,8 +92,20 @@ final class EloquentShipmentQueryRepository implements ShipmentQueryRepository
                 'shipments.status as shipment_status',
                 'shipments.eta',
 
+                // ★ Event 由来
+                DB::raw('MAX(delivered_events.occurred_at) as delivered_at'),
+
                 'orders.address_snapshot as destination_address',
             ])
+            ->groupBy(
+                'orders.id',
+                'orders.status',
+                'payments.id',
+                'shipments.id',
+                'shipments.status',
+                'shipments.eta',
+                'orders.address_snapshot'
+            )
             ->orderByDesc('orders.id')
             ->get();
 
@@ -91,6 +132,9 @@ final class EloquentShipmentQueryRepository implements ShipmentQueryRepository
 
             'shipment_status' => $row->shipment_status,
             'eta' => $row->eta,
+
+            // ★ ここが UI に届く
+            'delivered_at' => $row->delivered_at,
 
             'destination_address' => $row->destination_address
                 ? json_decode($row->destination_address, true)

@@ -8,7 +8,6 @@ final class ShopOrderShipmentViewFactory
 {
     public function fromRow(array $row): ShopOrderShipmentView
     {
-        // 未決済
         if (! $row['order_paid']) {
             return ShopOrderShipmentView::notCreated(
                 orderId: $row['order_id'],
@@ -17,7 +16,6 @@ final class ShopOrderShipmentViewFactory
             );
         }
 
-        // 決済済・Shipment 未作成
         if ($row['shipment_id'] === null) {
             return ShopOrderShipmentView::notCreated(
                 orderId: $row['order_id'],
@@ -25,8 +23,6 @@ final class ShopOrderShipmentViewFactory
                 destinationAddress: $row['destination_address'],
             );
         }
-
-        // Shipment 作成済：状態別 View
 
         return match ($row['shipment_status']) {
             'draft' => ShopOrderShipmentView::draft(
@@ -59,13 +55,9 @@ final class ShopOrderShipmentViewFactory
                 orderId: $row['order_id'],
                 shipmentId: $row['shipment_id'],
                 eta: $row['eta'],
+                deliveredAt: $row['delivered_at'] ?? null,
                 destinationAddress: $row['destination_address'],
             ),
-
-
-            // default => throw new \LogicException(
-            //     'Unknown shipment status: ' . $row['shipment_status']
-            // ),
         };
     }
 }

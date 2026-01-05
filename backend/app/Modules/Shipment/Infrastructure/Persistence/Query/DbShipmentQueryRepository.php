@@ -2,35 +2,32 @@
 
 namespace App\Modules\Shipment\Infrastructure\Persistence\Query;
 
-use App\Modules\Shipment\Domain\Repository\ShipmentQueryRepository;
 use Illuminate\Support\Facades\DB;
 
-final class DbShipmentQueryRepository implements ShipmentQueryRepository
+final class DbShipmentQueryRepository
 {
-    public function findByShopIdAndOrderId(
-        int $shopId,
-        int $orderId
-    ): ?array {
-        $row = DB::table('orders')
-            ->leftJoin('payments', function ($join) {
-                $join->on('payments.order_id', '=', 'orders.id')
-                     ->where('payments.status', 'succeeded');
+    /**
+     * Order 単位で Shipment + delivered_at（Event由来）を取得
+     */
+    public function findByOrderId(int $orderId): ?array
+    {
+        $row = DB::table('shipments')
+            ->leftJoin('shipment_events', function ($join) {
+                $join->on('shipments.id', '=', 'shipment_events.shipment_id')
+                    ->where('shipment_events.type', 'delivered');
             })
-            ->leftJoin('shipments', 'shipments.order_id', '=', 'orders.id')
-            ->where('orders.shop_id', $shopId)
-            ->where('orders.id', $orderId)
+            ->where('shipments.order_id', $orderId)
             ->select([
-                'orders.id as order_id',
-
-                // ★ ここが重要
-                DB::raw('payments.id IS NOT NULL as order_paid'),
-
                 'shipments.id as shipment_id',
                 'shipments.status as shipment_status',
                 'shipments.eta',
-
-                'orders.address_snapshot as destination_address',
+                DB::raw('MAX(shipment_events.occurred_at) as delivered_at'),
             ])
+            ->groupBy(
+                'shipments.id',
+                'shipments.status',
+                'shipments.eta',
+            )
             ->first();
 
         if (! $row) {
@@ -38,20 +35,10 @@ final class DbShipmentQueryRepository implements ShipmentQueryRepository
         }
 
         return [
-            'order_id' => (int) $row->order_id,
-            'order_paid' => (bool) $row->order_paid,   // ★ 必ず入る
-            'shipment_id' => $row->shipment_id ? (int) $row->shipment_id : null,
+            'shipment_id'    => $row->shipment_id,
             'shipment_status' => $row->shipment_status,
-            'eta' => $row->eta,
-            'destination_address' => $row->destination_address
-                ? json_decode($row->destination_address, true)
-                : null,
+            'eta'            => $row->eta,
+            'delivered_at'   => $row->delivered_at,
         ];
-    }
-
-    public function findByShopId(int $shopId): array
-    {
-        // 一覧用（今回は省略でOK）
-        return [];
     }
 }

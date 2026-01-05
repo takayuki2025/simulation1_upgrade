@@ -24,6 +24,8 @@ final class DeliverShipmentUseCase
         // ★ 新しいインスタンスを保存
         $this->shipments->save($deliveredShipment);
 
+\Log::info('[🔥DeliverShipmentUseCase] called', ['shipment_id' => $shipmentId]);
+
         $this->events->record(
             ShipmentEvent::delivered($shipmentId)
         );

@@ -22,7 +22,7 @@ type Shipment = {
     label: string;
   } | null;
 };
-
+  export const dynamic = "force-dynamic";
 /**
  * ============================
  * Page

@@ -35,10 +35,15 @@ final class GetOrderDetailUseCase
         $payment  = $this->payments->findLatestByOrderId($orderId);
         $shipment = $this->shipments->findByOrderId($orderId);
 
+
+        $deliveredAt = $this->shipmentQuery->findDeliveredAtByShipmentId($shipment?->id());
+
+
         return GetOrderDetailOutput::from(
             order: $order,
             payment: $payment,
             shipment: $shipment,
+            deliveredAt: $deliveredAt,
         );
     }
 }

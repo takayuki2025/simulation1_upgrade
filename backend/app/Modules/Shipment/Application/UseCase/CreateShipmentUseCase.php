@@ -21,11 +21,6 @@ final class CreateShipmentUseCase
     public function handle(int $orderId, int $shopId): int
     {
 
-        \Log::info('[🔥CreateShipment] input', [
-            'orderId' => $orderId,
-            'shopId'  => $shopId,
-        ]);
-
         $order = $this->orders->findById($orderId);
         if (! $order) {
             throw new \DomainException('Order not found');

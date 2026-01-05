@@ -30,6 +30,7 @@ final class GetOrderDetailOutput
         Order $order,
         ?Payment $payment,
         ?Shipment $shipment,
+        ?string $deliveredAt, // ★ Event 由来
     ): self {
         return new self(
             orderId: $order->id(),
@@ -38,12 +39,8 @@ final class GetOrderDetailOutput
             orderStatus: $order->status()->value,
             totalAmount: $order->totalAmount(),
             currency: $order->currency(),
-
-            // ===== Order Address Snapshot =====
             shippingAddress: $order->shippingAddress()?->toArray(),
             addressSnapshotAt: $order->addressSnapshotAt()?->format('Y-m-d H:i:s'),
-
-            // ===== Payment =====
             payment: $payment ? [
                 'payment_id' => $payment->id(),
                 'provider_payment_id' => $payment->providerPaymentId(),
@@ -51,14 +48,11 @@ final class GetOrderDetailOutput
                 'status' => $payment->status()->value,
                 'instructions' => $payment->instructions(),
             ] : null,
-
-            // ===== Shipment =====
             shipment: $shipment ? [
                 'shipment_id' => $shipment->id(),
                 'status'      => $shipment->status()->value,
                 'eta'         => $shipment->eta()?->format('Y-m-d'),
-
-                // Address ValueObject をそのまま DTO 化
+                'delivered_at' => $deliveredAt, // ★ 追加
                 'address'     => $shipment->destinationAddress()->toArray(),
             ] : null,
         );
