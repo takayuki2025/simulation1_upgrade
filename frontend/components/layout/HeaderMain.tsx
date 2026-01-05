@@ -9,6 +9,12 @@ import { useState, type FormEvent } from "react";
 export default function HeaderMain() {
   const { isAuthenticated, logout, isLoading } = useAuth();
   const router = useRouter();
+
+  const handleLogout = async () => {
+    await logout(); // ① 状態・トークン破棄
+    router.push("/login"); // ② 明示的に遷移
+  };
+
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = (e: FormEvent) => {
@@ -52,7 +58,7 @@ export default function HeaderMain() {
         <div className="flex items-center ml-auto space-x-2">
           {isLoading ? null : isAuthenticated ? (
             <>
-              <button onClick={logout} className="text-white">
+              <button onClick={handleLogout} className="text-white">
                 ログアウト
               </button>
               <Link href="/mypage?page=sell" className="text-white">

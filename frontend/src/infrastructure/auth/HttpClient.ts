@@ -7,7 +7,7 @@ export function createHttpClient(
 ): AxiosInstance {
   const client = axios.create({
     baseURL: "/api",
-    withCredentials: true,
+    // withCredentials: true,
   });
 
   /* ======================

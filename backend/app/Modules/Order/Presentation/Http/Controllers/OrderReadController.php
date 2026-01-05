@@ -32,6 +32,11 @@ final class OrderReadController extends Controller
                 userId: (int) $user->id,
             );
 
+\Log::info('[🔥DEBUG OrderRead]', [
+    'user' => $request->user(),
+    'auth_header' => $request->header('Authorization'),
+]);
+
             return response()->json($output->toArray(), 200);
 
         } catch (DomainException $e) {

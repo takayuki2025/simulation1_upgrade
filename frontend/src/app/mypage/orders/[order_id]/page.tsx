@@ -4,6 +4,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/ui/auth/useAuth";
 
+/**
+ * ============================
+ * Types
+ * ============================
+ */
 type OrderDetail = {
   order_id: number;
   order_status: string;
@@ -32,6 +37,7 @@ type OrderDetail = {
     shipment_id: number;
     status: string;
     eta: string | null;
+    delivered_at?: string | null; // ★ 追加（重要）
   } | null;
 };
 
@@ -42,6 +48,11 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
 
+  /**
+   * ============================
+   * Fetch
+   * ============================
+   */
   useEffect(() => {
     if (!isReady || !apiClient || !order_id) return;
 
@@ -59,6 +70,11 @@ export default function OrderDetailPage() {
 
   const isDelivered = order.shipment?.status === "delivered";
 
+  /**
+   * ============================
+   * Render
+   * ============================
+   */
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto">
       <h1 className="text-xl font-bold">注文 #{order.order_id}</h1>
@@ -78,7 +94,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* 配送状況 */}
-      <div className="border rounded p-4 space-y-1">
+      <div className="border rounded p-4 space-y-2">
         <h2 className="font-semibold">配送状況</h2>
 
         {order.shipment ? (
@@ -86,7 +102,6 @@ export default function OrderDetailPage() {
             <div className="flex items-center gap-2">
               <span>状態：{order.shipment.status}</span>
 
-              {/* ✅ delivered のときだけ表示 */}
               {isDelivered && (
                 <span className="text-green-700 text-sm font-semibold">
                   配達完了
@@ -95,6 +110,14 @@ export default function OrderDetailPage() {
             </div>
 
             <div>到着予定：{order.shipment.eta ?? "未定"}</div>
+
+            {/* ★ delivered_at 表示（ここが欠けていた） */}
+            {isDelivered && order.shipment.delivered_at && (
+              <div className="text-sm text-gray-600">
+                配達完了日：
+                {new Date(order.shipment.delivered_at).toLocaleString()}
+              </div>
+            )}
           </>
         ) : (
           <div>配送準備中</div>

@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const api = new LaravelAuthApi(null);
 
     // ② Http client（refresh 無効版）
-    const client = createHttpClient(null);
+    const client = createHttpClient();
 
     // ③ api に client 注入
     api.setClient(client);

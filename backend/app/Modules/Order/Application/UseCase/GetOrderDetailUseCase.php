@@ -6,7 +6,11 @@ use App\Modules\Order\Application\Dto\GetOrderDetailOutput;
 use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Payment\Domain\Repository\PaymentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
+use App\Modules\Shipment\Domain\Repository\ShipmentEventQueryRepository;
 use DomainException;
+use App\Modules\Shipment\Domain\Repository\ShipmentEventReadRepository;
+use App\Modules\Shipment\Infrastructure\Persistence\Query\DbShipmentEventQueryRepository;
+
 
 final class GetOrderDetailUseCase
 {
@@ -14,30 +18,29 @@ final class GetOrderDetailUseCase
         private OrderRepository $orders,
         private PaymentRepository $payments,
         private ShipmentRepository $shipments,
+        private ShipmentEventReadRepository $shipmentEventReads,
     ) {
     }
 
     public function handle(int $orderId, int $userId): GetOrderDetailOutput
     {
-        // ✅ ① 存在チェック
         $order = $this->orders->findById($orderId);
-
-        if ($order === null) {
+        if (! $order) {
             throw new DomainException('Order not found');
         }
 
-        // ✅ ② 所有者チェック
         if ($order->userId() !== $userId) {
             throw new DomainException('Forbidden');
         }
 
-        // ✅ ③ 関連取得
         $payment  = $this->payments->findLatestByOrderId($orderId);
         $shipment = $this->shipments->findByOrderId($orderId);
 
-
-        $deliveredAt = $this->shipmentQuery->findDeliveredAtByShipmentId($shipment?->id());
-
+        $deliveredAt = null;
+        if ($shipment) {
+            $deliveredAt = $this->shipmentEventReads
+                ->findDeliveredAtByShipmentId($shipment->id());
+        }
 
         return GetOrderDetailOutput::from(
             order: $order,
