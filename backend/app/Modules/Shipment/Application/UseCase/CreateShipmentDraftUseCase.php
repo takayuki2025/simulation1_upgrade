@@ -9,44 +9,39 @@ use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Order\Domain\Repository\OrderRepository;
 use Illuminate\Database\QueryException;
 
+
 final class CreateShipmentDraftUseCase
 {
     public function __construct(
         private OrderRepository $orders,
+        private ShopRepository $shops,
         private ShipmentRepository $shipments,
     ) {
     }
 
-    public function handle(CreateShipmentDraftInput $input): void
+    public function handle(int $orderId, int $shopId): void
     {
-        $order = $this->orders->findById($input->orderId);
+        $order = $this->orders->findById($orderId);
         if (! $order) {
             return;
         }
 
-        $destination = $order->shippingAddress();
-        if ($destination === null) {
+        $shop = $this->shops->findById($shopId);
+        if (! $shop) {
             return;
         }
 
         if ($this->shipments->existsByOrderId($order->id())) {
-            return;
+            return; // 冪等
         }
 
         $shipment = Shipment::createDraft(
-            shopId: $order->shopId(),
+            shopId: $shop->id(),
             orderId: $order->id(),
-            originAddress: $order->shopAddress(),
-            destinationAddress: $destination,
+            originAddress: $shop->shippingAddress(),
+            destinationAddress: $order->shippingAddress(),
         );
 
-        try {
-            $this->shipments->save($shipment);
-        } catch (QueryException $e) {
-            if ((int)($e->errorInfo[1] ?? 0) === 1062) {
-                return; // 冪等
-            }
-            throw $e;
-        }
+        $this->shipments->save($shipment);
     }
 }

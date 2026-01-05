@@ -5,6 +5,7 @@ namespace App\Modules\Shipment\Application\UseCase;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentEventRepository;
 use App\Modules\Shipment\Domain\Event\ShipmentEvent;
+use App\Modules\Shipment\Domain\Enum\ShipmentEventType;
 
 final class DeliverShipmentUseCase
 {
@@ -18,16 +19,28 @@ final class DeliverShipmentUseCase
     {
         $shipment = $this->shipments->findById($shipmentId);
 
-        // ★ 必ず戻り値を受け取る
+        // 冪等
+        if ($shipment->status()->isDelivered()) {
+            return;
+        }
+
+        // 状態遷移ガード（v1 固定）
+        if (! $shipment->status()->isShipped()
+            && ! $shipment->status()->isInTransit()
+        ) {
+            throw new \DomainException(
+                'Shipment cannot be delivered from status: ' . $shipment->status()->value
+            );
+        }
+
         $deliveredShipment = $shipment->deliver();
 
-        // ★ 新しいインスタンスを保存
         $this->shipments->save($deliveredShipment);
 
-\Log::info('[🔥DeliverShipmentUseCase] called', ['shipment_id' => $shipmentId]);
-
-        $this->events->record(
-            ShipmentEvent::delivered($shipmentId)
-        );
+        if (! $this->events->exists($shipmentId, ShipmentEventType::DELIVERED)) {
+            $this->events->record(
+                ShipmentEvent::delivered($shipmentId)
+            );
+        }
     }
 }

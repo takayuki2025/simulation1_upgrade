@@ -9,44 +9,27 @@ use App\Modules\Order\Domain\Repository\OrderRepository;
 use App\Modules\Shop\Domain\Repository\ShopRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Domain\Entity\Shipment;
+use Illuminate\Support\Facades\Log;
 
 final class CreateShipmentOnOrderPaid
 {
     public function __construct(
-        private OrderRepository $orders,
-        private ShopRepository $shops,
-        private ShipmentRepository $shipments,
+        private CreateShipmentDraftUseCase $useCase,
     ) {
     }
 
     public function handle(OrderPaid $event): void
     {
-        // ① Order 取得
-        $order = $this->orders->findById($event->orderId);
-        if (! $order) {
-            return;
-        }
 
-        // ② Shop 取得
-        $shop = $this->shops->findById($event->shopId);
-        if (! $shop) {
-            return;
-        }
 
-        // ③ 冪等ガード（すでに Shipment があるなら何もしない）
-        if ($this->shipments->existsByOrderId($order->id())) {
-            return;
-        }
+        Log::info('[Shipment] OrderPaid received', [
+            'order_id' => $event->orderId,
+            'shop_id'  => $event->shopId,
+        ]);
 
-        // ④ Shipment 作成（Aフェーズ正解ルート）
-        $shipment = Shipment::createDraft(
-            shopId: $shop->id(),
-            orderId: $order->id(),
-            originAddress: $shop->shippingAddress(),       // shop_addresses
-            destinationAddress: $order->shippingAddress()  // orders.address_snapshot
+        $this->useCase->handle(
+            orderId: $event->orderId,
+            shopId: $event->shopId,
         );
-
-        // ⑤ 保存
-        $this->shipments->save($shipment);
     }
 }

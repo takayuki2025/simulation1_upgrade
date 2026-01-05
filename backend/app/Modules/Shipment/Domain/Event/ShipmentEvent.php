@@ -2,12 +2,14 @@
 
 namespace App\Modules\Shipment\Domain\Event;
 
+use App\Modules\Shipment\Domain\Enum\ShipmentEventType;
+
 final class ShipmentEvent
 {
     public function __construct(
         public readonly int $shipmentId,
         public readonly ShipmentEventType $type,
-        public readonly array $payload,
+        public readonly ?array $meta,
         public readonly \DateTimeImmutable $occurredAt,
     ) {
     }
@@ -16,42 +18,42 @@ final class ShipmentEvent
     // Static factories
     // --------------------
 
-    public static function packed(int $shipmentId): self
+    public static function packed(int $shipmentId, ?array $meta = null): self
     {
         return new self(
             shipmentId: $shipmentId,
             type: ShipmentEventType::PACKED,
-            payload: [],
-            occurredAt: new \DateTimeImmutable(), // ★ここ
+            meta: $meta,
+            occurredAt: new \DateTimeImmutable(),
         );
     }
 
-    public static function shipped(int $shipmentId): self
+    public static function shipped(int $shipmentId, ?array $meta = null): self
     {
         return new self(
             shipmentId: $shipmentId,
             type: ShipmentEventType::SHIPPED,
-            payload: [],
+            meta: $meta,
             occurredAt: new \DateTimeImmutable(),
         );
     }
 
-    public static function inTransit(int $shipmentId): self
+    public static function inTransit(int $shipmentId, ?array $meta = null): self
     {
         return new self(
             shipmentId: $shipmentId,
             type: ShipmentEventType::IN_TRANSIT,
-            payload: [],
+            meta: $meta,
             occurredAt: new \DateTimeImmutable(),
         );
     }
 
-    public static function delivered(int $shipmentId): self
+    public static function delivered(int $shipmentId, ?array $meta = null): self
     {
         return new self(
             shipmentId: $shipmentId,
             type: ShipmentEventType::DELIVERED,
-            payload: [],
+            meta: $meta,
             occurredAt: new \DateTimeImmutable(),
         );
     }

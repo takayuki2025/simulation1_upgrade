@@ -5,7 +5,7 @@ namespace App\Modules\Shipment\Application\UseCase;
 use App\Modules\Shipment\Domain\Repository\ShipmentRepository;
 use App\Modules\Shipment\Domain\Repository\ShipmentEventRepository;
 use App\Modules\Shipment\Domain\Event\ShipmentEvent;
-use App\Modules\Shipment\Domain\Event\ShipmentEventType;
+use App\Modules\Shipment\Domain\Enum\ShipmentEventType;
 use Illuminate\Support\Facades\DB;
 
 final class ShipShipmentUseCase
@@ -20,21 +20,24 @@ final class ShipShipmentUseCase
     {
         DB::transaction(function () use ($shipmentId) {
 
-            if ($this->events->exists($shipmentId, ShipmentEventType::SHIPPED)) {
-                return; // 冪等
-            }
-
             $shipment = $this->shipments->findById($shipmentId);
 
-            $shipment = $shipment->ship(
-                new \DateTimeImmutable('+2 days') // 仮 ETA
+            // Aggregate 基準の冪等
+            if ($shipment->status()->isShipped()) {
+                return;
+            }
+
+            $shippedShipment = $shipment->ship(
+                new \DateTimeImmutable('+2 days')
             );
 
-            $this->shipments->save($shipment);
+            $this->shipments->save($shippedShipment);
 
-            $this->events->record(
-                ShipmentEvent::shipped($shipmentId)
-            );
+            if (! $this->events->exists($shipmentId, ShipmentEventType::SHIPPED)) {
+                $this->events->record(
+                    ShipmentEvent::shipped($shipmentId)
+                );
+            }
         });
     }
 }

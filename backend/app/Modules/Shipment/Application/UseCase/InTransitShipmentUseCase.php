@@ -34,7 +34,7 @@ final class InTransitShipmentUseCase
             }
 
             // ③ 状態遷移（Entity が新インスタンスを返す設計）
-            $inTransitShipment = $shipment->markInTransit();
+            $inTransitShipment = $shipment->InTransit();
 
             // ④ 永続化
             $this->shipments->save($inTransitShipment);
