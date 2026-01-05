@@ -44,45 +44,39 @@ final class ListPublicCatalogItemsUseCase
 
         foreach ($rows as $row) {
 
-            // ① 自分の shop 商品は除外
-            if (
-                $isShopMember &&
-                $row->shop_id !== null &&
-                in_array($row->shop_id, $viewerShopIds, true)
-            ) {
-                continue;
-            }
+    // ★ 0) item_origin がない場合の保険（運用中の移行期）
+    $itemOrigin = $row->item_origin ?? null;
 
-            // ② 表示タイプ判定
-            $displayType = null;
+    // ★ 1) ショップ公式出品はトップページから除外
+    if ($itemOrigin === 'shop_managed') {
+        continue;
+    }
 
-            if ($isShopMember && $row->shop_id === null) {
-                $displayType = 'STAR';
-            }
+    // ★ 2) 表示タイプ判定（個人出品だけ）
+    $displayType = null;
 
-            if (
-                !$isShopMember &&
-                $viewerUserId !== null &&
-                $row->shop_id === null &&
-                $row->created_by_user_id === $viewerUserId
-            ) {
-                $displayType = 'COMET';
-            }
+    if ($itemOrigin === 'user_personal') {
+        // 「一般か、ショップ関係か」は viewerShopIds（ロール等）で判定
+        $displayType = $isShopMember ? 'STAR' : 'COMET';
+    }
 
-            $items[] = new PublicCatalogItemDto(
-                $row->id,
-                $row->name,
-                $row->price,
-                $row->brand_primary,
-                $row->condition_name,
-                $row->color_name,
-                $row->item_image,
-                $row->created_at,
-                $displayType
-            );
-        }
+    $items[] = new PublicCatalogItemDto(
+        id: (int) $row->id,
+        name: (string) $row->name,
+        price: (int) $row->price,
+        brandPrimary: $row->brand_primary ?? null,
+        conditionName: $row->condition_name ?? null,
+        colorName: $row->color_name ?? null,
+        itemImagePath: $row->item_image ?? null,
+        publishedAt: $row->created_at,
+        itemOrigin: $itemOrigin,
+        displayType: $displayType
+    );
+}
+}
+
 
 
         return new PublicCatalogItemCollection($items);
     }
-}
+} 

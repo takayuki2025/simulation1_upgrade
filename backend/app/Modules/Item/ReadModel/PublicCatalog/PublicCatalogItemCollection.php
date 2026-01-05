@@ -36,4 +36,12 @@ final class PublicCatalogItemCollection implements Countable, IteratorAggregate
     {
         return new ArrayIterator($this->items);
     }
+
+    public function toArray(): array
+    {
+        return array_map(
+            fn (PublicCatalogItemDto $dto) => $dto->toArray(),
+            $this->items
+        );
+    }
 }

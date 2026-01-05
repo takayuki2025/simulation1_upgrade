@@ -7,15 +7,17 @@ use Illuminate\Http\Request;
 use App\Modules\Item\Application\UseCase\Item\Query\CatalogItemListUseCase;
 use App\Modules\Item\Application\Dto\Item\ListItemsInputDto;
 use App\Modules\Auth\Domain\ValueObject\AuthPrincipal;
+use App\Modules\Auth\Application\Service\AuthContext;
 
 final class PublicCatalogController extends Controller
 {
     public function __invoke(
         Request $request,
-        CatalogItemListUseCase $useCase
+        CatalogItemListUseCase $useCase,
+        AuthContext $authContext,
     ) {
         /** @var AuthPrincipal|null $principal */
-        $principal = $request->attributes->get('auth_principal');
+        $principal = $authContext->principalOrNull(); // ★ 修正点
 
         $input = new ListItemsInputDto(
             limit: 20,

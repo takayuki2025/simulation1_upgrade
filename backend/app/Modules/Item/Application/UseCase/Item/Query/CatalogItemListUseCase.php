@@ -51,6 +51,7 @@ final class CatalogItemListUseCase
                     favoritesCount: $favoritesCount,
                 );
             })
+            ->filter()   // ★ null を除外（超重要）
             ->values();
 
         return new ListItemsOutputDto(

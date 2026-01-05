@@ -32,6 +32,10 @@ final class AuthContext
         return $this->principal !== null;
     }
 
+    public function principalOrNull(): ?AuthPrincipal
+    {
+        return $this->principal;
+    }
 
 
     /**
