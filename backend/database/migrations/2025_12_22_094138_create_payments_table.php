@@ -22,10 +22,10 @@ return new class () extends Migration {
             $table->string('currency', 10);
 
             // External references (Stripe PI etc.)
-            $table->string('provider_payment_id', 191)->nullable()->index();
+            $table->string('provider_payment_id', 191)->nullable();
             $table->string('provider_customer_id', 191)->nullable()->index();
 
-            // For konbini (future) / instructions / receipt urls, etc.
+            // For konbini / instructions / receipt urls
             $table->json('method_details')->nullable();
             $table->json('instructions')->nullable();
 
@@ -34,7 +34,17 @@ return new class () extends Migration {
 
             $table->timestamps();
 
-            $table->foreign('order_id')->references('id')->on('orders')->cascadeOnDelete();
+            // FK
+            $table->foreign('order_id')
+                  ->references('id')
+                  ->on('orders')
+                  ->cascadeOnDelete();
+
+            // ✅ ★ これが今回の核心
+            $table->unique(
+                ['provider', 'provider_payment_id', 'order_id'],
+                'uq_payments_provider_pi_order'
+            );
         });
     }
 

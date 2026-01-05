@@ -162,4 +162,16 @@ final class EloquentPaymentRepository implements PaymentRepository
 
         return $row ? $this->mapRow($row) : null;
     }
+
+    public function findByProviderPaymentIdAndOrderId(
+        string $providerPaymentId,
+        int $orderId
+    ): ?Payment {
+        $row = DB::table('payments')
+            ->where('provider_payment_id', $providerPaymentId)
+            ->where('order_id', $orderId)
+            ->first();
+
+        return $row ? $this->mapRow($row) : null;
+    }
 }

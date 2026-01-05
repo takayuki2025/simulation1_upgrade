@@ -49,12 +49,23 @@ final class HandlePaymentWebhookUseCase
                 &$orderId,
                 &$orderPaidEvent
             ) {
+
                 $payment = $this->payments
                     ->findByProviderPaymentId($domainEvent->providerPaymentId);
 
-                if (!$payment) {
+                if (! $payment) {
                     return;
                 }
+
+                // ★ Stripe metadata と Payment.orderId の一致確認
+                if (
+                    isset($domainEvent->meta['order_id']) &&
+                    (int)$domainEvent->meta['order_id'] !== $payment->orderId()
+                ) {
+                    // 🚨 別 Order の Webhook。絶対に触らない
+                    return;
+                }
+
 
                 // ----------------------------
                 // Refund（ここが追加点）

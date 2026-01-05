@@ -15,4 +15,9 @@ interface PaymentRepository
     public function updateStatusById(int $paymentId, string $status, ?array $meta = null): void;
 
     public function findLatestByOrderId(int $orderId): ?Payment;
+
+    public function findByProviderPaymentIdAndOrderId(
+        string $providerPaymentId,
+        int $orderId
+    ): ?Payment;
 }
