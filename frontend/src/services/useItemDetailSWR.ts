@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import useSWR from "swr";
 import axios from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
@@ -28,80 +29,62 @@ export interface ItemDetailResponse {
   favorites_count: number;
 }
 
-/**
- * Item Detail SWR
- * - key は itemId のみ（auth / guest を分けない）
- * - 楽観更新・再検証と完全一致
- */
 export const useItemDetailSWR = (itemId: number | null) => {
   const { apiClient, isAuthenticated, isReady } = useAuth();
 
-  /**
-   * fetch 条件
-   */
   const shouldFetch =
     typeof itemId === "number" && Number.isFinite(itemId) && isReady;
 
   /**
-   * ✅ SWR Key（これが最重要）
-   * auth / guest を分けない
+   * ✅ auth / guest を SWR Key に含める
+   * → 認証状態が変わったら必ず再取得
    */
-  const swrKey = shouldFetch ? ["item-detail", itemId] : null;
+  const swrKey = shouldFetch
+    ? ["item-detail", itemId, apiClient ? "auth" : "guest"]
+    : null;
 
-  /**
-   * fetcher
-   */
   const fetcher = async (): Promise<ItemDetailResponse> => {
     if (!itemId) {
       throw new Error("itemId is not available");
     }
 
-    // 認証済み（JWT / Cookie）
     if (apiClient) {
       const res = await apiClient.get<ItemDetailResponse>(`/items/${itemId}`);
       return res.data;
     }
 
-    // 未ログイン（guest）
     const res = await axios.get<ItemDetailResponse>(`/api/items/${itemId}`);
     return res.data;
   };
 
-  /**
-   * SWR 本体
-   */
   const { data, error, isLoading, mutate } = useSWR<ItemDetailResponse>(
     swrKey,
     fetcher,
     {
-      // ❌ 勝手に戻る原因になる挙動は全て OFF
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       revalidateIfStale: false,
       shouldRetryOnError: false,
-    },
+    }
   );
 
   /**
-   * View 用に正規化して返す
+   * ✅ 認証が ready になった瞬間に再取得
+   * （guest → auth のズレを完全解消）
    */
+  useEffect(() => {
+    if (isAuthenticated && apiClient && isReady) {
+      mutate();
+    }
+  }, [isAuthenticated, apiClient, isReady, mutate]);
+
   return {
-    // core
     item: data?.item ?? null,
     comments: data?.comments ?? [],
-
-    // ❤️ reaction
     isFavorited: data?.is_favorited ?? false,
     favoritesCount: data?.favorites_count ?? 0,
-
-    // state
     isLoading,
     isError: error,
-
-    /**
-     * ✅ 外部から使える mutate
-     * submitFavorite / rollback / 再検証 用
-     */
     mutateItemDetail: mutate,
   };
 };

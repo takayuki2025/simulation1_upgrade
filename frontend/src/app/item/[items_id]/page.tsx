@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/ui/auth/useAuth";
 import { useItemDetailSWR } from "@/services/useItemDetailSWR";
+import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 
 import styles from "./W-ItemDetailView.module.css";
@@ -70,7 +71,7 @@ export default function ItemDetailPage() {
 
   const isAuthenticated = auth.isAuthenticated;
   const user = auth.user;
-
+  const { refetchFavorites } = useFavoriteItemsSWR();
   /* =========================
      Guard
   ========================= */
@@ -93,51 +94,67 @@ export default function ItemDetailPage() {
      ❤️ Favorite（唯一ここだけ mutate）
   ========================= */
   const submitFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
-    if (!isAuthenticated || !auth.apiClient) {
-      router.push("/login");
-      return;
+  if (!isAuthenticated || !auth.apiClient) {
+    router.push("/login");
+    return;
+  }
+  if (isTogglingFavorite) return;
+
+  setIsTogglingFavorite(true);
+
+  let nextFavorited: boolean | null = null;
+
+  // ✅ optimistic update（ここが唯一の真実）
+  mutateItemDetail(
+    (current) => {
+      if (!current) return current;
+
+      nextFavorited = !current.is_favorited;
+
+      return {
+        ...current,
+        is_favorited: nextFavorited,
+        favorites_count: Math.max(
+          0,
+          current.favorites_count + (nextFavorited ? 1 : -1),
+        ),
+      };
+    },
+    { revalidate: false },
+  );
+
+  try {
+    if (nextFavorited) {
+      await auth.apiClient.post(`/reactions/items/${item.id}/favorite`);
+    } else {
+      await auth.apiClient.delete(`/reactions/items/${item.id}/favorite`);
     }
-    if (isTogglingFavorite) return;
 
-    setIsTogglingFavorite(true);
-
-    const next = !displayedFavorited;
-
-    // optimistic update
+    // ✅ server truth は「差分だけ」同期
     mutateItemDetail(
-      (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          is_favorited: next,
-          favorites_count: Math.max(
-            0,
-            (current.favorites_count ?? 0) + (next ? 1 : -1),
-          ),
-        };
-      },
+      (current) =>
+        current
+          ? {
+              ...current,
+              is_favorited: nextFavorited!,
+            }
+          : current,
       { revalidate: false },
     );
 
-    try {
-      if (next) {
-        await auth.apiClient.post(`/reactions/items/${item.id}/favorite`);
-      } else {
-        await auth.apiClient.delete(`/reactions/items/${item.id}/favorite`);
-      }
+    // ✅ 一覧系だけ更新
+    refetchFavorites();
 
-      // サーバー真実で確定
-      const res = await auth.apiClient.get(`/items/${item.id}`);
-      mutateItemDetail(res.data, { revalidate: false });
-    } catch {
-      mutateItemDetail(); // rollback
-    } finally {
-      setIsTogglingFavorite(false);
-    }
-  };
+  } catch {
+    // rollback
+    mutateItemDetail();
+  } finally {
+    setIsTogglingFavorite(false);
+  }
+};
 
   /* =========================
      💬 Comment

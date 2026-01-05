@@ -57,6 +57,8 @@ export default function OrderDetailPage() {
 
   if (!order) return <div className="p-6">読み込み中...</div>;
 
+  const isDelivered = order.shipment?.status === "delivered";
+
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto">
       <h1 className="text-xl font-bold">注文 #{order.order_id}</h1>
@@ -78,9 +80,20 @@ export default function OrderDetailPage() {
       {/* 配送状況 */}
       <div className="border rounded p-4 space-y-1">
         <h2 className="font-semibold">配送状況</h2>
+
         {order.shipment ? (
           <>
-            <div>状態：{order.shipment.status}</div>
+            <div className="flex items-center gap-2">
+              <span>状態：{order.shipment.status}</span>
+
+              {/* ✅ delivered のときだけ表示 */}
+              {isDelivered && (
+                <span className="text-green-700 text-sm font-semibold">
+                  配達完了
+                </span>
+              )}
+            </div>
+
             <div>到着予定：{order.shipment.eta ?? "未定"}</div>
           </>
         ) : (

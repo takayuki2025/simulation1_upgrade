@@ -5,17 +5,17 @@ namespace App\Modules\Item\Presentation\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Item\Application\UseCase\Item\Query\GetItemDetailUseCase;
 use App\Modules\Item\Presentation\Http\Resources\ItemDetailResource;
+use App\Modules\Auth\Application\Service\AuthContext;
 use Illuminate\Http\Request;
 
 final class ItemDetailController extends Controller
 {
     public function __invoke(
         int $id,
-        Request $request,
-        GetItemDetailUseCase $useCase
+        GetItemDetailUseCase $useCase,
+        AuthContext $authContext, // ★ 追加
     ) {
-        /** @var \App\Modules\Auth\Domain\ValueObject\AuthPrincipal|null $principal */
-        $principal = $request->attributes->get('auth_principal');
+        $principal = $authContext->principal(); // ★ ここが正解
 
         $viewerUserId = $principal?->userId;
 

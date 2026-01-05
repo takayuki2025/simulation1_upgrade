@@ -17,6 +17,7 @@ type OrderShipmentListItem = {
 
   shipment_status: string | null;
   eta: string | null;
+  delivered_at?: string | null;
 
   destination_address: {
     postal_code?: string | null;
@@ -67,6 +68,10 @@ export default function ShopOrderListPage() {
             ? (it.shipment_status ?? "draft")
             : "not_created";
 
+          const isDelivered = shipmentStatus === "delivered";
+          const isDraft = shipmentStatus === "draft";
+          const isNotCreated = shipmentStatus === "not_created";
+
           const addressText = addr
             ? `〒${addr.postal_code ?? ""} ${addr.prefecture ?? ""}${addr.city ?? ""}${addr.address_line1 ?? ""} ${addr.address_line2 ?? ""}`
             : "（配送先未確定）";
@@ -75,9 +80,29 @@ export default function ShopOrderListPage() {
             <div key={it.order_id} className="border rounded p-4 space-y-2">
               <div className="flex justify-between">
                 <div className="font-semibold text-lg">注文 #{it.order_id}</div>
-                <div className="text-sm text-right">
+
+                <div className="text-sm text-right space-y-1">
                   <div>{it.order_status}</div>
                   <div className="font-mono">{shipmentStatus}</div>
+
+                  {/* ✅ 補足ステータス表示 */}
+                  {isDelivered && (
+                    <div className="text-green-700 text-xs font-semibold">
+                      配達完了
+                    </div>
+                  )}
+
+                  {isDraft && (
+                    <div className="text-amber-600 text-xs font-semibold">
+                      購入手続き受付待ち
+                    </div>
+                  )}
+
+                  {isNotCreated && (
+                    <div className="text-blue-600 text-xs font-semibold">
+                      支払い完了待ち
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -103,6 +128,13 @@ export default function ShopOrderListPage() {
                   {addr?.phone && <div>TEL: {addr.phone}</div>}
                 </div>
               </div>
+
+              {isDelivered && it.delivered_at && (
+                <div className="text-xs text-gray-600">
+                  配達完了日：
+                  {new Date(it.delivered_at).toLocaleString()}
+                </div>
+              )}
 
               <div className="pt-2">
                 <Link

@@ -10,12 +10,13 @@ import { useAuth } from "@/ui/auth/useAuth";
  * ============================
  */
 
-type ShipmentStatus = "draft" | "packed" | "shipped";
+type ShipmentStatus = "draft" | "packed" | "shipped" | "delivered";
 
 type Shipment = {
   id: number | null;
   status: ShipmentStatus | null;
   eta: string | null;
+  deliveredAt?: string | null; // ★ 追加（あってもなくてもOK）
   nextAction: {
     key: "accept" | "pack" | "ship";
     label: string;
@@ -61,6 +62,7 @@ export default function ShopOrderShipmentPage() {
         id: raw.shipment_id ?? null,
         status: raw.shipment_id ? (raw.status as ShipmentStatus) : null,
         eta: raw.eta ?? null,
+        deliveredAt: raw.delivered_at ?? null, // ★ 追加
         nextAction: raw.next_action ?? null,
       });
     } finally {
@@ -130,6 +132,20 @@ export default function ShopOrderShipmentPage() {
       {shipment.eta && (
         <div className="text-sm">
           到着予定：<span className="ml-2">{shipment.eta}</span>
+        </div>
+      )}
+
+      {/* ✅ 配達完了表示（終端状態） */}
+      {shipment.status === "delivered" && (
+        <div className="mt-4 space-y-1 text-sm">
+          <div className="font-semibold text-green-700">配達完了</div>
+
+          {shipment.deliveredAt && (
+            <div className="text-gray-600">
+              配達完了日：
+              {new Date(shipment.deliveredAt).toLocaleString()}
+            </div>
+          )}
         </div>
       )}
 
