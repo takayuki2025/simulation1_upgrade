@@ -27,11 +27,6 @@ export default function LoginPage() {
         return;
       }
 
-      if (result.isFirstLogin) {
-        router.replace("/mypage/profile");
-        return;
-      }
-
       router.replace("/");
     } catch {
       setApiError("ログインに失敗しました");

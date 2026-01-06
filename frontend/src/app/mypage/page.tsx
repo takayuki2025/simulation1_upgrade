@@ -33,7 +33,7 @@ type MypageItem = {
 
 type ProfileUser = {
   id: number;
-  name: string;
+  display_name: string | null;
   user_image: string | null;
 };
 
@@ -67,7 +67,8 @@ export default function Mypage() {
 
     try {
       const res: AxiosResponse<any> = await apiClient.get("/mypage/profile");
-      const data = (res.data?.user ?? res.data) as ProfileUser;
+      console.log(res.data.user.display_name);
+      const data = res.data.user;
       setUser(data);
     } catch (e: any) {
       if (e.response?.status === 401) {
@@ -138,7 +139,7 @@ export default function Mypage() {
           />
 
           <h2 className={`text-2xl font-bold ${styles.user_name_large_shift}`}>
-            {user.name}
+            {user.display_name ?? ""}
           </h2>
 
           <button

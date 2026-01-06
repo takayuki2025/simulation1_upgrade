@@ -16,7 +16,7 @@ import styles from "./W-ProfilePage.module.css";
 
 interface ProfileUser {
   id: number;
-  name: string;
+  display_name: string | null;
   email: string;
   post_number: string | null;
   address: string | null;
@@ -25,7 +25,7 @@ interface ProfileUser {
 }
 
 interface ProfileForm {
-  name: string;
+  display_name: string;
   post_number: string;
   address: string;
   building: string;
@@ -57,11 +57,11 @@ export default function ProfilePage() {
 
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
   const [form, setForm] = useState<ProfileForm>({
-    name: "",
-    post_number: "",
-    address: "",
-    building: "",
-  });
+  display_name: "",
+  post_number: "",
+  address: "",
+  building: "",
+});
 
   const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
   const [imageError, setImageError] = useState<string>("");
@@ -83,16 +83,16 @@ export default function ProfilePage() {
   }, [profileUser?.user_image]);
 
   const initializeProfileFromResponse = useCallback((src: any) => {
-    const data: ProfileUser = src?.user ?? src;
+  const data: ProfileUser = src?.user ?? src;
 
-    setProfileUser(data);
-    setForm({
-      name: data.name ?? "",
-      post_number: data.post_number ?? "",
-      address: data.address ?? "",
-      building: data.building ?? "",
-    });
-  }, []);
+  setProfileUser(data);
+  setForm({
+    display_name: data.display_name ?? "",
+    post_number: data.post_number ?? "",
+    address: data.address ?? "",
+    building: data.building ?? "",
+  });
+}, []);
 
   const fetchUserProfile = useCallback(
     async (isRetry = false) => {
@@ -201,31 +201,38 @@ export default function ProfilePage() {
 
   // プロフィール更新
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!apiClient) return;
+  e.preventDefault();
+  if (!apiClient) return;
 
-    setProfileErrors({});
-    setIsLoading(true);
+  setProfileErrors({});
+  setIsLoading(true);
 
-    try {
-      const res = await apiClient.patch("/mypage/profile", form);
-      initializeProfileFromResponse(res.data);
-      setSuccessMessage("プロフィールを更新しました！");
-    } catch (err: any) {
-      const status = err.response?.status;
+  try {
+    const res = profileUser
+      ? await apiClient.patch("/mypage/profile", form) // 既存 → 更新
+      : await apiClient.post("/mypage/profile", form); // 初回 → 作成
 
-      if (status === 422) {
-        setProfileErrors(err.response?.data?.errors ?? {});
-      } else if (status === 401) {
-        await logout();
-        router.replace("/login");
-      } else {
-        setSuccessMessage("更新時にエラーが発生しました。");
-      }
-    } finally {
-      setIsLoading(false);
+    initializeProfileFromResponse(res.data);
+    setSuccessMessage(
+      profileUser
+        ? "プロフィールを更新しました！"
+        : "プロフィールを作成しました！",
+    );
+  } catch (err: any) {
+    const status = err.response?.status;
+
+    if (status === 422) {
+      setProfileErrors(err.response?.data?.errors ?? {});
+    } else if (status === 401) {
+      await logout();
+      router.replace("/login");
+    } else {
+      setSuccessMessage("更新時にエラーが発生しました。");
     }
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // ローディング状態
   if (isAuthLoading || isLoading || isRecovering) {
@@ -308,14 +315,14 @@ export default function ProfilePage() {
               ユーザー名
             </label>
             <input
-              id="name"
+              id="display_name"
+              name="display_name"
               type="text"
-              className={styles.name_form}
-              name="name"
-              value={form.name}
+              className={styles.name_form} 
+              value={form.display_name}
               onChange={(e) =>
-                setForm((prev) => ({ ...prev, name: e.target.value }))
-              }
+            setForm((prev) => ({ ...prev, display_name: e.target.value }))
+            }
             />
             <div className={styles.profile__error}>
               {profileErrors.name ? profileErrors.name[0] : ""}
@@ -398,3 +405,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

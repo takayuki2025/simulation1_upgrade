@@ -19,7 +19,7 @@ final class EnsureShopAddressFromProfileUseCase
 
     public function handle(int $userId): void
     {
-        $profile = $this->profiles->find($userId);
+        $profile = $this->profiles->findByUserId($userId);
         if (! $profile) {
             return;
         }
@@ -33,18 +33,15 @@ final class EnsureShopAddressFromProfileUseCase
             return;
         }
 
-        // ★ ここが修正点
-
         $address = Address::fromArray([
             'postal_code'    => $profile->postNumber(),
-            'prefecture'     => null, // Profile に存在しないため null
-            'city'           => null, // 同上
+            'prefecture'     => null,
+            'city'           => null,
             'address_line1'  => $profile->address(),
             'address_line2'  => $profile->building(),
-            'recipient_name' => $profile->name(),
-            'phone'          => null, // Profile に無ければ null
+            'recipient_name' => $profile->displayName(), // ★ ここも重要
+            'phone'          => null,
         ]);
-
 
         $shopAddress = ShopAddress::createDefault(
             shopId: $shop->id(),

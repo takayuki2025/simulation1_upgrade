@@ -24,13 +24,15 @@ final class UserProvisioningService implements UserProvisioningPort
         $user = User::where('firebase_uid', $firebaseUid)->first();
 
         if (! $user) {
+
             $user = User::create([
                 'firebase_uid'      => $firebaseUid,
                 'email'             => $email,
-                'name'              => $displayName ?? $email ?? 'Guest',
+                'name'              => null, // ★ ここ重要
                 'email_verified_at' => $emailVerified ? now() : null,
                 'first_login_at'    => now(),
             ]);
+
 
             $isFirstLogin = true;
 
@@ -48,7 +50,7 @@ final class UserProvisioningService implements UserProvisioningPort
             userId: $user->id,
             email: $user->email,
             emailVerified: (bool) $user->email_verified_at,
-            isFirstLogin: false, // ← JWT は必ず false
+            isFirstLogin: $isFirstLogin,  // ← JWT は必ず falseというわけではない。
             shopIds: $this->resolveShopIds($user),
         );
 

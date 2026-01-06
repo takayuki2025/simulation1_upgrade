@@ -4,96 +4,116 @@ namespace App\Modules\User\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\User\Application\UseCase\MypageUseCase;
-use App\Modules\User\Application\UseCase\ProfileUseCase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+
+use App\Modules\User\Application\UseCase\GetProfileUseCase;
+use App\Modules\User\Application\UseCase\CreateProfileUseCase;
+use App\Modules\User\Application\UseCase\UpdateProfileUseCase;
+use App\Modules\User\Application\UseCase\UpdateProfileImageUseCase;
+
+use App\Modules\User\Application\Dto\CreateProfileInput;
+use App\Modules\User\Application\Dto\UpdateProfileInput;
+
+use App\Modules\User\Domain\Exception\ProfileAlreadyExistsException;
+use App\Modules\User\Domain\Exception\ProfileNotFoundException;
 
 final class MypageController extends Controller
 {
-    public function __construct(
-        private MypageUseCase $useCase,
-        private ProfileUseCase $profileUseCase,
-    ) {
-    }
-
-    public function profile(Request $request)
+    public function profile(Request $request, GetProfileUseCase $useCase)
     {
-        $userId = $request->user()->id;
+        $userId = (int) $request->user()->id;
 
-        $profile = $this->profileUseCase->getProfile($userId);
+        $profileDto = $useCase->handle($userId);
+
+        $hasProfile =
+            $profileDto !== null
+            && trim((string) ($profileDto->displayName ?? '')) !== '';
 
         return response()->json([
-            'user' => [
-                'user_id'      => $profile->userId(),
-                'display_name' => $profile->displayName(),
-                'post_number'  => $profile->postNumber(),
-                'address'      => $profile->address(),
-                'building'     => $profile->building(),
-                'user_image'   => $profile->userImage(),
-            ],
+            'user' => $profileDto?->toArray(),
+            'has_profile' => $hasProfile,
         ]);
     }
 
-    public function updateProfile(Request $request)
+    /**
+     * 初回作成（POST）
+     */
+    public function createProfile(Request $request, CreateProfileUseCase $useCase)
     {
-        $userId = $request->user()->id;
+        $userId = (int) $request->user()->id;
 
-        $data = $request->only([
-            'display_name',
-            'post_number',
-            'address',
-            'building',
-        ]);
-
-        $profile = $this->profileUseCase->updateProfile($userId, $data);
-
-        return response()->json([
-            'user' => [
-                'user_id'      => $profile->userId(),
-                'display_name' => $profile->displayName(),
-                'post_number'  => $profile->postNumber(),
-                'address'      => $profile->address(),
-                'building'     => $profile->building(),
-                'user_image'   => $profile->userImage(),
-            ],
-        ]);
-    }
-
-    public function updateProfileImage(Request $request)
-    {
-        $userId = $request->user()->id;
-
-        $path = $request->file('user_image')->store(
-            'pictures_user',
-            'public'
+        $input = new CreateProfileInput(
+            displayName: (string) $request->input('display_name', ''),
+            postNumber: $request->input('post_number'),
+            address: $request->input('address'),
+            building: $request->input('building'),
         );
 
-        $profile = $this->profileUseCase->updateProfileImage($userId, $path);
+        try {
+            $profileDto = $useCase->handle($userId, $input);
 
-        return response()->json([
-            'user' => [
-                'user_id'      => $profile->userId(),
-                'display_name' => $profile->displayName(),
-                'post_number'  => $profile->postNumber(),
-                'address'      => $profile->address(),
-                'building'     => $profile->building(),
-                'user_image'   => $profile->userImage(),
-            ],
-        ]);
+            return response()->json([
+                'user' => $profileDto->toArray(),
+                'has_profile' => true,
+            ], 201);
+        } catch (ProfileAlreadyExistsException) {
+            return response()->json([
+                'message' => 'Profile already exists.',
+            ], 409);
+        }
+    }
+
+    /**
+     * 更新（PATCH）
+     */
+    public function updateProfile(Request $request, UpdateProfileUseCase $useCase)
+    {
+        $userId = (int) $request->user()->id;
+
+        $input = new UpdateProfileInput(
+            displayName: (string) $request->input('display_name', ''),
+            postNumber: $request->input('post_number'),
+            address: $request->input('address'),
+            building: $request->input('building'),
+        );
+
+        try {
+            $profileDto = $useCase->handle($userId, $input);
+
+            return response()->json([
+                'user' => $profileDto->toArray(),
+                'has_profile' => true,
+            ]);
+        } catch (ProfileNotFoundException) {
+            return response()->json([
+                'message' => 'Profile not found.',
+            ], 404);
+        }
+    }
+
+    public function updateProfileImage(Request $request, UpdateProfileImageUseCase $useCase)
+    {
+        $userId = (int) $request->user()->id;
+
+        $path = $request->file('user_image')->store('pictures_user', 'public');
+
+        try {
+            $profileDto = $useCase->handle($userId, $path);
+
+            return response()->json([
+                'user' => $profileDto->toArray(),
+                'has_profile' => true,
+            ]);
+        } catch (ProfileNotFoundException) {
+            return response()->json([
+                'message' => 'Profile not found.',
+            ], 404);
+        }
     }
 
     public function sellItems(Request $request)
     {
         return response()->json([
-            'items' => $this->useCase->listSellItems($request->user()->id),
-        ]);
-    }
-
-    public function boughtItems(Request $request)
-    {
-        return response()->json([
-            'items' => $this->useCase->listBoughtItems($request->user()->id),
+            'items' => [],
         ]);
     }
 }

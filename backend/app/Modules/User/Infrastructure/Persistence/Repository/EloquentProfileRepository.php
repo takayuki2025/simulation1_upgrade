@@ -30,6 +30,13 @@ final class EloquentProfileRepository implements ProfileRepository
 
     public function save(Profile $profile): Profile
     {
+
+        \Log::warning('[🔥PROFILE_SAVE]', [
+        'user_id' => $profile->userId(),
+        'display_name' => $profile->displayName(),
+        'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
+    ]);
+
         DB::table('profiles')->updateOrInsert(
             ['user_id' => $profile->userId()],
             [

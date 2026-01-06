@@ -78,16 +78,16 @@ final class UserProvisioningService implements UserProvisioningPort
              * Profile SoT（profiles テーブル）
              * ★ 必ず存在させる
              * -------------------------------------- */
-            $profile = $this->profiles->findByUserId($user->id);
+            // $profile = $this->profiles->findByUserId($user->id);
 
-            if (! $profile) {
-                $this->profiles->save(
-                    Profile::createEmpty(
-                        userId: $user->id,
-                        displayName: $displayName ?? $user->name
-                    )
-                );
-            }
+            // if (! $profile) {
+            //     $this->profiles->save(
+            //         Profile::createEmpty(
+            //             userId: $user->id,
+            //             displayName: $displayName ?? $user->name
+            //         )
+            //     );
+            // }
 
             /** ---------------------------------------
              * Role / Shop 情報

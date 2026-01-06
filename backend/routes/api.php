@@ -334,18 +334,24 @@ Route::middleware(['auth.jwt'])->group(function () {
 
 
 // === MyPage / User ===
+
 use App\Modules\User\Presentation\Http\Controllers\MypageController;
 use App\Modules\Order\Presentation\Http\Controllers\MyPageBoughtController;
 
-Route::middleware('auth.jwt')->prefix('mypage')->group(function () {
-    Route::get('/profile', [MypageController::class, 'profile']);
-    Route::get('/sell', [MypageController::class, 'sellItems']);
-    Route::get('/bought', MyPageBoughtController::class);
+Route::middleware('auth.jwt')
+    ->prefix('mypage')
+    ->group(function () {
 
-    Route::patch('/profile', [MypageController::class, 'updateProfile']);
-    Route::post('/profile/image', [MypageController::class, 'updateProfileImage']);
+        // ===== Profile =====
+        Route::get('/profile', [MypageController::class, 'profile']);
+        Route::post('/profile', [MypageController::class, 'createProfile']); // 初回のみ
+        Route::patch('/profile', [MypageController::class, 'updateProfile']);
+        Route::post('/profile/image', [MypageController::class, 'updateProfileImage']);
 
-});
+        // ===== MyPage =====
+        Route::get('/sell', [MypageController::class, 'sellItems']);
+        Route::get('/bought', MyPageBoughtController::class);
+    });
 
 
 

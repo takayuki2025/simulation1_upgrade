@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { mutate } from "swr";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -21,6 +21,56 @@ export default function Home() {
   const searchParams = useSearchParams();
 
   const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
+
+  /* =========================
+     🔐 Profile Gate state
+  ========================= */
+  const [profileChecked, setProfileChecked] = useState(false);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+
+  /* =========================
+     🔐 Profile 判定（API 呼び出し）
+  ========================= */
+  useEffect(() => {
+    if (!isAuthenticated || !apiClient) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const res = await apiClient.get("/mypage/profile");
+        if (cancelled) return;
+
+        const flag =
+          typeof res.data?.has_profile === "boolean"
+            ? res.data.has_profile
+            : false;
+
+        setHasProfile(flag);
+        setProfileChecked(true);
+      } catch (e) {
+        console.error(e);
+        setHasProfile(false);
+        setProfileChecked(true);
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, apiClient]);
+
+  /* =========================
+     🚦 Profile 未作成なら強制遷移
+     ※ Hooks 後・副作用でのみ実行
+  ========================= */
+  useEffect(() => {
+    if (isAuthenticated && profileChecked && hasProfile === false) {
+      router.replace("/mypage/profile");
+    }
+  }, [isAuthenticated, profileChecked, hasProfile, router]);
 
   /* =========================
      🔖 タブ状態
@@ -46,15 +96,6 @@ export default function Home() {
   const listResult = useItemListSWR();
   const searchResult = useItemSearchSWR(currentSearchQuery);
   const favoriteResult = useFavoriteItemsSWR();
-
-  /* =========================
-     🔄 タブ切替時
-  ========================= */
-  useEffect(() => {
-    if (currentTab === "mylist") {
-      favoriteResult.refetchFavorites();
-    }
-  }, [currentTab]);
 
   /* =========================
      ❤️ いいね切替
@@ -84,8 +125,8 @@ export default function Home() {
       currentTab === "mylist"
         ? favoriteResult.items
         : isSearch
-          ? searchResult.items
-          : listResult.items;
+        ? searchResult.items
+        : listResult.items;
 
     return rawItems.map((item: any) => ({
       id: item.id,
@@ -107,13 +148,34 @@ export default function Home() {
     currentTab === "mylist"
       ? favoriteResult.isLoading
       : isSearch
-        ? searchResult.isLoading
-        : listResult.isLoading;
+      ? searchResult.isLoading
+      : listResult.isLoading;
 
-  const isPageLoading = isAuthLoading || isItemsLoading;
+
 
   /* =========================
-     🎨 UI
+     ⛔ Profile Gate UI
+     ※ return は必ず Hooks の後
+  ========================= */
+  const isGateLoading =
+  isAuthenticated && (!profileChecked || hasProfile === null);
+
+  const isPageLoading =
+  isAuthLoading || isItemsLoading || isGateLoading;
+
+if (isGateLoading) {
+  return (
+    <div className={styles.main_contents}>
+      <div className={styles.loadingBox}>
+        <div className={styles.spinner}></div>
+        <p className={styles.loadingText}>確認中...</p>
+      </div>
+    </div>
+  );
+}
+
+  /* =========================
+     🎨 UI（既存デザイン完全保持）
   ========================= */
   return (
     <div className={styles.main_contents}>
@@ -126,9 +188,7 @@ export default function Home() {
 
       {!isPageLoading && (
         <>
-          {/* =========================
-              🏪 テスト用ショップリンク（追加）
-          ========================= */}
+          {/* 🏪 テスト用ショップリンク */}
           <div className={styles.shopButtons}>
             {["a", "b", "c", "d"].map((code) => (
               <button
@@ -141,9 +201,7 @@ export default function Home() {
             ))}
           </div>
 
-          {/* =========================
-              Tabs
-          ========================= */}
+          {/* Tabs */}
           <div className={styles.main_select}>
             <Link
               href={{
@@ -167,9 +225,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* =========================
-              Items
-          ========================= */}
+          {/* Items */}
           <div className={styles.items_select}>
             {items.length > 0 ? (
               items.map((item) => {

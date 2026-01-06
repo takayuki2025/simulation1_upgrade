@@ -65,7 +65,9 @@ use App\Modules\Order\Infrastructure\Persistence\EloquentOrderHistoryQueryReposi
 use App\Modules\Order\Domain\Repository\OrderQueryRepository;
 use App\Modules\Order\Infrastructure\Persistence\EloquentOrderQueryRepository;
 use App\Modules\User\Domain\Port\ShopAddressSyncPort;
+// この2つはセット：NullShopAddressSyncAdapter＝開発用
 use App\Modules\User\Infrastructure\Adapter\ShopAddressSyncAdapter;
+use App\Modules\User\Infrastructure\External\NullShopAddressSyncAdapter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -173,10 +175,19 @@ class AppServiceProvider extends ServiceProvider
         );
 
 
-        $this->app->bind(
-            ShopAddressSyncPort::class,
-            ShopAddressSyncAdapter::class
-        );
+
+        if ($this->app->environment('production')) {
+            $this->app->bind(
+                ShopAddressSyncPort::class,
+                ShopAddressSyncAdapter::class
+            );
+        } else {
+            $this->app->bind(
+                ShopAddressSyncPort::class,
+                NullShopAddressSyncAdapter::class
+            );
+        }
+
 
     }
 

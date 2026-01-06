@@ -3,9 +3,11 @@
 namespace App\Modules\Auth\Application\UseCase;
 
 use App\Modules\Auth\Application\Service\AuthContext;
-use App\Modules\User\Domain\Repository\ProfileRepository;
 use App\Modules\Auth\Application\Dto\AuthUserDto;
 use App\Modules\Shop\Domain\Repository\ShopRoleQueryRepository;
+use App\Modules\User\Domain\Entity\Profile;
+use App\Modules\User\Domain\Repository\ProfileRepository;
+
 
 final class GetMyProfileUseCase
 {
@@ -20,22 +22,18 @@ final class GetMyProfileUseCase
     {
         $principal = $this->authContext->principal();
 
-        // Profile は Optional
+        // 🔵 取得のみ
         $profile = $this->profiles->findByUserId($principal->userId);
+
+        $hasProfile = ($profile !== null);
 
         $roles = $this->shopRoles->findByUserId($principal->userId);
 
-        if ($profile) {
-            return AuthUserDto::fromPrincipalWithProfile(
-                principal: $principal,
-                profile: $profile,
-                shopRoles: $roles,
-            );
-        }
-
-        return AuthUserDto::fromPrincipal(
+        return AuthUserDto::fromPrincipalWithProfile(
             principal: $principal,
+            profile: $profile,      // null のまま返す
             shopRoles: $roles,
+            hasProfile: $hasProfile,
         );
     }
 }

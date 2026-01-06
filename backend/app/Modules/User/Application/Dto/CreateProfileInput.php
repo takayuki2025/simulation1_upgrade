@@ -2,7 +2,7 @@
 
 namespace App\Modules\User\Application\Dto;
 
-final class UpdateProfileInput
+final class CreateProfileInput
 {
     public function __construct(
         public readonly string $displayName,
