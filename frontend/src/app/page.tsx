@@ -92,29 +92,34 @@ export default function Home() {
   /* =========================
      🧠 表示アイテム（★ return より前）
   ========================= */
-  const items: PublicItem[] = useMemo(() => {
-    const raw =
-      currentTab === "mylist"
-        ? favoriteResult.items
-        : isSearch
-        ? searchResult.items
-        : listResult.items;
+const items: PublicItem[] = useMemo(() => {
+  const raw =
+    currentTab === "mylist"
+      ? favoriteResult.items
+      : isSearch
+      ? searchResult.items
+      : listResult.items;
 
-    return raw.map((item: any) => ({
+  return raw.map((item: any) => {
+    const isSearchItem = isSearch;
+
+    return {
       id: item.id,
       name: item.name,
-      price: item.price,
-      itemImagePath: item.itemImagePath ?? item.item_image ?? null,
+
+      // ★ ここが核心
+      price: isSearchItem ? item.price.amount : item.price,
+
+      // Search は画像を返さない
+      itemImagePath: isSearchItem
+        ? null
+        : item.itemImagePath ?? item.item_image ?? null,
+
       displayType: item.displayType ?? null,
       isFavorited: item.isFavorited ?? false,
-    }));
-  }, [
-    currentTab,
-    isSearch,
-    favoriteResult.items,
-    searchResult.items,
-    listResult.items,
-  ]);
+    };
+  });
+}, [currentTab, isSearch, favoriteResult.items, searchResult.items, listResult.items]);
 
   /* =========================
      ⛔ Gate / Loading 判定
@@ -251,8 +256,10 @@ export default function Home() {
                       <div className={styles.item_info}>
                         <p className={styles.item_name}>{item.name}</p>
                         <p className={styles.item_price}>
-                          ¥{item.price.toLocaleString()}
-                        </p>
+  ¥{typeof item.price === "number"
+    ? item.price.toLocaleString()
+    : "-"}
+</p>
                       </div>
                     </div>
                   </div>

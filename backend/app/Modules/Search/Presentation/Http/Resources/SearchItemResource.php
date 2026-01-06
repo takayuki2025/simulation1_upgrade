@@ -3,26 +3,32 @@
 namespace App\Modules\Search\Presentation\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Models\Item as EloquentItem;
 
-/**
- * @mixin EloquentItem
- */
 final class SearchItemResource extends JsonResource
 {
+    /**
+     * @param array|object $resource
+     */
     public function toArray($request): array
     {
-        /** @var EloquentItem $item */
-        $item = $this->resource;
+        // $this は配列もオブジェクトも来得る（念のため両対応）
+        $id = is_array($this->resource) ? ($this->resource['id'] ?? null) : ($this->resource->id ?? null);
+
+        $shopId = is_array($this->resource) ? ($this->resource['shop_id'] ?? null) : ($this->resource->shop_id ?? null);
+        $name = is_array($this->resource) ? ($this->resource['name'] ?? null) : ($this->resource->name ?? null);
+        $priceAmount = is_array($this->resource) ? ($this->resource['price_amount'] ?? null) : ($this->resource->price_amount ?? null);
+        $priceCurrency = is_array($this->resource) ? ($this->resource['price_currency'] ?? null) : ($this->resource->price_currency ?? null);
+        $createdAt = is_array($this->resource) ? ($this->resource['created_at'] ?? null) : ($this->resource->created_at ?? null);
 
         return [
-            'id'         => $item->id,
-            'name'       => $item->name,
-            'price'      => $item->price,          // ✅ 生カラム
-            'remain'     => $item->remain,
-            'item_image' => $item->item_image
-                ? asset('storage/' . $item->item_image)
-                : null,
+            'id' => $id,
+            'shop_id' => $shopId,
+            'name' => $name,
+            'price' => [
+                'amount' => $priceAmount,
+                'currency' => $priceCurrency,
+            ],
+            'created_at' => $createdAt,
         ];
     }
 }

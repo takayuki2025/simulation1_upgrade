@@ -2,9 +2,9 @@ import useSWR from "swr";
 import axios from "axios";
 import { useAuth } from "@/ui/auth/useAuth";
 import type { PublicItem } from "@/types/publicItem";
-
+import type { SearchItem } from "@/types/searchItem";
 type ItemSearchResponse = {
-  items: PublicItem[];
+  items: SearchItem[];
 };
 
 export const useItemSearchSWR = (query: string) => {
@@ -23,15 +23,15 @@ export const useItemSearchSWR = (query: string) => {
     // 🔑 認証あり
     if (apiClient) {
       const res = await apiClient.get(
-        `/search/items?keyword=${encodeURIComponent(query)}`,
-      );
+  `/search/items?q=${encodeURIComponent(query)}`
+);
       return res.data;
     }
 
     // 👤 ゲスト（同じエンドポイント）
     const res = await axios.get(
-      `/api/search/items?keyword=${encodeURIComponent(query)}`,
-    );
+  `/api/search/items?q=${encodeURIComponent(query)}`
+);
     return res.data;
   };
 
