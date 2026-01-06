@@ -10,7 +10,6 @@ import { useItemSearchSWR } from "@/services/useItemSearchSWR";
 import { useFavoriteItemsSWR } from "@/services/useFavoriteItemsSWR";
 
 import type { PublicItem } from "@/types/publicItem";
-
 import { getImageUrl, IMAGE_TYPE, onImageError } from "@/utils/utils";
 import { useAuth } from "@/ui/auth/useAuth";
 
@@ -19,7 +18,6 @@ import styles from "./W-Resource-Rich-Simulation-Center-Home.module.css";
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const { isAuthenticated, isLoading: isAuthLoading, apiClient } = useAuth();
 
   /* =========================
@@ -29,33 +27,24 @@ export default function Home() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
 
   /* =========================
-     🔐 Profile 判定（API 呼び出し）
+     🔐 Profile 判定
   ========================= */
   useEffect(() => {
     if (!isAuthenticated || !apiClient) return;
 
     let cancelled = false;
 
-    const run = async () => {
+    (async () => {
       try {
         const res = await apiClient.get("/mypage/profile");
         if (cancelled) return;
-
-        const flag =
-          typeof res.data?.has_profile === "boolean"
-            ? res.data.has_profile
-            : false;
-
-        setHasProfile(flag);
+        setHasProfile(!!res.data?.has_profile);
         setProfileChecked(true);
-      } catch (e) {
-        console.error(e);
+      } catch {
         setHasProfile(false);
         setProfileChecked(true);
       }
-    };
-
-    run();
+    })();
 
     return () => {
       cancelled = true;
@@ -63,8 +52,7 @@ export default function Home() {
   }, [isAuthenticated, apiClient]);
 
   /* =========================
-     🚦 Profile 未作成なら強制遷移
-     ※ Hooks 後・副作用でのみ実行
+     🚦 Profile 未作成なら遷移
   ========================= */
   useEffect(() => {
     if (isAuthenticated && profileChecked && hasProfile === false) {
@@ -73,16 +61,13 @@ export default function Home() {
   }, [isAuthenticated, profileChecked, hasProfile, router]);
 
   /* =========================
-     🔖 タブ状態
+     🔖 タブ・検索状態
   ========================= */
   const currentTab = useMemo(
     () => (searchParams.get("tab") === "mylist" ? "mylist" : "all"),
     [searchParams],
   );
 
-  /* =========================
-     🔍 検索状態
-  ========================= */
   const currentSearchQuery = useMemo(
     () => searchParams.get("all_item_search") || "",
     [searchParams],
@@ -91,44 +76,31 @@ export default function Home() {
   const isSearch = currentSearchQuery.trim().length > 0;
 
   /* =========================
-     📦 Hooks
+     📦 データ Hooks（必ず呼ぶ）
   ========================= */
   const listResult = useItemListSWR();
   const searchResult = useItemSearchSWR(currentSearchQuery);
   const favoriteResult = useFavoriteItemsSWR();
 
-  /* =========================
-     ❤️ いいね切替
-  ========================= */
-  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
-    if (!apiClient) return;
-
-    try {
-      if (isFavorited) {
-        await apiClient.delete(`/reactions/items/${item.id}/favorite`);
-      } else {
-        await apiClient.post(`/reactions/items/${item.id}/favorite`);
-      }
-
-      mutate("/items/favorite");
-      await favoriteResult.refetchFavorites();
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const isItemsLoading =
+    currentTab === "mylist"
+      ? favoriteResult.isLoading
+      : isSearch
+      ? searchResult.isLoading
+      : listResult.isLoading;
 
   /* =========================
-     🧠 表示アイテム決定
+     🧠 表示アイテム（★ return より前）
   ========================= */
   const items: PublicItem[] = useMemo(() => {
-    const rawItems =
+    const raw =
       currentTab === "mylist"
         ? favoriteResult.items
         : isSearch
         ? searchResult.items
         : listResult.items;
 
-    return rawItems.map((item: any) => ({
+    return raw.map((item: any) => ({
       id: item.id,
       name: item.name,
       price: item.price,
@@ -144,39 +116,48 @@ export default function Home() {
     listResult.items,
   ]);
 
-  const isItemsLoading =
-    currentTab === "mylist"
-      ? favoriteResult.isLoading
-      : isSearch
-      ? searchResult.isLoading
-      : listResult.isLoading;
-
-
-
   /* =========================
-     ⛔ Profile Gate UI
-     ※ return は必ず Hooks の後
+     ⛔ Gate / Loading 判定
   ========================= */
   const isGateLoading =
-  isAuthenticated && (!profileChecked || hasProfile === null);
+    isAuthenticated && (!profileChecked || hasProfile === null);
 
   const isPageLoading =
-  isAuthLoading || isItemsLoading || isGateLoading;
-
-if (isGateLoading) {
-  return (
-    <div className={styles.main_contents}>
-      <div className={styles.loadingBox}>
-        <div className={styles.spinner}></div>
-        <p className={styles.loadingText}>確認中...</p>
-      </div>
-    </div>
-  );
-}
+    isAuthLoading || isItemsLoading || isGateLoading;
 
   /* =========================
-     🎨 UI（既存デザイン完全保持）
+     ❤️ いいね切替
   ========================= */
+  const toggleFavorite = async (item: PublicItem, isFavorited: boolean) => {
+    if (!apiClient) return;
+
+    try {
+      if (isFavorited) {
+        await apiClient.delete(`/reactions/items/${item.id}/favorite`);
+      } else {
+        await apiClient.post(`/reactions/items/${item.id}/favorite`);
+      }
+      mutate("/items/favorite");
+      await favoriteResult.refetchFavorites();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  /* =========================
+     🎨 return はここだけ
+  ========================= */
+  if (isGateLoading) {
+    return (
+      <div className={styles.main_contents}>
+        <div className={styles.loadingBox}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>確認中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.main_contents}>
       {isPageLoading && (

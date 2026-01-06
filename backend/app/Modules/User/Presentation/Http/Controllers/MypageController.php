@@ -24,9 +24,14 @@ final class MypageController extends Controller
 
         $profileDto = $useCase->handle($userId);
 
-        $hasProfile =
-            $profileDto !== null
-            && trim((string) ($profileDto->displayName ?? '')) !== '';
+        // $hasProfile =
+        //     $profileDto !== null
+        //     && trim((string) ($profileDto->displayName ?? '')) !== '';
+
+        // 🔑 暫定 Gate 条件：住所が null かどうかとりあえずアドレスで設定
+            $hasProfile =
+                $profileDto !== null
+                && $profileDto->address !== null;
 
         return response()->json([
             'user' => $profileDto?->toArray(),
