@@ -2,10 +2,11 @@
 
 namespace App\Modules\User\Application\UseCase;
 
-use App\Modules\User\Application\Dto\ProfileDto;
+use App\Modules\User\Application\Dto\UpdateProfileInput;
+use App\Modules\User\Domain\Entity\Profile;
+use App\Modules\User\Domain\Port\ShopAddressSyncPort;
 use App\Modules\User\Domain\Repository\ProfileRepository;
 use App\Modules\User\Domain\Repository\UserAddressRepository;
-use App\Modules\Shop\Application\UseCase\EnsureShopAddressFromProfileUseCase;
 use RuntimeException;
 
 final class ProfileUseCase
@@ -13,73 +14,65 @@ final class ProfileUseCase
     public function __construct(
         private ProfileRepository $profiles,
         private UserAddressRepository $addresses,
-        private EnsureShopAddressFromProfileUseCase $ensureShopAddress,
+        private ShopAddressSyncPort $shopSync,
     ) {
     }
 
-    public function getProfile(int $userId): ProfileDto
+    public function getProfile(int $userId): Profile
     {
-        $profile = $this->profiles->find($userId);
+        $profile = $this->profiles->findByUserId($userId);
 
         if (! $profile) {
             throw new RuntimeException('User profile not found.');
         }
 
-        return ProfileDto::fromEntity($profile);
+        return $profile;
     }
 
-    /**
-     * プロフィール更新
-     * - users を更新
-     * - primary UserAddress が無ければ作成
-     * - 同一内容なら保存しない
-     */
-    public function updateProfile(int $userId, array $data): ProfileDto
-{
-    $current = $this->profiles->find($userId);
-
-    if (! $current) {
-        throw new RuntimeException('User profile not found.');
-    }
-
-    // 差分チェック
-    $noChange =
-        ($data['name']        ?? $current->name())        === $current->name()
-     && ($data['post_number'] ?? $current->postNumber()) === $current->postNumber()
-     && ($data['address']     ?? $current->address())    === $current->address()
-     && ($data['building']    ?? $current->building())   === $current->building();
-
-    if ($noChange) {
-        return ProfileDto::fromEntity($current);
-    }
-
-    // User プロフィール更新
-    $profile = $this->profiles->update($userId, $data);
-
-    // UserAddress primary 保証
-    $primary = $this->addresses->findPrimaryByUser($userId);
-
-    if (
-        ! $primary
-        && $profile->postNumber()
-        && $profile->address()
-    ) {
-        $this->addresses->createPrimaryFromProfile(
-            $userId,
-            $profile
-        );
-    }
-
-    // 👇 ここだけ追加（Shop 側の整合性は別UseCaseへ）
-    $this->ensureShopAddress->handle($userId);
-
-    return ProfileDto::fromEntity($profile);
-}
-
-
-    public function updateProfileImage(int $userId, string $path): ProfileDto
+    public function updateProfile(int $userId, UpdateProfileInput $input): Profile
     {
-        $profile = $this->profiles->updateImage($userId, $path);
-        return ProfileDto::fromEntity($profile);
+        $current = $this->profiles->findByUserId($userId)
+            ?? Profile::createEmpty($userId, $input->displayName);
+
+        $next = $current->withBasic(
+            displayName: $input->displayName,
+            postNumber: $input->postNumber,
+            address: $input->address,
+            building: $input->building,
+        );
+
+        if ($current->equalsBasic($next)) {
+            return $current;
+        }
+
+        $saved = $this->profiles->save($next);
+
+        // primary address 保証
+        $primary = $this->addresses->findPrimaryByUser($userId);
+        if (! $primary && $saved->postNumber() && $saved->address()) {
+            $this->addresses->createPrimaryFromProfile($userId, $saved);
+        }
+
+        // Shop同期
+        $this->shopSync->syncFromUserProfile($userId);
+
+        return $saved;
+    }
+
+    public function updateProfileImage(int $userId, string $path): Profile
+    {
+        $current = $this->profiles->findByUserId($userId);
+
+        if (! $current) {
+            throw new RuntimeException('User profile not found.');
+        }
+
+        $saved = $this->profiles->save(
+            $current->withImage($path)
+        );
+
+        $this->shopSync->syncFromUserProfile($userId);
+
+        return $saved;
     }
 }

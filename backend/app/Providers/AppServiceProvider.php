@@ -64,6 +64,8 @@ use App\Modules\Order\Domain\Repository\OrderHistoryQueryRepository;
 use App\Modules\Order\Infrastructure\Persistence\EloquentOrderHistoryQueryRepository;
 use App\Modules\Order\Domain\Repository\OrderQueryRepository;
 use App\Modules\Order\Infrastructure\Persistence\EloquentOrderQueryRepository;
+use App\Modules\User\Domain\Port\ShopAddressSyncPort;
+use App\Modules\User\Infrastructure\Adapter\ShopAddressSyncAdapter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -170,6 +172,11 @@ class AppServiceProvider extends ServiceProvider
             EloquentOrderQueryRepository::class
         );
 
+
+        $this->app->bind(
+            ShopAddressSyncPort::class,
+            ShopAddressSyncAdapter::class
+        );
 
     }
 

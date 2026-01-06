@@ -6,9 +6,16 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use App\Modules\Auth\Domain\Port\UserProvisioningPort;
 use App\Modules\Auth\Domain\Dto\ProvisionedUser;
+use App\Modules\User\Domain\Repository\ProfileRepository;
+use App\Modules\User\Domain\Entity\Profile;
 
 final class UserProvisioningService implements UserProvisioningPort
 {
+    public function __construct(
+        private ProfileRepository $profiles,
+    ) {
+    }
+
     public function provisionFromFirebase(
         string $firebaseUid,
         ?string $email,
@@ -27,6 +34,9 @@ final class UserProvisioningService implements UserProvisioningPort
             $displayName
         ) {
 
+            /** ---------------------------------------
+             * User SoT（users テーブル）
+             * -------------------------------------- */
             $user = User::where('firebase_uid', $firebaseUid)->first()
                 ?? User::where('email', $email)->first();
 
@@ -64,6 +74,24 @@ final class UserProvisioningService implements UserProvisioningPort
                 }
             }
 
+            /** ---------------------------------------
+             * Profile SoT（profiles テーブル）
+             * ★ 必ず存在させる
+             * -------------------------------------- */
+            $profile = $this->profiles->findByUserId($user->id);
+
+            if (! $profile) {
+                $this->profiles->save(
+                    Profile::createEmpty(
+                        userId: $user->id,
+                        displayName: $displayName ?? $user->name
+                    )
+                );
+            }
+
+            /** ---------------------------------------
+             * Role / Shop 情報
+             * -------------------------------------- */
             $shopIds = DB::table('role_user')
                 ->where('user_id', $user->id)
                 ->pluck('shop_id')
@@ -123,5 +151,4 @@ final class UserProvisioningService implements UserProvisioningPort
             );
         });
     }
-
 }

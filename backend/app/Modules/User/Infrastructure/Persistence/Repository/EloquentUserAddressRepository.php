@@ -42,7 +42,7 @@ final class EloquentUserAddressRepository implements UserAddressRepository
 
             'address_line1'  => $profile->address(),
             'address_line2'  => $profile->building(),
-            'recipient_name' => $profile->name(),
+            'recipient_name' => $profile->displayName(),
             'phone'          => null,
 
             'is_primary'     => true,

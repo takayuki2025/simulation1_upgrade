@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UsersTableSeeder::class,
             UserAddressesTableSeeder::class,
+            ProfilesTableSeeder::class,
             ShopsTableSeeder::class,
             ShopAddressesTableSeeder::class,
             RoleUserSeeder::class,

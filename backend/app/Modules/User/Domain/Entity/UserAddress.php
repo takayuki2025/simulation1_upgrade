@@ -27,10 +27,14 @@ final class UserAddress
         return $this->userId;
     }
 
-    public function toArray(): array
+    public function isPrimary(): bool
+    {
+        return $this->isPrimary;
+    }
+
+    public function toSnapshot(): array
     {
         return [
-            'id' => $this->id,
             'postal_code' => $this->postalCode,
             'prefecture' => $this->prefecture,
             'city' => $this->city,
@@ -38,7 +42,6 @@ final class UserAddress
             'address_line2' => $this->addressLine2,
             'recipient_name' => $this->recipientName,
             'phone' => $this->phone,
-            'is_primary' => $this->isPrimary,
         ];
     }
 }

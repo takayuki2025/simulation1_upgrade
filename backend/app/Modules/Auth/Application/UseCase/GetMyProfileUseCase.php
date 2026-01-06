@@ -20,15 +20,20 @@ final class GetMyProfileUseCase
     {
         $principal = $this->authContext->principal();
 
-        $profile = $this->profiles->find($principal->userId);
-        if (! $profile) {
-            throw new \RuntimeException('User not found');
-        }
+        // Profile は Optional
+        $profile = $this->profiles->findByUserId($principal->userId);
 
         $roles = $this->shopRoles->findByUserId($principal->userId);
 
-        return AuthUserDto::fromProfilePrincipalAndRoles(
-            profile: $profile,
+        if ($profile) {
+            return AuthUserDto::fromPrincipalWithProfile(
+                principal: $principal,
+                profile: $profile,
+                shopRoles: $roles,
+            );
+        }
+
+        return AuthUserDto::fromPrincipal(
             principal: $principal,
             shopRoles: $roles,
         );

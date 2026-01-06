@@ -4,45 +4,36 @@ namespace App\Modules\User\Application\Dto;
 
 use App\Modules\User\Domain\Entity\Profile;
 
-class ProfileDto
+final class ProfileDto
 {
     public function __construct(
-        public int $id,
-        public string $name,
-        public string $email,
+        public int $userId,
+        public string $displayName,
+
+        // profile
         public ?string $postNumber,
         public ?string $address,
         public ?string $building,
         public ?string $userImage,
-        public ?string $emailVerifiedAt,
+
+        // auth view（v1互換）
+        public ?string $email = null,
+        public ?string $emailVerifiedAt = null,
     ) {
     }
 
-    public static function fromEntity(Profile $entity): self
+    public static function fromEntity(Profile $profile, ?array $authView = null): self
     {
         return new self(
-            id: $entity->id,
-            name: $entity->name,
-            email: $entity->email,
-            postNumber: $entity->postNumber,
-            address: $entity->address,
-            building: $entity->building,
-            userImage: $entity->userImage,
-            emailVerifiedAt: $entity->emailVerifiedAt?->format('Y-m-d H:i:s'),
-        );
-    }
+            userId: $profile->userId(),
+            displayName: $profile->displayName(),
+            postNumber: $profile->postNumber(),
+            address: $profile->address(),
+            building: $profile->building(),
+            userImage: $profile->userImage(),
 
-    public function toArray(): array
-    {
-        return [
-            'id'                => $this->id,
-            'name'              => $this->name,
-            'email'             => $this->email,
-            'post_number'       => $this->postNumber,
-            'address'           => $this->address,
-            'building'          => $this->building,
-            'user_image'        => $this->userImage,
-            'email_verified_at' => $this->emailVerifiedAt,
-        ];
+            email: $authView['email'] ?? null,
+            emailVerifiedAt: $authView['email_verified_at'] ?? null,
+        );
     }
 }

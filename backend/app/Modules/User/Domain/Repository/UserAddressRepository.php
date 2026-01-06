@@ -10,8 +10,7 @@ interface UserAddressRepository
     public function findPrimaryByUser(int $userId): ?UserAddress;
 
     /**
-     * プロフィール情報から primary address を作成
-     * （初回のみ想定）
+     * Profile から primary address を作成（初回のみ）
      */
     public function createPrimaryFromProfile(
         int $userId,

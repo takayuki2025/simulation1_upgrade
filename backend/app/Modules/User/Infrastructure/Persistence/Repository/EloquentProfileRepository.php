@@ -3,93 +3,11 @@
 namespace App\Modules\User\Infrastructure\Persistence\Repository;
 
 use App\Modules\User\Domain\Entity\Profile;
-// ✅ 新しいインターフェース名を使用
 use App\Modules\User\Domain\Repository\ProfileRepository;
-use App\Models\User; // Eloquent Model
 use Illuminate\Support\Facades\DB;
 
-// ✅ インターフェースを実装する
-class EloquentProfileRepository implements ProfileRepository
+final class EloquentProfileRepository implements ProfileRepository
 {
-    public function find(int $userId): ?Profile
-    {
-        $user = User::select(
-            'id',
-            'name',
-            'email',
-            'post_number',
-            'address',
-            'building',
-            'user_image',
-            'email_verified_at'
-        )
-            ->find($userId);
-
-        if (!$user) {
-            return null;
-        }
-
-        return $this->toEntity($user);
-    }
-
-    public function update(int $userId, array $data): Profile
-    {
-        $user = User::findOrFail($userId);
-
-        // 更新可能なフィールドだけを反映
-        $user->fill([
-            'name'        => $data['name']        ?? $user->name,
-            'post_number' => $data['post_number'] ?? $user->post_number,
-            'address'     => $data['address']     ?? $user->address,
-            'building'    => $data['building']    ?? $user->building,
-        ]);
-
-        $user->save();
-
-        return $this->toEntity($user);
-    }
-
-    public function updateImage(int $userId, string $path): Profile
-    {
-        $user = User::findOrFail($userId);
-        $user->user_image = $path;
-        $user->save();
-
-        return $this->toEntity($user);
-    }
-
-    public function updateAddress(
-        int $userId,
-        string $postNumber,
-        string $address,
-        ?string $building
-    ): Profile {
-        $user = User::findOrFail($userId);
-        $user->post_number = $postNumber;
-        $user->address     = $address;
-        $user->building    = $building;
-        $user->save();
-
-        return $this->toEntity($user);
-    }
-
-    private function toEntity(User $user): Profile
-    {
-        // ... (UserProfile::fromArrayを使っても良いが、今回はこのまま)
-        return new Profile(
-            id: $user->id,
-            name: $user->name,
-            email: $user->email,
-            postNumber: $user->post_number,
-            address: $user->address,
-            building: $user->building,
-            userImage: $user->user_image,
-            emailVerifiedAt: $user->email_verified_at
-                ? new \DateTimeImmutable($user->email_verified_at)
-                : null,
-        );
-    }
-
     public function findByUserId(int $userId): ?Profile
     {
         $row = DB::table('profiles')
@@ -101,12 +19,29 @@ class EloquentProfileRepository implements ProfileRepository
         }
 
         return Profile::reconstitute(
-            id: (int)$row->id,
             userId: (int)$row->user_id,
-            name: (string)$row->name,
+            displayName: (string)$row->display_name,
             postNumber: $row->post_number,
             address: $row->address,
             building: $row->building,
+            userImage: $row->user_image,
         );
+    }
+
+    public function save(Profile $profile): Profile
+    {
+        DB::table('profiles')->updateOrInsert(
+            ['user_id' => $profile->userId()],
+            [
+                'display_name' => $profile->displayName(),
+                'post_number'  => $profile->postNumber(),
+                'address'      => $profile->address(),
+                'building'     => $profile->building(),
+                'user_image'   => $profile->userImage(),
+                'updated_at'   => now(),
+            ]
+        );
+
+        return $profile;
     }
 }

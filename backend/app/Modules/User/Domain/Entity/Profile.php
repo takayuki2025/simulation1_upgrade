@@ -2,91 +2,78 @@
 
 namespace App\Modules\User\Domain\Entity;
 
-class Profile
+final class Profile
 {
-    public function __construct(
-        public readonly int $id,
-        public string $name,
-        public string $email,
-        public ?string $postNumber,
-        public ?string $address,
-        public ?string $building,
-        public ?string $userImage,
-        public ?\DateTimeImmutable $emailVerifiedAt,
+    private function __construct(
+        private int $userId,
+        private string $displayName,
+        private ?string $postNumber,
+        private ?string $address,
+        private ?string $building,
+        private ?string $userImage,
     ) {
     }
 
-    public static function fromArray(array $row): self
-    {
-        return new self(
-            id: (int) $row['id'],
-            name: $row['name'],
-            email: $row['email'],
-            postNumber: $row['post_number'] ?? null,
-            address: $row['address'] ?? null,
-            building: $row['building'] ?? null,
-            userImage: $row['user_image'] ?? null,
-            emailVerifiedAt: !empty($row['email_verified_at'])
-                ? new \DateTimeImmutable($row['email_verified_at'])
-                : null,
-        );
+    public static function reconstitute(
+        int $userId,
+        string $displayName,
+        ?string $postNumber,
+        ?string $address,
+        ?string $building,
+        ?string $userImage,
+    ): self {
+        return new self($userId, $displayName, $postNumber, $address, $building, $userImage);
     }
 
-    public function toArray(): array
+    public static function createEmpty(int $userId, string $displayName): self
     {
-        return [
-            'id'                => $this->id,
-            'name'              => $this->name,
-            'email'             => $this->email,
-            'post_number'       => $this->postNumber,
-            'address'           => $this->address,
-            'building'          => $this->building,
-            'user_image'        => $this->userImage,
-            'email_verified_at' => $this->emailVerifiedAt?->format('Y-m-d H:i:s'),
-        ];
+        return new self($userId, $displayName, null, null, null, null);
     }
 
-    // =====================
-    // getters（読み取り専用）
-    // =====================
-
-    public function id(): int
+    public function userId(): int
     {
-        return $this->id;
+        return $this->userId;
     }
-
-    public function name(): string
+    public function displayName(): string
     {
-        return $this->name;
+        return $this->displayName;
     }
-
-    public function email(): string
-    {
-        return $this->email;
-    }
-
     public function postNumber(): ?string
     {
         return $this->postNumber;
     }
-
     public function address(): ?string
     {
         return $this->address;
     }
-
     public function building(): ?string
     {
         return $this->building;
     }
-
     public function userImage(): ?string
     {
         return $this->userImage;
     }
 
-    public function emailVerifiedAt(): ?\DateTimeImmutable
+    public function withBasic(
+        string $displayName,
+        ?string $postNumber,
+        ?string $address,
+        ?string $building
+    ): self {
+        return new self($this->userId, $displayName, $postNumber, $address, $building, $this->userImage);
+    }
+
+    public function withImage(string $path): self
     {
-        return $this->emailVerifiedAt;
+        return new self($this->userId, $this->displayName, $this->postNumber, $this->address, $this->building, $path);
+    }
+
+    public function equalsBasic(self $other): bool
+    {
+        return $this->displayName === $other->displayName
+            && $this->postNumber === $other->postNumber
+            && $this->address === $other->address
+            && $this->building === $other->building;
     }
 }

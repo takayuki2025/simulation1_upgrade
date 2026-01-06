@@ -12,44 +12,56 @@ use Illuminate\Support\Facades\Storage;
 final class MypageController extends Controller
 {
     public function __construct(
-        private MypageUseCase $useCase
+        private MypageUseCase $useCase,
+        private ProfileUseCase $profileUseCase,
     ) {
     }
 
-    public function profile(Request $request, ProfileUseCase $profileUseCase)
+    public function profile(Request $request)
     {
         $userId = $request->user()->id;
 
+        $profile = $this->profileUseCase->getProfile($userId);
+
         return response()->json([
-            'user' => $profileUseCase->getProfile($userId)->toArray(),
+            'user' => [
+                'user_id'      => $profile->userId(),
+                'display_name' => $profile->displayName(),
+                'post_number'  => $profile->postNumber(),
+                'address'      => $profile->address(),
+                'building'     => $profile->building(),
+                'user_image'   => $profile->userImage(),
+            ],
         ]);
     }
 
-    public function updateProfile(
-        Request $request,
-        ProfileUseCase $profileUseCase
-    ) {
+    public function updateProfile(Request $request)
+    {
         $userId = $request->user()->id;
 
-        // ✅ 必ず array にする
         $data = $request->only([
-            'name',
+            'display_name',
             'post_number',
             'address',
             'building',
         ]);
 
-        $profileDto = $profileUseCase->updateProfile($userId, $data);
+        $profile = $this->profileUseCase->updateProfile($userId, $data);
 
         return response()->json([
-            'user' => $profileDto->toArray(),
+            'user' => [
+                'user_id'      => $profile->userId(),
+                'display_name' => $profile->displayName(),
+                'post_number'  => $profile->postNumber(),
+                'address'      => $profile->address(),
+                'building'     => $profile->building(),
+                'user_image'   => $profile->userImage(),
+            ],
         ]);
     }
 
-    public function updateProfileImage(
-        Request $request,
-        ProfileUseCase $profileUseCase
-    ) {
+    public function updateProfileImage(Request $request)
+    {
         $userId = $request->user()->id;
 
         $path = $request->file('user_image')->store(
@@ -57,10 +69,17 @@ final class MypageController extends Controller
             'public'
         );
 
-        $profileDto = $profileUseCase->updateProfileImage($userId, $path);
+        $profile = $this->profileUseCase->updateProfileImage($userId, $path);
 
         return response()->json([
-            'user' => $profileDto->toArray(),
+            'user' => [
+                'user_id'      => $profile->userId(),
+                'display_name' => $profile->displayName(),
+                'post_number'  => $profile->postNumber(),
+                'address'      => $profile->address(),
+                'building'     => $profile->building(),
+                'user_image'   => $profile->userImage(),
+            ],
         ]);
     }
 
