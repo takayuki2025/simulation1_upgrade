@@ -6,28 +6,39 @@ import { useAuth } from "@/ui/auth/useAuth";
 /**
  * API Response 型
  */
-export interface ItemDetailResponse {
+export type ItemDetailResponse = {
   item: {
     id: number;
+    shop_id: number;
     name: string;
     price: number;
-    explain: string | null;
+    explain: string;
     remain: number;
-    user_id: number;
-    shop_id: number;
 
     brands: string[];
     brand_primary: string | null;
     condition: string | null;
     color: string | null;
+    categories: string[];
 
-    tags: any[];
+    tags: Record<string, any[]>;
     item_image: string | null;
   };
-  comments: any[];
+
+  comments: {
+    id: number;
+    comment: string;
+    created_at: string;
+    user: {
+      id: number;
+      name: string;
+      user_image: string | null;
+    };
+  }[];
+
   is_favorited: boolean;
   favorites_count: number;
-}
+};
 
 export const useItemDetailSWR = (itemId: number | null) => {
   const { apiClient, isAuthenticated, isReady } = useAuth();

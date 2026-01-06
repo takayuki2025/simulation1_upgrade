@@ -12,7 +12,7 @@ use App\Modules\User\Application\UseCase\UpdateProfileImageUseCase;
 
 use App\Modules\User\Application\Dto\CreateProfileInput;
 use App\Modules\User\Application\Dto\UpdateProfileInput;
-
+use App\Modules\User\Application\UseCase\MypageUseCase;
 use App\Modules\User\Domain\Exception\ProfileAlreadyExistsException;
 use App\Modules\User\Domain\Exception\ProfileNotFoundException;
 
@@ -115,10 +115,25 @@ final class MypageController extends Controller
         }
     }
 
-    public function sellItems(Request $request)
-    {
-        return response()->json([
-            'items' => [],
-        ]);
-    }
+    public function sellItems(
+    Request $request,
+    MypageUseCase $useCase
+) {
+    $userId = (int) $request->user()->id;
+
+    return response()->json([
+        'items' => $useCase->listSellItems($userId),
+    ]);
+}
+
+public function boughtItems(
+    Request $request,
+    MypageUseCase $useCase
+) {
+    $userId = (int) $request->user()->id;
+
+    return response()->json([
+        'items' => $useCase->listBoughtItems($userId),
+    ]);
+}
 }

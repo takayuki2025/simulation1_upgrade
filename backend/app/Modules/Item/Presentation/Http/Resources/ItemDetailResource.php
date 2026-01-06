@@ -4,31 +4,30 @@ namespace App\Modules\Item\Presentation\Http\Resources;
 
 final class ItemDetailResource
 {
-    /**
-     * @param array $row ItemReadRepository::findWithDisplayEntities の戻り値
-     */
     public static function fromReadModel(array $row): array
     {
         return [
-            'id'        => (int) $row['id'],
-            'name'      => $row['name'],
-            'price'     => (int) $row['price'],
-            'explain'   => $row['explain'] ?? null,
-            'remain'    => (int) ($row['remain'] ?? 0),
-            'user_id'   => (int) ($row['user_id'] ?? 0),
-            'shop_id'   => (int) ($row['shop_id'] ?? 0),
+            'id'         => $row['id'],
+            'shop_id'    => $row['shop_id'],
+            'name'       => $row['name'],
+            'price'      => $row['price'],
+            'explain'    => $row['explain'],
+            'remain'     => $row['remain'],
 
-            // 正規化結果
-            'brands'        => $row['brands'] ?? [],
-            'brand_primary' => $row['brand_primary'] ?? null,
-            'condition'     => $row['condition'] ?? null,
-            'color'         => $row['color'] ?? null,
+            // brand / condition / color
+            'brands'         => $row['brands'] ?? [],
+            'brand_primary'  => $row['brand_primary'] ?? null,
+            'condition'      => $row['condition'] ?? null,
+            'color'          => $row['color'] ?? null,
 
-            // tags
+            // categories
+            'categories' => $row['categories'] ?? [],
+
+            // tags（将来 UI 拡張用・そのまま返す）
             'tags' => $row['tags'] ?? [],
 
-            // image
-            'item_image' => $row['item_image'] ?? null,
+            // image（生パス）
+            'item_image' => $row['item_image'],
         ];
     }
 }

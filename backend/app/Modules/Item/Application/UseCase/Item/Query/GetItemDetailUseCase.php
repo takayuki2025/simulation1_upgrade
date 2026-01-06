@@ -3,16 +3,15 @@
 namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
-use App\Modules\Item\Infrastructure\Persistence\Query\ItemReadRepository;
+use App\Modules\Item\Application\Service\ItemDetailReadService;
 use App\Modules\Reaction\Application\UseCase\Query\IsFavoritedUseCase;
 use App\Modules\Reaction\Application\UseCase\Query\CountFavoritesUseCase;
 use App\Modules\Comment\Application\UseCase\Query\ListItemCommentsUseCase;
-use RuntimeException;
 
 final class GetItemDetailUseCase
 {
     public function __construct(
-        private readonly ItemReadRepository $itemReadRepository,
+        private readonly ItemDetailReadService $itemReader,
         private readonly IsFavoritedUseCase $isFavorited,
         private readonly CountFavoritesUseCase $countFavorites,
         private readonly ListItemCommentsUseCase $listComments,
@@ -24,18 +23,13 @@ final class GetItemDetailUseCase
         ?int $viewerUserId
     ): ItemDetailOutputDto {
 
-        // 🔍 ReadModel
-        $itemRow = $this->itemReadRepository
-            ->findWithDisplayEntities($itemId);
-
-        if (!$itemRow) {
-            throw new RuntimeException('Item not found');
-        }
+        // 🔍 Detail ReadModel（NotFound は Service に委譲）
+        $item = $this->itemReader->get($itemId);
 
         // 💬 コメント
         $comments = $this->listComments->execute($itemId);
 
-        // ❤️ お気に入り（★ここが重要）
+        // ❤️ お気に入り
         $isFavorited = $viewerUserId !== null
             ? $this->isFavorited->execute($viewerUserId, $itemId)
             : false;
@@ -44,7 +38,7 @@ final class GetItemDetailUseCase
         $favoritesCount = $this->countFavorites->execute($itemId);
 
         return new ItemDetailOutputDto(
-            item: $itemRow,
+            item: $item,
             comments: $comments,
             isFavorited: $isFavorited,
             favoritesCount: $favoritesCount,

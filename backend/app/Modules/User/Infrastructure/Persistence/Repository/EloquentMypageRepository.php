@@ -16,22 +16,43 @@ final class EloquentMypageRepository implements MypageRepository
      * ✔ SHOP_MANAGED（Seeder商品）は一切出さない
      */
     public function listSellItems(int $userId): array
-    {
-        return Item::query()
-            ->where('item_origin', 'USER_PERSONAL')
-            ->where('created_by_user_id', $userId)
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn ($item) => [
-                'row_id'     => 'sell-' . $item->id,
-                'item_id'    => $item->id,
-                'name'       => $item->name,
-                'item_image' => $item->item_image,
-                'price'      => $item->price,
-            ])
-            ->toArray();
-    }
+{
+    // ユーザーが関与しているショップID一覧
+    $shopIds = DB::table('role_user')
+        ->where('user_id', $userId)
+        ->pluck('shop_id')
+        ->filter()
+        ->toArray();
 
+    return Item::query()
+        ->where(function ($q) use ($userId, $shopIds) {
+            // 個人出品
+            $q->where(function ($q) use ($userId) {
+                $q->where('item_origin', 'user_personal')
+                  ->where('created_by_user_id', $userId);
+            });
+
+            // ショップ出品（関与ショップ）
+            if (!empty($shopIds)) {
+                $q->orWhere(function ($q) use ($shopIds) {
+                    $q->where('item_origin', 'shop_managed')
+                      ->whereIn('shop_id', $shopIds);
+                });
+            }
+        })
+        ->orderByDesc('id')
+        ->get()
+        ->map(fn ($item) => [
+            'row_id'     => 'sell-' . $item->id,
+            'item_id'    => $item->id,
+            'name'       => $item->name,
+            'item_image' => $item->item_image,
+            'price'      => $item->price,
+            'item_origin'=> $item->item_origin,
+            'shop_id'    => $item->shop_id,
+        ])
+        ->toArray();
+}
     /**
      * 購入した商品一覧
      * ※ ここは Order 側が完成するまで既存ロジック維持でOK
