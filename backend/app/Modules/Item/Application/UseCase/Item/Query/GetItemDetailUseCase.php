@@ -4,9 +4,9 @@ namespace App\Modules\Item\Application\UseCase\Item\Query;
 
 use App\Modules\Item\Application\Dto\Item\ItemDetailOutputDto;
 use App\Modules\Item\Infrastructure\Persistence\Query\ItemReadRepository;
-use App\Modules\Reaction\Application\UseCase\Favorite\IsFavoritedUseCase;
-use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
-use App\Modules\Comment\Application\UseCase\ListItemCommentsUseCase;
+use App\Modules\Reaction\Application\UseCase\Query\IsFavoritedUseCase;
+use App\Modules\Reaction\Application\UseCase\Query\CountFavoritesUseCase;
+use App\Modules\Comment\Application\UseCase\Query\ListItemCommentsUseCase;
 use RuntimeException;
 
 final class GetItemDetailUseCase

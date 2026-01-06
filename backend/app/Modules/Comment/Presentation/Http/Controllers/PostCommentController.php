@@ -4,7 +4,7 @@ namespace App\Modules\Comment\Presentation\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use App\Modules\Comment\Application\UseCase\PostCommentUseCase;
+use App\Modules\Comment\Application\UseCase\Command\PostCommentUseCase;
 
 final class PostCommentController extends Controller
 {

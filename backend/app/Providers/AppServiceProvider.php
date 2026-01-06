@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Event;
 // NOTE: UserRepositoryInterface は App\Domain\Repository\UserRepository に置き換えられていると想定
 use App\Domain\Repository\OrderHistoryRepository;
 use App\Domain\Repository\CommentRepository;
-// use App\Domain\Repository\FavoriteRepository;
+
 use App\Domain\Repository\ItemRepositoryInterface;
 use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
 use App\Modules\Item\Domain\Repository\ItemRepository;//⚪️

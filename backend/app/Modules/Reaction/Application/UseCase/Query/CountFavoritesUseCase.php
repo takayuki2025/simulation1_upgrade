@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Modules\Reaction\Application\UseCase\Favorite;
+
+namespace App\Modules\Reaction\Application\UseCase\Query;
+
 
 use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
 use App\Modules\Reaction\Domain\ValueObject\FavoriteTargetId;

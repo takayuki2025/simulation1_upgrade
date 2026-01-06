@@ -4,10 +4,11 @@ namespace App\Modules\Reaction\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Modules\Reaction\Application\UseCase\Favorite\AddFavoriteUseCase;
-use App\Modules\Reaction\Application\UseCase\Favorite\RemoveFavoriteUseCase;
-use App\Modules\Reaction\Application\UseCase\Favorite\ListFavoriteUseCase;
-use App\Modules\Reaction\Application\UseCase\Favorite\CountFavoritesUseCase;
+use App\Modules\Reaction\Application\UseCase\Command\AddFavoriteUseCase;
+use App\Modules\Reaction\Application\UseCase\Command\RemoveFavoriteUseCase;
+use App\Modules\Reaction\Application\UseCase\Query\IsFavoritedUseCase;
+use App\Modules\Reaction\Application\UseCase\Query\ListFavoriteUseCase;
+use App\Modules\Reaction\Application\UseCase\Query\CountFavoritesUseCase;
 
 final class FavoriteController extends Controller
 {

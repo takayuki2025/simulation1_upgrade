@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Comment\Application\UseCase;
+namespace App\Modules\Comment\Application\UseCase\Query;
 
 use App\Modules\Comment\Application\Dto\CommentViewDto;
 use App\Modules\Comment\Domain\Repository\CommentRepository;

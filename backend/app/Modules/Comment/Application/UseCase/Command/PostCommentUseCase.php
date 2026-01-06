@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Comment\Application\UseCase;
+namespace App\Modules\Comment\Application\UseCase\Command;
 
 use App\Modules\Comment\Domain\Repository\CommentRepository;
 use App\Modules\Comment\Domain\Entity\Comment;

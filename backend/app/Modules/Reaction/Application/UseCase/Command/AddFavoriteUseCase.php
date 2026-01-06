@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Modules\Reaction\Application\UseCase\Favorite;
+
+namespace App\Modules\Reaction\Application\UseCase\Command;
+
 
 use App\Modules\Reaction\Domain\Entity\Favorite;
 use App\Modules\Reaction\Domain\Repository\FavoriteRepository;
